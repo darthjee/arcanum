@@ -96,4 +96,14 @@ End with:
 Does this approach look correct? Anything to add or correct?
 ```
 
-Wait for the user's response. If the user requests changes or additions, update the plan file(s) accordingly and present the overview again. Repeat until the user confirms.
+Wait for the user's response. During this interaction:
+
+- If the user requests changes or additions, update the plan file(s) accordingly and present the overview again.
+- If the user asks a question about the plan:
+  - If the answer is already covered in the plan, answer it directly.
+  - If the answer is **not yet in the plan and is not known**, say so honestly — do not speculate or invent an answer. Example: *"That's not defined in the plan yet — I don't know."*
+  - The user may then either:
+    - **Provide the answer or specification directly** — incorporate it into the plan and confirm the update.
+    - **Ask the agent to research it** — explore the codebase or relevant context to reach a conclusion, then present the finding to the user before updating the plan.
+
+Repeat until the user confirms the plan is complete.
