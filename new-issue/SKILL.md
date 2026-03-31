@@ -46,7 +46,9 @@ Wait for the user's response before continuing.
 
 ## Step 5 — Write the issue file
 
-Based on the user's description, write a structured issue file at `<issues_folder>/<filename>`. Model the structure after this template (adapt sections to what makes sense for the described issue):
+Based on the user's description, write a structured issue file at `<issues_folder>/<filename>`. **Always write the file content in English**, regardless of the language the user used to describe the issue. If the description was given in another language, translate it to English before writing.
+
+Model the structure after this template (adapt sections to what makes sense for the described issue):
 
 ```markdown
 # Issue: <Title>
