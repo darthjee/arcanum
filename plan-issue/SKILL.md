@@ -32,28 +32,7 @@ Based on the issue description, explore the relevant parts of the codebase to un
 - Existing patterns, conventions, and structure
 - Dependencies or constraints
 
-## Step 5 — Identify open questions
-
-Before writing the plan, determine if there is anything unclear or ambiguous that the user must decide. If so, ask all questions at once in a numbered list. Wait for the user's answers before continuing.
-
-If everything is clear, skip this step.
-
-## Step 6 — Present an overview
-
-Present a high-level overview of the plan to the user. Include:
-- A summary of what will be implemented
-- The main steps or phases
-- Any notable design decisions or trade-offs
-
-End with:
-
-```
-Does this approach look correct? Any adjustments before I write the plan?
-```
-
-Wait for the user's confirmation or corrections. If the user requests changes, update your understanding and present the overview again. Repeat until the user confirms.
-
-## Step 7 — Determine the plan location
+## Step 5 — Determine the plan location
 
 The plan folder name follows the same base name as the issue file (without the `.md` extension). For example:
 - Issue file: `99_add_tables.md`
@@ -62,7 +41,7 @@ The plan folder name follows the same base name as the issue file (without the `
 
 If the plan is complex, it may be split into multiple files inside the same folder (e.g., `plan.md`, `plan_api.md`, `plan_database.md`). Use your judgment based on the scope of the issue.
 
-## Step 8 — Write the plan
+## Step 6 — Write the initial plan
 
 Write the plan file(s) in English, regardless of the language used in the issue or by the user.
 
@@ -96,12 +75,23 @@ Model `plan.md` after this structure (adapt sections as needed):
 
 If splitting into multiple files, `plan.md` should serve as the index with links to the other files.
 
-## Step 9 — Confirm
+## Step 7 — Clarify open questions
 
-After writing the file(s), inform the user of the exact paths created and give a one-paragraph summary of the plan. Ask:
+After writing the initial plan, determine if there is anything unclear or ambiguous that the user must decide. If so, ask all questions at once in a numbered list. Wait for the user's answers, then update the plan file with the clarified information.
+
+If everything is clear, skip this step.
+
+## Step 8 — Present an overview
+
+Present a high-level overview of the plan to the user. Include:
+- A summary of what will be implemented
+- The main steps or phases
+- Any notable design decisions or trade-offs
+
+End with:
 
 ```
-Plan written. Anything to adjust?
+Does this approach look correct? Any adjustments?
 ```
 
-If the user requests changes, update the files and ask again. Repeat until done.
+Wait for the user's confirmation or corrections. If the user requests changes, update the plan file and present the overview again. Repeat until the user confirms.
