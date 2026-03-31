@@ -41,6 +41,8 @@ The plan folder name follows the same base name as the issue file (without the `
 
 If the plan is complex, it may be split into multiple files inside the same folder (e.g., `plan.md`, `plan_api.md`, `plan_database.md`). Use your judgment based on the scope of the issue.
 
+**Check if the plan folder or `plan.md` already exists.** If it does, read the existing plan file(s) and skip directly to Step 8 — present the existing plan to the user and ask if they want to add or correct anything.
+
 ## Step 6 — Write the initial plan
 
 Write the plan file(s) in English, regardless of the language used in the issue or by the user.
@@ -91,7 +93,7 @@ Present a high-level overview of the plan to the user. Include:
 End with:
 
 ```
-Does this approach look correct? Any adjustments?
+Does this approach look correct? Anything to add or correct?
 ```
 
-Wait for the user's confirmation or corrections. If the user requests changes, update the plan file and present the overview again. Repeat until the user confirms.
+Wait for the user's response. If the user requests changes or additions, update the plan file(s) accordingly and present the overview again. Repeat until the user confirms.
