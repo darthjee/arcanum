@@ -17,6 +17,10 @@ Use whatever paths are documented there.
 
 Read [file_definition.md](file_definition.md) and follow the instructions there to parse the ID, locate the issue file, and find the corresponding plan.
 
-## Step 3 — Open the PR
+## Step 3 — Initialize the process log
+
+Read [process_log.md](process_log.md) and follow the instructions there to create the `prs` log folder and begin writing the log files. Keep the log updated throughout all subsequent steps.
+
+## Step 4 — Open the PR
 
 Read [open_pr.md](open_pr.md) and follow the instructions there.
