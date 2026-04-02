@@ -1,0 +1,22 @@
+---
+name: fix-issue
+description: Opens a PR to fix a given issue. Reads the issue and plan files, presents a summary, and opens a PR upon confirmation. Usage: /fix-issue 5, /fix-issue 05, /fix-issue #5, /fix-issue #05
+---
+
+You are helping the user open a pull request to fix an existing issue. Follow the steps below precisely and in order.
+
+## Step 1 — Find the issues and plans folders
+
+Read `AGENTS.md` (and `CLAUDE.md` if needed) in the current working directory to locate:
+- The **issues folder** (e.g., `docs/issues/`, `docs/agents/issues/`)
+- The **plans folder** (e.g., `docs/plans/`, `docs/agents/plans/`)
+
+Use whatever paths are documented there.
+
+## Step 2 — Locate the issue and plan files
+
+Read [file_definition.md](file_definition.md) and follow the instructions there to parse the ID, locate the issue file, and find the corresponding plan.
+
+## Step 3 — Open the PR
+
+Read [open_pr.md](open_pr.md) and follow the instructions there.
