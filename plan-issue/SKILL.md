@@ -13,97 +13,10 @@ Read `AGENTS.md` (and `CLAUDE.md` if needed) in the current working directory to
 
 Use whatever paths are documented there.
 
-## Step 2 — Parse the issue ID
+## Step 2 — Define the issue and plan files
 
-The argument may be in one of these formats:
-- `99` → ID is `99`
-- `#99` → strip the `#`, ID is `99`
+Read [file_definition.md](file_definition.md) and follow the instructions there to parse the ID, locate the issue file, and determine the plan location.
 
-## Step 3 — Locate the issue file
+## Step 3 — Write and confirm the plan
 
-List the files in the issues folder and find the one whose name starts with the given ID (e.g., `99_add_tables.md`). Read that file to understand the issue.
-
-If no matching file is found, inform the user and stop.
-
-## Step 4 — Analyze the codebase
-
-Based on the issue description, explore the relevant parts of the codebase to understand:
-- What code is affected or needs to be created
-- Existing patterns, conventions, and structure
-- Dependencies or constraints
-
-## Step 5 — Determine the plan location
-
-The plan folder name follows the same base name as the issue file (without the `.md` extension). For example:
-- Issue file: `99_add_tables.md`
-- Plan folder: `<plans_folder>/99_add_tables/`
-- Main plan file: `<plans_folder>/99_add_tables/plan.md`
-
-If the plan is complex, it may be split into multiple files inside the same folder (e.g., `plan.md`, `plan_api.md`, `plan_database.md`). Use your judgment based on the scope of the issue.
-
-**Check if the plan folder or `plan.md` already exists.** If it does, read the existing plan file(s) and skip directly to Step 8 — present the existing plan to the user and ask if they want to add or correct anything.
-
-## Step 6 — Write the initial plan
-
-Write the plan file(s) in English, regardless of the language used in the issue or by the user.
-
-Model `plan.md` after this structure (adapt sections as needed):
-
-```markdown
-# Plan: <Issue Title>
-
-## Overview
-<Brief description of what this plan covers>
-
-## Context
-<Relevant background from the issue and codebase analysis>
-
-## Implementation Steps
-
-### Step 1 — <Name>
-<Description of what to do and why>
-
-### Step 2 — <Name>
-<Description of what to do and why>
-
-...
-
-## Files to Change
-- `path/to/file.ext` — <what changes and why>
-
-## Notes
-- <Any caveats, risks, or follow-up considerations>
-```
-
-If splitting into multiple files, `plan.md` should serve as the index with links to the other files.
-
-## Step 7 — Clarify open questions
-
-After writing the initial plan, determine if there is anything unclear or ambiguous that the user must decide. If so, ask all questions at once in a numbered list. Wait for the user's answers, then update the plan file with the clarified information.
-
-If everything is clear, skip this step.
-
-## Step 8 — Present an overview
-
-Present a high-level overview of the plan to the user. Include:
-- A summary of what will be implemented
-- The main steps or phases
-- Any notable design decisions or trade-offs
-
-End with:
-
-```
-Does this approach look correct? Anything to add or correct?
-```
-
-Wait for the user's response. During this interaction:
-
-- If the user requests changes or additions, update the plan file(s) accordingly and present the overview again.
-- If the user asks a question about the plan:
-  - If the answer is already covered in the plan, answer it directly.
-  - If the answer is **not yet in the plan and is not known**, say so honestly — do not speculate or invent an answer. Example: *"That's not defined in the plan yet — I don't know."*
-  - The user may then either:
-    - **Provide the answer or specification directly** — incorporate it into the plan and confirm the update.
-    - **Ask the agent to research it** — explore the codebase or relevant context to reach a conclusion, then present the finding to the user before updating the plan.
-
-Repeat until the user confirms the plan is complete.
+Read [write_and_confirm.md](write_and_confirm.md) and follow the instructions there.
