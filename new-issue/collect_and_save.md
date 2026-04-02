@@ -54,3 +54,14 @@ Then loop:
 - If the user says no, gives corrections, or adds details: update the file with the new information, then ask `Did I comprehend the issue?` again.
 - If the response is partial or unclear, prompt: `Tell me more`
 - Repeat until the user confirms.
+
+## Ask about planning
+
+After the user confirms the issue, ask exactly:
+
+```
+Would you like to start planning this issue?
+```
+
+- If the user says yes (or similar affirmative): invoke the `/plan-issue` skill passing the issue ID (e.g. `/plan-issue <id>`).
+- If the user says no (or similar negative): finish.
