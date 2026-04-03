@@ -39,6 +39,10 @@ Then stop.
 
 After the scenario completes successfully, read and follow [setup_docs_structure.md](setup_docs_structure.md).
 
-## Step 4 — Setup contributing guide
+## Step 4 — Setup folder structure document
 
-After the documentation structure is created, read and follow [setup_contributing.md](setup_contributing.md).
+After the documentation structure is created, read and follow [setup_folder_structure.md](setup_folder_structure.md).
+
+## Step 5 — Setup contributing guide
+
+After the folder structure document is created, read and follow [setup_contributing.md](setup_contributing.md).

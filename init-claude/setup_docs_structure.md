@@ -43,6 +43,7 @@ All project documentation lives under [`docs/agents/`](docs/agents/):
 
 | File | Contents |
 |------|----------|
+| [Folder Structure](docs/agents/folder-structure.md) | Top-level directory layout and the role of each folder. |
 | [Architecture](docs/agents/architecture.md) | Source layout, modules, code style, and implementation guidelines. |
 | [Flow](docs/agents/flow.md) | Main runtime flow of the application. |
 | [Plans](docs/agents/plans/) | Implementation plans for ongoing or upcoming features. |
@@ -75,6 +76,7 @@ Tell the user:
 
 ```
 Documentation structure created under docs/agents/:
+- docs/agents/folder-structure.md
 - docs/agents/architecture.md
 - docs/agents/flow.md
 - docs/agents/issues/   (ready for issue files)
