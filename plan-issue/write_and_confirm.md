@@ -71,3 +71,14 @@ Wait for the user's response. During this interaction:
     - **Ask the agent to research it** — explore the codebase or relevant context to reach a conclusion, then present the finding to the user before updating the plan.
 
 Repeat until the user confirms the plan is complete.
+
+## Offer to open the PR
+
+Once the plan is confirmed, ask:
+
+```
+Would you like to proceed and open a PR to fix this issue now?
+```
+
+- If the user confirms (yes, sure, go ahead, or similar affirmative): invoke the `/fix-issue <id>` skill, where `<id>` is the issue ID parsed in Step 2.
+- If the user declines: acknowledge and stop.
