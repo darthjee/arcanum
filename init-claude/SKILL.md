@@ -8,6 +8,7 @@ You are helping the user initialize or update the Claude and Copilot configurati
 ## Step 1 — Detect existing files
 
 Check which of these files exist in the current working directory:
+- `AGENTS.md`
 - `CLAUDE.md`
 - `.github/copilot-instructions.md`
 
@@ -15,12 +16,16 @@ Check which of these files exist in the current working directory:
 
 Based on what exists, read and follow the appropriate scenario file:
 
-| CLAUDE.md | copilot-instructions.md | Scenario file        |
-|-----------|-------------------------|----------------------|
-| absent    | absent                  | [scenario_new.md](scenario_new.md) |
-| present   | absent                  | *(not yet defined)*  |
-| absent    | present                 | *(not yet defined)*  |
-| present   | present                 | *(not yet defined)*  |
+| AGENTS.md | CLAUDE.md | copilot-instructions.md | Scenario file        |
+|-----------|-----------|-------------------------|----------------------|
+| absent    | absent    | absent                  | [scenario_new.md](scenario_new.md) |
+| absent    | present   | absent                  | [scenario_claude_only.md](scenario_claude_only.md) |
+| absent    | absent    | present                 | [scenario_copilot_only.md](scenario_copilot_only.md) |
+| present   | absent    | absent                  | [scenario_agents_only.md](scenario_agents_only.md) |
+| absent    | present   | present                 | [scenario_both_no_agents.md](scenario_both_no_agents.md) |
+| present   | present   | absent                  | [scenario_agents_claude.md](scenario_agents_claude.md) |
+| present   | absent    | present                 | [scenario_agents_copilot.md](scenario_agents_copilot.md) |
+| present   | present   | present                 | [scenario_all_present.md](scenario_all_present.md) |
 
 If the detected scenario is marked as "not yet defined", inform the user:
 
