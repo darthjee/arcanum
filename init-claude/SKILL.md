@@ -38,3 +38,7 @@ Then stop.
 ## Step 3 — Setup documentation structure
 
 After the scenario completes successfully, read and follow [setup_docs_structure.md](setup_docs_structure.md).
+
+## Step 4 — Setup contributing guide
+
+After the documentation structure is created, read and follow [setup_contributing.md](setup_contributing.md).
