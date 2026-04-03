@@ -5,7 +5,11 @@ description: Opens a PR to fix a given issue. Reads the issue and plan files, pr
 
 You are helping the user open a pull request to fix an existing issue. Follow the steps below precisely and in order.
 
-## Step 1 — Find the issues and plans folders
+## Step 1 — Select the base branch
+
+Read [base_branch.md](base_branch.md) and follow the instructions there to determine the base branch and switch to it if needed. If the user declines to switch branches, stop here.
+
+## Step 2 — Find the issues and plans folders
 
 Read `AGENTS.md` (and `CLAUDE.md` if needed) in the current working directory to locate:
 - The **issues folder** (e.g., `docs/issues/`, `docs/agents/issues/`)
@@ -13,14 +17,14 @@ Read `AGENTS.md` (and `CLAUDE.md` if needed) in the current working directory to
 
 Use whatever paths are documented there.
 
-## Step 2 — Locate the issue and plan files
+## Step 3 — Locate the issue and plan files
 
 Read [file_definition.md](file_definition.md) and follow the instructions there to parse the ID, locate the issue file, and find the corresponding plan.
 
-## Step 3 — Initialize the process log
+## Step 4 — Initialize the process log
 
 Read [process_log.md](process_log.md) and follow the instructions there to create the `prs` log folder and begin writing the log files. Keep the log updated throughout all subsequent steps.
 
-## Step 4 — Open the PR
+## Step 5 — Open the PR
 
 Read [open_pr.md](open_pr.md) and follow the instructions there.
