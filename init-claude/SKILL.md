@@ -34,3 +34,7 @@ This scenario is not yet implemented. Please open an issue or contribute a scena
 ```
 
 Then stop.
+
+## Step 3 — Setup documentation structure
+
+After the scenario completes successfully, read and follow [setup_docs_structure.md](setup_docs_structure.md).
