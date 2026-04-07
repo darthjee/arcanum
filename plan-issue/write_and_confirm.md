@@ -6,6 +6,7 @@ Based on the issue description, explore the relevant parts of the codebase to un
 - What code is affected or needs to be created
 - Existing patterns, conventions, and structure
 - Dependencies or constraints
+- Which top-level folders will contain changes — then read `.circleci/config.yml` (if present) to identify which CI jobs apply to those folders and what local commands run them
 
 ## Write the initial plan
 
@@ -34,6 +35,10 @@ Model `plan.md` after this structure (adapt sections as needed):
 
 ## Files to Change
 - `path/to/file.ext` — <what changes and why>
+
+## CI Checks
+Before opening a PR, run the following checks for the folders being modified:
+- `<folder>`: `<local command>` (CircleCI job: `<job name>`)
 
 ## Notes
 - <Any caveats, risks, or follow-up considerations>

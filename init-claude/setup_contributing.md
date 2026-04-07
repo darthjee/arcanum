@@ -9,6 +9,7 @@ Collect context from the following sources, in order:
 1. **Existing file:** If `docs/agents/contributing.md` already exists, read it. Its content is the baseline — preserve any project-specific rules already documented.
 2. **README.md:** If present, read it. It may mention testing commands, linting tools, or contribution conventions.
 3. **Project files:** Look for `package.json`, `Makefile`, `Gemfile`, `pyproject.toml`, etc. to determine the actual test and lint commands.
+4. **`.circleci/config.yml`:** If present, read it to extract the folder-to-job mapping — which jobs run for which top-level folders (via path filters or job names). Extract the local commands for each job (e.g. `cd <folder> && yarn coverage && yarn lint`). This information will be used to generate a concrete CI Checks table.
 
 ## Step 2 — Determine the project language
 
@@ -36,6 +37,7 @@ Produce a draft of `docs/agents/contributing.md` based on the sample, with the f
 - Preserve all sections and their intent — do not remove or summarise guidelines
 - Remove the entrypoints table if not applicable, or update it to reflect the project's actual entrypoints if known
 - If the existing file already has project-specific rules not in the sample, include them
+- **CI Checks table:** If `.circleci/config.yml` was found in Step 1, replace the dynamic instructions in the CI Checks section with a concrete table mapping each modified folder to its CircleCI job names and local commands to run. If the config was not found, keep the dynamic instructions as-is.
 
 ## Step 5 — Present draft and ask for confirmation
 

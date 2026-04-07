@@ -48,15 +48,17 @@ A PR is considered complete when:
 
 ### CI Checks
 
-Before a PR is considered complete, all CI checks relevant to the modified parts of the project must pass locally. Run only the checks that correspond to the folders you changed:
+Before a PR is considered complete, all CI checks relevant to the modified parts of the project must pass locally.
 
-| Modified folder | CircleCI jobs | Local commands to run |
-|-----------------|---------------|-----------------------|
-| `source/` | `jasmine`, `checks` | `cd source && yarn coverage && yarn lint && yarn report` |
-| `dev/app/` | `jasmine-dev`, `checks-dev` | `cd dev/app && yarn coverage && yarn lint && yarn report` |
-| `frontend/` | `jasmine-frontend`, `checks-frontend` | `cd frontend && yarn coverage && yarn lint && yarn report` |
+To determine which checks to run:
 
-If a new container or application folder is added in the future, its corresponding test and check jobs must be run before merging any changes to that folder.
+1. Identify which top-level folders contain modified files.
+2. Read `.circleci/config.yml` to find which jobs are triggered for those folders (look for path filters, `only` rules, or job names that reference those folders).
+3. Run the corresponding local commands for each relevant job.
+
+Run only the checks that correspond to the folders you changed. If a new container or application folder is added in the future, its corresponding test and check jobs must be included before merging changes to that folder.
+
+This same process must be followed when **planning how to resolve an issue**: include a final step in the plan that identifies the affected folders and lists the CI commands to run before opening a PR.
 
 ## Code Organization
 
