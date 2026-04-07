@@ -46,6 +46,18 @@ A PR is considered complete when:
     ```
   - This requirement applies primarily to source code. For specs, refactor only if there is excessive duplication.
 
+### CI Checks
+
+Before a PR is considered complete, all CI checks relevant to the modified parts of the project must pass locally. Run only the checks that correspond to the folders you changed:
+
+| Modified folder | CircleCI jobs | Local commands to run |
+|-----------------|---------------|-----------------------|
+| `source/` | `jasmine`, `checks` | `cd source && yarn coverage && yarn lint && yarn report` |
+| `dev/app/` | `jasmine-dev`, `checks-dev` | `cd dev/app && yarn coverage && yarn lint && yarn report` |
+| `frontend/` | `jasmine-frontend`, `checks-frontend` | `cd frontend && yarn coverage && yarn lint && yarn report` |
+
+If a new container or application folder is added in the future, its corresponding test and check jobs must be run before merging any changes to that folder.
+
 ## Code Organization
 
 ### File Responsibility: Class Declarers vs Scripts
@@ -57,9 +69,9 @@ The only exceptions are **entrypoints**:
 | Application | Entrypoint |
 |-------------|-----------|
 | Main app (`source/`) | `source/bin/navi.js` |
-| Dev app (`dev/`) | `dev/server.js` |
+| Dev app (`dev/app/`) | `dev/app/server.js` |
 
-`dev/app.js` is the application module (exports the configured Express app) and is imported by both `server.js` and the test suite. It is not a script.
+`dev/app/app.js` is the application module (exports the configured Express app) and is imported by both `server.js` and the test suite. It is not a script.
 
 *Example:*
 ```js
@@ -91,8 +103,37 @@ Files that define and export a class must use **CamelCase** naming, matching the
 This applies to both source files and their corresponding spec files:
 - `Router.js` → spec: `Router_spec.js`
 - `DataNavigator.js` → spec: `DataNavigator_spec.js`
-- `Router.js` â spec: `Router_spec.js`
+- `Router.js` â spec: `Router_spec.js`
 Non-class files (e.g., utility modules that export functions) use lowercase or camelCase at the author's discretion.
+
+### Method Order: Public Before Private
+
+Within a class, **public methods must be declared before private methods**. Private methods (prefixed with `#`) serve as implementation helpers and should appear at the end of the class body.
+
+*Example:*
+```js
+// Good: public methods first, private methods last
+class Worker {
+  run() {
+    this.#prepare();
+    this.#execute();
+  }
+
+  getStatus() { ... }
+
+  #prepare() { ... }
+  #execute() { ... }
+}
+
+// Bad: private methods mixed in with or before public methods
+class Worker {
+  #prepare() { ... }
+
+  run() { ... }
+
+  #execute() { ... }
+}
+```
 
 ## Dependency Injection
 
