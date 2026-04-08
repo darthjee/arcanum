@@ -17,6 +17,10 @@ Use whatever paths are documented there.
 
 Read [file_definition.md](file_definition.md) and follow the instructions there to parse the ID, locate the issue file, and determine the plan location.
 
-## Step 3 — Write and confirm the plan
+## Step 3 — Identify the project folder
+
+Read [identify_project_folder.md](identify_project_folder.md) and follow the instructions there to determine which folder(s) or module(s) of the project this issue involves, and confirm with the user.
+
+## Step 4 — Write and confirm the plan
 
 Read [write_and_confirm.md](write_and_confirm.md) and follow the instructions there.
