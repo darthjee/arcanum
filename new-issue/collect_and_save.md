@@ -2,7 +2,9 @@
 
 ## Ask for a description
 
-Say exactly:
+If the issue content was **pre-populated from GitHub** (Scenario C2 in [extract_id_and_name.md](extract_id_and_name.md)), skip this step and go directly to "Write the issue file" using the fetched body as the description.
+
+Otherwise, say exactly:
 
 ```
 Describe me the issue
@@ -12,7 +14,7 @@ Wait for the user's response before continuing.
 
 ## Write the issue file
 
-Based on the user's description, write a structured issue file at `<issues_folder>/<filename>`. **Always write the file content in English**, regardless of the language the user used to describe the issue. If the description was given in another language, translate it to English before writing.
+Based on the user's description (or the GitHub body), write a structured issue file at `<issues_folder>/<filename>`. **Always write the file content in English**, regardless of the language the user used to describe the issue. If the description was given in another language, translate it to English before writing.
 
 Model the structure after this template (adapt sections to what makes sense for the described issue):
 
