@@ -57,26 +57,18 @@ Then loop:
 - If the response is partial or unclear, prompt: `Tell me more`
 - Repeat until the user confirms.
 
-## Ask about updating GitHub issue
+## Update GitHub issue
 
-After the user confirms the issue, ask exactly:
+After the user confirms the issue, automatically run:
 
 ```
-Would you like to update the GitHub issue #<id> with this description?
+gh issue edit <id> --title "<Title>" --body "<description>"
 ```
 
-- If the user says yes (or similar affirmative): use `gh issue edit <id> --title "<Title>" --body "<description>"` to update the GitHub issue title and body with the content from the saved file. Then proceed to the next step.
-- If the user says no (or similar negative): proceed to the next step.
+to update the GitHub issue title and body with the content from the saved file.
 
 > Note: If the ID is an auto-assigned `X##` placeholder, skip this step entirely.
 
-## Ask about planning
+## Plan the issue
 
-After handling the GitHub update, ask exactly:
-
-```
-Would you like to start planning this issue?
-```
-
-- If the user says yes (or similar affirmative): invoke the `/plan-issue` skill passing the issue ID (e.g. `/plan-issue <id>`).
-- If the user says no (or similar negative): finish.
+After handling the GitHub update, automatically invoke the `/plan-issue` skill passing the issue ID (e.g. `/plan-issue <id>`).
