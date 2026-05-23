@@ -40,7 +40,13 @@ Model the structure after this template (adapt sections to what makes sense for 
 See issue for details: https://<domain>/<owner>/<repo>/issues/<id>
 ```
 
-Use only sections that are relevant. Replace `<domain>` and `<owner>/<repo>` with the `DOMAIN` and `REPO` values from the fetch script output (or run `git remote get-url origin` to derive them). If the ID is an auto-assigned `X##` placeholder, omit the "See issue for details" line.
+Use only sections that are relevant. If `DOMAIN` and `REPO` are not already known from a prior `fetch` call, run:
+
+```bash
+~/.claude-darthjee/skills/new-issue/scripts/github.sh info
+```
+
+to obtain them. If the ID is an auto-assigned `X##` placeholder, omit the "See issue for details" line entirely.
 
 ## Confirm and iterate
 

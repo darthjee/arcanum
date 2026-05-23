@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # GitHub operations script
 # Usage: github.sh <command> [args]
-#   fetch <id>              Fetch a GitHub issue and save to docs/agents/issues/
-#   update <id> <title> <file>  Update a GitHub issue title and body from a file
+#   info                         Print DOMAIN and REPO from git origin
+#   fetch <id>                   Fetch a GitHub issue and save to docs/agents/issues/
+#   update <id> <title> <file>   Update a GitHub issue title and body from a file
 
 set -euo pipefail
 
@@ -126,12 +127,20 @@ cmd_update() {
   echo "Updated issue #$id on $repo_ref"
 }
 
+cmd_info() {
+  _load_origin
+  echo "DOMAIN=$_ORIGIN_DOMAIN"
+  echo "REPO=$_ORIGIN_REPO_PATH"
+}
+
 case "${1:-}" in
+  info)   cmd_info ;;
   fetch)  shift; cmd_fetch  "$@" ;;
   update) shift; cmd_update "$@" ;;
   *)
     echo "Usage: $0 <command> [args]" >&2
     echo "Commands:" >&2
+    echo "  info                         Print DOMAIN and REPO from git origin" >&2
     echo "  fetch <id>                   Fetch a GitHub issue and save to docs/agents/issues/" >&2
     echo "  update <id> <title> <file>   Update a GitHub issue title and body from a file" >&2
     exit 1
