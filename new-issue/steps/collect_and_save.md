@@ -40,7 +40,7 @@ Model the structure after this template (adapt sections to what makes sense for 
 See issue for details: https://<domain>/<owner>/<repo>/issues/<id>
 ```
 
-Use only sections that are relevant. Replace `<domain>`, `<owner>/<repo>` with the values from `DOMAIN` and `REPO` output of the fetch script (or `github.com` and the repo from git origin if fetched). If the ID is an auto-assigned `X##` placeholder, omit the "See issue for details" line.
+Use only sections that are relevant. Replace `<domain>` and `<owner>/<repo>` with the `DOMAIN` and `REPO` values from the fetch script output (or run `git remote get-url origin` to derive them). If the ID is an auto-assigned `X##` placeholder, omit the "See issue for details" line.
 
 ## Confirm and iterate
 
@@ -62,10 +62,10 @@ Then loop:
 After the user confirms the issue, automatically run:
 
 ```bash
-gh issue edit <id> -R <repo_ref> --title "<Title>" --body "<description>"
+~/.claude-darthjee/skills/new-issue/scripts/github.sh update <id> "<Title>" <issue_file_path>
 ```
 
-Where `<repo_ref>` is `<domain>/<owner>/<repo>` for custom domains (e.g., `djart-github.com/owner/repo`) or `<owner>/<repo>` for `github.com`.
+The script resolves the GitHub domain and repository from `git remote get-url origin`, so no manual `-R` argument is needed. The body is read directly from the saved issue file via `--body-file`, avoiding quoting issues with multi-line content.
 
 > Note: If the ID is an auto-assigned `X##` placeholder, skip this step entirely.
 

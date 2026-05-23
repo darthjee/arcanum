@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # GitHub operations script
 # Usage: github.sh <command> [args]
-#   fetch <id>   Fetch a GitHub issue and save to docs/agents/issues/
+#   fetch <id>              Fetch a GitHub issue and save to docs/agents/issues/
+#   update <id> <title> <file>  Update a GitHub issue title and body from a file
 
 set -euo pipefail
 
@@ -105,12 +106,34 @@ cmd_fetch() {
   echo "REPO=$_ORIGIN_REPO_PATH"
 }
 
+cmd_update() {
+  local id="${1:-}" title="${2:-}" file="${3:-}"
+  [[ -n "$id" && -n "$title" && -n "$file" ]] || {
+    echo "Usage: $0 update <id> <title> <file>" >&2; exit 1
+  }
+  [[ -f "$file" ]] || { echo "Error: file not found: $file" >&2; exit 1; }
+
+  _load_origin
+
+  local repo_ref
+  repo_ref=$(get_repo_ref)
+
+  gh issue edit "$id" -R "$repo_ref" --title "$title" --body-file "$file" || {
+    echo "Error: could not update issue #$id on $repo_ref" >&2
+    exit 1
+  }
+
+  echo "Updated issue #$id on $repo_ref"
+}
+
 case "${1:-}" in
-  fetch) shift; cmd_fetch "$@" ;;
+  fetch)  shift; cmd_fetch  "$@" ;;
+  update) shift; cmd_update "$@" ;;
   *)
     echo "Usage: $0 <command> [args]" >&2
     echo "Commands:" >&2
-    echo "  fetch <id>   Fetch a GitHub issue and save to docs/agents/issues/" >&2
+    echo "  fetch <id>                   Fetch a GitHub issue and save to docs/agents/issues/" >&2
+    echo "  update <id> <title> <file>   Update a GitHub issue title and body from a file" >&2
     exit 1
     ;;
 esac
