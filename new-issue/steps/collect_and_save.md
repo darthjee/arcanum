@@ -43,8 +43,10 @@ See issue for details: https://<domain>/<owner>/<repo>/issues/<id>
 Use only sections that are relevant. If `DOMAIN` and `REPO` are not already known from a prior `fetch` call, run:
 
 ```bash
-~/.claude-darthjee/skills/new-issue/scripts/github.sh info
+../scripts/github.sh info
 ```
+
+> Resolve `../scripts/github.sh` relative to this file's directory.
 
 to obtain them. If the ID is an auto-assigned `X##` placeholder, omit the "See issue for details" line entirely.
 
@@ -68,13 +70,12 @@ Then loop:
 After the user confirms the issue, automatically run:
 
 ```bash
-~/.claude-darthjee/skills/new-issue/scripts/github.sh update <id> "<Title>" <issue_file_path>
+../scripts/github.sh update <id> "<Title>" <issue_file_path>
 ```
+
+> Resolve `../scripts/github.sh` relative to this file's directory.
 
 The script resolves the GitHub domain and repository from `git remote get-url origin`, so no manual `-R` argument is needed. The body is read directly from the saved issue file via `--body-file`, avoiding quoting issues with multi-line content.
 
 > Note: If the ID is an auto-assigned `X##` placeholder, skip this step entirely.
 
-## Plan the issue
-
-After handling the GitHub update, automatically invoke the `/plan-issue` skill passing the issue ID (e.g. `/plan-issue <id>`).

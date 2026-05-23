@@ -47,8 +47,10 @@ List files in the issues folder and look for any file whose name starts with `<i
 If the ID is a plain number (not `X##`), run:
 
 ```bash
-~/.claude-darthjee/skills/new-issue/scripts/github.sh fetch <id>
+../scripts/github.sh fetch <id>
 ```
+
+> Resolve `../scripts/github.sh` relative to this file's directory (i.e., the `scripts/` folder inside this skill).
 
 The script automatically:
 - Reads `git remote get-url origin` to determine the GitHub domain (e.g., `github.com` or `djart-github.com`) and the repository path

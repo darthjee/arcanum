@@ -20,8 +20,10 @@ Present a concise summary (3–5 sentences) covering:
 Write the PR body to a temporary file, then run:
 
 ```bash
-~/.claude-darthjee/skills/fix-issue/scripts/github.sh pr-create "Fix #<id> — <title>" /tmp/pr_body_<id>.md
+../scripts/github.sh pr-create "Fix #<id> — <title>" /tmp/pr_body_<id>.md
 ```
+
+> Resolve `../scripts/github.sh` relative to this file's directory.
 
 The script resolves the GitHub domain and repository from `git remote get-url origin`, so no manual `-R` argument is needed.
 
