@@ -1,36 +1,64 @@
 #!/usr/bin/env bash
-# GitHub operations for the new-issue skill
+# GitHub operations script
 # Usage: github.sh <command> [args]
 #   fetch <id>   Fetch a GitHub issue and save to docs/agents/issues/
 
 set -euo pipefail
 
-parse_origin() {
+# --- Origin helpers (cached) ---
+
+_ORIGIN_PARSED=0
+_ORIGIN_DOMAIN=""
+_ORIGIN_REPO_PATH=""
+
+_load_origin() {
+  [[ "$_ORIGIN_PARSED" -eq 1 ]] && return 0
+
   local origin
   origin=$(git remote get-url origin 2>/dev/null) || {
     echo "Error: not a git repository or no 'origin' remote" >&2
     exit 1
   }
 
-  local domain repo_path
-
   if [[ "$origin" =~ ^git@ ]]; then
-    domain="${origin#git@}"
-    domain="${domain%%:*}"
-    repo_path="${origin#*:}"
-    repo_path="${repo_path%.git}"
+    _ORIGIN_DOMAIN="${origin#git@}"
+    _ORIGIN_DOMAIN="${_ORIGIN_DOMAIN%%:*}"
+    _ORIGIN_REPO_PATH="${origin#*:}"
+    _ORIGIN_REPO_PATH="${_ORIGIN_REPO_PATH%.git}"
   elif [[ "$origin" =~ ^https?:// ]]; then
     local stripped="${origin#*://}"
-    domain="${stripped%%/*}"
-    repo_path="${stripped#*/}"
-    repo_path="${repo_path%.git}"
+    _ORIGIN_DOMAIN="${stripped%%/*}"
+    _ORIGIN_REPO_PATH="${stripped#*/}"
+    _ORIGIN_REPO_PATH="${_ORIGIN_REPO_PATH%.git}"
   else
     echo "Error: unrecognized origin format: $origin" >&2
     exit 1
   fi
 
-  echo "$domain $repo_path"
+  _ORIGIN_PARSED=1
 }
+
+get_domain() {
+  _load_origin
+  echo "$_ORIGIN_DOMAIN"
+}
+
+get_repo_path() {
+  _load_origin
+  echo "$_ORIGIN_REPO_PATH"
+}
+
+# Returns [HOST/]OWNER/REPO as expected by gh -R flag
+get_repo_ref() {
+  _load_origin
+  if [[ "$_ORIGIN_DOMAIN" == "github.com" ]]; then
+    echo "$_ORIGIN_REPO_PATH"
+  else
+    echo "$_ORIGIN_DOMAIN/$_ORIGIN_REPO_PATH"
+  fi
+}
+
+# --- Utilities ---
 
 normalize_title() {
   echo "$1" \
@@ -41,21 +69,16 @@ normalize_title() {
     | sed 's/-$//'
 }
 
+# --- Commands ---
+
 cmd_fetch() {
   local id="${1:-}"
   [[ -n "$id" ]] || { echo "Usage: $0 fetch <id>" >&2; exit 1; }
 
-  local origin_info domain repo_path
-  origin_info=$(parse_origin)
-  domain=$(echo "$origin_info" | awk '{print $1}')
-  repo_path=$(echo "$origin_info" | awk '{print $2}')
+  _load_origin
 
   local repo_ref
-  if [[ "$domain" == "github.com" ]]; then
-    repo_ref="$repo_path"
-  else
-    repo_ref="$domain/$repo_path"
-  fi
+  repo_ref=$(get_repo_ref)
 
   local result
   result=$(gh issue view "$id" -R "$repo_ref" --json title,body 2>/dev/null) || {
@@ -74,13 +97,12 @@ cmd_fetch() {
   mkdir -p "$issues_dir"
 
   local filepath="${issues_dir}/${id}-${normalized}.md"
-
   printf '%s\n' "$body" > "$filepath"
 
   echo "TITLE=$title"
   echo "FILE=$filepath"
-  echo "DOMAIN=$domain"
-  echo "REPO=$repo_path"
+  echo "DOMAIN=$_ORIGIN_DOMAIN"
+  echo "REPO=$_ORIGIN_REPO_PATH"
 }
 
 case "${1:-}" in
