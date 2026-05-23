@@ -7,7 +7,7 @@ You are helping the user open a pull request to fix an existing issue. Follow th
 
 ## Step 1 — Select the base branch
 
-Read [base_branch.md](base_branch.md) and follow the instructions there to determine the base branch and switch to it if needed. If the user declines to switch branches, stop here.
+Read [steps/base_branch.md](steps/base_branch.md) and follow the instructions there to determine the base branch and switch to it if needed. If the user declines to switch branches, stop here.
 
 ## Step 2 — Find the issues and plans folders
 
@@ -19,8 +19,8 @@ Use whatever paths are documented there.
 
 ## Step 3 — Locate the issue and plan files
 
-Read [file_definition.md](file_definition.md) and follow the instructions there to parse the ID, locate the issue file, and find the corresponding plan.
+Read [steps/file_definition.md](steps/file_definition.md) and follow the instructions there to parse the ID, locate the issue file, and find the corresponding plan.
 
 ## Step 4 — Open the PR
 
-Read [open_pr.md](open_pr.md) and follow the instructions there.
+Read [steps/open_pr.md](steps/open_pr.md) and follow the instructions there.

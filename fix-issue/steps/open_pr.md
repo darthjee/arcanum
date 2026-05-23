@@ -17,14 +17,17 @@ Present a concise summary (3–5 sentences) covering:
 
 ## Open the PR
 
-Use `gh pr create` to open the pull request with:
-- **Title:** `Fix #<id> — <issue title>`
-- **Body:** a markdown summary including the issue description and the main implementation steps from the plan
-
-Example:
+Write the PR body to a temporary file, then run:
 
 ```bash
-gh pr create --title "Fix #<id> — <title>" --body "$(cat <<'EOF'
+~/.claude-darthjee/skills/fix-issue/scripts/github.sh pr-create "Fix #<id> — <title>" /tmp/pr_body_<id>.md
+```
+
+The script resolves the GitHub domain and repository from `git remote get-url origin`, so no manual `-R` argument is needed.
+
+The PR body file should follow this structure:
+
+```markdown
 ## Issue
 <brief issue description>
 
@@ -32,8 +35,6 @@ gh pr create --title "Fix #<id> — <title>" --body "$(cat <<'EOF'
 <main implementation steps>
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
-EOF
-)"
 ```
 
 After the PR is created, return the PR URL to the user.
