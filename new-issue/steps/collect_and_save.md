@@ -37,10 +37,10 @@ Model the structure after this template (adapt sections to what makes sense for 
 - <why this matters>
 
 ---
-See issue for details: https://github.com/<owner>/<repo>/issues/<id>
+See issue for details: https://<domain>/<owner>/<repo>/issues/<id>
 ```
 
-Use only sections that are relevant. If the ID is an auto-assigned `X##` placeholder, omit the "See issue for details" line.
+Use only sections that are relevant. Replace `<domain>`, `<owner>/<repo>` with the values from `DOMAIN` and `REPO` output of the fetch script (or `github.com` and the repo from git origin if fetched). If the ID is an auto-assigned `X##` placeholder, omit the "See issue for details" line.
 
 ## Confirm and iterate
 
@@ -61,11 +61,11 @@ Then loop:
 
 After the user confirms the issue, automatically run:
 
-```
-gh issue edit <id> --title "<Title>" --body "<description>"
+```bash
+gh issue edit <id> -R <repo_ref> --title "<Title>" --body "<description>"
 ```
 
-to update the GitHub issue title and body with the content from the saved file.
+Where `<repo_ref>` is `<domain>/<owner>/<repo>` for custom domains (e.g., `djart-github.com/owner/repo`) or `<owner>/<repo>` for `github.com`.
 
 > Note: If the ID is an auto-assigned `X##` placeholder, skip this step entirely.
 

@@ -11,8 +11,8 @@ Read `AGENTS.md` (and `CLAUDE.md` if needed) in the current working directory to
 
 ## Step 2 — Define the issue ID and filename
 
-Read [file_definition.md](file_definition.md) and follow the instructions there to parse the arguments, auto-assign an ID if needed, and build the filename.
+Read [steps/file_definition.md](steps/file_definition.md) and follow the instructions there to parse the arguments, auto-assign an ID if needed, and build the filename.
 
 ## Step 3 — Collect description and save
 
-Read [collect_and_save.md](collect_and_save.md) and follow the instructions there.
+Read [steps/collect_and_save.md](steps/collect_and_save.md) and follow the instructions there.
