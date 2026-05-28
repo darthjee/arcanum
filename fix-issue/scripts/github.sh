@@ -6,6 +6,8 @@
 
 set -euo pipefail
 
+export GH_INSECURE_SKIP_VERIFY=true
+
 # --- Origin helpers (cached) ---
 
 _ORIGIN_PARSED=0
