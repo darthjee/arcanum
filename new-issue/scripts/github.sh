@@ -50,7 +50,21 @@ get_repo_path() {
   echo "$_ORIGIN_REPO_PATH"
 }
 
+get_gh_user() {
+  git config user.ghuser 2>/dev/null || git config --global user.ghuser 2>/dev/null || true
+}
+
+_ensure_gh_user() {
+  local ghuser
+  ghuser=$(get_gh_user)
+  if [[ -n "$ghuser" ]]; then
+    gh auth switch --user "$ghuser" >/dev/null 2>&1 || \
+      echo "Warning: gh auth switch --user $ghuser failed; proceeding with current gh user" >&2
+  fi
+}
+
 get_github_token() {
+  _ensure_gh_user
   gh auth token 2>/dev/null || gh auth token --hostname github.com 2>/dev/null || {
     echo "Error: could not obtain GitHub token via gh auth token" >&2
     exit 1

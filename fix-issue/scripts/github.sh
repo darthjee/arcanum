@@ -61,6 +61,19 @@ get_repo_ref() {
   fi
 }
 
+get_gh_user() {
+  git config user.ghuser 2>/dev/null || git config --global user.ghuser 2>/dev/null || true
+}
+
+_ensure_gh_user() {
+  local ghuser
+  ghuser=$(get_gh_user)
+  if [[ -n "$ghuser" ]]; then
+    gh auth switch --user "$ghuser" >/dev/null 2>&1 || \
+      echo "Warning: gh auth switch --user $ghuser failed; proceeding with current gh user" >&2
+  fi
+}
+
 # --- Commands ---
 
 cmd_info() {
@@ -76,6 +89,7 @@ cmd_pr_create() {
   }
   [[ -f "$file" ]] || { echo "Error: file not found: $file" >&2; exit 1; }
 
+  _ensure_gh_user
   _load_origin
 
   local repo_ref
