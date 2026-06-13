@@ -15,6 +15,10 @@ Run `git branch --show-current` and use the current branch as the base branch. N
 
 Read [steps/file_definition.md](steps/file_definition.md) and follow the instructions there to parse the ID, locate the issue file, and find the corresponding plan.
 
-## Step 3 — Open the PR
+## Step 3 — Apply the plan
+
+Read [steps/apply_plan.md](steps/apply_plan.md) and follow the instructions there to implement the plan with atomic commits, then push the branch.
+
+## Step 4 — Open the PR
 
 Read [steps/open_pr.md](steps/open_pr.md) and follow the instructions there.
