@@ -7,8 +7,6 @@
 
 set -euo pipefail
 
-export GH_INSECURE_SKIP_VERIFY=true
-
 # --- Origin helpers (cached) ---
 
 _ORIGIN_PARSED=0
@@ -52,14 +50,11 @@ get_repo_path() {
   echo "$_ORIGIN_REPO_PATH"
 }
 
-# Returns [HOST/]OWNER/REPO as expected by gh -R flag
-get_repo_ref() {
-  _load_origin
-  if [[ "$_ORIGIN_DOMAIN" == "github.com" ]]; then
-    echo "$_ORIGIN_REPO_PATH"
-  else
-    echo "$_ORIGIN_DOMAIN/$_ORIGIN_REPO_PATH"
-  fi
+get_github_token() {
+  gh auth token 2>/dev/null || gh auth token --hostname github.com 2>/dev/null || {
+    echo "Error: could not obtain GitHub token via gh auth token" >&2
+    exit 1
+  }
 }
 
 # --- Utilities ---
@@ -81,12 +76,13 @@ cmd_fetch() {
 
   _load_origin
 
-  local repo_ref
-  repo_ref=$(get_repo_ref)
+  local token
+  token=$(get_github_token)
 
   local result
-  result=$(gh issue view "$id" -R "$repo_ref" --json title,body 2>/dev/null) || {
-    echo "Error: could not fetch issue #$id from $repo_ref" >&2
+  result=$(curl -sf -H "Authorization: Bearer $token" \
+    "https://api.github.com/repos/$_ORIGIN_REPO_PATH/issues/$id") || {
+    echo "Error: could not fetch issue #$id from $_ORIGIN_REPO_PATH" >&2
     exit 1
   }
 
@@ -118,15 +114,26 @@ cmd_update() {
 
   _load_origin
 
-  local repo_ref
-  repo_ref=$(get_repo_ref)
+  local token
+  token=$(get_github_token)
 
-  gh issue edit "$id" -R "$repo_ref" --title "$title" --body-file "$file" || {
-    echo "Error: could not update issue #$id on $repo_ref" >&2
+  local body
+  body=$(cat "$file")
+
+  local payload
+  payload=$(jq -n --arg title "$title" --arg body "$body" \
+    '{"title": $title, "body": $body}')
+
+  curl -sf -X PATCH \
+    -H "Authorization: Bearer $token" \
+    -H "Content-Type: application/json" \
+    -d "$payload" \
+    "https://api.github.com/repos/$_ORIGIN_REPO_PATH/issues/$id" > /dev/null || {
+    echo "Error: could not update issue #$id on $_ORIGIN_REPO_PATH" >&2
     exit 1
   }
 
-  echo "Updated issue #$id on $repo_ref"
+  echo "Updated issue #$id on $_ORIGIN_REPO_PATH"
 }
 
 cmd_info() {
