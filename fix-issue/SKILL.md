@@ -7,7 +7,7 @@ You are helping the user open a pull request to fix an existing issue. Follow th
 
 ## Step 1 — Select the base branch
 
-Read [steps/base_branch.md](steps/base_branch.md) and follow the instructions there to determine the base branch and switch to it if needed. If the user declines to switch branches, stop here.
+Run `git branch --show-current` and use the current branch as the base branch. No confirmation needed.
 
 ## Step 2 — Find the issues and plans folders
 
