@@ -2,12 +2,12 @@
 
 ## Extract ID and title
 
-Read [extract_id_and_name.md](extract_id_and_name.md) and follow the instructions there to determine the issue ID and title from the arguments and the issues folder.
+Read [extract_id_and_name.md](extract_id_and_name.md) and follow the instructions there. The resolve script outputs all three values — `ID`, `TITLE`, and `FILE` — directly.
 
-## Determine the filename
+## Filename format (reference)
 
-Build the filename as:
+The script builds filenames as:
 
     <id>_<title_in_snake_case>.md
 
-Where `<title_in_snake_case>` is the title lowercased with spaces replaced by underscores. Example: `19_add_database_table.md`.
+Example: `19_add_database_table.md`, `X01_add_login_page.md`.
