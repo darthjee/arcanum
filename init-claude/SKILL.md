@@ -54,3 +54,7 @@ After the architecture document is created, read and follow [setup_contributing.
 ## Step 7 — Setup agents
 
 After the contributing guide is created, read and follow [setup_agents.md](setup_agents.md).
+
+## Step 8 — Setup PR and commit message templates
+
+After the agents are set up, read and follow [setup_templates.md](setup_templates.md).
