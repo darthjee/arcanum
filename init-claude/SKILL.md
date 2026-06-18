@@ -5,14 +5,18 @@ description: Configures CLAUDE.md and .github/copilot-instructions.md for a proj
 
 You are helping the user initialize or update the Claude and Copilot configuration files for the current project.
 
-## Step 1 — Detect existing files
+## Step 1 — Setup PR and commit message templates
+
+Read and follow [setup_templates.md](setup_templates.md).
+
+## Step 2 — Detect existing files
 
 Check which of these files exist in the current working directory:
 - `AGENTS.md`
 - `CLAUDE.md`
 - `.github/copilot-instructions.md`
 
-## Step 2 — Select scenario and follow it
+## Step 3 — Select scenario and follow it
 
 Based on what exists, read and follow the appropriate scenario file:
 
@@ -35,18 +39,22 @@ This scenario is not yet implemented. Please open an issue or contribute a scena
 
 Then stop.
 
-## Step 3 — Setup documentation structure
+## Step 4 — Setup documentation structure
 
 After the scenario completes successfully, read and follow [setup_docs_structure.md](setup_docs_structure.md).
 
-## Step 4 — Setup folder structure document
+## Step 5 — Setup folder structure document
 
 After the documentation structure is created, read and follow [setup_folder_structure.md](setup_folder_structure.md).
 
-## Step 5 — Setup architecture document
+## Step 6 — Setup architecture document
 
 After the folder structure document is created, read and follow [setup_architecture.md](setup_architecture.md).
 
-## Step 6 — Setup contributing guide
+## Step 7 — Setup contributing guide
 
 After the architecture document is created, read and follow [setup_contributing.md](setup_contributing.md).
+
+## Step 8 — Setup agents
+
+After the contributing guide is created, read and follow [setup_agents.md](setup_agents.md).
