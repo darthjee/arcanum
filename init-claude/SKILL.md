@@ -50,3 +50,7 @@ After the folder structure document is created, read and follow [setup_architect
 ## Step 6 — Setup contributing guide
 
 After the architecture document is created, read and follow [setup_contributing.md](setup_contributing.md).
+
+## Step 7 — Setup agents
+
+After the contributing guide is created, read and follow [setup_agents.md](setup_agents.md).
