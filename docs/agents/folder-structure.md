@@ -4,6 +4,7 @@
 
 | Directory / File | Description |
 |-----------------|-------------|
+| `auto-new-issue/` | Skill `/auto-new-issue` — cria um novo arquivo de issue de forma autônoma (sem interação com o usuário), comitando e sincronizando com o GitHub automaticamente. |
 | `check-plan/` | Skill `/check-plan` — valida um plano de implementação existente. |
 | `fix-issue/` | Skill `/fix-issue` — abre um PR para corrigir uma issue. |
 | `init-claude/` | Skill `/init-claude` — configura AGENTS.md/CLAUDE.md/copilot-instructions.md e a estrutura de docs do projeto. |
