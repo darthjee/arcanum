@@ -13,8 +13,9 @@ Skills are prompt files that Claude Code loads as slash commands. Each skill liv
 | [`/init-claude`](init-claude/) | Initializes a project's AI configuration: creates or consolidates `CLAUDE.md`, `.github/copilot-instructions.md`, and `AGENTS.md`, then scaffolds `docs/agents/` with architecture, folder structure, and contributing guides. |
 | [`/new-issue`](new-issue/) | Creates a new issue file in the project's `docs/agents/issues/` folder. |
 | [`/plan-issue`](plan-issue/) | Reads an issue file, analyzes the codebase, and writes a structured implementation plan in `docs/agents/plans/`. |
+| [`/check-plan`](check-plan/) | Validates an existing implementation plan, identifies problems and open questions, and optionally invokes `/fix-issue`. |
+| [`/new-plan`](new-plan/) | Creates a new issue and immediately writes its implementation plan, in one uninterrupted flow. |
 | [`/fix-issue`](fix-issue/) | Reads an issue and its plan, then opens a pull request to fix it. |
-| [`/helloworld`](helloworld/) | Responds with a greeting message. |
 
 ## Installation
 
