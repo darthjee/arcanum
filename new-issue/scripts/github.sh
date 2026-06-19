@@ -83,6 +83,18 @@ normalize_title() {
     | sed 's/-$//'
 }
 
+extract_tags_block() {
+  local body="$1"
+  local tags_block
+  tags_block=$(perl -0777 -ne 'if (/(?:[ \t]*\n)+---[ \t]*(?:[ \t]*\n)+((?:(?i)tags:.*\n?)+)$/) { print $1 }' <<< "$body")
+  printf '%s' "$tags_block" | sed -e 's/[[:space:]]*$//'
+}
+
+strip_tags_block() {
+  local body="$1"
+  perl -0777 -pe 's/(?:[ \t]*\n)+---[ \t]*(?:[ \t]*\n)+(?:(?i)tags:.*\n?)+$//' <<< "$body"
+}
+
 # --- Commands ---
 
 cmd_fetch() {
@@ -106,11 +118,10 @@ cmd_fetch() {
   body=$(echo "$result" | jq -r '.body')
 
   local tags_block
-  tags_block=$(perl -0777 -ne 'if (/(?:[ \t]*\n)+---[ \t]*(?:[ \t]*\n)+((?:(?i)tags:.*\n?)+)$/) { print $1 }' <<< "$body")
-  tags_block=$(printf '%s' "$tags_block" | sed -e 's/[[:space:]]*$//')
+  tags_block=$(extract_tags_block "$body")
 
   if [[ -n "$tags_block" ]]; then
-    body=$(perl -0777 -pe 's/(?:[ \t]*\n)+---[ \t]*(?:[ \t]*\n)+(?:(?i)tags:.*\n?)+$//' <<< "$body")
+    body=$(strip_tags_block "$body")
   fi
 
   local normalized
