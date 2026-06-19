@@ -19,6 +19,11 @@ ID="${3:-}"
   exit 1
 }
 
+[[ "$ID" =~ ^[0-9]+$ ]] || {
+  echo "Error: issue id must be numeric and linked to a GitHub issue (got '${ID}'). Local-only ids are no longer supported." >&2
+  exit 1
+}
+
 find_existing_file() {
   find "$ISSUES_FOLDER" -maxdepth 1 \( -name "${1}_*" -o -name "${1}-*" \) 2>/dev/null | head -1
 }
