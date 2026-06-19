@@ -143,9 +143,12 @@ For each **specialist** agent, also write a check script at `.claude/scripts/che
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
+set -x
 
 <the gathered test/lint/build command(s), one per line, including any required wrapper>
 ```
+
+`set -x` prints each command before it runs, so the dispatched agent can see exactly what `run_checks.sh` executed on its behalf.
 
 Make it executable (`chmod +x .claude/scripts/check_<agent-name>.sh`). This script is what `auto-fix-issue`'s `scripts/run_checks.sh <agent-name>` will run on this agent's behalf, instead of relying on the prose-described commands inside `<agent-name>.md`.
 
