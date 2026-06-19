@@ -4,6 +4,10 @@
 
 | Directory / File | Description |
 |-----------------|-------------|
+| `auto-new-issue/` | Skill `/auto-new-issue` — cria um novo arquivo de issue de forma autônoma (sem interação com o usuário), comitando e sincronizando com o GitHub automaticamente. |
+| `auto-plan-issue/` | Skill `/auto-plan-issue` — escreve o plano de implementação de uma issue de forma autônoma, dividindo entre agentes especialistas quando existirem. |
+| `auto-fix-issue/` | Skill `/auto-fix-issue` — implementa uma issue planejada de forma autônoma, despachando agentes especialistas em paralelo e abrindo/marcando pronto o PR. |
+| `auto-fix-all/` | Skill `/auto-fix-all` — orquestra o pipeline completo (issue → plano → fix → monitoramento) para uma fila de IDs, um por vez, reagindo a comentários, aprovações, falhas de CI e fechamentos de PR até esvaziar a fila. |
 | `check-plan/` | Skill `/check-plan` — valida um plano de implementação existente. |
 | `fix-issue/` | Skill `/fix-issue` — abre um PR para corrigir uma issue. |
 | `init-claude/` | Skill `/init-claude` — configura AGENTS.md/CLAUDE.md/copilot-instructions.md e a estrutura de docs do projeto. |
