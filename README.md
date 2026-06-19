@@ -2,9 +2,9 @@
 
 A collection of Claude Code skills — reusable slash commands that extend Claude Code with project workflows.
 
-**Current Version:** [0.0.1](https://github.com/darthjee/arcanum/releases/tag/0.0.1)
+**Current Version:** [0.1.0](https://github.com/darthjee/arcanum/releases/tag/0.1.0)
 
-**Next Release:** [0.0.2](https://github.com/darthjee/arcanum/compare/0.0.1...main)
+**Next Release:** [0.1.1](https://github.com/darthjee/arcanum/compare/0.1.0...main)
 
 ## What are skills?
 
