@@ -14,7 +14,10 @@ Wait for the user's response before continuing.
 
 ## Write the issue file
 
-Based on the user's description (or the GitHub body), write a structured issue file at `<issues_folder>/<filename>`. **Always write the file content in English**, regardless of the language the user used to describe the issue. If the description was given in another language, translate it to English before writing.
+Based on the user's description (or the GitHub body), write a structured issue file. **Always write the file content in English**, regardless of the language the user used to describe the issue. If the description was given in another language, translate it to English before writing.
+
+- **`FILE` is already known** (an id was given or fetched): write to `<issues_folder>/<filename>` as usual.
+- **`FILE` is not known yet** (the "create new issue" branch from [extract_id_and_name.md](extract_id_and_name.md)'s `STATUS=missing_id` section — no GitHub issue exists yet for this content): write the drafted content to a temporary file instead (e.g. via `mktemp`), and keep that path at hand for the "Update GitHub issue" step below, which will mint the real issue and the final `FILE`.
 
 Model the structure after this template (adapt sections to what makes sense for the described issue):
 
@@ -48,7 +51,7 @@ Use only sections that are relevant. If `DOMAIN` and `REPO` are not already know
 
 > Resolve `../scripts/github.sh` relative to this file's directory.
 
-to obtain them. If the ID is an auto-assigned `X##` placeholder, omit the "See issue for details" line entirely.
+to obtain them. While the file is still at a temporary path (no GitHub id minted yet), omit the "See issue for details" line entirely — it would be self-referential since the id doesn't exist yet.
 
 ## Confirm and iterate
 
@@ -67,15 +70,17 @@ Then loop:
 
 ## Update GitHub issue
 
-After the user confirms the issue, automatically run:
+After the user confirms the issue, automatically run one of the following, depending on whether an id was already known:
 
-```bash
-../scripts/github.sh update <id> "<Title>" <issue_file_path>
-```
+- **ID already known** (explicit `#<id>` from the user, a number they gave in response to the missing-id question, or a fetched id):
+  ```bash
+  ../scripts/github.sh update <id> "<Title>" <issue_file_path>
+  ```
+- **ID was not known** (the "create new issue" branch — the file is still at a temporary path): run
+  ```bash
+  ../scripts/github.sh create "<Title>" <temp_file_path>
+  ```
+  instead. Parse the returned `ID`, `FILE`, `DOMAIN`, `REPO` — the script writes the body to the canonical `FILE` itself. Tell the user: `Created GitHub issue #<ID>: <FILE>`. This is the final step; there is nothing left to write or update.
 
-> Resolve `../scripts/github.sh` relative to this file's directory.
-
-The script resolves the GitHub domain and repository from `git remote get-url origin`, so no manual `-R` argument is needed. The body is read directly from the saved issue file via `--body-file`, avoiding quoting issues with multi-line content.
-
-> Note: If the ID is an auto-assigned `X##` placeholder, skip this step entirely.
+> Resolve `../scripts/github.sh` relative to this file's directory. The script resolves the GitHub domain and repository from `git remote get-url origin`, so no manual `-R` argument is needed. The body is read directly from file via `--body-file`/`cat`, avoiding quoting issues with multi-line content.
 

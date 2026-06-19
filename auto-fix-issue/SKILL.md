@@ -9,7 +9,7 @@ The issues folder is always `docs/agents/issues` and the plans folder is always 
 
 ## Step 1 — Locate the issue and plan
 
-Parse the issue ID from the skill argument (accept `5`, `#5`, or `X01` style local ids — strip the leading `#` if present).
+Parse the issue ID from the skill argument (accept `5` or `#5` — strip the leading `#` if present). IDs must be numeric and correspond to an existing GitHub issue; `scripts/resolve_plan_paths.sh` enforces this and will error out otherwise.
 
 Run:
 

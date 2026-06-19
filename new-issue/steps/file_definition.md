@@ -10,4 +10,6 @@ The script builds filenames as:
 
     <id>_<title_in_snake_case>.md
 
-Example: `19_add_database_table.md`, `X01_add_login_page.md`.
+Example: `19_add_database_table.md`.
+
+The id is always numeric and tied to a real GitHub issue — there is no local-only id convention.
