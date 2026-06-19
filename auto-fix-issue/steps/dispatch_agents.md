@@ -14,7 +14,11 @@ When `scripts/list_plan_agents.sh` printed no output (single unsplit plan, handl
 >
 > Follow the development cycle:
 > 1. Implement the changes.
-> 2. Run tests and lint/fix (using the commands documented in your own agent instructions, or in the plan's `## CI Checks` section when present).
+> 2. Run your checks:
+>    ```bash
+>    scripts/run_checks.sh <agent-name>
+>    ```
+>    (resolved relative to the `auto-fix-issue` skill folder, where `<agent-name>` is your own agent name). This runs `.claude/scripts/check_<agent-name>.sh` if the target project defines one, or reports cleanly that no checks are configured. Use the plan's `## CI Checks` section, when present, as context for investigating any failure it reports. If it exits non-zero, fix the issue and re-run before continuing.
 > 3. Analyze whether refactoring is needed — if so, refactor and repeat from step 2.
 > 4. When clean: `git add` your changes, then commit them by running the helper script — never write the commit message or run `git commit` by hand:
 >    ```bash

@@ -138,6 +138,22 @@ Wait for the user's response.
 
 Ensure `.claude/agents/` exists, then write (or overwrite) one file per agent: `.claude/agents/<agent-name>.md`.
 
+For each **specialist** agent, also write a check script at `.claude/scripts/check_<agent-name>.sh` (creating `.claude/scripts/` if needed), containing the command(s) gathered in Step 3 ("Commands"):
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+set -x
+
+<the gathered test/lint/build command(s), one per line, including any required wrapper>
+```
+
+`set -x` prints each command before it runs, so the dispatched agent can see exactly what `run_checks.sh` executed on its behalf.
+
+Make it executable (`chmod +x .claude/scripts/check_<agent-name>.sh`). This script is what `auto-fix-issue`'s `scripts/run_checks.sh <agent-name>` will run on this agent's behalf, instead of relying on the prose-described commands inside `<agent-name>.md`.
+
+Do not generate a check script for the `architect` coordinator unless the user explicitly gave it its own check command — `architect` typically has no stack-specific test suite of its own. If unsure whether `architect` needs one, ask.
+
 ## Step 7 — Confirm
 
 Tell the user:
@@ -146,6 +162,9 @@ Tell the user:
 .claude/agents/ written:
 - architect.md
 - <agent-name>.md (one per specialist agent)
+
+.claude/scripts/ written:
+- check_<agent-name>.sh (one per specialist agent with a check command)
 
 Keep these in sync with AGENTS.md and docs/agents/ as scopes evolve.
 ```
