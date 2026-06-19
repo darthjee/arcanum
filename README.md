@@ -18,6 +18,7 @@ Skills are prompt files that Claude Code loads as slash commands. Each skill liv
 | [`/check-plan`](check-plan/) | Validates an existing implementation plan, identifies problems and open questions, and optionally invokes `/fix-issue`. |
 | [`/new-plan`](new-plan/) | Creates a new issue and immediately writes its implementation plan, in one uninterrupted flow. |
 | [`/fix-issue`](fix-issue/) | Reads an issue and its plan, then opens a pull request to fix it. |
+| [`/auto-fix-issue`](auto-fix-issue/) | Autonomously implements a planned issue with no user interaction, dispatching the plan's specialist agents in parallel, reviewing and re-dispatching until correct, then opening or marking ready a pull request. |
 
 ## Installation
 
