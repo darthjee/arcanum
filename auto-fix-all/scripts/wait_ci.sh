@@ -12,18 +12,28 @@
 # lines are the names of the failed check-runs (status completed and
 # conclusion in failure/cancelled/timed_out).
 #
-# Check-runs whose name case-insensitively contains any pattern in
-# IGNORED_CHECK_PATTERNS are excluded entirely from the passed/failed/total
-# accounting (neither blocking the PR nor required to pass). Currently this
-# only ignores Codacy, since it can report a "action_required" conclusion
-# that is neither success nor a failure state, which would otherwise hang
-# this script forever.
+# Check-runs whose name case-insensitively contains any pattern in the
+# project's configured ignored_check_patterns are excluded entirely from
+# the passed/failed/total accounting (neither blocking the PR nor required
+# to pass). Patterns are read from the target project's own
+# .claude/configuration/auto-fix-all.json (relative to the current working
+# directory), field "ignored_check_patterns" (an array of regex strings).
+# If the file or field is missing, no patterns are ignored. This exists
+# because some check-runs (e.g. Codacy) can report a "action_required"
+# conclusion that is neither success nor a failure state, which would
+# otherwise hang this script forever unless ignored.
 
 set -euo pipefail
 
 export GH_INSECURE_SKIP_VERIFY=true
 
-IGNORED_CHECK_PATTERNS=("Codacy")
+CONFIG_FILE=".claude/configuration/auto-fix-all.json"
+
+if [[ -f "$CONFIG_FILE" ]]; then
+  ignored_json=$(jq -c '.ignored_check_patterns // []' "$CONFIG_FILE")
+else
+  ignored_json="[]"
+fi
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib_origin.sh"
 
@@ -48,8 +58,6 @@ while true; do
   checks=$(gh api "repos/${REPO_REF}/commits/${sha}/check-runs?per_page=100" 2>/dev/null) || {
     sleep 5; continue
   }
-
-  ignored_json=$(printf '%s\n' "${IGNORED_CHECK_PATTERNS[@]}" | jq -R . | jq -s .)
 
   filtered=$(echo "$checks" | jq --argjson ignored "$ignored_json" \
     '.check_runs |= map(select(([$ignored[] as $p | (.name | test($p; "i"))] | any) | not))' \
