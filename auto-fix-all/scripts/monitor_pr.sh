@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # Monitor a PR for merge/close/approval/new-comments from its owner
 # Usage: monitor_pr.sh <pr_number> <pr_owner> <since_file>
+#        monitor_pr.sh monitor <issue_id>
+#   The "monitor <issue_id>" form resolves PR_OWNER via get_gh_user, resolves
+#   PR_NUMBER from the current branch's PR (same pattern as github.sh's
+#   cmd_pr_number), and derives SINCE_FILE as
+#   .claude/state/auto-fix-all-<issue_id>-since.txt; it then falls through
+#   into the same monitoring loop as the explicit-args form.
 #
 # Blocking loop (5s sleep) that polls `gh pr view --json state,comments,reviews`
 # plus the inline review comments API, retrying silently on transient gh
@@ -25,15 +31,6 @@
 set -euo pipefail
 
 export GH_INSECURE_SKIP_VERIFY=true
-
-PR_NUMBER="${1:-}"
-PR_OWNER="${2:-}"
-SINCE_FILE="${3:-}"
-
-[[ -n "$PR_NUMBER" && -n "$PR_OWNER" && -n "$SINCE_FILE" ]] || {
-  echo "Usage: $0 <pr_number> <pr_owner> <since_file>" >&2
-  exit 1
-}
 
 # --- Origin helpers (cached) ---
 # Duplicated verbatim from github.sh: self-contained script, no sourcing
@@ -91,6 +88,43 @@ _ensure_gh_user() {
       echo "Warning: gh auth switch --user $ghuser failed; proceeding with current gh user" >&2
   fi
 }
+
+if [[ "${1:-}" == "monitor" ]]; then
+  issue_id="${2:-}"
+  [[ -n "$issue_id" ]] || {
+    echo "Usage: $0 monitor <issue_id>" >&2
+    echo "       $0 <pr_number> <pr_owner> <since_file>" >&2
+    exit 1
+  }
+
+  _ensure_gh_user
+  PR_OWNER=$(get_gh_user)
+
+  repo_ref=$(get_repo_ref)
+  branch=$(git branch --show-current)
+
+  PR_NUMBER=$(gh pr view -R "$repo_ref" "$branch" --json number -q '.number' 2>/dev/null) || {
+    echo "Error: no pull request found for the current branch on $repo_ref" >&2
+    exit 1
+  }
+
+  [[ -n "$PR_NUMBER" ]] || {
+    echo "Error: no pull request found for the current branch on $repo_ref" >&2
+    exit 1
+  }
+
+  SINCE_FILE=".claude/state/auto-fix-all-${issue_id}-since.txt"
+else
+  PR_NUMBER="${1:-}"
+  PR_OWNER="${2:-}"
+  SINCE_FILE="${3:-}"
+
+  [[ -n "$PR_NUMBER" && -n "$PR_OWNER" && -n "$SINCE_FILE" ]] || {
+    echo "Usage: $0 <pr_number> <pr_owner> <since_file>" >&2
+    echo "       $0 monitor <issue_id>" >&2
+    exit 1
+  }
+fi
 
 _ensure_gh_user
 REPO_REF=$(get_repo_ref)
