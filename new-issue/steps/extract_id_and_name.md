@@ -32,7 +32,7 @@ Run the fetch script to retrieve the initial content from GitHub:
 
 > Resolve `../scripts/github.sh` relative to this file's directory.
 
-- **Success:** Use the returned `TITLE`, `FILE`, `DOMAIN`, and `REPO` values. Use the body saved in `FILE` as the initial description. Proceed to "Confirm and iterate" in [collect_and_save.md](collect_and_save.md).
+- **Success:** Use the returned `TITLE`, `FILE`, `DOMAIN`, and `REPO` values. Use the body saved in `FILE` as the initial description. If the output also includes a `TAGS_BEGIN`/`TAGS_END` block (the body had a trailing `---`/`tags: ...` section, now stripped from `FILE`), remember it for [collect_and_save.md](collect_and_save.md), which re-appends it verbatim at the end of the final file. Proceed to "Confirm and iterate" in [collect_and_save.md](collect_and_save.md).
 - **Failure / issue not found:** Inform the user: `Could not find GitHub issue #<id>. Please provide a title.`, ask for a title, then proceed with the provided title and the numeric ID (no pre-populated content). The `FILE` from the resolve script can be used once a title is known.
 
 ### STATUS=missing_id

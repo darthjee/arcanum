@@ -53,6 +53,8 @@ Use only sections that are relevant. If `DOMAIN` and `REPO` are not already know
 
 to obtain them. While the file is still at a temporary path (no GitHub id minted yet), omit the "See issue for details" line entirely — it would be self-referential since the id doesn't exist yet.
 
+If the prior `fetch` call printed a `TAGS_BEGIN`/`TAGS_END` block, append it verbatim at the very end of the written file (after the "See issue for details" line, separated by a blank line), exactly as captured — do not edit, summarize, or reformat it. If no such block was printed, do not add anything; never invent a tags line.
+
 ## Confirm and iterate
 
 After writing the file, summarize your understanding of the issue in 2–3 sentences and ask:
