@@ -5,9 +5,9 @@
 # Output (key=value lines):
 #   SCENARIO=A|B|C
 #   ID=<id>
-#   TITLE=<title>          (empty when STATUS=needs_title)
-#   FILE=<filepath>        (empty when STATUS=needs_title or needs_fetch)
-#   STATUS=new|existing|needs_title
+#   TITLE=<title>          (empty when STATUS=missing_id)
+#   FILE=<filepath>        (empty when STATUS=missing_id or needs_fetch)
+#   STATUS=new|existing|missing_id
 #   NEEDS_FETCH=true       (only when GitHub fetch is required)
 
 set -euo pipefail
@@ -28,16 +28,6 @@ title_to_snake_case() {
 
 find_existing_file() {
   find "$ISSUES_FOLDER" -maxdepth 1 \( -name "${1}_*" -o -name "${1}-*" \) 2>/dev/null | head -1
-}
-
-next_x_id() {
-  local n=1 candidate existing
-  while true; do
-    candidate=$(printf "X%02d" "$n")
-    existing=$(find_existing_file "$candidate")
-    [[ -z "$existing" ]] && { echo "$candidate"; return; }
-    (( n++ ))
-  done
 }
 
 build_file() {
@@ -72,6 +62,11 @@ else
   TITLE="${ARG_STRING## }" TITLE="${TITLE%% }"
 fi
 
+if [[ -n "$ID" && ! "$ID" =~ ^[0-9]+$ ]]; then
+  echo "Error: issue id must be numeric and linked to a GitHub issue (got '${ID}'). Local-only ids are no longer supported." >&2
+  exit 1
+fi
+
 # --- Resolve ---
 
 case "$SCENARIO" in
@@ -79,29 +74,20 @@ case "$SCENARIO" in
     EXISTING=$(find_existing_file "$ID")
     if [[ -n "$EXISTING" ]]; then
       printf 'SCENARIO=A\nID=%s\nTITLE=%s\nFILE=%s\nSTATUS=existing\n' "$ID" "$TITLE" "$EXISTING"
-    elif [[ "$ID" =~ ^X ]]; then
-      printf 'SCENARIO=A\nID=%s\nTITLE=%s\nFILE=%s\nSTATUS=new\n' "$ID" "$TITLE" "$(build_file "$ID" "$TITLE")"
     else
       printf 'SCENARIO=A\nID=%s\nTITLE=%s\nFILE=%s\nSTATUS=new\nNEEDS_FETCH=true\n' "$ID" "$TITLE" "$(build_file "$ID" "$TITLE")"
     fi
     ;;
   B)
-    ID=$(next_x_id)
-    if [[ -z "$TITLE" ]]; then
-      printf 'SCENARIO=B\nID=%s\nTITLE=\nFILE=\nSTATUS=needs_title\n' "$ID"
-    else
-      printf 'SCENARIO=B\nID=%s\nTITLE=%s\nFILE=%s\nSTATUS=new\n' "$ID" "$TITLE" "$(build_file "$ID" "$TITLE")"
-    fi
+    printf 'SCENARIO=B\nID=\nTITLE=%s\nFILE=\nSTATUS=missing_id\n' "$TITLE"
     ;;
   C)
     EXISTING=$(find_existing_file "$ID")
     if [[ -n "$EXISTING" ]]; then
       TITLE=$(title_from_filename "$EXISTING")
       printf 'SCENARIO=C\nID=%s\nTITLE=%s\nFILE=%s\nSTATUS=existing\n' "$ID" "$TITLE" "$EXISTING"
-    elif [[ "$ID" =~ ^[0-9]+$ ]]; then
-      printf 'SCENARIO=C\nID=%s\nTITLE=\nFILE=\nSTATUS=new\nNEEDS_FETCH=true\n' "$ID"
     else
-      printf 'SCENARIO=C\nID=%s\nTITLE=\nFILE=\nSTATUS=needs_title\n' "$ID"
+      printf 'SCENARIO=C\nID=%s\nTITLE=\nFILE=\nSTATUS=new\nNEEDS_FETCH=true\n' "$ID"
     fi
     ;;
 esac
