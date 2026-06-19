@@ -58,3 +58,7 @@ After the architecture document is created, read and follow [setup_contributing.
 ## Step 8 — Setup agents
 
 After the contributing guide is created, read and follow [setup_agents.md](setup_agents.md).
+
+## Step 9 — Setup CI monitoring options
+
+After the agents are set up, read and follow [setup_ci_monitoring.md](setup_ci_monitoring.md).

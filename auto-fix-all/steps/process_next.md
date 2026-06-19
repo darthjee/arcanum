@@ -34,11 +34,20 @@ Record the issue's title and the PR URL/number it reports — you will need them
 
 ## 6. Check for pre-approval
 
-Pre-approval is expressed in this family of skills via a `shipit` label on the GitHub issue (not via a metadata file, and not via a "Tags:" line in the local issue body — `auto-new-issue` does not maintain GitHub labels itself, so this is the simplest direct source of truth):
+Pre-approval is expressed in this family of skills via either of two independent sources — a `shipit` label on the GitHub issue, or a `tags:` line at the end of the local issue body containing a `:shipit:` token:
 
 ```bash
 scripts/github.sh has-shipit-label <id>
 ```
 
-- **Exit 0** — the issue is pre-approved. Skip monitoring entirely and jump directly to the **"If `approved`"** section of [monitor_pr.md](monitor_pr.md).
-- **Exit 1** — continue to Step 3 of `SKILL.md` (monitor the PR normally).
+```bash
+../auto-plan-issue/scripts/resolve_plan_paths.sh docs/agents/issues docs/agents/plans <id>
+```
+(parse `ISSUE_FILE` from its output, resolved relative to the `auto-plan-issue` skill folder — the same pattern used by the "approved" branch of [monitor_pr.md](monitor_pr.md))
+
+```bash
+scripts/has_shipit_tag.sh <ISSUE_FILE>
+```
+
+- **Either command exits 0** — the issue is pre-approved. Skip monitoring entirely and jump directly to the **"If `approved`"** section of [monitor_pr.md](monitor_pr.md).
+- **Both exit 1** — continue to Step 3 of `SKILL.md` (monitor the PR normally).
