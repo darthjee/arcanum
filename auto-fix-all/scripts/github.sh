@@ -72,11 +72,12 @@ _ensure_gh_user() {
 
 cmd_pr_number() {
   _ensure_gh_user
-  local repo_ref
+  local repo_ref branch
   repo_ref=$(get_repo_ref)
+  branch=$(git branch --show-current)
 
   local number
-  number=$(gh pr view -R "$repo_ref" --json number -q '.number' 2>/dev/null) || {
+  number=$(gh pr view -R "$repo_ref" "$branch" --json number -q '.number' 2>/dev/null) || {
     echo "Error: no pull request found for the current branch on $repo_ref" >&2
     exit 1
   }
@@ -91,11 +92,12 @@ cmd_pr_number() {
 
 cmd_pr_state() {
   _ensure_gh_user
-  local repo_ref
+  local repo_ref branch
   repo_ref=$(get_repo_ref)
+  branch=$(git branch --show-current)
 
   local state
-  state=$(gh pr view -R "$repo_ref" --json state -q '.state' 2>/dev/null) || {
+  state=$(gh pr view -R "$repo_ref" "$branch" --json state -q '.state' 2>/dev/null) || {
     echo "Error: no pull request found for the current branch on $repo_ref" >&2
     exit 1
   }
@@ -105,11 +107,12 @@ cmd_pr_state() {
 
 cmd_pr_merge() {
   _ensure_gh_user
-  local repo_ref
+  local repo_ref branch
   repo_ref=$(get_repo_ref)
+  branch=$(git branch --show-current)
 
   local output
-  output=$(gh pr view -R "$repo_ref" --json title,number,url 2>/dev/null) || {
+  output=$(gh pr view -R "$repo_ref" "$branch" --json title,number,url 2>/dev/null) || {
     echo "Error: no pull request found for the current branch on $repo_ref" >&2
     exit 1
   }
