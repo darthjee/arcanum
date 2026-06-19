@@ -20,8 +20,8 @@
 #   - PR state MERGED  -> print "merged", exit 0
 #   - PR state CLOSED  -> print "closed", exit 0
 #   - latest review by <pr_owner> is APPROVED -> print "approved", exit 0
-#   - else collect comments (issue-level + inline) from <pr_owner> newer
-#     than the since-file timestamp; if any are found, write the max of
+#   - else collect comments (issue-level + inline + review bodies) from
+#     <pr_owner> newer than the since-file timestamp; if any are found, write the max of
 #     their timestamps into <since_file> (creating its parent dir if
 #     needed); if any of those new comments is exactly ":shipit:" print
 #     "approved" and exit 0; otherwise print "commented" followed by each
@@ -164,12 +164,13 @@ while true; do
     continue
   }
 
-  # Normalize both sources to {login, createdAt, body}
+  # Normalize all sources to {login, createdAt, body}
   all_comments=$(jq -n \
     --argjson conv "$pr_data" \
     --argjson inline "$review_comments" \
     '[$conv.comments[] | {login: .author.login, createdAt: .createdAt, body: .body}] +
-     [$inline[] | {login: .user.login, createdAt: .created_at, body: .body}]' \
+     [$inline[] | {login: .user.login, createdAt: .created_at, body: .body}] +
+     [$conv.reviews[] | select(.body != null and (.body | gsub("[[:space:]]"; "") != "")) | {login: .author.login, createdAt: .submittedAt, body: .body}]' \
     2>/dev/null) || { sleep 5; continue; }
 
   last_time="1970-01-01T00:00:00Z"

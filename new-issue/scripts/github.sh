@@ -105,6 +105,14 @@ cmd_fetch() {
   title=$(echo "$result" | jq -r '.title')
   body=$(echo "$result" | jq -r '.body')
 
+  local tags_block
+  tags_block=$(perl -0777 -ne 'if (/(?:[ \t]*\n)+---[ \t]*(?:[ \t]*\n)+((?:(?i)tags:.*\n?)+)$/) { print $1 }' <<< "$body")
+  tags_block=$(printf '%s' "$tags_block" | sed -e 's/[[:space:]]*$//')
+
+  if [[ -n "$tags_block" ]]; then
+    body=$(perl -0777 -pe 's/(?:[ \t]*\n)+---[ \t]*(?:[ \t]*\n)+(?:(?i)tags:.*\n?)+$//' <<< "$body")
+  fi
+
   local normalized
   normalized=$(normalize_title "$title")
 
@@ -118,6 +126,12 @@ cmd_fetch() {
   echo "FILE=$filepath"
   echo "DOMAIN=$_ORIGIN_DOMAIN"
   echo "REPO=$_ORIGIN_REPO_PATH"
+
+  if [[ -n "$tags_block" ]]; then
+    echo "TAGS_BEGIN"
+    printf '%s\n' "$tags_block"
+    echo "TAGS_END"
+  fi
 }
 
 cmd_update() {

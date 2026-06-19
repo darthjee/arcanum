@@ -30,7 +30,7 @@ Only when `NEEDS_FETCH=true`, run:
 scripts/github.sh fetch <id>
 ```
 
-- **Success:** the script saves the raw GitHub body into a temporary file under `docs/agents/issues/` and prints `TITLE`, `FILE`, `DOMAIN`, `REPO`. Use the fetched `TITLE` and the body content as the starting material for Step 3.
+- **Success:** the script saves the raw GitHub body into a temporary file under `docs/agents/issues/` and prints `TITLE`, `FILE`, `DOMAIN`, `REPO`. If the body ended with a trailing `---`/`tags: ...` block, that block is stripped from the saved body and instead printed between `TAGS_BEGIN`/`TAGS_END` markers — carry it forward to Step 3, which re-appends it verbatim at the end of the final file. Use the fetched `TITLE` and the (now tags-stripped) body content as the starting material for Step 3.
 - **Failure (issue not found):** proceed with just the title already known from Step 1 (or `TODO: untitled issue` if none), with no GitHub content. Do not stop and do not ask the user anything.
 
 ## Step 3 — Write the issue file
