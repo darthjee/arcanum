@@ -2,6 +2,10 @@
 
 A collection of Claude Code skills — reusable slash commands that extend Claude Code with project workflows.
 
+**Current Version:** [0.0.1](https://github.com/darthjee/arcanum/releases/tag/0.0.1)
+
+**Next Release:** [0.0.2](https://github.com/darthjee/arcanum/compare/0.0.1...main)
+
 ## What are skills?
 
 Skills are prompt files that Claude Code loads as slash commands. Each skill lives in its own folder under the repository root and is activated by typing `/skill-name` in Claude Code.
