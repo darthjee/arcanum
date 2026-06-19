@@ -11,10 +11,19 @@
 # Output: first line is "passed" or "failed". On "failed", subsequent
 # lines are the names of the failed check-runs (status completed and
 # conclusion in failure/cancelled/timed_out).
+#
+# Check-runs whose name case-insensitively contains any pattern in
+# IGNORED_CHECK_PATTERNS are excluded entirely from the passed/failed/total
+# accounting (neither blocking the PR nor required to pass). Currently this
+# only ignores Codacy, since it can report a "action_required" conclusion
+# that is neither success nor a failure state, which would otherwise hang
+# this script forever.
 
 set -euo pipefail
 
 export GH_INSECURE_SKIP_VERIFY=true
+
+IGNORED_CHECK_PATTERNS=("Codacy")
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib_origin.sh"
 
@@ -40,25 +49,31 @@ while true; do
     sleep 5; continue
   }
 
-  total=$(echo "$checks" | jq '.check_runs | length' 2>/dev/null) || { sleep 5; continue; }
+  ignored_json=$(printf '%s\n' "${IGNORED_CHECK_PATTERNS[@]}" | jq -R . | jq -s .)
+
+  filtered=$(echo "$checks" | jq --argjson ignored "$ignored_json" \
+    '.check_runs |= map(select(([$ignored[] as $p | (.name | test($p; "i"))] | any) | not))' \
+    2>/dev/null) || { sleep 5; continue; }
+
+  total=$(echo "$filtered" | jq '.check_runs | length' 2>/dev/null) || { sleep 5; continue; }
 
   # No checks registered yet — keep waiting
   if [[ "$total" -eq 0 ]]; then
     sleep 5; continue
   fi
 
-  failed=$(echo "$checks" | jq \
+  failed=$(echo "$filtered" | jq \
     '[.check_runs[] | select(.status == "completed" and (.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out"))] | length' \
     2>/dev/null) || { sleep 5; continue; }
 
   if [[ "$failed" -gt 0 ]]; then
     echo "failed"
-    echo "$checks" | jq -r \
+    echo "$filtered" | jq -r \
       '.check_runs[] | select(.status == "completed" and (.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out")) | .name'
     exit 0
   fi
 
-  passed=$(echo "$checks" | jq \
+  passed=$(echo "$filtered" | jq \
     '[.check_runs[] | select(.status == "completed" and .conclusion == "success")] | length' \
     2>/dev/null) || { sleep 5; continue; }
 
