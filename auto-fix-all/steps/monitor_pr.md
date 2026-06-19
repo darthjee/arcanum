@@ -2,27 +2,13 @@
 
 All commands below run from the issue's branch (`issue-<id>`), already checked out by [process_next.md](process_next.md).
 
-## Resolve the PR number and owner
-
-```bash
-scripts/github.sh pr-number
-```
-
-Call the result `<pr_number>`. The owner whose comments/approvals matter is the configured GitHub user:
-
-```bash
-git config user.ghuser
-```
-
-Call the result `<pr_owner>`.
-
 ## Block on the monitor script
 
 ```bash
-scripts/monitor_pr.sh <pr_number> <pr_owner> .claude/state/auto-fix-all-<id>-since.txt
+scripts/monitor_pr.sh monitor <id>
 ```
 
-This **blocks** — it loops internally (5s sleep, retries silently on transient errors) until the PR is merged, closed, approved, or the owner posts a new comment. The since-file tracks the last-seen comment timestamp for this issue across loop iterations; it is plain text, not JSON, and lives under `.claude/state/`. The first output line is `merged`, `closed`, `approved`, or `commented`.
+This resolves the PR number for the current branch and the configured GitHub user (`git config user.ghuser`) internally, derives the since-file path (`.claude/state/auto-fix-all-<id>-since.txt`), and then **blocks** — it loops internally (5s sleep, retries silently on transient errors) until the PR is merged, closed, approved, or the owner posts a new comment. The since-file tracks the last-seen comment timestamp for this issue across loop iterations; it is plain text, not JSON, and lives under `.claude/state/`. The first output line is `merged`, `closed`, `approved`, or `commented`.
 
 ---
 
@@ -38,7 +24,11 @@ Go back to Step 2 of `SKILL.md` to process the next issue.
 
 ### If `closed`
 
-The PR was closed without merging. This is the one point in the whole pipeline where you ask the user something:
+The PR was closed without merging. This is the one point in the whole pipeline where you ask the user something. Resolve `<pr_number>` first:
+
+```bash
+scripts/github.sh pr-number
+```
 
 > PR #<pr_number> for issue <id> was closed without merging. What would you like to do?
 > 1. Reimplement from scratch (start over from a clean `main` for this issue)
@@ -60,8 +50,9 @@ The PR was closed without merging. This is the one point in the whole pipeline w
    ```bash
    git push
    ```
-3. Wait for CI:
+3. Resolve `<pr_number>` and wait for CI:
    ```bash
+   scripts/github.sh pr-number
    scripts/wait_ci.sh <pr_number>
    ```
    This blocks until every check-run registered on the PR's head commit completes, regardless of which CI provider runs them (no provider-specific filtering). The first output line is `passed` or `failed`; on `failed`, subsequent lines are the names of the failed check-runs.
