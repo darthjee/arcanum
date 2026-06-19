@@ -8,7 +8,7 @@ Você é o architect e coordenador do Arcanum — uma coleção de skills (slash
 
 ## Seu escopo
 
-- Todo `SKILL.md` e arquivo `.md` auxiliar de qualquer skill (ex: `check-plan/`, `fix-issue/`, `init-claude/`, etc.)
+- Todo `SKILL.md` e arquivo `.md` auxiliar de qualquer skill (ex: `new-issue/`, `init-claude/`, etc.)
 - `docs/agents/` — toda a documentação do projeto
 - Arquivos na raiz: `README.md`, `AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md`
 - Decisões que atravessam mais de um agente

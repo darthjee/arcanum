@@ -8,11 +8,8 @@
 | `auto-plan-issue/` | Skill `/auto-plan-issue` — escreve o plano de implementação de uma issue de forma autônoma, dividindo entre agentes especialistas quando existirem. |
 | `auto-fix-issue/` | Skill `/auto-fix-issue` — implementa uma issue planejada de forma autônoma, despachando agentes especialistas em paralelo e abrindo/marcando pronto o PR. |
 | `auto-fix-all/` | Skill `/auto-fix-all` — orquestra o pipeline completo (issue → plano → fix → monitoramento) para uma fila de IDs, um por vez, reagindo a comentários, aprovações, falhas de CI e fechamentos de PR até esvaziar a fila. |
-| `check-plan/` | Skill `/check-plan` — valida um plano de implementação existente. |
-| `fix-issue/` | Skill `/fix-issue` — abre um PR para corrigir uma issue. |
 | `init-claude/` | Skill `/init-claude` — configura AGENTS.md/CLAUDE.md/copilot-instructions.md e a estrutura de docs do projeto. |
 | `new-issue/` | Skill `/new-issue` — cria um novo arquivo de issue. |
-| `new-plan/` | Skill `/new-plan` — cria uma issue e seu plano em um fluxo único. |
 | `plan-issue/` | Skill `/plan-issue` — cria o plano de implementação de uma issue existente. |
 | `docs/agents/` | Documentação do próprio repositório (arquitetura, fluxo, issues, plans). |
 | `.github/` | Contém `copilot-instructions.md`, que aponta para AGENTS.md. |

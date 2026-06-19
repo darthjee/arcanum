@@ -17,9 +17,6 @@ Skills are prompt files that Claude Code loads as slash commands. Each skill liv
 | [`/init-claude`](init-claude/) | Initializes a project's AI configuration: creates or consolidates `CLAUDE.md`, `.github/copilot-instructions.md`, and `AGENTS.md`, then scaffolds `docs/agents/` with architecture, folder structure, and contributing guides. |
 | [`/new-issue`](new-issue/) | Creates a new issue file in the project's `docs/agents/issues/` folder. |
 | [`/plan-issue`](plan-issue/) | Reads an issue file, analyzes the codebase, and writes a structured implementation plan in `docs/agents/plans/`. |
-| [`/check-plan`](check-plan/) | Validates an existing implementation plan, identifies problems and open questions, and optionally invokes `/fix-issue`. |
-| [`/new-plan`](new-plan/) | Creates a new issue and immediately writes its implementation plan, in one uninterrupted flow. |
-| [`/fix-issue`](fix-issue/) | Reads an issue and its plan, then opens a pull request to fix it. |
 | [`/auto-fix-all`](auto-fix-all/) | Autonomously runs the full pipeline (new issue → plan → fix → monitor) for a queue of issue IDs, one at a time, reacting to PR comments, approvals, CI failures, and closes until every issue is merged or skipped. |
 | [`/auto-new-issue`](auto-new-issue/) | Autonomously creates a new issue file with no user interaction, then commits it and syncs it to GitHub. |
 | [`/auto-plan-issue`](auto-plan-issue/) | Autonomously writes an implementation plan with no user interaction, splitting it across the target project's specialist agents when any are configured, then commits it. |

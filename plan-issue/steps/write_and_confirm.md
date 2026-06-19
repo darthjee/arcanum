@@ -94,5 +94,5 @@ Once the plan is confirmed, ask:
 Would you like to proceed and open a PR to fix this issue now?
 ```
 
-- If the user confirms (yes, sure, go ahead, or similar affirmative): invoke the `/fix-issue <id>` skill, where `<id>` is the issue ID parsed in Step 2.
+- If the user confirms (yes, sure, go ahead, or similar affirmative): invoke the `/auto-fix-issue <id>` skill, where `<id>` is the issue ID parsed in Step 2.
 - If the user declines: acknowledge and stop.
