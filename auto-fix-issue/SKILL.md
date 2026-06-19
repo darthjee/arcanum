@@ -44,7 +44,7 @@ scripts/list_plan_agents.sh <PLAN_DIR>
 
 Each line printed is the name of a specialist agent that has its own plan file (`<PLAN_DIR>/<agent-name>.md`) — the same convention used by `auto-plan-issue` to split plans. This list is **not** hardcoded to any fixed set of layers; it reflects whatever agents `auto-plan-issue` (or a human) decided were relevant for this issue.
 
-- **No output (empty)** — the plan was not split across agents. Treat `PLAN_FILE` itself as the only unit of work and implement it yourself, following the same development cycle described in [steps/dispatch_agents.md](steps/dispatch_agents.md) (implement, test/lint, commit via `scripts/commit_change.sh`). Skip straight to Step 5 once done.
+- **No output (empty)** — the plan was not split across agents. Treat `PLAN_FILE` itself as the only unit of work and implement it yourself, following the same development cycle described in [steps/dispatch_agents.md](steps/dispatch_agents.md) (implement, run `scripts/run_checks.sh architect`, commit via `scripts/commit_change.sh`). Skip straight to Step 5 once done.
 - **One or more lines** — proceed to Step 4 with this list of agent names.
 
 ## Step 4 — Dispatch specialist agents in parallel
