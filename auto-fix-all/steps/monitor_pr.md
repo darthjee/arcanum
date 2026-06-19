@@ -50,10 +50,9 @@ scripts/github.sh pr-number
    ```bash
    git push
    ```
-3. Resolve `<pr_number>` and wait for CI:
+3. Wait for CI:
    ```bash
-   scripts/github.sh pr-number
-   scripts/wait_ci.sh <pr_number>
+   scripts/wait_ci.sh
    ```
    This blocks until every check-run registered on the PR's head commit completes, regardless of which CI provider runs them (no provider-specific filtering). The first output line is `passed` or `failed`; on `failed`, subsequent lines are the names of the failed check-runs.
 
