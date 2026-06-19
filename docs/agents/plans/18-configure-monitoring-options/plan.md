@@ -46,13 +46,21 @@ Create `.claude/configuration/auto-fix-all.json` in this repo with `{"ignored_ch
 
 Test `wait_ci.sh` against a real PR in this repo after the change, confirming Codacy is still ignored (reads from the newly-created config file) and the script still reports `passed`/`failed` correctly.
 
+### Step 6 — Detect pre-approval from a body tags line too
+
+Add `auto-fix-all/scripts/has_shipit_tag.sh <issue_file>`: reads the given local issue file, finds the last line matching `^[ \t]*tags:` case-insensitively, extracts every colon-delimited token on that line (e.g. `tags: :shipit: :+1: :some_tag:` → `shipit`, `+1`, `some_tag`), and exits 0 if any token equals `shipit` case-insensitively, exit 1 otherwise (including when no such line exists or the file doesn't exist).
+
+Update `auto-fix-all/steps/process_next.md`'s Step 6 ("Check for pre-approval") to treat the issue as pre-approved when **either** `scripts/github.sh has-shipit-label <id>` exits 0 **or** `scripts/has_shipit_tag.sh <ISSUE_FILE>` exits 0 (resolve `ISSUE_FILE` the same way the "approved" branch of `monitor_pr.md` already does, via `../../auto-plan-issue/scripts/resolve_plan_paths.sh docs/agents/issues docs/agents/plans <id>`). Update the section's explanatory comment, which currently says pre-approval is *not* expressed via a "Tags:" line — that statement becomes outdated and must be corrected to describe the new dual-source check.
+
 ## Files to Change
 
 - `.claude/configuration/auto-fix-all.json` (new, this repo's own config)
 - `auto-fix-all/scripts/wait_ci.sh`
 - `init-claude/SKILL.md` and/or a new/updated step file under `init-claude/` for asking about ignored CI patterns
+- `auto-fix-all/scripts/has_shipit_tag.sh` (new)
+- `auto-fix-all/steps/process_next.md`
 
 ## Notes
 
 - No CI config of its own beyond GitHub's check-runs (GitGuardian, Codacy) exists in this repo; verification is manual, per Step 5.
-- Script work (`wait_ci.sh`) goes through `scripter`; the `init-claude` prose update and the new config file go through `architect`.
+- Script work (`wait_ci.sh`, `has_shipit_tag.sh`) goes through `scripter`; the `init-claude`/`process_next.md` prose updates and the new config file go through `architect`.
