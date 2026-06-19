@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Wait for all CI check-runs on a PR's head commit to complete
-# Usage: wait_ci.sh <pr_number>
+# Usage: wait_ci.sh
 #
 # Blocking loop (5s sleep) that polls the GitHub Checks API for ALL
 # check-runs on the PR's head commit, from any CI provider (no filtering
@@ -15,13 +15,6 @@
 set -euo pipefail
 
 export GH_INSECURE_SKIP_VERIFY=true
-
-PR_NUMBER="${1:-}"
-
-[[ -n "$PR_NUMBER" ]] || {
-  echo "Usage: $0 <pr_number>" >&2
-  exit 1
-}
 
 # --- Origin helpers (cached) ---
 # Duplicated verbatim from github.sh: self-contained script, no sourcing
@@ -82,6 +75,16 @@ _ensure_gh_user() {
 
 _ensure_gh_user
 REPO_REF=$(get_repo_ref)
+
+branch=$(git branch --show-current)
+PR_NUMBER=$(gh pr view -R "$REPO_REF" "$branch" --json number -q '.number' 2>/dev/null) || {
+  echo "Error: no pull request found for the current branch on $REPO_REF" >&2
+  exit 1
+}
+[[ -n "$PR_NUMBER" ]] || {
+  echo "Error: no pull request found for the current branch on $REPO_REF" >&2
+  exit 1
+}
 
 while true; do
   sha=$(gh pr view "$PR_NUMBER" -R "$REPO_REF" --json headRefOid -q '.headRefOid' 2>/dev/null) || {
