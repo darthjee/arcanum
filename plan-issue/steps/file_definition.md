@@ -6,6 +6,8 @@ The argument may be in one of these formats:
 - `99` → ID is `99`
 - `#99` → strip the `#`, ID is `99`
 
+The ID must be a plain numeric value tied to a real GitHub issue. If a non-numeric value is given (e.g. a legacy local id like `X01`), stop immediately and report: `Error: issue id must be numeric and linked to a GitHub issue.` Do not attempt to resolve or guess it.
+
 ## Locate the issue file
 
 List the files in the issues folder and find the one whose name starts with the given ID (e.g., `99_add_tables.md`). Read that file to understand the issue.

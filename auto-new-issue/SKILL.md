@@ -18,7 +18,7 @@ scripts/resolve_id_and_file.sh docs/agents/issues "<skill_args>"
 Parse the key=value output to obtain `SCENARIO`, `ID`, `TITLE`, `FILE`, `STATUS`, and optionally `NEEDS_FETCH`.
 
 - **STATUS=existing** — the file already exists. Skip straight to confirming nothing else needs to be done; this skill never overwrites an existing issue file.
-- **STATUS=needs_title** — no title was given and no numeric ID either. Do not ask the user. Use `TODO: untitled issue` as the title and continue (you may revise the title later in the file body if context elsewhere gives you a better one).
+- **STATUS=missing_id** — no numeric GitHub issue ID is known yet (and there is no local-only id convention to fall back on). This skill never asks the user. If no title is known either, use `TODO: untitled issue` as the title. Proceed to Step 3 to draft the content — since there's no `FILE` path yet, Step 3 writes to a temporary file instead. Step 4 is then responsible for minting the real GitHub issue id (via `scripts/github.sh create`) before committing.
 - **STATUS=new + NEEDS_FETCH=true** — a numeric ID was provided; proceed to Step 2 to fetch it from GitHub before writing.
 - **STATUS=new** (no NEEDS_FETCH) — proceed directly to Step 3 with the given/inferred title.
 

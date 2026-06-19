@@ -110,11 +110,12 @@ cmd_pr_view() {
   _ensure_gh_user
   _load_origin
 
-  local repo_ref
+  local repo_ref branch
   repo_ref=$(get_repo_ref)
+  branch=$(git branch --show-current)
 
   local output
-  if output=$(gh pr view -R "$repo_ref" --json url,isDraft 2>&1); then
+  if output=$(gh pr view -R "$repo_ref" "$branch" --json url,isDraft 2>&1); then
     local url is_draft
     url=$(echo "$output" | jq -r '.url')
     is_draft=$(echo "$output" | jq -r '.isDraft')
@@ -133,10 +134,11 @@ cmd_pr_ready() {
   _ensure_gh_user
   _load_origin
 
-  local repo_ref
+  local repo_ref branch
   repo_ref=$(get_repo_ref)
+  branch=$(git branch --show-current)
 
-  gh pr ready -R "$repo_ref" >/dev/null || {
+  gh pr ready -R "$repo_ref" "$branch" >/dev/null || {
     echo "Error: could not mark PR ready on $repo_ref" >&2
     exit 1
   }

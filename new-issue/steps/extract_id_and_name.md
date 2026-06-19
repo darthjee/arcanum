@@ -35,6 +35,15 @@ Run the fetch script to retrieve the initial content from GitHub:
 - **Success:** Use the returned `TITLE`, `FILE`, `DOMAIN`, and `REPO` values. Use the body saved in `FILE` as the initial description. Proceed to "Confirm and iterate" in [collect_and_save.md](collect_and_save.md).
 - **Failure / issue not found:** Inform the user: `Could not find GitHub issue #<id>. Please provide a title.`, ask for a title, then proceed with the provided title and the numeric ID (no pre-populated content). The `FILE` from the resolve script can be used once a title is known.
 
-### STATUS=needs_title
+### STATUS=missing_id
 
-No title was provided. Ask: `What is the title of the issue?` and wait for the response. Then re-run the resolve script with the same issues folder and the answer as the arg string, but prefixed with the ID if one was already determined (e.g., `#<ID> <title>`).
+No numeric GitHub issue ID is known yet (every issue must be backed by a real GitHub issue — there is no local-only id). Tell the user:
+
+```
+No GitHub issue ID was provided for this issue. Do you have an existing GitHub issue number, or should I create a new issue on GitHub now?
+```
+
+Wait for the response.
+
+- **The user gives a number** (with or without `#`): re-run the resolve script (`../scripts/resolve_id_and_file.sh <issues_folder> "#<id> <title-if-known>"`) and re-interpret the fresh output from the top of this section.
+- **The user confirms creating a new issue**: if no title is known yet, ask `What is the title of the issue?` and wait. Then proceed to [collect_and_save.md](collect_and_save.md)'s description-collection flow — note that there is **no `FILE` yet**; the file is only created once `github.sh create` mints the real GitHub issue id (see collect_and_save.md's "create new issue" branch).
