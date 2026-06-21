@@ -2,13 +2,9 @@
 
 All commands below run from the issue's branch (`issue-<id>`), already checked out by [process_next.md](process_next.md).
 
-## Block on the monitor script
+## Block on the monitor skill
 
-```bash
-scripts/monitor_pr.sh monitor <id>
-```
-
-This resolves the PR number for the current branch and the configured GitHub user (`git config user.ghuser`) internally, derives the since-file path (`.claude/state/auto-fix-all-<id>-since.txt`), and then **blocks** — it loops internally (5s sleep, retries silently on transient errors) until the PR is merged, closed, approved, or the owner posts a new comment. The since-file tracks the last-seen comment timestamp for this issue across loop iterations; it is plain text, not JSON, and lives under `.claude/state/`. The first output line is `merged`, `closed`, `approved`, or `commented`.
+Read [../../auto-monitor-issue-pr/SKILL.md](../../auto-monitor-issue-pr/SKILL.md) and follow it for `<id>`. It resolves the PR for the current branch and **blocks** — looping internally (5s sleep, retries silently on transient errors) until the PR is merged, closed, approved, or the owner posts a new comment — then reports the outcome. The first output line is `merged`, `closed`, `approved`, or `commented`.
 
 ---
 

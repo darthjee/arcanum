@@ -1,20 +1,15 @@
 #!/usr/bin/env bash
 # Monitor a PR for merge/close/approval/new-comments from its owner
-# Usage: monitor_pr.sh <pr_number> <pr_owner> <since_file>
-#        monitor_pr.sh monitor <issue_id>
-#   The "monitor <issue_id>" form resolves PR_OWNER via get_gh_user, resolves
-#   PR_NUMBER from the current branch's PR (same pattern as github.sh's
-#   cmd_pr_number), and derives SINCE_FILE as
-#   .claude/state/auto-fix-all-<issue_id>-since.txt; it then falls through
-#   into the same monitoring loop as the explicit-args form.
+# Usage: monitor_pr.sh <pr_number>
+#
+# Resolves PR_OWNER via get_gh_user and derives SINCE_FILE as
+# .claude/state/auto-monitor-pr-<pr_number>-since.txt.
 #
 # Blocking loop (5s sleep) that polls `gh pr view --json state,comments,reviews`
 # plus the inline review comments API, retrying silently on transient gh
-# errors. Generalized + simplified version of majora's cmd_monitor_pr: there
-# is no JSON metadata file — instead <since_file> is a plain-text file
-# (created by the caller's choosing, e.g. under .claude/state/) holding a
-# single ISO8601 timestamp line, the last-seen comment time. If the file is
-# missing, "1970-01-01T00:00:00Z" is assumed.
+# errors. The since-file is a plain-text file holding a single ISO8601
+# timestamp line, the last-seen comment time. If the file is missing,
+# "1970-01-01T00:00:00Z" is assumed.
 #
 # Behavior:
 #   - PR state MERGED  -> print "merged", exit 0
@@ -34,45 +29,17 @@ export GH_INSECURE_SKIP_VERIFY=true
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib_origin.sh"
 
-if [[ "${1:-}" == "monitor" ]]; then
-  issue_id="${2:-}"
-  [[ -n "$issue_id" ]] || {
-    echo "Usage: $0 monitor <issue_id>" >&2
-    echo "       $0 <pr_number> <pr_owner> <since_file>" >&2
-    exit 1
-  }
+PR_NUMBER="${1:-}"
 
-  _ensure_gh_user
-  PR_OWNER=$(get_gh_user)
-
-  repo_ref=$(get_repo_ref)
-  branch=$(git branch --show-current)
-
-  PR_NUMBER=$(gh pr view -R "$repo_ref" "$branch" --json number -q '.number' 2>/dev/null) || {
-    echo "Error: no pull request found for the current branch on $repo_ref" >&2
-    exit 1
-  }
-
-  [[ -n "$PR_NUMBER" ]] || {
-    echo "Error: no pull request found for the current branch on $repo_ref" >&2
-    exit 1
-  }
-
-  SINCE_FILE=".claude/state/auto-fix-all-${issue_id}-since.txt"
-else
-  PR_NUMBER="${1:-}"
-  PR_OWNER="${2:-}"
-  SINCE_FILE="${3:-}"
-
-  [[ -n "$PR_NUMBER" && -n "$PR_OWNER" && -n "$SINCE_FILE" ]] || {
-    echo "Usage: $0 <pr_number> <pr_owner> <since_file>" >&2
-    echo "       $0 monitor <issue_id>" >&2
-    exit 1
-  }
-fi
+[[ -n "$PR_NUMBER" ]] || {
+  echo "Usage: $0 <pr_number>" >&2
+  exit 1
+}
 
 _ensure_gh_user
+PR_OWNER=$(get_gh_user)
 REPO_REF=$(get_repo_ref)
+SINCE_FILE=".claude/state/auto-monitor-pr-${PR_NUMBER}-since.txt"
 
 while true; do
   pr_data=$(gh pr view "$PR_NUMBER" -R "$REPO_REF" --json state,comments,reviews 2>/dev/null) || {

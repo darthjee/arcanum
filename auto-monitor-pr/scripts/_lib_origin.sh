@@ -1,14 +1,12 @@
-# Shared origin-resolution helpers for auto-fix-all's scripts.
+# Shared origin-resolution helpers for auto-monitor-pr's scripts.
 #
 # This file is meant to be SOURCED, not executed directly — it defines
-# globals/functions used by github.sh and wait_ci.sh.
+# globals/functions used by monitor_pr.sh.
 #
-# Scope: this sourcing is local to the auto-fix-all skill only. Other
-# skills (new-issue, auto-new-issue, auto-fix-issue, auto-monitor-pr,
-# auto-monitor-issue-pr, etc.) intentionally keep their own independent
-# copies of similar helpers so each skill folder remains self-contained
-# and portable on its own — that cross-skill boundary is not being
-# changed here.
+# Scope: this sourcing is local to the auto-monitor-pr skill only. Other
+# skills (auto-fix-all, auto-monitor-issue-pr, etc.) intentionally keep
+# their own independent copies of this helper so each skill folder
+# remains self-contained and portable on its own.
 
 # --- Origin helpers (cached) ---
 
