@@ -30,6 +30,7 @@ export GH_INSECURE_SKIP_VERIFY=true
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib_origin.sh"
 
 PR_NUMBER="${1:-}"
+PR_NUMBER="${PR_NUMBER#\#}"
 
 [[ -n "$PR_NUMBER" ]] || {
   echo "Usage: $0 <pr_number>" >&2

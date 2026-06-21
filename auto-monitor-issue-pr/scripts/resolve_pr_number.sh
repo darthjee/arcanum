@@ -12,6 +12,7 @@ set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib_origin.sh"
 
 ID="${1:-}"
+ID="${ID#\#}"
 
 [[ "$ID" =~ ^[0-9]+$ ]] || {
   echo "Usage: $0 <id>" >&2
