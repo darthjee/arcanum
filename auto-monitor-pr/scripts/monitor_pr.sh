@@ -2,18 +2,17 @@
 # Monitor a PR for merge/close/approval/new-comments from its owner
 # Usage: monitor_pr.sh <pr_number>
 #
-# Resolves PR_OWNER via get_gh_user and derives SINCE_FILE as
-# .claude/state/auto-monitor-pr-<pr_number>-since.txt and COMMENTS_FILE as
+# Resolves PR_OWNER via get_gh_user and derives COMMENTS_FILE as
 # .claude/state/auto-monitor-pr-<pr_number>-comments.json.
 #
 # Blocking loop (5s sleep) that polls `gh pr view --json state,comments,reviews`
 # plus the inline review comments API, retrying silently on transient gh
-# errors. The since-file is a plain-text file holding a single ISO8601
-# timestamp line, the last-seen comment time. If the file is missing,
-# "1970-01-01T00:00:00Z" is assumed. The comments-file is a JSON object
-# `{"comments":[{id,user,url,status}]}` tracking each owner comment's
-# lifecycle (status "open" -> "addressed") across loop iterations and
-# across separate invocations of this script.
+# errors. The comments-file is a JSON object
+# `{"comments":[{id,user,url,status}],"last_comment_time":<ISO8601>}`
+# tracking each owner comment's lifecycle (status "open" -> "addressed")
+# and the last-seen comment time, across loop iterations and across
+# separate invocations of this script. If the file is missing, the
+# timestamp defaults to "1970-01-01T00:00:00Z".
 #
 # On every invocation, before polling: any comment still marked "open" in
 # the comments-file is assumed addressed by whatever triggered this fresh
@@ -28,13 +27,13 @@
 #   - latest review by <pr_owner> is APPROVED -> print "approved", exit 0
 #   - else collect comments (issue-level + inline + review bodies, each with
 #     its GraphQL node id and html url) from <pr_owner> newer than the
-#     since-file timestamp; if any are found, write the max of their
-#     timestamps into <since_file> (creating its parent dir if needed); if
-#     any of those new comments is exactly ":shipit:" print "approved" and
-#     exit 0; otherwise add an :eyes: reaction to each, record them as
-#     "open" in the comments-file, then print "commented" followed by each
-#     new comment as a "---"-preceded block of "id: <id>", "url: <url>",
-#     then the body, exit 0
+#     comments-file's last_comment_time; if any are found, write the max of
+#     their timestamps into the comments-file's last_comment_time; if any of
+#     those new comments is exactly ":shipit:" print "approved" and exit 0;
+#     otherwise add an :eyes: reaction to each, record them as "open" in the
+#     comments-file, then print "commented" followed by each new comment as
+#     a "---"-preceded block of "id: <id>", "url: <url>", then the body,
+#     exit 0
 #   - otherwise sleep 5s and loop
 
 set -euo pipefail
@@ -54,7 +53,6 @@ PR_NUMBER="${PR_NUMBER#\#}"
 _ensure_gh_user
 PR_OWNER=$(get_gh_user)
 REPO_REF=$(get_repo_ref)
-SINCE_FILE=".claude/state/auto-monitor-pr-${PR_NUMBER}-since.txt"
 COMMENTS_FILE=".claude/state/auto-monitor-pr-${PR_NUMBER}-comments.json"
 
 add_reaction() { # $1 = node id, $2 = ReactionContent (EYES|THUMBS_UP)
@@ -66,7 +64,7 @@ remove_reaction() { # $1 = node id, $2 = ReactionContent
 }
 
 load_comments_state() {
-  cat "$COMMENTS_FILE" 2>/dev/null || echo '{"comments":[]}'
+  cat "$COMMENTS_FILE" 2>/dev/null || echo '{"comments":[],"last_comment_time":"1970-01-01T00:00:00Z"}'
 }
 
 save_comments_state() {
@@ -134,11 +132,7 @@ while true; do
      [$conv.reviews[] | select(.body != null and (.body | gsub("[[:space:]]"; "") != "")) | {login: .author.login, createdAt: .submittedAt, body: .body, id: .id, url: .url}]' \
     2>/dev/null) || { sleep 5; continue; }
 
-  last_time="1970-01-01T00:00:00Z"
-  if [[ -f "$SINCE_FILE" ]]; then
-    file_time=$(head -1 "$SINCE_FILE" 2>/dev/null || true)
-    [[ -n "$file_time" ]] && last_time="$file_time"
-  fi
+  last_time=$(echo "$comments_state" | jq -r '.last_comment_time // "1970-01-01T00:00:00Z"')
 
   new_comments=$(echo "$all_comments" | jq \
     --arg owner "$PR_OWNER" \
@@ -150,8 +144,6 @@ while true; do
 
   if [[ "$count" -gt 0 ]]; then
     latest_time=$(echo "$new_comments" | jq -r '[.[].createdAt] | max' 2>/dev/null) || { sleep 5; continue; }
-    mkdir -p "$(dirname "$SINCE_FILE")"
-    echo "$latest_time" > "$SINCE_FILE"
 
     shipit_count=$(echo "$new_comments" | jq \
       '[.[] | select(.body | test("^[[:space:]]*:shipit:[[:space:]]*$"))] | length' \
@@ -169,8 +161,8 @@ while true; do
     done <<< "$new_ids"
 
     comments_state=$(load_comments_state)
-    comments_state=$(jq -n --argjson state "$comments_state" --argjson new "$new_comments" \
-      '$state.comments + [$new[] | {id, user: .login, url, status: "open"}] | {comments: .}')
+    comments_state=$(jq -n --argjson state "$comments_state" --argjson new "$new_comments" --arg latest "$latest_time" \
+      '{comments: ($state.comments + [$new[] | {id, user: .login, url, status: "open"}]), last_comment_time: $latest}')
     save_comments_state "$comments_state"
 
     echo "commented"
