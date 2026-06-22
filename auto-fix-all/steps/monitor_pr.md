@@ -70,7 +70,7 @@ After all agents commit, `git push`, then go back to step 3 above (`wait_ci.sh`)
 
 ### If `commented`
 
-The lines after the first are the new comment bodies, one per `---`-separated block — only comments from `<pr_owner>` are included.
+The lines after the first are the new comments, one per `---`-separated block — only comments from `<pr_owner>` are included. Each block starts with an `id: <node id>` line and a `url: <html url>` line, followed by the comment body. The underlying monitor script already added a `:eyes:` reaction to each of these comments and recorded them as `open`; it will swap that to `:+1:` and mark them `addressed` the next time it (re)starts — i.e. after you push the fixes below.
 
 Read [handle_comment.md](handle_comment.md) and follow its instructions to dispatch each comment to the right agent(s) and apply the feedback.
 

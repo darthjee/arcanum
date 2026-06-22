@@ -17,9 +17,9 @@ Each line has the form `<name>|<description>`.
 
 ## Choosing the responsible agent(s)
 
-For each comment body (or failed check-run name):
+For each comment (or failed check-run name):
 
-1. Read it carefully.
+1. Read its body carefully (when called from the `commented` branch of [monitor_pr.md](monitor_pr.md), also note its `id`/`url` header lines — keep the `url` at hand for the commit step below).
 2. Compare it against each candidate agent's `description` (excluding any agent that is clearly a coordinator/orchestrator rather than an implementation specialist, the same exclusion rule `auto-plan-issue` uses).
 3. Judge — based on the content of the comment/failure and what each agent's description says it owns — which agent(s), if any, are responsible for addressing it. There is no fixed keyword table; this is a judgment call grounded in the actual agent descriptions of this project.
 4. If **no** agent seems responsible, treat the comment/failure yourself as architect.
@@ -34,9 +34,9 @@ Launch the responsible agent(s) in parallel (single message, multiple Agent tool
 - The relevant plan file path(s) under `docs/agents/plans/<issue_dir>/` for context.
 - The instruction to implement the feedback (or fix the failure), run the full local dev/test/lint cycle, and commit via:
   ```bash
-  ../../auto-fix-issue/scripts/commit_change.sh <type> <scope> <id> "<subject>" <agent> "<AI model name>" "<AI model email>" "<optional body>"
+  ../../auto-fix-issue/scripts/commit_change.sh <type> <scope> <id> "<subject>" <agent> "<AI model name>" "<AI model email>" "<optional body>" "<comment_url>"
   ```
-  (resolved relative to the `auto-fix-issue` skill folder, same script and conventions used during the original implementation step).
+  (resolved relative to the `auto-fix-issue` skill folder, same script and conventions used during the original implementation step). Pass the comment's `url` (from its header line) as `<comment_url>` when this dispatch is for a specific PR comment; omit it entirely (no trailing argument) when handling a failed check-run, since that isn't tied to any one comment.
 
 If you (architect) are handling a comment/failure yourself, follow the same cycle and commit through the same script with `<agent>` set to `architect`.
 
