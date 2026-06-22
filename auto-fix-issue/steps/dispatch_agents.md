@@ -22,13 +22,14 @@ When `scripts/list_plan_agents.sh` printed no output (single unsplit plan, handl
 > 3. Analyze whether refactoring is needed — if so, refactor and repeat from step 2.
 > 4. When clean: `git add` your changes, then commit them by running the helper script — never write the commit message or run `git commit` by hand:
 >    ```bash
->    scripts/commit_change.sh <type> <scope> <id> "<subject>" <agent> "<AI model name>" "<AI model email>" "<optional body>"
+>    scripts/commit_change.sh <type> <scope> <id> "<subject>" <agent> "<AI model name>" "<AI model email>" "<optional body>" "<optional comment_url>"
 >    ```
 >    - `<type>`: `feat`, `fix`, `refactor`, `docs`, `test`, or `chore` — whichever best matches this commit.
 >    - `<scope>`: your layer/area (e.g. `backend`, `frontend`, `infra` — match your own agent name unless the plan's `## Files to Change` clearly points to a different scope).
 >    - `<id>`: the issue number.
 >    - `<agent>`: your own agent name (the same one used as `subagent_type`).
 >    - `<AI model name>` and `<AI model email>`: the model you are running on and its canonical noreply email (e.g. `Claude Sonnet 4.6` / `noreply@anthropic.com`).
+>    - `<optional comment_url>`: only pass this when the commit addresses a specific PR comment carried over from `auto-fix-all/steps/handle_comment.md` (its `url`); omit it for the initial implementation commits, same as the optional `<body>`.
 >    - Resolve `scripts/commit_change.sh` relative to the `auto-fix-issue` skill folder.
 >    - You may split your work into multiple atomic commits, each through this script, if the plan has multiple independent steps.
 >

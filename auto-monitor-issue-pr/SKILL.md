@@ -15,8 +15,8 @@ scripts/resolve_pr_number.sh <id>
 
 ## Step 2 — Delegate monitoring
 
-Read [../auto-monitor-pr/SKILL.md](../auto-monitor-pr/SKILL.md) and follow it for `<pr_number>`. It blocks and reports the outcome (`merged`, `closed`, `approved`, or `commented` + comment bodies).
+Read [../auto-monitor-pr/SKILL.md](../auto-monitor-pr/SKILL.md) and follow it for `<pr_number>`. It blocks and reports the outcome (`merged`, `closed`, `approved`, or `commented` + one `id`/`url`/body block per new comment).
 
 ## Step 3 — Report
 
-Report whatever `auto-monitor-pr` reported, verbatim. Do not act on it — reacting to the outcome is the caller's responsibility.
+Report whatever `auto-monitor-pr` reported, verbatim. Do not decide what to do about a comment — that is the caller's responsibility.
