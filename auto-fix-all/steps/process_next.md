@@ -3,10 +3,10 @@
 ## 1. Get the next ID
 
 ```bash
-scripts/queue.sh next
+scripts/queue.sh wait-next
 ```
 
-If the output is empty, the queue is done — go straight to Step 4 of `SKILL.md` (report and stop).
+This blocks until the queue has an ID — if it's currently empty, it sleeps 5 seconds and checks again, forever, so a run that drains the queue keeps waiting for issues pushed onto it later (e.g. via `push-issue-to-queue`) instead of exiting.
 
 Call this ID `<id>` for the rest of this file.
 
