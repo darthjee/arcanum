@@ -2,8 +2,11 @@
 
 # Queue management for auto-fix-all.
 #
-# State is stored in .claude/state/auto-fix-all-queue.txt — one ID per line.
-# The first line is always the current (in-progress) ID.
+# State is stored in .claude/state/auto-fix-all-queue.json — a JSON array of
+# entry objects (currently just {"id": "<id>"} each), so future fields (e.g.
+# issue metadata or auto-fix-all options) can be added to an entry without
+# changing the overall shape. The first element is always the current
+# (in-progress) entry.
 #
 # Commands:
 #   save <id...>  — overwrite the queue with the given IDs
@@ -31,7 +34,7 @@
 set -euo pipefail
 
 STATE_DIR=".claude/state"
-QUEUE_FILE="${STATE_DIR}/auto-fix-all-queue.txt"
+QUEUE_FILE="${STATE_DIR}/auto-fix-all-queue.json"
 LOCK_FILE="${STATE_DIR}/auto-fix-all-queue.lock"
 
 mkdir -p "$STATE_DIR"
@@ -61,6 +64,15 @@ _release_lock() {
   rm -f "$LOCK_FILE"
 }
 
+# Reads the queue array from QUEUE_FILE, or "[]" if absent/empty.
+_read_queue() {
+  if [[ -s "$QUEUE_FILE" ]]; then
+    cat "$QUEUE_FILE"
+  else
+    echo "[]"
+  fi
+}
+
 case ${1:-} in
   save)
     shift
@@ -68,23 +80,19 @@ case ${1:-} in
       echo "Error: save requires at least one ID" >&2
       exit 1
     fi
-    printf '%s\n' "$@" > "$QUEUE_FILE"
+    printf '%s\n' "$@" | jq -R '{id: .}' | jq -s '.' > "$QUEUE_FILE"
     echo "Queue saved: $*"
     ;;
 
   next)
-    if [[ ! -f "$QUEUE_FILE" ]] || [[ ! -s "$QUEUE_FILE" ]]; then
-      echo ""
-      exit 0
-    fi
-    head -1 "$QUEUE_FILE"
+    _read_queue | jq -r '.[0].id // ""'
     ;;
 
   wait-next)
-    while [[ ! -f "$QUEUE_FILE" ]] || [[ ! -s "$QUEUE_FILE" ]]; do
+    while [[ "$(_read_queue | jq 'length')" -eq 0 ]]; do
       sleep 5
     done
-    head -1 "$QUEUE_FILE"
+    _read_queue | jq -r '.[0].id'
     ;;
 
   push)
@@ -94,31 +102,31 @@ case ${1:-} in
       exit 1
     fi
     _acquire_lock
-    printf '%s\n' "$@" >> "$QUEUE_FILE"
+    NEW_ENTRIES=$(printf '%s\n' "$@" | jq -R '{id: .}' | jq -s '.')
+    _read_queue | jq --argjson new "$NEW_ENTRIES" '. + $new' > "${QUEUE_FILE}.tmp"
+    mv "${QUEUE_FILE}.tmp" "$QUEUE_FILE"
     _release_lock
     echo "Pushed: $*"
     ;;
 
   pop)
-    if [[ ! -f "$QUEUE_FILE" ]]; then
-      exit 0
-    fi
     _acquire_lock
-    tail -n +2 "$QUEUE_FILE" > "${QUEUE_FILE}.tmp"
+    _read_queue | jq '.[1:]' > "${QUEUE_FILE}.tmp"
     mv "${QUEUE_FILE}.tmp" "$QUEUE_FILE"
     _release_lock
     ;;
 
   empty)
-    if [[ ! -f "$QUEUE_FILE" ]] || [[ ! -s "$QUEUE_FILE" ]]; then
+    if [[ "$(_read_queue | jq 'length')" -eq 0 ]]; then
       exit 0
     fi
     exit 1
     ;;
 
   list)
-    if [[ -f "$QUEUE_FILE" ]] && [[ -s "$QUEUE_FILE" ]]; then
-      cat "$QUEUE_FILE"
+    IDS=$(_read_queue | jq -r '.[].id')
+    if [[ -n "$IDS" ]]; then
+      echo "$IDS"
     else
       echo "(empty)"
     fi
