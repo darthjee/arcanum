@@ -8,6 +8,8 @@
 # Commands:
 #   save <id...>  — overwrite the queue with the given IDs
 #   next          — print the first ID without removing it (empty output = done)
+#   wait-next     — like `next`, but if the queue is empty, sleep 5s and retry
+#                   forever instead of returning empty
 #   push <id...>  — append the given IDs to the end of the queue (locked)
 #   pop           — remove the first ID (mark current issue as done) (locked)
 #   empty         — exit 0 if queue is empty, exit 1 if it has items
@@ -78,6 +80,13 @@ case ${1:-} in
     head -1 "$QUEUE_FILE"
     ;;
 
+  wait-next)
+    while [[ ! -f "$QUEUE_FILE" ]] || [[ ! -s "$QUEUE_FILE" ]]; do
+      sleep 5
+    done
+    head -1 "$QUEUE_FILE"
+    ;;
+
   push)
     shift
     if [[ $# -eq 0 ]]; then
@@ -116,7 +125,7 @@ case ${1:-} in
     ;;
 
   *)
-    echo "Usage: $0 {save <id...>|next|push <id...>|pop|empty|list}" >&2
+    echo "Usage: $0 {save <id...>|next|wait-next|push <id...>|pop|empty|list}" >&2
     exit 1
     ;;
 esac

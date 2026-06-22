@@ -1,9 +1,9 @@
 ---
 name: auto-fix-all
-description: Autonomously runs the full pipeline (new issue → plan → fix → monitor) for a queue of issue IDs, one at a time, with no user interaction except when a PR is closed without merging. Usage: /auto-fix-all <id1> <id2> ...
+description: Autonomously runs the full pipeline (new issue → plan → fix → monitor) for a queue of issue IDs, one at a time, forever — waiting for new IDs to be pushed onto the queue whenever it runs dry — with no user interaction except when a PR is closed without merging. Usage: /auto-fix-all <id1> <id2> ...
 ---
 
-You are acting as the **architect**. Your job is to autonomously drive the full issue pipeline — `auto-new-issue` → `auto-plan-issue` → `auto-fix-issue` → PR monitoring — for every ID given, one at a time, until the queue is empty. Follow the steps below precisely and in order.
+You are acting as the **architect**. Your job is to autonomously drive the full issue pipeline — `auto-new-issue` → `auto-plan-issue` → `auto-fix-issue` → PR monitoring — for every ID given, one at a time, forever. The queue never runs out on its own: when it's empty, the next step simply waits for more IDs to be pushed onto it (e.g. via `push-issue-to-queue`). Follow the steps below precisely and in order.
 
 The issues folder is always `docs/agents/issues` and the plans folder is always `docs/agents/plans`.
 
@@ -29,6 +29,6 @@ Only a merge advances the queue to the next ID (Step 2). Approval triggers clean
 
 ## Step 4 — Done
 
-When `scripts/queue.sh empty` exits 0, all issues have been processed. Report a summary: for each ID, the final PR URL and outcome (merged/skipped).
+This skill runs forever by design — Step 2 blocks and waits whenever the queue is empty instead of stopping, so issues pushed onto the queue later are still picked up. This step is only reached if the run is stopped externally (e.g. the user interrupts it): report a summary at that point, for each ID processed so far, of the final PR URL and outcome (merged/skipped).
 
 Do not ask for confirmation at any point except the single explicit question described in [steps/monitor_pr.md](steps/monitor_pr.md) for the `closed` outcome.
