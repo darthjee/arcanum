@@ -17,7 +17,10 @@
 # simple lock (.claude/state/auto-fix-all-queue.lock) to avoid one
 # clobbering the other if they ever run concurrently: write this
 # invocation's instance id into the lock file, sleep 1s, re-read it back —
-# if it still matches, the lock is held; otherwise retry (bounded). The
+# if it still matches, the lock is held; otherwise retry. Acquisition never
+# gives up: every 10 attempts it prints a warning that the lock looks stuck
+# and may need manual intervention (check whether a process actually holds
+# it, and if not, remove the lock file by hand), then keeps retrying. The
 # lock file is removed once the mutation is done.
 
 set -euo pipefail
@@ -30,16 +33,18 @@ mkdir -p "$STATE_DIR"
 
 _acquire_lock() {
   local instance_id="${HOSTNAME:-host}-$$-$(date +%s%N)"
-  local attempt
-  for attempt in $(seq 1 10); do
+  local attempt=0
+  while true; do
+    attempt=$((attempt + 1))
     echo "$instance_id" > "$LOCK_FILE"
     sleep 1
     if [[ "$(cat "$LOCK_FILE" 2>/dev/null)" == "$instance_id" ]]; then
       return 0
     fi
+    if (( attempt % 10 == 0 )); then
+      echo "Warning: queue lock ($LOCK_FILE) seems stuck after ${attempt} attempts — check whether a process is actually holding it, and if not, remove the lock file manually. Retrying..." >&2
+    fi
   done
-  echo "Error: could not acquire queue lock after 10 attempts" >&2
-  return 1
 }
 
 _release_lock() {
@@ -71,7 +76,7 @@ case ${1:-} in
       echo "Error: push requires at least one ID" >&2
       exit 1
     fi
-    _acquire_lock || exit 1
+    _acquire_lock
     printf '%s\n' "$@" >> "$QUEUE_FILE"
     _release_lock
     echo "Pushed: $*"
@@ -81,7 +86,7 @@ case ${1:-} in
     if [[ ! -f "$QUEUE_FILE" ]]; then
       exit 0
     fi
-    _acquire_lock || exit 1
+    _acquire_lock
     tail -n +2 "$QUEUE_FILE" > "${QUEUE_FILE}.tmp"
     mv "${QUEUE_FILE}.tmp" "$QUEUE_FILE"
     _release_lock
