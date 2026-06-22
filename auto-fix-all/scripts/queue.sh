@@ -18,10 +18,13 @@
 # clobbering the other if they ever run concurrently: write this
 # invocation's instance id into the lock file, sleep 1s, re-read it back —
 # if it still matches, the lock is held; otherwise retry. Acquisition never
-# gives up: every 10 attempts it prints a warning that the lock looks stuck
-# and may need manual intervention (check whether a process actually holds
-# it, and if not, remove the lock file by hand), then keeps retrying. The
-# lock file is removed once the mutation is done.
+# gives up: every 10 attempts the attempt counter resets to 0 (so it never
+# grows unbounded), and the very first time that threshold is hit a warning
+# is printed — once only, never again for the same acquisition — that the
+# lock looks stuck and may need manual intervention (check whether a process
+# actually holds it, and if not, remove the lock file by hand). It then
+# keeps retrying silently. The lock file is removed once the mutation is
+# done.
 
 set -euo pipefail
 
@@ -34,6 +37,7 @@ mkdir -p "$STATE_DIR"
 _acquire_lock() {
   local instance_id="${HOSTNAME:-host}-$$-$(date +%s%N)"
   local attempt=0
+  local warned=false
   while true; do
     attempt=$((attempt + 1))
     echo "$instance_id" > "$LOCK_FILE"
@@ -42,7 +46,11 @@ _acquire_lock() {
       return 0
     fi
     if (( attempt % 10 == 0 )); then
-      echo "Warning: queue lock ($LOCK_FILE) seems stuck after ${attempt} attempts — check whether a process is actually holding it, and if not, remove the lock file manually. Retrying..." >&2
+      if [[ "$warned" == false ]]; then
+        echo "Warning: queue lock ($LOCK_FILE) seems stuck after ${attempt} attempts — check whether a process is actually holding it, and if not, remove the lock file manually. Retrying..." >&2
+        warned=true
+      fi
+      attempt=0
     fi
   done
 }
