@@ -2,6 +2,8 @@
 
 A collection of Claude Code skills — reusable slash commands that extend Claude Code with project workflows.
 
+![arcanum](https://raw.githubusercontent.com/darthjee/arcanum/master/arcanum.png)
+
 **Current Version:** [0.1.0](https://github.com/darthjee/arcanum/releases/tag/0.1.0)
 
 **Next Release:** [0.1.1](https://github.com/darthjee/arcanum/compare/0.1.0...main)
