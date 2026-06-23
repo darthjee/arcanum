@@ -1,18 +1,23 @@
 ---
 name: monitor-issues
-description: Starts a continuous background monitor that polls GitHub for issues created by the current user, writes parsed metadata and tags to a shared JSON state file, and respects the existing lock system. Usage: /monitor-issues
+description: Polls GitHub once per cycle for issues created by the current user, writes parsed metadata and tags to a shared JSON state file, and loops — either inline or with a fresh context via ScheduleWakeup when clear_context is enabled. Usage: /monitor-issues (or /loop /monitor-issues for context-clearing mode)
 ---
 
-You are acting as the **architect**. Your job is to start the issue monitoring loop — no user interaction, no confirmation.
+You are acting as the **architect**. Your job is to run one polling cycle and then decide whether to loop inline or reschedule — no user interaction.
 
-## Step 1 — Start the monitor
-
-Run the monitoring script:
+## Step 1 — Run one polling cycle
 
 ```bash
 scripts/monitor_issues.sh
 ```
 
-This script runs forever (5-second sleep between rounds). It polls GitHub for issues created by the current user that have been created or updated since the last check, then writes parsed metadata (timestamps, tags) to `.claude/state/issues.json`, respecting the lock system. It does not take tag-based actions — that is out of scope for this skill.
+This runs one poll: fetches issues updated since the last check, updates `.claude/state/issues.json`, and exits. It does not loop internally.
 
-The script never exits on its own. Stop it with Ctrl-C or by killing the process.
+## Step 2 — Check whether to clear context
+
+```bash
+scripts/config.sh is-enabled clear_context
+```
+
+- **Exit 1 (`false` or absent):** go back to Step 1 (loop inline in the same context).
+- **Exit 0 (`true`):** call `ScheduleWakeup(delaySeconds=60, prompt="/monitor-issues", reason="clearing context before next poll cycle")` and stop. The next invocation resumes in a fresh context. Requires invocation via `/loop /monitor-issues`.
