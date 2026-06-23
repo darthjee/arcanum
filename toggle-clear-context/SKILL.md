@@ -1,6 +1,6 @@
 ---
 name: toggle-clear-context
-description: Toggles the clear_context setting for auto-fix-all. When enabled, auto-fix-all spawns a fresh agent after each issue to continue processing with a clean context. Usage: /toggle-clear-context
+description: Toggles the clear_context setting for auto-fix-all. When enabled and invoked via /loop, auto-fix-all clears its conversation context between issues using ScheduleWakeup. Usage: /toggle-clear-context
 ---
 
 You are acting as the **architect**. Toggle the `clear_context` setting — no user interaction.
@@ -15,6 +15,6 @@ Run:
 
 ## Step 2 — Report
 
-Report the new value: "clear_context is now ON (auto-fix-all will spawn a fresh agent after each issue to continue processing with a clean context)" or "clear_context is now OFF (auto-fix-all will loop in the same context)".
+Report the new value: "clear_context is now ON" or "clear_context is now OFF (auto-fix-all will loop in the same context)".
 
-Note: when enabled, `auto-fix-all` spawns a fresh agent after each issue to continue processing with a clean context.
+Note: context clearing only takes effect when `auto-fix-all` is invoked via `/loop /auto-fix-all <ids>` — `ScheduleWakeup` requires /loop dynamic mode. There is a 60-second gap between issues.

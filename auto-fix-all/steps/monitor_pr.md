@@ -20,13 +20,7 @@ Check whether to clear context:
 scripts/config.sh is-enabled clear_context
 ```
 
-- **Exit 0 (`true`)**: spawn a fresh Agent (no `subagent_type`, i.e. general-purpose) with the following prompt, then stop — do not loop back to Step 2:
-
-  > You are continuing an `auto-fix-all` run with a cleared context. The queue is already saved at `.claude/state/auto-fix-all-queue.json`.
-  >
-  > Working directory: `<current working directory via pwd>`
-  >
-  > Read `auto-fix-all/SKILL.md` and follow it, but **skip Step 1** (the queue is already saved — go directly to Step 2). Continue until the queue is empty or the run is interrupted.
+- **Exit 0 (`true`)**: call `ScheduleWakeup(delaySeconds=60, prompt="/auto-fix-all", reason="clearing context before next issue")` and stop. Do not loop back to Step 2. (Requires that `auto-fix-all` was invoked via `/loop /auto-fix-all <ids>`; the 60-second wakeup fires a fresh iteration that reads the queue and continues.)
 
 - **Exit 1 (`false` or absent)**: go back to Step 2 of `SKILL.md` to process the next issue.
 
@@ -80,13 +74,7 @@ Check whether to clear context:
 scripts/config.sh is-enabled clear_context
 ```
 
-- **Exit 0 (`true`)**: spawn a fresh Agent (no `subagent_type`, i.e. general-purpose) with the following prompt, then stop — do not loop back to Step 2:
-
-  > You are continuing an `auto-fix-all` run with a cleared context. The queue is already saved at `.claude/state/auto-fix-all-queue.json`.
-  >
-  > Working directory: `<current working directory via pwd>`
-  >
-  > Read `auto-fix-all/SKILL.md` and follow it, but **skip Step 1** (the queue is already saved — go directly to Step 2). Continue until the queue is empty or the run is interrupted.
+- **Exit 0 (`true`)**: call `ScheduleWakeup(delaySeconds=60, prompt="/auto-fix-all", reason="clearing context before next issue")` and stop. Do not loop back to Step 2. (Requires that `auto-fix-all` was invoked via `/loop /auto-fix-all <ids>`; the 60-second wakeup fires a fresh iteration that reads the queue and continues.)
 
 - **Exit 1 (`false` or absent)**: go back to Step 2 of `SKILL.md`.
 
