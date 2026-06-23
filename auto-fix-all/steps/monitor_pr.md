@@ -14,7 +14,15 @@ Read [../../auto-monitor-issue-pr/SKILL.md](../../auto-monitor-issue-pr/SKILL.md
 scripts/queue.sh pop
 ```
 
-Go back to Step 2 of `SKILL.md` to process the next issue.
+Check whether to clear context:
+
+```bash
+scripts/config.sh is-enabled clear_context
+```
+
+- **Exit 0 (`true`)**: call `ScheduleWakeup(delaySeconds=60, prompt="/auto-fix-all", reason="clearing context before next issue")` and stop. Do not loop back to Step 2. (Requires that `auto-fix-all` was invoked via `/loop /auto-fix-all <ids>`; the 60-second wakeup fires a fresh iteration that reads the queue and continues.)
+
+- **Exit 1 (`false` or absent)**: go back to Step 2 of `SKILL.md` to process the next issue.
 
 ---
 
@@ -58,7 +66,17 @@ scripts/github.sh pr-number
 scripts/github.sh pr-merge
 ```
 
-Then `scripts/queue.sh pop` and go back to Step 2 of `SKILL.md`.
+Then `scripts/queue.sh pop`.
+
+Check whether to clear context:
+
+```bash
+scripts/config.sh is-enabled clear_context
+```
+
+- **Exit 0 (`true`)**: call `ScheduleWakeup(delaySeconds=60, prompt="/auto-fix-all", reason="clearing context before next issue")` and stop. Do not loop back to Step 2. (Requires that `auto-fix-all` was invoked via `/loop /auto-fix-all <ids>`; the 60-second wakeup fires a fresh iteration that reads the queue and continues.)
+
+- **Exit 1 (`false` or absent)**: go back to Step 2 of `SKILL.md`.
 
 #### If CI `failed`
 
