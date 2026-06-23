@@ -14,7 +14,9 @@
 | `push-issue-to-queue/` | Skill `/push-issue-to-queue` — adiciona um ou mais ids de issue ao final da fila do `auto-fix-all`. |
 | `docs/agents/` | Documentação do próprio repositório (arquitetura, fluxo, issues, plans). |
 | `.github/` | Contém `copilot-instructions.md`, que aponta para AGENTS.md. |
-| `.claude/` | Configuração local do Claude Code para este repositório. |
+| `.claude/` | Configuração local do Claude Code para este repositório. Contém subpastas para estado de runtime e configuração de skills. |
+| `.claude/state/` | Runtime state files: queue JSON (`auto-fix-all-queue.json`), queue lock (`auto-fix-all-queue.lock`), per-PR comment tracking (`auto-monitor-pr-<pr_number>-comments.json`). |
+| `.claude/configuration/` | Skill configuration files: e.g. `auto-fix-all.json` (controls ignored CI check patterns). |
 | `AGENTS.md` | Instruções compartilhadas do projeto. |
 | `CLAUDE.md` | Aponta para AGENTS.md. |
 | `README.md` | Apresentação do repositório e tabela de skills disponíveis. |
