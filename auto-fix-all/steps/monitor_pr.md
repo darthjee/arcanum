@@ -14,14 +14,14 @@ Read [../../auto-monitor-issue-pr/SKILL.md](../../auto-monitor-issue-pr/SKILL.md
 scripts/queue.sh pop
 ```
 
-Check the clear_context setting:
+Check whether to clear context:
 
 ```bash
-scripts/config.sh get clear_context
+scripts/config.sh is-enabled clear_context
 ```
 
-- If it prints `true`: call `ScheduleWakeup(delaySeconds=60, prompt="/auto-fix-all", reason="clearing context before next issue")` and stop. Do not loop back to Step 2.
-- If it prints `false` (or the script is absent/fails): go back to Step 2 of `SKILL.md` to process the next issue.
+- Exit 0 (`true`): call `ScheduleWakeup(delaySeconds=60, prompt="/auto-fix-all", reason="clearing context before next issue")` and stop. Do not loop back to Step 2.
+- Exit 1 (`false` or absent): go back to Step 2 of `SKILL.md` to process the next issue.
 
 ---
 
@@ -67,14 +67,14 @@ scripts/github.sh pr-merge
 
 Then `scripts/queue.sh pop`.
 
-Check the clear_context setting:
+Check whether to clear context:
 
 ```bash
-scripts/config.sh get clear_context
+scripts/config.sh is-enabled clear_context
 ```
 
-- If it prints `true`: call `ScheduleWakeup(delaySeconds=60, prompt="/auto-fix-all", reason="clearing context before next issue")` and stop. Do not loop back to Step 2.
-- If it prints `false` (or the script is absent/fails): go back to Step 2 of `SKILL.md`.
+- Exit 0 (`true`): call `ScheduleWakeup(delaySeconds=60, prompt="/auto-fix-all", reason="clearing context before next issue")` and stop. Do not loop back to Step 2.
+- Exit 1 (`false` or absent): go back to Step 2 of `SKILL.md`.
 
 #### If CI `failed`
 

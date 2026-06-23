@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Config management for auto-fix-all.
 # Usage: config.sh get <key>
+#        config.sh is-enabled <key>
 #        config.sh set <key> true|false
 #        config.sh toggle <key>
 set -euo pipefail
@@ -55,6 +56,16 @@ case ${1:-} in
     _read_config | jq -r --arg k "$KEY" '.[$k] // false'
     ;;
 
+  is-enabled)
+    if [[ $# -lt 2 ]]; then
+      echo "Error: is-enabled requires a key" >&2
+      exit 1
+    fi
+    KEY="$2"
+    VALUE=$(_read_config | jq -r --arg k "$KEY" '.[$k] // false')
+    [[ "$VALUE" == "true" ]]
+    ;;
+
   set)
     if [[ $# -lt 3 ]]; then
       echo "Error: set requires a key and a value (true|false)" >&2
@@ -92,7 +103,7 @@ case ${1:-} in
     ;;
 
   *)
-    echo "Usage: $0 {get <key>|set <key> true|false|toggle <key>}" >&2
+    echo "Usage: $0 {get <key>|is-enabled <key>|set <key> true|false|toggle <key>}" >&2
     exit 1
     ;;
 esac
