@@ -9,11 +9,13 @@ The issues folder is always `docs/agents/issues` and the plans folder is always 
 
 ## Step 1 — Initialize the queue
 
-Parse the IDs from the skill arguments (space-separated). Run:
+If skill arguments were provided (space-separated IDs), run:
 
 ```bash
 scripts/queue.sh save <id1> <id2> ...
 ```
+
+If no arguments were given, this is a re-invocation after context clearing — the queue already contains the remaining issues. Skip this step and go directly to Step 2.
 
 ## Step 2 — Process the next issue
 
