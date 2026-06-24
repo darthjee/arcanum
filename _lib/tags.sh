@@ -10,11 +10,26 @@ _LIB_TAGS_LOADED=1
 # extract_tags <text>
 #   Scans <text> for all occurrences of the pattern `:word:` where word is
 #   [A-Za-z0-9_+]+, strips the surrounding colons, and prints each unique
-#   tag name on its own line. Extraction is case-sensitive; ordering follows
-#   first-occurrence order with duplicates suppressed.
+#   tag name on its own line. Also recognizes a small set of emoji aliases
+#   (see _TAG_EMOJI_ALIASES below) as equivalent to their canonical `:word:`
+#   name, so a tag may be written either way in the source text and still
+#   normalize to the same bare name. Extraction is case-sensitive for the
+#   `:word:` form; ordering follows first-occurrence order with duplicates
+#   suppressed.
+#
+# Emoji aliases (emoji -> canonical name):
+#   ❓  -> question
+#   ✏️  -> pencil2
+#   📋  -> clipboard
 extract_tags() {
   local text="$1"
-  echo "$text" | grep -oE ':[A-Za-z0-9_+]+:' | sed 's/^://;s/:$//' | awk '!seen[$0]++'
+  local normalized="$text"
+  # Replace each known emoji alias with its canonical `:word:` form before
+  # running the colon-based extraction, so both forms feed the same path.
+  normalized="${normalized//❓/:question:}"
+  normalized="${normalized//✏️/:pencil2:}"
+  normalized="${normalized//📋/:clipboard:}"
+  echo "$normalized" | grep -oE ':[A-Za-z0-9_+]+:' | sed 's/^://;s/:$//' | awk '!seen[$0]++'
 }
 
 # has_tag <text> <tag>
