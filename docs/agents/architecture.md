@@ -47,6 +47,20 @@ Skills store runtime state and configuration under `.claude/`:
 
 Never write to these files directly — always use the dedicated scripts (e.g. `queue.sh push`, `queue.sh pop`) that handle locking and atomicity.
 
+## Issue Tags
+
+Issue files (`docs/agents/issues/<id>-<name>.md`) may end with a trailing tags block:
+
+```markdown
+---
+
+Tags: <list of tags>
+```
+
+Tags are free-form `:word:` tokens (e.g. `Tags: :shipit: :urgent:`), parsed by `_lib/tags.sh`'s `extract_tags`/`has_tag` helpers (case-insensitive, full-line match per tag). Skills never invent this block — it only exists when a GitHub fetch (`github.sh fetch`) found one in the issue body, and it is carried over verbatim by whichever skill wrote the file.
+
+**`:shipit:`** is the only tag with defined meaning today: it marks an issue as pre-approved, so `auto-fix-all` skips PR review/monitoring and merges directly once CI passes (checked via `has_shipit_tag.sh`/`has-shipit-label`, the same pre-approval signal as the GitHub issue's `shipit` label).
+
 ## Lock System
 
 The lock system prevents concurrent mutations of shared JSON state files. Currently used by `auto-fix-all/scripts/queue.sh` for `push` and `pop` operations on the queue.
