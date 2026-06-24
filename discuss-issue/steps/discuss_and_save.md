@@ -6,11 +6,7 @@ This skill only handles issues that come **pre-populated from GitHub** — there
 
 ## 1. Get the starting content
 
-By the time this step runs, [extract_id_and_name.md](extract_id_and_name.md) has already resolved the id and fetched the issue:
-
-- **STATUS=existing**: the local issue file already exists — read it as the starting material.
-- **STATUS=new + NEEDS_FETCH=true, fetch succeeded**: use the fetched GitHub body (`FILE`) as the starting material.
-- **Fetch failed** (`Could not find GitHub issue #<id>`) or **STATUS=missing_id**: tell the user this skill requires an existing GitHub issue number and ask for a valid `#<id>`. Re-run the resolve script with the new id and restart this step from the top — do not proceed without fetched content.
+By the time this step runs, [extract_id_and_name.md](extract_id_and_name.md) has already resolved the id and fetched the issue — `FILE` holds the starting content (read from disk for `STATUS=existing`, just written for `STATUS=fetched`). Read it as the starting material.
 
 ## 2. Initial evaluation
 
