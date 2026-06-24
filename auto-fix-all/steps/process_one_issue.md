@@ -85,6 +85,15 @@ Read [../../auto-monitor-issue-pr/steps/run.md](../../auto-monitor-issue-pr/step
 
 ### If `merged`
 
+Capture the current branch name, then run cleanup:
+
+```bash
+BRANCH=$(git branch --show-current)
+scripts/github.sh cleanup-branch "$BRANCH"
+```
+
+> Resolve `scripts/github.sh` relative to the `auto-fix-all` skill folder.
+
 Report `OUTCOME=merged`. Done — stop here.
 
 ### If `closed`
@@ -121,6 +130,15 @@ Report `OUTCOME=closed PR_NUMBER=<pr_number>`. Done — stop here. Do not ask th
 ```bash
 scripts/github.sh pr-merge
 ```
+
+Capture the current branch name, then run cleanup:
+
+```bash
+BRANCH=$(git branch --show-current)
+scripts/github.sh cleanup-branch "$BRANCH"
+```
+
+> Resolve `scripts/github.sh` relative to the `auto-fix-all` skill folder.
 
 Report `OUTCOME=merged`. Done — stop here.
 
