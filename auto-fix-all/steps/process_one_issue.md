@@ -28,9 +28,26 @@ This fetches the latest `main`, hard-resets the local `main` to it, and (re)crea
 
 Read [../../auto-new-issue/steps/run.md](../../auto-new-issue/steps/run.md) and follow all its steps for `<id>`. Its final step commits the issue file — do not commit it again here. You're already running as the architect; do not spawn another `Agent(architect)` for this — just follow the steps directly.
 
+Once that finishes, push a `:eyes:` status tag onto the live GitHub issue, to signal it has been fetched/checked:
+
+```bash
+scripts/github.sh add-tag <id> eyes
+```
+
+> Resolve `scripts/github.sh` relative to the `auto-fix-all` skill folder. This is `auto-fix-all`-specific pipeline signaling — it does not belong in `auto-new-issue/steps/run.md` itself, since that flow is also read by the manual `/new-issue` skill.
+
 ## 3. Create the plan
 
 Read [../../auto-plan-issue/steps/run.md](../../auto-plan-issue/steps/run.md) and follow all its steps for `<id>`. Its final step commits the plan files — do not commit them again here.
+
+Once that finishes, swap the `:eyes:` tag for `:construction:` on the live GitHub issue, to signal implementation is starting:
+
+```bash
+scripts/github.sh remove-tag <id> eyes
+scripts/github.sh add-tag <id> construction
+```
+
+> Resolve `scripts/github.sh` relative to the `auto-fix-all` skill folder. Same rationale as above — this belongs in `auto-fix-all`'s own flow, not in `auto-plan-issue/steps/run.md`, since that flow is also read by the manual `/plan-issue` skill.
 
 ## 4. Implement and open/mark-ready the PR
 
