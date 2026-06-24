@@ -6,45 +6,13 @@ This skill only handles issues that come **pre-populated from GitHub** — there
 
 ## 1. Get the starting content
 
-By the time this step runs, [extract_id_and_name.md](extract_id_and_name.md) has already resolved the id and fetched the issue — `FILE` holds the starting content (read from disk for `STATUS=existing`, just written for `STATUS=fetched`). Read it as the starting material.
+By the time this step runs, [extract_id_and_name.md](extract_id_and_name.md) has already resolved the id and guaranteed `FILE` exists with content. Read it as the starting material.
 
 ## 2. Initial evaluation
 
-Based on the fetched/existing content, write a draft issue file using the same template as `new-issue`:
+Based on the fetched/existing content, write a draft issue file following the template in [issue_template.md](issue_template.md). Use only sections that are relevant. **Always write the file content in English**, translating if the fetched content was in another language. Write to `FILE`.
 
-```markdown
-# Issue: <Title>
-
-## Description
-<Clear explanation of the issue>
-
-## Problem
-- <bullet points describing what is broken or missing>
-
-## Expected Behavior
-- <what should happen>
-
-## Solution
-- <suggested implementation steps, if applicable>
-
-## Benefits
-- <why this matters>
-
----
-See issue for details: https://<domain>/<owner>/<repo>/issues/<id>
-```
-
-Use only sections that are relevant. **Always write the file content in English**, translating if the fetched content was in another language. Write to `<issues_folder>/<filename>` (`FILE`).
-
-If `DOMAIN` and `REPO` are not already known from the prior `fetch` call, run:
-
-```bash
-../scripts/github.sh info
-```
-
-> Resolve `../scripts/github.sh` relative to this file's directory.
-
-If the `fetch` call printed a `TAGS_BEGIN`/`TAGS_END` block, remember it — it gets appended verbatim at the very end of the final file (after the "See issue for details" line) once writing is done for good. Do not edit, summarize, or reformat it. If no such block was printed, never invent a tags line.
+If the prior `fetch` call printed a `TAGS_BEGIN`/`TAGS_END` block, remember it — it gets appended verbatim at the very end of the final file (see [issue_template.md](issue_template.md)) once writing is done for good. Do not edit, summarize, or reformat it. If no such block was printed, never invent a tags line — see [issue_template.md](issue_template.md) for what the `Tags:` line means and when it applies.
 
 ## 3. Spawn specialist agents as needed
 

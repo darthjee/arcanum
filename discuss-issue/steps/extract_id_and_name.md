@@ -8,17 +8,17 @@ discuss-issue only operates on existing GitHub issues, so resolving the id and f
 
 > Resolve `../scripts/resolve_and_fetch.sh` relative to this file's directory (i.e., the `scripts/` folder inside this skill).
 
-The script outputs key=value lines. Parse them to obtain `STATUS` and, depending on it, `ID`, `TITLE`, `FILE`, `DOMAIN`, `REPO`, and `ERROR`.
+The script guarantees `FILE` exists on disk once it exits `STATUS=ok` — the script handles fetching and writing it; there's nothing left for the agent to do there. The only other case is `STATUS=error` (no id given, or the GitHub issue doesn't exist).
 
 ## Interpret the output
 
-### STATUS=existing or STATUS=fetched
+### STATUS=ok
 
-`FILE` already holds the issue's content (read from disk for `existing`, just written by the fetch for `fetched`). Proceed straight to [discuss_and_save.md](discuss_and_save.md) using `FILE` as the starting material.
+`ID`, `TITLE`, and `FILE` are set; `FILE` already has content on disk. Proceed straight to [discuss_and_save.md](discuss_and_save.md) using `FILE` as the starting material.
 
 If the output includes a `TAGS_BEGIN`/`TAGS_END` block, remember it for [discuss_and_save.md](discuss_and_save.md), which re-appends it verbatim at the end of the final file.
 
-### STATUS=fetch_failed or STATUS=missing_id
+### STATUS=error
 
 Tell the user `<ERROR>`, then ask:
 
