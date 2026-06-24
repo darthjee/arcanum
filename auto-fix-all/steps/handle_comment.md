@@ -13,13 +13,13 @@ Unlike Majora's original `fix-all`, this skill never decides the responsible age
 Each line has the form `<name>|<description>`.
 
 - **No output (empty)** — the target project has no specialist agents configured. Handle every comment yourself, as architect.
-- **One or more lines** — proceed to "Choosing the responsible agent(s)" below for each comment (or failed check-run name, when called from the CI-failure branch of [monitor_pr.md](monitor_pr.md)).
+- **One or more lines** — proceed to "Choosing the responsible agent(s)" below for each comment (or failed check-run name, when called from the CI-failure branch of [process_one_issue.md](process_one_issue.md)).
 
 ## Choosing the responsible agent(s)
 
 For each comment (or failed check-run name):
 
-1. Read its body carefully (when called from the `commented` branch of [monitor_pr.md](monitor_pr.md), also note its `id`/`url` header lines — keep the `url` at hand for the commit step below).
+1. Read its body carefully (when called from the `commented` branch of [process_one_issue.md](process_one_issue.md), also note its `id`/`url` header lines — keep the `url` at hand for the commit step below).
 2. Compare it against each candidate agent's `description` (excluding any agent that is clearly a coordinator/orchestrator rather than an implementation specialist, the same exclusion rule `auto-plan-issue` uses).
 3. Judge — based on the content of the comment/failure and what each agent's description says it owns — which agent(s), if any, are responsible for addressing it. There is no fixed keyword table; this is a judgment call grounded in the actual agent descriptions of this project.
 4. If **no** agent seems responsible, treat the comment/failure yourself as architect.
@@ -44,5 +44,5 @@ If you (architect) are handling a comment/failure yourself, follow the same cycl
 
 Wait for every dispatched agent (and your own work, if any) to report back, confirming tests/lint passed and the commit hash. Then:
 
-- From the **comment** branch of [monitor_pr.md](monitor_pr.md): `git push`, then return to the top of that file to resume monitoring.
-- From the **CI-failure** branch of [monitor_pr.md](monitor_pr.md): `git push`, then return to its `wait_ci.sh` step to re-check.
+- From the **comment** branch of [process_one_issue.md](process_one_issue.md): `git push`, then return to the top of that file to resume monitoring.
+- From the **CI-failure** branch of [process_one_issue.md](process_one_issue.md): `git push`, then return to its `wait_ci.sh` step to re-check.
