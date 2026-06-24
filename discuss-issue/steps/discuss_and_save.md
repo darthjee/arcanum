@@ -2,21 +2,19 @@
 
 This replaces the single "Did I comprehend the issue?" check from `new-issue` with an iterative dialogue loop that may spawn specialist agents before settling on a final issue file.
 
-## 1. Get a starting description
+This skill only handles issues that come **pre-populated from GitHub** — there is no manual "describe the issue to me" flow and no "create a brand-new GitHub issue" flow. It always operates on a real, existing GitHub issue.
 
-If the issue content was **pre-populated from GitHub** (Scenario C2 in [extract_id_and_name.md](extract_id_and_name.md)), use the fetched body as the starting material and skip straight to "Initial evaluation".
+## 1. Get the starting content
 
-Otherwise, say exactly:
+By the time this step runs, [extract_id_and_name.md](extract_id_and_name.md) has already resolved the id and fetched the issue:
 
-```
-Describe me the issue
-```
-
-Wait for the user's response before continuing.
+- **STATUS=existing**: the local issue file already exists — read it as the starting material.
+- **STATUS=new + NEEDS_FETCH=true, fetch succeeded**: use the fetched GitHub body (`FILE`) as the starting material.
+- **Fetch failed** (`Could not find GitHub issue #<id>`) or **STATUS=missing_id**: tell the user this skill requires an existing GitHub issue number and ask for a valid `#<id>`. Re-run the resolve script with the new id and restart this step from the top — do not proceed without fetched content.
 
 ## 2. Initial evaluation
 
-Based on whatever is known so far (the user's description or the fetched GitHub body), write a draft issue file using the same template as `new-issue`:
+Based on the fetched/existing content, write a draft issue file using the same template as `new-issue`:
 
 ```markdown
 # Issue: <Title>
@@ -40,12 +38,9 @@ Based on whatever is known so far (the user's description or the fetched GitHub 
 See issue for details: https://<domain>/<owner>/<repo>/issues/<id>
 ```
 
-Use only sections that are relevant. **Always write the file content in English**, translating if the user described it in another language.
+Use only sections that are relevant. **Always write the file content in English**, translating if the fetched content was in another language. Write to `<issues_folder>/<filename>` (`FILE`).
 
-- **`FILE` is already known**: write to `<issues_folder>/<filename>`.
-- **`FILE` is not known yet** (the "create new issue" branch — no GitHub issue exists yet): write the draft to a temporary file instead (e.g. via `mktemp`), and keep that path at hand for the "Update GitHub issue" step below. Omit the "See issue for details" line until a real id is minted.
-
-If `DOMAIN` and `REPO` are not already known from a prior `fetch` call, run:
+If `DOMAIN` and `REPO` are not already known from the prior `fetch` call, run:
 
 ```bash
 ../scripts/github.sh info
@@ -53,7 +48,7 @@ If `DOMAIN` and `REPO` are not already known from a prior `fetch` call, run:
 
 > Resolve `../scripts/github.sh` relative to this file's directory.
 
-If the prior `fetch` call printed a `TAGS_BEGIN`/`TAGS_END` block, remember it — it gets appended verbatim at the very end of the final file (after the "See issue for details" line) once writing is done for good. Do not edit, summarize, or reformat it. If no such block was printed, never invent a tags line.
+If the `fetch` call printed a `TAGS_BEGIN`/`TAGS_END` block, remember it — it gets appended verbatim at the very end of the final file (after the "See issue for details" line) once writing is done for good. Do not edit, summarize, or reformat it. If no such block was printed, never invent a tags line.
 
 ## 3. Spawn specialist agents as needed
 
@@ -73,7 +68,7 @@ Show the questions to the user and wait for their response.
 
 ## 6. Update the draft
 
-Incorporate the user's answers into the issue file (rewriting the temp/real file in place, same rules as step 2).
+Incorporate the user's answers into the issue file (rewriting `FILE` in place, same rules as step 2).
 
 ## 7. Comprehension loop
 
@@ -94,16 +89,10 @@ Repeat until one of the two finishing conditions above is met.
 
 ## Update GitHub issue
 
-After the loop ends, automatically run one of the following, depending on whether an id was already known:
+After the loop ends, run:
 
-- **ID already known** (explicit `#<id>` from the user, a number they gave in response to the missing-id question, or a fetched id):
-  ```bash
-  ../scripts/github.sh update <id> "<Title>" <issue_file_path>
-  ```
-- **ID was not known** (the "create new issue" branch — the file is still at a temporary path): run
-  ```bash
-  ../scripts/github.sh create "<Title>" <temp_file_path>
-  ```
-  instead. Parse the returned `ID`, `FILE`, `DOMAIN`, `REPO` — the script writes the body to the canonical `FILE` itself. Tell the user: `Created GitHub issue #<ID>: <FILE>`. This is the final step; there is nothing left to write or update.
+```bash
+../scripts/github.sh update <id> "<Title>" <issue_file_path>
+```
 
 > Resolve `../scripts/github.sh` relative to this file's directory. The script resolves the GitHub domain and repository from `git remote get-url origin`, so no manual `-R` argument is needed. The body is read directly from file via `--body-file`/`cat`, avoiding quoting issues with multi-line content.
