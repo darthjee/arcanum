@@ -15,6 +15,17 @@ Each line has the form `<name>|<description>`.
 - **No output (empty)** — the target project has no specialist agents configured. Handle every comment yourself, as architect.
 - **One or more lines** — proceed to "Choosing the responsible agent(s)" below for each comment (or failed check-run name, when called from the CI-failure branch of [process_one_issue.md](process_one_issue.md)).
 
+## Question vs. actionable (comments only)
+
+This judgment applies only when handling real PR comments — i.e. the `commented` branch of [process_one_issue.md](process_one_issue.md). It does not apply to failed check-run names, which are always actionable by definition; skip straight to "Choosing the responsible agent(s)" below for those.
+
+For each comment, before doing anything else, read its body and judge whether it is:
+
+- A **question or clarification request** — no code change is implied; the owner is asking something or making an observation. Skip "Choosing the responsible agent(s)" and "Dispatching" below for this comment and go straight to "Replying to a question" instead.
+- An **actionable request** — a code change, fix, or feature is being asked for. Proceed exactly as described in "Choosing the responsible agent(s)" below, unchanged.
+
+When a single `commented` batch contains a mix of both, route each comment independently — some replied to directly, others dispatched-and-committed — then return to "Monitor the PR" only once, after every comment in the batch has been handled.
+
 ## Choosing the responsible agent(s)
 
 For each comment (or failed check-run name):
@@ -46,3 +57,18 @@ Wait for every dispatched agent (and your own work, if any) to report back, conf
 
 - From the **comment** branch of [process_one_issue.md](process_one_issue.md): `git push`, then return to the top of that file to resume monitoring.
 - From the **CI-failure** branch of [process_one_issue.md](process_one_issue.md): `git push`, then return to its `wait_ci.sh` step to re-check.
+
+## Replying to a question
+
+For each comment judged a question/clarification above:
+
+1. Decide which agent should answer, using the same reasoning as "Choosing the responsible agent(s)" — compare the comment against each candidate agent's `description`; fall back to `architect` if none seems responsible.
+2. Draft the reply body addressing the question. This is a judgment call, not scripted — the responsible agent (or you, as architect) writes the actual answer.
+3. Post it:
+   ```bash
+   ../scripts/reply_comment.sh <id> <agent> "<your AI model name>" "<your AI model noreply email>" "<reply body>"
+   ```
+   (resolved relative to the `auto-fix-all` skill folder).
+4. No commit, no push, and no CI wait for a question reply — nothing changed in the working tree.
+
+Once every comment in the batch — questions replied to, actionable ones dispatched-and-committed — has been handled, return to "Monitor the PR" (top of [process_one_issue.md](process_one_issue.md)) to resume monitoring. If at least one comment in the batch was actionable, `git push` first as described in "After dispatching" above; if the entire batch was pure replies, skip the push (nothing to push) and go straight back to monitoring.
