@@ -14,6 +14,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/_lib_origin.sh"
 # shellcheck source=../../_lib/tags.sh
 source "${SCRIPT_DIR}/../../_lib/tags.sh"
+# shellcheck source=../../_lib/tag_actions.sh
+source "${SCRIPT_DIR}/../../_lib/tag_actions.sh"
+
+QUEUE_SCRIPT="${SCRIPT_DIR}/../../auto-fix-all/scripts/queue.sh"
 
 STATE_DIR=".claude/state"
 ISSUES_FILE="${STATE_DIR}/issues.json"
@@ -180,6 +184,28 @@ _poll_once() {
       _release_lock
 
       _log "Processed #${ISSUE_ID} — tags: ${TAGS_JSON}"
+
+      # Dispatch any actionable tags found on this issue. `question` and
+      # `pencil2` need AI judgment (answering / rewriting), so this loop
+      # only logs them for now — actually answering/rewriting is left to a
+      # future architect-level step. `clipboard` (push to the auto-fix
+      # queue) is fully deterministic, so it's handled here directly.
+      local ACTION_TAG
+      while IFS= read -r ACTION_TAG; do
+        [[ -z "$ACTION_TAG" ]] && continue
+        case "$ACTION_TAG" in
+          question)
+            _log "Issue #${ISSUE_ID} has actionable tag 'question' — needs an answer from the agent"
+            ;;
+          pencil2)
+            _log "Issue #${ISSUE_ID} has actionable tag 'pencil2' — needs to be rewritten by the agent"
+            ;;
+          clipboard)
+            _log "Issue #${ISSUE_ID} has actionable tag 'clipboard' — pushing to auto-fix-all queue"
+            "$QUEUE_SCRIPT" push "$ISSUE_ID" || _log "ERROR: failed to push #${ISSUE_ID} to the queue"
+            ;;
+        esac
+      done < <(actionable_tags "$BODY")
     done
   fi
 }
