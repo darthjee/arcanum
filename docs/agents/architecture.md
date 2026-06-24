@@ -70,9 +70,15 @@ Issue files (`docs/agents/issues/<id>-<name>.md`) may end with a trailing tags b
 Tags: <list of tags>
 ```
 
-Tags are free-form `:word:` tokens (e.g. `Tags: :shipit: :urgent:`), parsed by `_lib/tags.sh`'s `extract_tags`/`has_tag` helpers (case-insensitive, full-line match per tag). Skills never invent this block — it only exists when a GitHub fetch (`github.sh fetch`) found one in the issue body, and it is carried over verbatim by whichever skill wrote the file.
+Tags are free-form `:word:` tokens (e.g. `Tags: :shipit: :urgent:`), parsed by `_lib/tags.sh`'s `extract_tags`/`has_tag` helpers (case-insensitive, full-line match per tag). Skills never invent this block — it only exists when a GitHub fetch (`github.sh fetch`) found one in the issue body, and it is carried over verbatim by whichever skill wrote the file. Three of the tags below may also be written as an emoji instead of the `:word:` form — `extract_tags` normalizes the emoji to its canonical name internally, so `has_tag` and every other consumer never need to know which form was used.
 
 **`:shipit:`** is the only tag with defined meaning today: it marks an issue as pre-approved, so `auto-fix-all` skips PR review/monitoring and merges directly once CI passes (checked via `has_shipit_tag.sh`/`has-shipit-label`, the same pre-approval signal as the GitHub issue's `shipit` label).
+
+**`:question:` / ❓** marks an issue as having a question for the agent. `monitor-issues` detects it (via `_lib/tag_actions.sh`'s `actionable_tags`) and logs that it needs an answer — actually answering it requires AI judgment, so that step is left to architect-level reasoning, not the polling script. Once answered, the tag should be removed from the live GitHub issue body via `monitor-issues/scripts/github.sh remove-tag <id> question`.
+
+**`:pencil2:` / ✏️** marks an issue as ready to be read and rewritten by the agent. `monitor-issues` detects it the same way and logs that a rewrite is needed; the rewrite itself is architect-level (AI judgment), and once done the tag is removed via `monitor-issues/scripts/github.sh remove-tag <id> pencil2` and the GitHub issue body is updated.
+
+**`:clipboard:` / 📋** marks an issue as ready to be pushed to the `auto-fix-all` queue. Unlike the two tags above, this action is fully deterministic, so `monitor_issues.sh` performs it directly: it pushes the issue id via `auto-fix-all/scripts/queue.sh push <id>` as soon as the tag is detected.
 
 ## Lock System
 
