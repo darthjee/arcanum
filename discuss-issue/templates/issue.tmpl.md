@@ -1,0 +1,11 @@
+# Issue: %%TITLE%%
+
+%%DESCRIPTION%%
+
+%%PROBLEM%%
+
+%%EXPECTED_BEHAVIOR%%
+
+%%SOLUTION%%
+
+%%BENEFITS%%
