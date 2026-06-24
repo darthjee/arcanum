@@ -21,6 +21,8 @@ _LIB_TAGS_LOADED=1
 #   ❓  -> question
 #   ✏️  -> pencil2
 #   📋  -> clipboard
+#   👀  -> eyes
+#   🚧  -> construction
 extract_tags() {
   local text="$1"
   local normalized="$text"
@@ -29,6 +31,8 @@ extract_tags() {
   normalized="${normalized//❓/:question:}"
   normalized="${normalized//✏️/:pencil2:}"
   normalized="${normalized//📋/:clipboard:}"
+  normalized="${normalized//👀/:eyes:}"
+  normalized="${normalized//🚧/:construction:}"
   echo "$normalized" | grep -oE ':[A-Za-z0-9_+]+:' | sed 's/^://;s/:$//' | awk '!seen[$0]++'
 }
 

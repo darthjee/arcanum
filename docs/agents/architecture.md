@@ -70,7 +70,7 @@ Issue files (`docs/agents/issues/<id>-<name>.md`) may end with a trailing tags b
 Tags: <list of tags>
 ```
 
-Tags are free-form `:word:` tokens (e.g. `Tags: :shipit: :urgent:`), parsed by `_lib/tags.sh`'s `extract_tags`/`has_tag` helpers (case-insensitive, full-line match per tag). Skills never invent this block — it only exists when a GitHub fetch (`github.sh fetch`) found one in the issue body, and it is carried over verbatim by whichever skill wrote the file. Three of the tags below may also be written as an emoji instead of the `:word:` form — `extract_tags` normalizes the emoji to its canonical name internally, so `has_tag` and every other consumer never need to know which form was used.
+Tags are free-form `:word:` tokens (e.g. `Tags: :shipit: :urgent:`), parsed by `_lib/tags.sh`'s `extract_tags`/`has_tag` helpers (case-insensitive, full-line match per tag). Skills never invent this block — it only exists when a GitHub fetch (`github.sh fetch`) found one in the issue body, and it is carried over verbatim by whichever skill wrote the file. Five of the tags below may also be written as an emoji instead of the `:word:` form — `extract_tags` normalizes the emoji to its canonical name internally, so `has_tag` and every other consumer never need to know which form was used.
 
 **`:shipit:`** is the only tag with defined meaning today: it marks an issue as pre-approved, so `auto-fix-all` skips PR review/monitoring and merges directly once CI passes (checked via `has_shipit_tag.sh`/`has-shipit-label`, the same pre-approval signal as the GitHub issue's `shipit` label).
 
@@ -79,6 +79,12 @@ Tags are free-form `:word:` tokens (e.g. `Tags: :shipit: :urgent:`), parsed by `
 **`:pencil2:` / ✏️** marks an issue as ready to be read and rewritten by the agent. `monitor-issues` detects it the same way and logs that a rewrite is needed; the rewrite itself is architect-level (AI judgment), and once done the tag is removed via `monitor-issues/scripts/github.sh remove-tag <id> pencil2` and the GitHub issue body is updated.
 
 **`:clipboard:` / 📋** marks an issue as ready to be pushed to the `auto-fix-all` queue. Unlike the two tags above, this action is fully deterministic, so `monitor_issues.sh` performs it directly: it pushes the issue id via `auto-fix-all/scripts/queue.sh push <id>` as soon as the tag is detected.
+
+**`:eyes:` / 👀** and **`:construction:` / 🚧** are pipeline-status tags, not actionable ones — `monitor-issues` does not detect or act on them (they are not part of `_lib/tag_actions.sh`'s `ACTIONABLE_TAGS`). They exist purely so the GitHub issue list reflects `auto-fix-all`'s progress at a glance: `auto-fix-all` pushes `:eyes:` onto the live issue right after fetching/checking it (`auto-fix-all/steps/process_one_issue.md` step 2), then swaps it for `:construction:` once the implementation plan has been written and coding is about to start (step 3). This applies only to the `auto-fix-all` pipeline — the manual `/new-issue`, `/plan-issue`, and `/discuss-issue` skills never push either tag.
+
+### Tag mutation primitives
+
+`_lib/tag_mutate.sh` exposes the shared `add`/`remove` primitives that operate on an issue body's trailing `---`/`Tags:` block: `tag_mutate_add`/`tag_mutate_remove` (pure body-string mutation, given a body and a canonical tag name) and `tag_mutate_fetch_and_push` (fetches an issue's current body via `gh issue view`, applies one of the two mutation functions, and pushes the result via `gh issue edit`). `monitor-issues/scripts/github.sh remove-tag` and `auto-fix-all/scripts/github.sh add-tag`/`remove-tag` are thin CLI wrappers around this shared library — new skills needing to mutate issue tags should add their own thin wrapper rather than re-implementing the body-parsing logic.
 
 ## Lock System
 
