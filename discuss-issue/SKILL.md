@@ -7,9 +7,9 @@ You are helping the user define and refine an existing GitHub issue through inte
 
 The issues folder is always `docs/agents/issues`.
 
-## Step 1 — Define the issue ID and filename
+## Step 1 — Resolve the issue ID and fetch its content
 
-Read [steps/file_definition.md](steps/file_definition.md) and follow the instructions there to parse the arguments, auto-assign an ID if needed, and build the filename.
+Read [steps/extract_id_and_name.md](steps/extract_id_and_name.md) and follow the instructions there.
 
 ## Step 2 — Interactive dialogue and save
 

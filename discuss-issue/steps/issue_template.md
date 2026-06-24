@@ -1,29 +1,20 @@
 # Issue File Template
 
-```markdown
-# Issue: <Title>
+The literal template lives at [../templates/issue.tmpl.md](../templates/issue.tmpl.md). Render it with:
 
-## Description
-<Clear explanation of the issue>
-
-## Problem
-- <bullet points describing what is broken or missing>
-
-## Expected Behavior
-- <what should happen>
-
-## Solution
-- <suggested implementation steps, if applicable>
-
-## Benefits
-- <why this matters>
+```bash
+../scripts/render_issue.sh <output_file> "<title>" "<description_section>" "<problem_section>" "<expected_behavior_section>" "<solution_section>" "<benefits_section>" "<tags_block>"
 ```
 
-There is no "See issue for details" link in this template — unlike `new-issue`, discuss-issue always starts from an existing GitHub issue, so a self-referential link back to that same issue is redundant.
+> Resolve `../scripts/render_issue.sh` relative to this file's directory.
+
+Each `<..._section>` argument is the **full block** including its own `## Heading` line (e.g. `"## Description\nSome text."`). Pass `""` for any section that isn't relevant — the script drops it and collapses the resulting blank lines, so the output never has empty headings. `<tags_block>` is the raw `Tags: ...` line(s) with no leading `---`; pass `""` when there's nothing to carry over.
+
+There is no "See issue for details" link in the rendered output — unlike `new-issue`, discuss-issue always starts from an existing GitHub issue, so a self-referential link back to that same issue is redundant.
 
 ## Tags line
 
-If a prior `fetch` (in [extract_id_and_name.md](extract_id_and_name.md)) printed a `TAGS_BEGIN`/`TAGS_END` block, append it verbatim at the very end of the file, separated from the body above by a blank line:
+If a prior `fetch` (in [extract_id_and_name.md](extract_id_and_name.md)) printed a `TAGS_BEGIN`/`TAGS_END` block, pass its content verbatim as `<tags_block>` — the script appends it as:
 
 ```markdown
 ---
@@ -31,4 +22,4 @@ If a prior `fetch` (in [extract_id_and_name.md](extract_id_and_name.md)) printed
 Tags: <list of tags>
 ```
 
-Tags are free-form `:word:` tokens (e.g. `:shipit:`) read by other skills — see the general explanation in [../../docs/agents/architecture.md](../../docs/agents/architecture.md)'s "Issue Tags" section. Never invent this line; only carry it over verbatim when the fetch produced one.
+Tags are free-form `:word:` tokens (e.g. `:shipit:`) read by other skills — see the general explanation in [../../docs/agents/architecture.md](../../docs/agents/architecture.md)'s "Issue Tags" section. Never invent this block; only carry it over verbatim when the fetch produced one.

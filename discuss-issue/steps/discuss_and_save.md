@@ -10,9 +10,9 @@ By the time this step runs, [extract_id_and_name.md](extract_id_and_name.md) has
 
 ## 2. Initial evaluation
 
-Based on the fetched/existing content, write a draft issue file following the template in [issue_template.md](issue_template.md). Use only sections that are relevant. **Always write the file content in English**, translating if the fetched content was in another language. Write to `FILE`.
+Based on the fetched/existing content, draft the section bodies (Description, Problem, Expected Behavior, Solution, Benefits — only the ones that are relevant) and render them to `FILE` by following [issue_template.md](issue_template.md). **Always write the file content in English**, translating if the fetched content was in another language.
 
-If the prior `fetch` call printed a `TAGS_BEGIN`/`TAGS_END` block, remember it — it gets appended verbatim at the very end of the final file (see [issue_template.md](issue_template.md)) once writing is done for good. Do not edit, summarize, or reformat it. If no such block was printed, never invent a tags line — see [issue_template.md](issue_template.md) for what the `Tags:` line means and when it applies.
+If the prior `fetch` call printed a `TAGS_BEGIN`/`TAGS_END` block, remember it and pass it as the render script's `<tags_block>` argument every time you re-render — see [issue_template.md](issue_template.md). Do not edit, summarize, or reformat it. If no such block was printed, never invent one.
 
 ## 3. Spawn specialist agents as needed
 
