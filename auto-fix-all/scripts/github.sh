@@ -4,7 +4,7 @@
 #   pr-number               Print the PR number (no '#') for the current branch
 #   pr-state                Print STATE=<OPEN|MERGED|CLOSED> for the current branch's PR
 #   pr-merge                Squash-merge the current branch's PR, print its URL
-#   cleanup-branch <branch> Delete the remote and local branch, switch back to main
+#   cleanup-branch <id>     Delete the issue's remote and local branch, switch back to main
 #   has-shipit-label <id>   Exit 0 if GitHub issue <id> has a "shipit" label, else exit 1
 #   add-tag <id> <tag>      Add a single tag (colon or emoji form) to GitHub
 #                           issue <id>'s trailing `Tags:` line, and push the
@@ -87,11 +87,13 @@ cmd_pr_merge() {
 }
 
 cmd_cleanup_branch() {
-  local branch="${1:-}"
-  [[ -n "$branch" ]] || {
-    echo "Usage: $0 cleanup-branch <branch>" >&2
+  local id="${1:-}"
+  [[ -n "$id" ]] || {
+    echo "Usage: $0 cleanup-branch <id>" >&2
     exit 1
   }
+
+  local branch="issue-${id}"
 
   # Delete remote branch — tolerate "not found" (may already be gone)
   git push origin --delete "$branch" 2>/dev/null || true
@@ -163,7 +165,7 @@ case "${1:-}" in
     echo "  pr-number               Print the PR number (no '#') for the current branch" >&2
     echo "  pr-state                Print STATE=<OPEN|MERGED|CLOSED> for the current branch's PR" >&2
     echo "  pr-merge                Squash-merge the current branch's PR, print its URL" >&2
-    echo "  cleanup-branch <branch> Delete the remote and local branch, switch back to main" >&2
+    echo "  cleanup-branch <id>     Delete the issue's remote and local branch, switch back to main" >&2
     echo "  has-shipit-label <id>   Exit 0 if GitHub issue <id> has a 'shipit' label, else exit 1" >&2
     echo "  add-tag <id> <tag>      Add a single tag (colon or emoji form) to GitHub issue <id>'s trailing 'Tags:' line" >&2
     echo "  remove-tag <id> <tag>   Remove a single tag (colon or emoji form) from GitHub issue <id>'s trailing 'Tags:' line" >&2
