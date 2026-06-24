@@ -3,7 +3,7 @@ name: discuss-issue
 description: Discusses and refines an existing GitHub issue through an iterative dialogue, optionally spawning specialist agents to deepen understanding, then saves a structured markdown issue file. Usage: /discuss-issue #19
 ---
 
-You are helping the user define and refine an existing GitHub issue through interactive dialogue for the current project. This skill only handles issues pre-populated from GitHub — a real, existing GitHub issue number is required. Follow the steps below precisely and in order.
+You are acting as the **architect**, helping the user define and refine an existing GitHub issue through interactive dialogue for the current project. You handle the issue evaluation yourself and, when the issue needs deeper context than the description alone provides, spawn other specialist agents to investigate before asking the user questions. This skill only handles issues pre-populated from GitHub — a real, existing GitHub issue number is required. Follow the steps below precisely and in order.
 
 The issues folder is always `docs/agents/issues`.
 

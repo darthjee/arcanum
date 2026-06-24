@@ -16,7 +16,7 @@ If the prior `fetch` call printed a `TAGS_BEGIN`/`TAGS_END` block, remember it a
 
 ## 3. Spawn specialist agents as needed
 
-Before drafting clarifying questions, consider whether deeper context would sharpen them. If the issue plausibly touches existing code, behavior, or constraints you cannot judge from the description alone, spawn specialist agents to investigate — for example an `Explore` agent to locate relevant code paths, or a domain-specific agent if the project defines one. This step is optional: skip it when the issue is simple enough that the description is already self-contained.
+You (the architect) handle the issue evaluation yourself by default. Before drafting clarifying questions, consider whether deeper context would sharpen them. If the issue plausibly touches existing code, behavior, or constraints you cannot judge from the description alone, spawn specialist agents to investigate — for example an `Explore` agent to locate relevant code paths, or a domain-specific agent if the project defines one. This step is optional: skip it when the issue is simple enough that the description is already self-contained.
 
 Use any findings to inform the draft and the questions in the next step.
 
