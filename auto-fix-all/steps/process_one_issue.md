@@ -134,6 +134,6 @@ After all agents commit, `git push`, then go back to step 3 above (`wait_ci.sh`)
 
 The lines after the first are the new comments, one per `---`-separated block — only comments from `<pr_owner>` are included. Each block starts with an `id: <node id>` line and a `url: <html url>` line, followed by the comment body. The underlying monitor script already added a `:eyes:` reaction to each of these comments and recorded them as `open`; it will swap that to `:+1:` and mark them `addressed` the next time it (re)starts — i.e. after you push the fixes below.
 
-Read [handle_comment.md](handle_comment.md) and follow its instructions to dispatch each comment to the right agent(s) and apply the feedback.
+Read [handle_comment.md](handle_comment.md) and follow its instructions to dispatch each comment to the right agent(s) and apply the feedback. Some comments may be pure questions, replied to directly with no code change; others are actionable and result in a commit — see `handle_comment.md` for how it routes each.
 
-After all comments are handled and pushed, go back to "Monitor the PR" above (block on the monitor step again) to resume monitoring.
+After all comments are handled — pushing any code changes made — go back to "Monitor the PR" above (block on the monitor step again) to resume monitoring.
