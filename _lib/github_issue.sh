@@ -8,6 +8,13 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# shellcheck source=tags.sh
+# Source the shared tag-parsing library
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/tags.sh"
+
 # --- Origin helpers (cached) ---
 
 _ORIGIN_PARSED=0
@@ -113,9 +120,11 @@ cmd_fetch() {
     exit 1
   }
 
-  local title body
+  local title body issue_state updated_at
   title=$(echo "$result" | jq -r '.title')
   body=$(echo "$result" | jq -r '.body')
+  issue_state=$(echo "$result" | jq -r '.state')
+  updated_at=$(echo "$result" | jq -r '.updated_at')
 
   local tags_block
   tags_block=$(extract_tags_block "$body")
@@ -132,6 +141,19 @@ cmd_fetch() {
 
   local filepath="${issues_dir}/${id}-${normalized}.md"
   printf '%s\n' "$body" > "$filepath"
+
+  # Persist metadata to per-issue JSON state file
+  local issue_state_script="${SCRIPT_DIR}/issue_state.sh"
+
+  # Build tags JSON array from tags_block (wrap each bare name with colons)
+  # Uses jq to safely produce a valid JSON array; empty input yields [].
+  local tags_json
+  tags_json=$(extract_tags "$tags_block" | jq -R '":"+.+":"' | jq -s '.')
+
+  "$issue_state_script" set-json "$id" tags "$tags_json"
+  "$issue_state_script" set      "$id" updated_at "$updated_at"
+  "$issue_state_script" set      "$id" title "$title"
+  "$issue_state_script" set      "$id" state "$issue_state"
 
   echo "TITLE=$title"
   echo "FILE=$filepath"
