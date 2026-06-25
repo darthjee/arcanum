@@ -35,7 +35,8 @@ else
   ignored_json="[]"
 fi
 
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib_origin.sh"
+# shellcheck source=../../_lib/origin.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../_lib/origin.sh"
 
 _ensure_gh_user
 REPO_REF=$(get_repo_ref)

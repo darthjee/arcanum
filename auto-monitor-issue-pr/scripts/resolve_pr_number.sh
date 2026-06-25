@@ -9,7 +9,8 @@
 
 set -euo pipefail
 
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib_origin.sh"
+# shellcheck source=../../_lib/origin.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../_lib/origin.sh"
 
 ID="${1:-}"
 ID="${ID#\#}"

@@ -10,12 +10,14 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=./_lib_origin.sh
-source "${SCRIPT_DIR}/_lib_origin.sh"
+# shellcheck source=../../_lib/origin.sh
+source "${SCRIPT_DIR}/../../_lib/origin.sh"
 # shellcheck source=../../_lib/tags.sh
 source "${SCRIPT_DIR}/../../_lib/tags.sh"
 # shellcheck source=../../_lib/tag_actions.sh
 source "${SCRIPT_DIR}/../../_lib/tag_actions.sh"
+# shellcheck source=../../_lib/lock.sh
+source "${SCRIPT_DIR}/../../_lib/lock.sh"
 
 QUEUE_SCRIPT="${SCRIPT_DIR}/../../auto-fix-all/scripts/queue.sh"
 REWRITE_QUEUE_SCRIPT="${SCRIPT_DIR}/rewrite_queue.sh"
@@ -41,34 +43,6 @@ _now_minus_1s() {
   else
     date -u -d '-1 second' +%FT%TZ
   fi
-}
-
-# --- Lock helpers ---
-
-_LOCK_INSTANCE_ID="${HOSTNAME:-host}-$$-$(date +%s%N)"
-
-_acquire_lock() {
-  local attempt=0
-  local warned=false
-  while true; do
-    attempt=$((attempt + 1))
-    echo "$_LOCK_INSTANCE_ID" > "$LOCK_FILE"
-    sleep 1
-    if [[ "$(cat "$LOCK_FILE" 2>/dev/null)" == "$_LOCK_INSTANCE_ID" ]]; then
-      return 0
-    fi
-    if (( attempt % 10 == 0 )); then
-      if [[ "$warned" == false ]]; then
-        echo "Warning: issue-monitor lock ($LOCK_FILE) seems stuck after ${attempt} attempts — check whether a process is actually holding it, and if not, remove the lock file manually. Retrying..." >&2
-        warned=true
-      fi
-      attempt=0
-    fi
-  done
-}
-
-_release_lock() {
-  rm -f "$LOCK_FILE"
 }
 
 # Release lock on exit to avoid leaving it behind.
