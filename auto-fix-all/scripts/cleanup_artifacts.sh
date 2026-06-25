@@ -11,6 +11,9 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../../_lib/push.sh"
+
 ISSUE_FILE="${1:-}"
 PLAN_DIR="${2:-}"
 ID="${3:-}"
@@ -40,3 +43,5 @@ fi
   echo "Co-Authored-By: ${MODEL_NAME} <${MODEL_EMAIL}>"
   echo "Co-Authored-By: architect agent <${MODEL_EMAIL}>"
 } | git commit -F -
+
+push_current_branch

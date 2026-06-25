@@ -55,8 +55,8 @@ If you (architect) are handling a comment/failure yourself, follow the same cycl
 
 Wait for every dispatched agent (and your own work, if any) to report back, confirming tests/lint passed and the commit hash. Then:
 
-- From the **comment** branch of [process_one_issue.md](process_one_issue.md): `git push`, then return to the top of that file to resume monitoring.
-- From the **CI-failure** branch of [process_one_issue.md](process_one_issue.md): `git push`, then return to its `wait_ci.sh` step to re-check.
+- From the **comment** branch of [process_one_issue.md](process_one_issue.md): return to the top of that file to resume monitoring.
+- From the **CI-failure** branch of [process_one_issue.md](process_one_issue.md): return to its `wait_ci.sh` step to re-check.
 
 ## Replying to a question
 
@@ -71,4 +71,4 @@ For each comment judged a question/clarification above:
    (resolved relative to the `auto-fix-all` skill folder).
 4. No commit, no push, and no CI wait for a question reply — nothing changed in the working tree.
 
-Once every comment in the batch — questions replied to, actionable ones dispatched-and-committed — has been handled, return to "Monitor the PR" (top of [process_one_issue.md](process_one_issue.md)) to resume monitoring. If at least one comment in the batch was actionable, `git push` first as described in "After dispatching" above; if the entire batch was pure replies, skip the push (nothing to push) and go straight back to monitoring.
+Once every comment in the batch — questions replied to, actionable ones dispatched-and-committed — has been handled, return to "Monitor the PR" (top of [process_one_issue.md](process_one_issue.md)) to resume monitoring.

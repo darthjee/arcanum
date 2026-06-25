@@ -16,6 +16,9 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../../_lib/push.sh"
+
 TYPE="${1:-}"
 SCOPE="${2:-}"
 ID="${3:-}"
@@ -45,3 +48,5 @@ COMMENT_URL="${9:-}"
   echo "Co-Authored-By: ${MODEL_NAME} <${MODEL_EMAIL}>"
   echo "Co-Authored-By: ${AGENT} agent <${MODEL_EMAIL}>"
 } | git commit -F -
+
+push_current_branch
