@@ -19,7 +19,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE="$SCRIPT_DIR/../templates/reply.tmpl.md"
 RESOLVE_PR_NUMBER="$SCRIPT_DIR/../../auto-monitor-issue-pr/scripts/resolve_pr_number.sh"
 
-source "${SCRIPT_DIR}/_lib_origin.sh"
+source "${SCRIPT_DIR}/../../_lib/origin.sh"
+source "${SCRIPT_DIR}/../../_lib/push.sh"
 
 ID="${1:-}"
 AGENT="${2:-}"
@@ -48,3 +49,5 @@ content="${content/\%\%MODEL_NAME\%\%/$MODEL_NAME}"
 content="${content/\%\%MODEL_EMAIL\%\%/$MODEL_EMAIL}"
 
 printf '%s\n' "$content" | gh pr comment "$PR_NUMBER" -R "$REPO_REF" --body-file -
+
+push_current_branch

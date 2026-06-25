@@ -45,6 +45,8 @@ export GH_INSECURE_SKIP_VERIFY=true
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../../_lib/origin.sh
 source "${SCRIPT_DIR}/../../_lib/origin.sh"
+# shellcheck source=../../_lib/push.sh
+source "${SCRIPT_DIR}/../../_lib/push.sh"
 
 ISSUE_STATE_SCRIPT="${SCRIPT_DIR}/../../auto-fix-issue/scripts/issue_state.sh"
 
@@ -133,6 +135,8 @@ if [[ -n "$open_ids" ]]; then
 fi
 
 while true; do
+  push_current_branch 2>/dev/null || true
+
   pr_data=$(gh pr view "$PR_NUMBER" -R "$REPO_REF" --json state,comments,reviews 2>/dev/null) || {
     sleep 5
     continue
