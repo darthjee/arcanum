@@ -2,12 +2,6 @@
 
 This skill never replicates the metadata-file tracking used by Majora's `draft-pr`/`mark-ready` (no `.claude/state/metadata/issue_<id>.json` equivalent). Instead, it checks GitHub directly for an existing PR on the current branch.
 
-## Push
-
-```bash
-git push -u origin HEAD
-```
-
 ## Check for an existing PR
 
 Run:

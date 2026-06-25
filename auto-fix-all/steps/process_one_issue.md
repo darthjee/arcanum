@@ -114,11 +114,7 @@ Report `OUTCOME=closed PR_NUMBER=<pr_number>`. Done — stop here. Do not ask th
    scripts/cleanup_artifacts.sh <issue_file> <plan_dir> <id> "<your AI model name>" "<your AI model noreply email>"
    ```
    `<issue_file>` and `<plan_dir>` are the same paths resolved by `../auto-plan-issue/scripts/resolve_plan_paths.sh docs/agents/issues docs/agents/plans <id>` (re-run it here, resolved relative to the `auto-plan-issue` skill folder, if you no longer have them at hand).
-2. Push:
-   ```bash
-   git push
-   ```
-3. Wait for CI:
+2. Wait for CI:
    ```bash
    scripts/wait_ci.sh
    ```
@@ -144,7 +140,7 @@ Report `OUTCOME=merged`. Done — stop here.
 
 Read [handle_comment.md](handle_comment.md)'s **"Choosing the responsible agent(s)"** section and apply the same agent-selection approach to the failed check-run names: dispatch the responsible specialist agent(s) (or yourself, as architect, if none seem responsible) in parallel with the instruction to investigate the CI failure, fix it, run the full dev cycle locally, and commit via `../../auto-fix-issue/scripts/commit_change.sh` (resolved relative to the `auto-fix-issue` skill folder).
 
-After all agents commit, `git push`, then go back to step 3 above (`wait_ci.sh`) to re-check.
+After all agents commit, go back to step 3 above (`wait_ci.sh`) to re-check.
 
 ### If `commented`
 
@@ -152,4 +148,4 @@ The lines after the first are the new comments, one per `---`-separated block �
 
 Read [handle_comment.md](handle_comment.md) and follow its instructions to dispatch each comment to the right agent(s) and apply the feedback. Some comments may be pure questions, replied to directly with no code change; others are actionable and result in a commit — see `handle_comment.md` for how it routes each.
 
-After all comments are handled — pushing any code changes made — go back to "Monitor the PR" above (block on the monitor step again) to resume monitoring.
+After all comments are handled, go back to "Monitor the PR" above (block on the monitor step again) to resume monitoring.
