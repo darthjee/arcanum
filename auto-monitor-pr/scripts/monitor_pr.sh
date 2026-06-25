@@ -156,6 +156,11 @@ while true; do
   state=$(echo "$pr_data" | jq -r '.state' 2>/dev/null) || { sleep 5; continue; }
 
   if [[ "$state" == "MERGED" ]]; then
+    if [[ -n "$ISSUE_ID" ]]; then
+      rm -f ".claude/state/issue-${ISSUE_ID}.json"
+    else
+      rm -f "$COMMENTS_FILE"
+    fi
     echo "merged"
     exit 0
   fi
