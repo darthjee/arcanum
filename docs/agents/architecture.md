@@ -57,6 +57,8 @@ Skills store runtime state and configuration under `.claude/`:
 | `.claude/state/auto-fix-all-queue.lock` | Lock file used during `push`/`pop` mutations to prevent concurrent writes. Contains the acquiring instance's unique ID. | Plain text (instance ID string) |
 | `.claude/state/auto-monitor-pr-<pr_number>-comments.json` | Tracks owner comments seen by `auto-monitor-pr` for a given PR. One file per PR number. | `{"comments": [{"id": "<node_id>", "user": "<login>", "url": "<html_url>", "status": "open"\|"addressed"}], "last_comment_time": "<ISO8601>"}` |
 | `.claude/configuration/auto-fix-all.json` | Configuration for the `auto-fix-all` skill. Controls which CI check names are ignored when deciding pass/fail. | `{"ignored_check_patterns": ["<substring>", ...]}` |
+| `.claude/state/monitor-issues-rewrite-queue.json` | Queue of issue IDs awaiting a `:pencil2:` rewrite, drained by `auto-rewrite-issue`. | `[{"id": "<issue_id>"}, ...]` |
+| `.claude/state/monitor-issues-rewrite-queue.lock` | Lock file used during `rewrite_queue.sh push`/`pop` mutations to prevent concurrent writes. Contains the acquiring instance's unique ID. | Plain text (instance ID string) |
 
 Never write to these files directly — always use the dedicated scripts (e.g. `queue.sh push`, `queue.sh pop`) that handle locking and atomicity.
 
@@ -76,7 +78,7 @@ Tags are free-form `:word:` tokens (e.g. `Tags: :shipit: :urgent:`), parsed by `
 
 **`:question:` / ❓** marks an issue as having a question for the agent. `monitor-issues` detects it (via `_lib/tag_actions.sh`'s `actionable_tags`) and logs that it needs an answer — actually answering it requires AI judgment, so that step is left to architect-level reasoning, not the polling script. Once answered, the tag should be removed from the live GitHub issue body via `monitor-issues/scripts/github.sh remove-tag <id> question`.
 
-**`:pencil2:` / ✏️** marks an issue as ready to be read and rewritten by the agent. `monitor-issues` detects it the same way and logs that a rewrite is needed; the rewrite itself is architect-level (AI judgment), and once done the tag is removed via `monitor-issues/scripts/github.sh remove-tag <id> pencil2` and the GitHub issue body is updated.
+**`:pencil2:` / ✏️** marks an issue as ready to be read and rewritten by the agent. Unlike `:question:`, this action is now fully wired end-to-end: `monitor_issues.sh` pushes the issue id onto `monitor-issues/scripts/rewrite_queue.sh`'s queue (`.claude/state/monitor-issues-rewrite-queue.json`) as soon as the tag is detected. The `auto-rewrite-issue` skill drains that queue: for each id it fetches the issue body, rewrites it (architect-level AI judgment, the same kind of rewrite `discuss-issue/steps/discuss_and_save.md` performs but fully autonomous), pushes the new body to GitHub, then removes the tag via `monitor-issues/scripts/github.sh remove-tag <id> pencil2`.
 
 **`:clipboard:` / 📋** marks an issue as ready to be pushed to the `auto-fix-all` queue. Unlike the two tags above, this action is fully deterministic, so `monitor_issues.sh` performs it directly: it pushes the issue id via `auto-fix-all/scripts/queue.sh push <id>` as soon as the tag is detected.
 

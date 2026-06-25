@@ -18,6 +18,7 @@ source "${SCRIPT_DIR}/../../_lib/tags.sh"
 source "${SCRIPT_DIR}/../../_lib/tag_actions.sh"
 
 QUEUE_SCRIPT="${SCRIPT_DIR}/../../auto-fix-all/scripts/queue.sh"
+REWRITE_QUEUE_SCRIPT="${SCRIPT_DIR}/rewrite_queue.sh"
 
 STATE_DIR=".claude/state"
 ISSUES_FILE="${STATE_DIR}/issues.json"
@@ -119,7 +120,7 @@ _poll_once() {
     ISSUES_JSON=$(gh issue list \
       -R "$REPO_REF" \
       --author "$GH_USER" \
-      --state all \
+      --state open \
       --json number,title,updatedAt,body,labels \
       --search "updated:>$SINCE" \
       --limit 100 2>&1) || {
@@ -129,7 +130,7 @@ _poll_once() {
   else
     ISSUES_JSON=$(gh issue list \
       -R "$REPO_REF" \
-      --state all \
+      --state open \
       --json number,title,updatedAt,body,labels \
       --search "updated:>$SINCE" \
       --limit 100 2>&1) || {
@@ -168,28 +169,16 @@ _poll_once() {
       # Build tags JSON array from body.
       TAGS_JSON=$(extract_tags "$BODY" | jq -R . | jq -s .)
 
-      NOW=$(date -u +%FT%TZ)
+      _log "Processing #${ISSUE_ID} — tags: ${TAGS_JSON}"
 
-      # Acquire lock, merge, write, release.
-      _acquire_lock
-      CURRENT_ISSUES=$(_read_issues)
-      UPDATED_ISSUES=$(
-        echo "$CURRENT_ISSUES" | jq \
-          --arg id "$ISSUE_ID" \
-          --arg updated_at "$NOW" \
-          --argjson tags "$TAGS_JSON" \
-          '.[$id] = {"updated_at": $updated_at, "tags": $tags}'
-      )
-      _write_issues "$UPDATED_ISSUES"
-      _release_lock
-
-      _log "Processed #${ISSUE_ID} — tags: ${TAGS_JSON}"
-
-      # Dispatch any actionable tags found on this issue. `question` and
-      # `pencil2` need AI judgment (answering / rewriting), so this loop
-      # only logs them for now — actually answering/rewriting is left to a
-      # future architect-level step. `clipboard` (push to the auto-fix
-      # queue) is fully deterministic, so it's handled here directly.
+      # Dispatch any actionable tags found on this issue. `question` has no
+      # dispatched action (it needs AI judgment to answer, left to a future
+      # architect-level step) and is log-only. `clipboard` (push to the
+      # auto-fix queue) and `pencil2` (push to the rewrite queue) are fully
+      # deterministic dispatches handled here directly. `updated_at` for
+      # this issue is only recorded once all dispatched actions for it have
+      # succeeded — see below — so a failed dispatch gets retried next poll.
+      local ISSUE_DISPATCH_FAILED=0
       local ACTION_TAG
       while IFS= read -r ACTION_TAG; do
         [[ -z "$ACTION_TAG" ]] && continue
@@ -198,14 +187,36 @@ _poll_once() {
             _log "Issue #${ISSUE_ID} has actionable tag 'question' — needs an answer from the agent"
             ;;
           pencil2)
-            _log "Issue #${ISSUE_ID} has actionable tag 'pencil2' — needs to be rewritten by the agent"
+            _log "Issue #${ISSUE_ID} has actionable tag 'pencil2' — pushing to rewrite queue"
+            "$REWRITE_QUEUE_SCRIPT" push "$ISSUE_ID" || { _log "ERROR: failed to push #${ISSUE_ID} to the rewrite queue"; ISSUE_DISPATCH_FAILED=1; }
             ;;
           clipboard)
             _log "Issue #${ISSUE_ID} has actionable tag 'clipboard' — pushing to auto-fix-all queue"
-            "$QUEUE_SCRIPT" push "$ISSUE_ID" || _log "ERROR: failed to push #${ISSUE_ID} to the queue"
+            "$QUEUE_SCRIPT" push "$ISSUE_ID" || { _log "ERROR: failed to push #${ISSUE_ID} to the queue"; ISSUE_DISPATCH_FAILED=1; }
             ;;
         esac
       done < <(actionable_tags "$BODY")
+
+      if [[ "$ISSUE_DISPATCH_FAILED" -eq 0 ]]; then
+        NOW=$(date -u +%FT%TZ)
+
+        # Acquire lock, merge, write, release.
+        _acquire_lock
+        CURRENT_ISSUES=$(_read_issues)
+        UPDATED_ISSUES=$(
+          echo "$CURRENT_ISSUES" | jq \
+            --arg id "$ISSUE_ID" \
+            --arg updated_at "$NOW" \
+            --argjson tags "$TAGS_JSON" \
+            '.[$id] = {"updated_at": $updated_at, "tags": $tags}'
+        )
+        _write_issues "$UPDATED_ISSUES"
+        _release_lock
+
+        _log "Processed #${ISSUE_ID} — updated_at recorded"
+      else
+        _log "Skipping updated_at write for #${ISSUE_ID} — a dispatched action failed; will retry next poll"
+      fi
     done
   fi
 }
