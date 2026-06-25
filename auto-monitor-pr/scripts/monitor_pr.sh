@@ -4,24 +4,33 @@
 #
 # Resolves PR_OWNER via get_gh_user and derives COMMENTS_FILE as
 # .claude/state/auto-monitor-pr-<pr_number>-comments.json (when <id> is
-# absent or empty) or reads/writes the `comments` and `last_comment_time`
+# absent or empty) or reads/writes the `pr_comments` and `last_comment_time`
 # fields inside .claude/state/issue-<id>.json (when <id> is non-empty).
 #
 # Blocking loop (5s sleep) that polls `gh pr view --json state,comments,reviews`
 # plus the inline review comments API, retrying silently on transient gh
-# errors. The comments-file is a JSON object
-# `{"comments":[{id,user,url,status}],"last_comment_time":<ISO8601>}`
-# tracking each owner comment's lifecycle (status "open" -> "addressed")
-# and the last-seen comment time, across loop iterations and across
-# separate invocations of this script. If the file is missing, the
-# timestamp defaults to "1970-01-01T00:00:00Z".
+# errors. When --issue-id is provided the comments-state is a JSON object
+# `{"pr_comments":[{id,user,url,state,emojis}],"last_comment_time":<ISO8601>}`
+# tracking each owner comment's three-state lifecycle:
+#   fetched    – comment seen and recorded; reaction not yet added
+#   processing – :eyes: reaction added; waiting for a fix to be pushed
+#   addressed  – fix pushed; :eyes: swapped for :+1:
+# The `emojis` field lists the current reactions added by this script
+# (e.g. [":eyes:"] or [":+1:"]).
+# The last_comment_time is the ISO 8601 timestamp of the newest recorded
+# comment, persisted across loop iterations and across separate invocations.
+# If the file is missing, the timestamp defaults to "1970-01-01T00:00:00Z".
 #
-# On every invocation, before polling: any comment still marked "open" in
-# the comments-file is assumed addressed by whatever triggered this fresh
+# Note: the deprecated per-PR file (.claude/state/auto-monitor-pr-<pr_number>
+# -comments.json, used when --issue-id is absent) retains its own JSON object
+# with a `comments` key and is not part of this change.
+#
+# On every invocation, before polling: any comment still marked "processing"
+# in the issue state is assumed addressed by whatever triggered this fresh
 # run (the only caller that restarts this script is auto-fix-all, after
 # pushing a fix for previously-reported comments) -- its :eyes: reaction is
-# swapped for :+1: (GitHub's reaction set has no check-mark) and its status
-# becomes "addressed".
+# swapped for :+1: (GitHub's reaction set has no check-mark), its state
+# becomes "addressed", and its emojis field is updated to [":+1:"].
 #
 # Behavior:
 #   - PR state MERGED  -> print "merged", exit 0
@@ -29,13 +38,15 @@
 #   - latest review by <pr_owner> is APPROVED -> print "approved", exit 0
 #   - else collect comments (issue-level + inline + review bodies, each with
 #     its GraphQL node id and html url) from <pr_owner> newer than the
-#     comments-file's last_comment_time; if any are found, write the max of
-#     their timestamps into the comments-file's last_comment_time; if any of
-#     those new comments is exactly ":shipit:" print "approved" and exit 0;
-#     otherwise add an :eyes: reaction to each, record them as "open" in the
-#     comments-file, then print "commented" followed by each new comment as
-#     a "---"-preceded block of "id: <id>", "url: <url>", then the body,
-#     exit 0
+#     last_comment_time; if any are found, write the max of their timestamps
+#     into last_comment_time; if any of those new comments is exactly
+#     ":shipit:" print "approved" and exit 0; otherwise:
+#       1. persist them as state "fetched" with emojis []
+#       2. add an :eyes: reaction to each and persist them as "processing"
+#          with emojis [":eyes:"]
+#       3. print "commented" followed by each new comment as a
+#          "---"-preceded block of "id: <id>", "url: <url>", then the body,
+#          exit 0
 #   - otherwise sleep 5s and loop
 
 set -euo pipefail
@@ -95,12 +106,12 @@ load_comments_state() {
     local issue_file=".claude/state/issue-${ISSUE_ID}.json"
     if [[ -s "$issue_file" ]]; then
       local comments last_time
-      comments=$(jq -c '.comments // []' "$issue_file" 2>/dev/null || echo '[]')
+      comments=$(jq -c '.pr_comments // []' "$issue_file" 2>/dev/null || echo '[]')
       last_time=$(jq -r '.last_comment_time // "1970-01-01T00:00:00Z"' "$issue_file" 2>/dev/null || echo '1970-01-01T00:00:00Z')
       jq -n --argjson comments "$comments" --arg last_comment_time "$last_time" \
-        '{"comments": $comments, "last_comment_time": $last_comment_time}'
+        '{"pr_comments": $comments, "last_comment_time": $last_comment_time}'
     else
-      echo '{"comments":[],"last_comment_time":"1970-01-01T00:00:00Z"}'
+      echo '{"pr_comments":[],"last_comment_time":"1970-01-01T00:00:00Z"}'
     fi
   else
     cat "$COMMENTS_FILE" 2>/dev/null || echo '{"comments":[],"last_comment_time":"1970-01-01T00:00:00Z"}'
@@ -110,9 +121,9 @@ load_comments_state() {
 save_comments_state() {
   if [[ -n "$ISSUE_ID" ]]; then
     local comments last_time
-    comments=$(echo "$1" | jq -c '.comments // []')
+    comments=$(echo "$1" | jq -c '.pr_comments // []')
     last_time=$(echo "$1" | jq -r '.last_comment_time // "1970-01-01T00:00:00Z"')
-    "$ISSUE_STATE_SCRIPT" set-json "$ISSUE_ID" comments "$comments"
+    "$ISSUE_STATE_SCRIPT" set-json "$ISSUE_ID" pr_comments "$comments"
     "$ISSUE_STATE_SCRIPT" set "$ISSUE_ID" last_comment_time "$last_time"
   else
     mkdir -p "$(dirname "$COMMENTS_FILE")"
@@ -120,17 +131,17 @@ save_comments_state() {
   fi
 }
 
-# Resolve any comments left "open" by a previous invocation -- this run was
-# triggered by a push made in response to them, so they're now addressed.
+# Resolve any comments left "processing" by a previous invocation -- this run
+# was triggered by a push made in response to them, so they're now addressed.
 comments_state=$(load_comments_state)
-open_ids=$(echo "$comments_state" | jq -r '.comments[] | select(.status == "open") | .id')
+open_ids=$(echo "$comments_state" | jq -r '.pr_comments[] | select(.state == "processing") | .id')
 if [[ -n "$open_ids" ]]; then
   while IFS= read -r node_id; do
     [[ -n "$node_id" ]] || continue
     remove_reaction "$node_id" EYES
     add_reaction "$node_id" THUMBS_UP
   done <<< "$open_ids"
-  comments_state=$(echo "$comments_state" | jq '.comments |= map(if .status == "open" then .status = "addressed" else . end)')
+  comments_state=$(echo "$comments_state" | jq '.pr_comments |= map(if .state == "processing" then (.state = "addressed" | .emojis = [":+1:"]) else . end)')
   save_comments_state "$comments_state"
 fi
 
@@ -204,17 +215,22 @@ while true; do
       exit 0
     fi
 
+    # Phase 1 — write fetched (crash-recovery checkpoint)
+    comments_state=$(load_comments_state)
+    comments_state=$(jq -n --argjson state "$comments_state" --argjson new "$new_comments" --arg latest "$latest_time" \
+      '{pr_comments: (($state.pr_comments // []) + [$new[] | {id, user: .login, url, state: "fetched", emojis: []}]), last_comment_time: $latest}')
+    save_comments_state "$comments_state"
+
+    # Phase 2 — add reactions and update to processing
     new_ids=$(echo "$new_comments" | jq -r '.[].id')
     while IFS= read -r node_id; do
       [[ -n "$node_id" ]] || continue
       add_reaction "$node_id" EYES
     done <<< "$new_ids"
-
-    comments_state=$(load_comments_state)
-    comments_state=$(jq -n --argjson state "$comments_state" --argjson new "$new_comments" --arg latest "$latest_time" \
-      '{comments: ($state.comments + [$new[] | {id, user: .login, url, status: "open"}]), last_comment_time: $latest}')
+    comments_state=$(echo "$comments_state" | jq '.pr_comments |= map(if .state == "fetched" then (.state = "processing" | .emojis = [":eyes:"]) else . end)')
     save_comments_state "$comments_state"
 
+    # Phase 3 — print output and exit
     echo "commented"
     echo "$new_comments" | jq -r '.[] | "---\nid: " + .id + "\nurl: " + .url + "\n" + .body'
     exit 0
