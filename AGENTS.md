@@ -14,6 +14,16 @@ Nenhuma linguagem de programação — o projeto é composto por arquivos markdo
 - Quando um caminho absoluto for necessário (ex: dentro de um script), ele deve ser extraído para uma variável em vez de repetido inline.
 - Sempre que possível, extrair lógica das skills para scripts (em vez de instruções em linguagem natural), para tornar o comportamento determinístico e reduzir consumo de tokens.
 
+## Agents
+
+Specialist agents are defined in `.claude/agents/`. Each has a specific scope within the repository.
+
+| Agent | Scope |
+|-------|-------|
+| `architect` | Skills (SKILL.md and auxiliary `.md` files), project documentation, root-level files, and decisions that span more than one agent. Coordinates the other specialists. |
+| `scripter` | `<skill-name>/scripts/` — bash scripts that extract deterministic logic out of skills. |
+| `skill-reviewer` | Reviews skill files (SKILL.md and step `.md` files) modified in a PR and flags any complex inline bash that should be extracted to a script. Reports violations to the architect; does not fix them. |
+
 ## Documentation
 
 All project documentation lives under [`docs/agents/`](docs/agents/):
