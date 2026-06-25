@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Monitor a PR for merge/close/approval/new-comments from its owner
-# Usage: monitor_pr.sh <pr_number> [<id>]
+# Usage: monitor_pr.sh --pr-number <pr_number> [--issue-id <id>]
 #
 # Resolves PR_OWNER via get_gh_user and derives COMMENTS_FILE as
 # .claude/state/auto-monitor-pr-<pr_number>-comments.json (when <id> is
@@ -47,12 +47,30 @@ source "${SCRIPT_DIR}/_lib_origin.sh"
 
 ISSUE_STATE_SCRIPT="${SCRIPT_DIR}/../../auto-fix-issue/scripts/issue_state.sh"
 
-PR_NUMBER="${1:-}"
+PR_NUMBER=""
+ISSUE_ID=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --pr-number)
+      PR_NUMBER="${2:-}"
+      shift 2
+      ;;
+    --issue-id)
+      ISSUE_ID="${2:-}"
+      shift 2
+      ;;
+    *)
+      echo "Usage: $0 --pr-number <pr_number> [--issue-id <id>]" >&2
+      exit 1
+      ;;
+  esac
+done
+
 PR_NUMBER="${PR_NUMBER#\#}"
-ISSUE_ID="${2:-}"
 
 [[ -n "$PR_NUMBER" ]] || {
-  echo "Usage: $0 <pr_number> [<id>]" >&2
+  echo "Usage: $0 --pr-number <pr_number> [--issue-id <id>]" >&2
   exit 1
 }
 
