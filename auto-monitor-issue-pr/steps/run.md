@@ -19,3 +19,5 @@ Read [../../auto-monitor-pr/steps/run.md](../../auto-monitor-pr/steps/run.md) an
 ## Step 3 — Report
 
 Report whatever the monitor step reported, verbatim. Do not decide what to do about a comment — that is the caller's responsibility.
+
+> **Permission-rule gotcha:** `scripts/resolve_pr_number.sh` (this skill) and `auto-monitor-pr/scripts/monitor_pr.sh` both take a PR/issue number as an argument. If a local `.claude/settings.local.json` ever grants these scripts permission with the number baked in (e.g. `Bash(auto-monitor-issue-pr/scripts/resolve_pr_number.sh 21 *)`), the rule will never match a future issue's number, and Claude Code will prompt for permission again on every new issue — silently breaking the "no confirmation loop" contract this skill promises. Always keep (or rewrite) these two rules as number-agnostic wildcards, e.g. `Bash(auto-monitor-issue-pr/scripts/resolve_pr_number.sh *)` and `Bash(auto-monitor-pr/scripts/monitor_pr.sh *)`, covering every path form (relative and absolute) under which they get invoked.
