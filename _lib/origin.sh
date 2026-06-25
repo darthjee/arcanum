@@ -1,12 +1,8 @@
-# Shared origin-resolution helpers for auto-monitor-issue-pr's scripts.
+# Shared origin-resolution helpers.
 #
 # This file is meant to be SOURCED, not executed directly — it defines
-# globals/functions used by resolve_pr_number.sh.
-#
-# Scope: this sourcing is local to the auto-monitor-issue-pr skill only.
-# Other skills (auto-fix-all, auto-monitor-pr, etc.) intentionally keep
-# their own independent copies of this helper so each skill folder
-# remains self-contained and portable on its own.
+# globals/functions used by scripts that need to resolve the git origin
+# domain and repository path.
 
 # --- Origin helpers (cached) ---
 

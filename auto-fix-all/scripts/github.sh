@@ -18,7 +18,8 @@ set -euo pipefail
 export GH_INSECURE_SKIP_VERIFY=true
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/_lib_origin.sh"
+# shellcheck source=../../_lib/origin.sh
+source "${SCRIPT_DIR}/../../_lib/origin.sh"
 # shellcheck source=../../_lib/tags.sh
 source "${SCRIPT_DIR}/../../_lib/tags.sh"
 # shellcheck source=../../_lib/tag_mutate.sh
