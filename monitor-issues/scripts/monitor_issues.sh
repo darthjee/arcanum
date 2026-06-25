@@ -19,9 +19,9 @@ source "${SCRIPT_DIR}/../../_lib/tag_actions.sh"
 
 QUEUE_SCRIPT="${SCRIPT_DIR}/../../auto-fix-all/scripts/queue.sh"
 REWRITE_QUEUE_SCRIPT="${SCRIPT_DIR}/rewrite_queue.sh"
+ISSUE_STATE_SCRIPT="${SCRIPT_DIR}/../../auto-fix-issue/scripts/issue_state.sh"
 
 STATE_DIR=".claude/state"
-ISSUES_FILE="${STATE_DIR}/issues.json"
 LAST_CHECKED_FILE="${STATE_DIR}/issue-monitor-last-checked.txt"
 LOCK_FILE="${STATE_DIR}/issue-monitor.lock"
 
@@ -75,20 +75,6 @@ _release_lock() {
 trap '_release_lock' EXIT
 
 # --- State helpers ---
-
-_read_issues() {
-  if [[ -s "$ISSUES_FILE" ]]; then
-    cat "$ISSUES_FILE"
-  else
-    echo '{}'
-  fi
-}
-
-_write_issues() {
-  local json="$1"
-  echo "$json" > "${ISSUES_FILE}.tmp"
-  mv "${ISSUES_FILE}.tmp" "$ISSUES_FILE"
-}
 
 _read_last_checked() {
   if [[ -s "$LAST_CHECKED_FILE" ]]; then
@@ -148,15 +134,14 @@ _poll_once() {
   if (( ISSUE_COUNT > 0 )); then
     local i
     for i in $(seq 0 $((ISSUE_COUNT - 1))); do
-      local ISSUE ISSUE_ID GH_UPDATED_AT STORED_UPDATED_AT BODY TAGS_JSON NOW CURRENT_ISSUES UPDATED_ISSUES
+      local ISSUE ISSUE_ID GH_UPDATED_AT STORED_UPDATED_AT BODY TAGS_JSON NOW
       ISSUE=$(echo "$ISSUES_JSON" | jq ".[$i]")
       ISSUE_ID=$(echo "$ISSUE" | jq -r '.number | tostring')
       GH_UPDATED_AT=$(echo "$ISSUE" | jq -r '.updatedAt')
 
       # Read stored updated_at for this issue.
-      STORED_UPDATED_AT=$(
-        _read_issues | jq -r --arg id "$ISSUE_ID" '.[$id].updated_at // "1970-01-01T00:00:00Z"'
-      )
+      STORED_UPDATED_AT=$("$ISSUE_STATE_SCRIPT" get "$ISSUE_ID" updated_at)
+      STORED_UPDATED_AT="${STORED_UPDATED_AT:-1970-01-01T00:00:00Z}"
 
       # Fine-grained guard: skip if not newer.
       if [[ ! "$GH_UPDATED_AT" > "$STORED_UPDATED_AT" ]]; then
@@ -200,18 +185,9 @@ _poll_once() {
       if [[ "$ISSUE_DISPATCH_FAILED" -eq 0 ]]; then
         NOW=$(date -u +%FT%TZ)
 
-        # Acquire lock, merge, write, release.
-        _acquire_lock
-        CURRENT_ISSUES=$(_read_issues)
-        UPDATED_ISSUES=$(
-          echo "$CURRENT_ISSUES" | jq \
-            --arg id "$ISSUE_ID" \
-            --arg updated_at "$NOW" \
-            --argjson tags "$TAGS_JSON" \
-            '.[$id] = {"updated_at": $updated_at, "tags": $tags}'
-        )
-        _write_issues "$UPDATED_ISSUES"
-        _release_lock
+        # Write per-issue state file via issue_state.sh (handles its own locking).
+        "$ISSUE_STATE_SCRIPT" set "$ISSUE_ID" updated_at "$NOW"
+        "$ISSUE_STATE_SCRIPT" set-json "$ISSUE_ID" tags "$TAGS_JSON"
 
         _log "Processed #${ISSUE_ID} — updated_at recorded"
       else

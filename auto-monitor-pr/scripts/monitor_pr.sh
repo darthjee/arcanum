@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Monitor a PR for merge/close/approval/new-comments from its owner
-# Usage: monitor_pr.sh <pr_number>
+# Usage: monitor_pr.sh <pr_number> [<id>]
 #
 # Resolves PR_OWNER via get_gh_user and derives COMMENTS_FILE as
-# .claude/state/auto-monitor-pr-<pr_number>-comments.json.
+# .claude/state/auto-monitor-pr-<pr_number>-comments.json (when <id> is
+# absent or empty) or reads/writes the `comments` and `last_comment_time`
+# fields inside .claude/state/issue-<id>.json (when <id> is non-empty).
 #
 # Blocking loop (5s sleep) that polls `gh pr view --json state,comments,reviews`
 # plus the inline review comments API, retrying silently on transient gh
@@ -40,13 +42,17 @@ set -euo pipefail
 
 export GH_INSECURE_SKIP_VERIFY=true
 
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib_origin.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/_lib_origin.sh"
+
+ISSUE_STATE_SCRIPT="${SCRIPT_DIR}/../../auto-fix-issue/scripts/issue_state.sh"
 
 PR_NUMBER="${1:-}"
 PR_NUMBER="${PR_NUMBER#\#}"
+ISSUE_ID="${2:-}"
 
 [[ -n "$PR_NUMBER" ]] || {
-  echo "Usage: $0 <pr_number>" >&2
+  echo "Usage: $0 <pr_number> [<id>]" >&2
   exit 1
 }
 
@@ -64,12 +70,33 @@ remove_reaction() { # $1 = node id, $2 = ReactionContent
 }
 
 load_comments_state() {
-  cat "$COMMENTS_FILE" 2>/dev/null || echo '{"comments":[],"last_comment_time":"1970-01-01T00:00:00Z"}'
+  if [[ -n "$ISSUE_ID" ]]; then
+    local issue_file=".claude/state/issue-${ISSUE_ID}.json"
+    if [[ -s "$issue_file" ]]; then
+      local comments last_time
+      comments=$(jq -c '.comments // []' "$issue_file" 2>/dev/null || echo '[]')
+      last_time=$(jq -r '.last_comment_time // "1970-01-01T00:00:00Z"' "$issue_file" 2>/dev/null || echo '1970-01-01T00:00:00Z')
+      jq -n --argjson comments "$comments" --arg last_comment_time "$last_time" \
+        '{"comments": $comments, "last_comment_time": $last_comment_time}'
+    else
+      echo '{"comments":[],"last_comment_time":"1970-01-01T00:00:00Z"}'
+    fi
+  else
+    cat "$COMMENTS_FILE" 2>/dev/null || echo '{"comments":[],"last_comment_time":"1970-01-01T00:00:00Z"}'
+  fi
 }
 
 save_comments_state() {
-  mkdir -p "$(dirname "$COMMENTS_FILE")"
-  echo "$1" > "$COMMENTS_FILE"
+  if [[ -n "$ISSUE_ID" ]]; then
+    local comments last_time
+    comments=$(echo "$1" | jq -c '.comments // []')
+    last_time=$(echo "$1" | jq -r '.last_comment_time // "1970-01-01T00:00:00Z"')
+    "$ISSUE_STATE_SCRIPT" set-json "$ISSUE_ID" comments "$comments"
+    "$ISSUE_STATE_SCRIPT" set "$ISSUE_ID" last_comment_time "$last_time"
+  else
+    mkdir -p "$(dirname "$COMMENTS_FILE")"
+    echo "$1" > "$COMMENTS_FILE"
+  fi
 }
 
 # Resolve any comments left "open" by a previous invocation -- this run was

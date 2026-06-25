@@ -12,7 +12,7 @@ scripts/resolve_pr_number.sh <id>
 
 ## Step 2 — Delegate monitoring
 
-Read [../../auto-monitor-pr/steps/run.md](../../auto-monitor-pr/steps/run.md) and follow it for `<pr_number>`. It blocks and reports the outcome (`merged`, `closed`, `approved`, or `commented` + one `id`/`url`/body block per new comment).
+Read [../../auto-monitor-pr/steps/run.md](../../auto-monitor-pr/steps/run.md) and follow it for `<pr_number>` and `<id>` (the issue id from the skill argument). Pass `<id>` as the second argument so the monitor script stores comments state in `.claude/state/issue-<id>.json` rather than the legacy per-PR file. It blocks and reports the outcome (`merged`, `closed`, `approved`, or `commented` + one `id`/`url`/body block per new comment).
 
 > You are already running inside an architect agent — follow `run.md` directly here; do not spawn another `Agent(architect)` for it.
 
