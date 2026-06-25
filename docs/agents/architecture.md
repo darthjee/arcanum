@@ -34,6 +34,17 @@ Scripts are invoked from markdown steps with explicit arguments. This means:
 
 **Guideline:** when adding a new skill or extending an existing one, ask: "could this step produce a wrong result due to AI misinterpretation?" If yes, extract it to a script.
 
+## Agent Roster
+
+Specialist agents are defined in `.claude/agents/`. The architect coordinates them; each specialist owns a clearly bounded scope.
+
+| Agent | Scope | When the architect dispatches it |
+|-------|-------|----------------------------------|
+| `scripter` | `<skill-name>/scripts/` — writes and edits bash scripts | Whenever a skill needs deterministic logic extracted into a new or updated script |
+| `skill-reviewer` | Reads skill files (SKILL.md + step `.md` files) changed in a PR and reports complex inline bash that violates the script-extraction rule | During PR review, after implementation, to validate that no complex logic was left inline |
+
+`skill-reviewer` is a **read-only** agent: it never commits, never fixes violations — it only reports findings. The architect decides what to do (usually: dispatch `scripter` to extract the flagged logic).
+
 ## Architect Delegation
 
 A skill that's meant to run autonomously, with no user interaction (the `auto-*` family is the current example), should not just narrate "you are acting as the architect" and execute its own steps inline in whichever context invoked it — that context might be the general/coordinator context (a human typing the slash command directly, or a `/loop` re-entry), which then carries that reasoning forward across unrelated turns. Instead, split the skill into two layers:

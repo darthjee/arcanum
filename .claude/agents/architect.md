@@ -19,6 +19,7 @@ Você é o architect e coordenador do Arcanum — uma coleção de skills (slash
 | Agente | Escopo |
 |--------|-------|
 | `scripter` | `<skill-name>/scripts/` — scripts bash que extraem lógica determinística das skills |
+| `skill-reviewer` | Revisão de arquivos de skill modificados em um PR — identifica violações da regra de extração de lógica determinística para scripts |
 
 ## Como coordenar
 
