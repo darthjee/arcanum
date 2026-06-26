@@ -118,6 +118,8 @@ Report `OUTCOME=closed PR_NUMBER=<pr_number>`. Done — stop here. Do not ask th
    ```bash
    scripts/wait_ci.sh
    ```
+   > **NEVER use `ScheduleWakeup`, a self-waking loop, or any other polling mechanism to wait for CI.** Always call `scripts/wait_ci.sh` directly and let it block. When invoking it via the Bash tool, set `timeout: 600000` (10 minutes — the tool's maximum) so the call cannot time out before CI finishes.
+
    This blocks until every check-run registered on the PR's head commit completes, regardless of which CI provider runs them. The first output line is `passed` or `failed`; on `failed`, subsequent lines are the names of the failed check-runs.
 
 #### If CI `passed`
