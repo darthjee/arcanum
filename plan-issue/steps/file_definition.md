@@ -1,26 +1,17 @@
 # Plan File Definition
 
-## Parse the issue ID
+Run:
 
-The argument may be in one of these formats:
-- `99` → ID is `99`
-- `#99` → strip the `#`, ID is `99`
+```bash
+../auto-plan-issue/scripts/resolve_plan_paths.sh docs/agents/issues docs/agents/plans <id>
+```
 
-The ID must be a plain numeric value tied to a real GitHub issue. If a non-numeric value is given (e.g. a legacy local id like `X01`), stop immediately and report: `Error: issue id must be numeric and linked to a GitHub issue.` Do not attempt to resolve or guess it.
+> Resolve `../auto-plan-issue/scripts/resolve_plan_paths.sh` relative to the `plan-issue` skill folder (i.e., `<plan-issue>/scripts/../../../auto-plan-issue/scripts/resolve_plan_paths.sh`).
 
-## Locate the issue file
+The argument `<id>` may be in the form `99` or `#99` — strip the leading `#` if present before passing to the script. The ID must be numeric and tied to a real GitHub issue; the script enforces this and will error otherwise.
 
-List the files in the issues folder and find the one whose name starts with the given ID (e.g., `99_add_tables.md`). Read that file to understand the issue.
+Parse the key=value output to obtain `ISSUE_FILE`, `PLAN_DIR`, `PLAN_FILE`, and `PLAN_EXISTS`.
 
-If no matching file is found, inform the user and stop.
-
-## Determine the plan location
-
-The plan folder name follows the same base name as the issue file (without the `.md` extension). For example:
-- Issue file: `99_add_tables.md`
-- Plan folder: `<plans_folder>/99_add_tables/`
-- Main plan file: `<plans_folder>/99_add_tables/plan.md`
-
-If the plan is complex, it may be split into multiple files inside the same folder (e.g., `plan.md`, `plan_api.md`, `plan_database.md`). Use your judgment based on the scope of the issue.
-
-**Check if the plan folder or `plan.md` already exists.** If it does, read the existing plan file(s) and skip directly to the "Present an overview" section in [write_and_confirm.md](write_and_confirm.md).
+- If the script fails (no issue file found for `<id>`), stop and inform the user.
+- Read `ISSUE_FILE` to understand the issue.
+- If `PLAN_EXISTS=true`, read the existing plan file(s) in `PLAN_DIR` and skip directly to the "Present an overview" section in [write_and_confirm.md](write_and_confirm.md).
