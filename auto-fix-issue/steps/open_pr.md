@@ -16,7 +16,6 @@ scripts/github.sh pr-view
     scripts/github.sh pr-ready
     ```
   - If `IS_DRAFT=false`, the PR is already open and ready — nothing more to do.
-  - In both cases, persist the PR URL and number to the issue state (see "Persist PR state" below).
 - **Exit code 1, no error message** — no PR exists yet for this branch. Proceed to "Create the PR" below.
 - **Exit code 1, with an error message on stderr** — a real GitHub/`gh` error occurred. Report it; do not silently continue.
 
@@ -47,19 +46,6 @@ scripts/github.sh pr-create "Fix #<id> — <title>" /tmp/pr_body_<id>.md
 ```
 
 > Resolve `scripts/github.sh` relative to the `auto-fix-issue` skill folder.
-
-Persist the PR URL and number to the issue state (see "Persist PR state" below).
-
-## Persist PR state
-
-After every code path that yields a PR URL (`pr-view` or `pr-create`), extract the PR number from the URL (the last `/`-delimited path segment) and write both fields to the issue state:
-
-```bash
-scripts/issue_state.sh set <id> pr_url <url>
-scripts/issue_state.sh set <id> pr_id  <number>
-```
-
-> Resolve `scripts/issue_state.sh` relative to the `auto-fix-issue` skill folder.
 
 ## Report
 
