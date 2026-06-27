@@ -33,7 +33,7 @@ extract_tags() {
   normalized="${normalized//📋/:clipboard:}"
   normalized="${normalized//👀/:eyes:}"
   normalized="${normalized//🚧/:construction:}"
-  echo "$normalized" | grep -oE ':[A-Za-z0-9_+]+:' | sed 's/^://;s/:$//' | awk '!seen[$0]++'
+  echo "$normalized" | grep -oE ':[A-Za-z0-9_+]+:' | sed 's/^://;s/:$//' | awk '!seen[$0]++' || true
 }
 
 # has_tag <text> <tag>
