@@ -10,6 +10,8 @@ set -euo pipefail
 
 export GH_INSECURE_SKIP_VERIFY=true
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # --- Origin helpers (cached) ---
 
 _ORIGIN_PARSED=0
@@ -76,6 +78,20 @@ _ensure_gh_user() {
   fi
 }
 
+# --- PR state persistence ---
+
+_persist_pr_state() {
+  local url="$1"
+  local branch
+  branch=$(git branch --show-current)
+  if [[ "$branch" =~ ^issue-([0-9]+)$ ]]; then
+    local id="${BASH_REMATCH[1]}"
+    local number="${url##*/}"
+    "${SCRIPT_DIR}/issue_state.sh" set "$id" pr_url "$url" 2>/dev/null || true
+    "${SCRIPT_DIR}/issue_state.sh" set "$id" pr_id  "$number" 2>/dev/null || true
+  fi
+}
+
 # --- Commands ---
 
 cmd_info() {
@@ -103,6 +119,7 @@ cmd_pr_create() {
     exit 1
   }
 
+  _persist_pr_state "$url"
   echo "$url"
 }
 
@@ -119,6 +136,7 @@ cmd_pr_view() {
     local url is_draft
     url=$(echo "$output" | jq -r '.url')
     is_draft=$(echo "$output" | jq -r '.isDraft')
+    _persist_pr_state "$url"
     echo "URL=$url"
     echo "IS_DRAFT=$is_draft"
   else
@@ -142,6 +160,12 @@ cmd_pr_ready() {
     echo "Error: could not mark PR ready on $repo_ref" >&2
     exit 1
   }
+
+  local url
+  url=$(gh pr view -R "$repo_ref" "$branch" --json url -q '.url' 2>/dev/null) || true
+  if [[ -n "$url" ]]; then
+    _persist_pr_state "$url"
+  fi
 
   echo "OK"
 }
