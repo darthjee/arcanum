@@ -28,10 +28,22 @@ source "${SCRIPT_DIR}/../../_lib/tag_mutate.sh"
 # --- Commands ---
 
 cmd_pr_number() {
-  _ensure_gh_user
-  local repo_ref branch
-  repo_ref=$(get_repo_ref)
+  # Try issue state cache first
+  local branch
   branch=$(git branch --show-current)
+  if [[ "$branch" =~ ^issue-([0-9]+)$ ]]; then
+    local id="${BASH_REMATCH[1]}"
+    local cached
+    cached=$("${SCRIPT_DIR}/../../_lib/issue_state.sh" get "$id" pr_id 2>/dev/null || true)
+    if [[ -n "$cached" ]]; then
+      echo "$cached"
+      return 0
+    fi
+  fi
+
+  _ensure_gh_user
+  local repo_ref
+  repo_ref=$(get_repo_ref)
 
   local number
   number=$(gh pr view -R "$repo_ref" "$branch" --json number -q '.number' 2>/dev/null) || {
@@ -63,21 +75,39 @@ cmd_pr_state() {
 }
 
 cmd_pr_merge() {
-  _ensure_gh_user
-  local repo_ref branch
-  repo_ref=$(get_repo_ref)
+  local branch
   branch=$(git branch --show-current)
 
-  local output
-  output=$(gh pr view -R "$repo_ref" "$branch" --json title,number,url 2>/dev/null) || {
-    echo "Error: no pull request found for the current branch on $repo_ref" >&2
-    exit 1
-  }
+  # Try issue state cache for pr_id and pr_url
+  local cached_number="" cached_url=""
+  if [[ "$branch" =~ ^issue-([0-9]+)$ ]]; then
+    local id="${BASH_REMATCH[1]}"
+    cached_number=$("${SCRIPT_DIR}/../../_lib/issue_state.sh" get "$id" pr_id 2>/dev/null || true)
+    cached_url=$("${SCRIPT_DIR}/../../_lib/issue_state.sh" get "$id" pr_url 2>/dev/null || true)
+  fi
+
+  _ensure_gh_user
+  local repo_ref
+  repo_ref=$(get_repo_ref)
 
   local title number url
-  title=$(echo "$output" | jq -r '.title')
-  number=$(echo "$output" | jq -r '.number')
-  url=$(echo "$output" | jq -r '.url')
+  if [[ -n "$cached_number" && -n "$cached_url" ]]; then
+    number="$cached_number"
+    url="$cached_url"
+    title=$(gh pr view -R "$repo_ref" "$branch" --json title -q '.title' 2>/dev/null) || {
+      echo "Error: no pull request found for the current branch on $repo_ref" >&2
+      exit 1
+    }
+  else
+    local output
+    output=$(gh pr view -R "$repo_ref" "$branch" --json title,number,url 2>/dev/null) || {
+      echo "Error: no pull request found for the current branch on $repo_ref" >&2
+      exit 1
+    }
+    title=$(echo "$output" | jq -r '.title')
+    number=$(echo "$output" | jq -r '.number')
+    url=$(echo "$output" | jq -r '.url')
+  fi
 
   gh pr merge "$number" -R "$repo_ref" --squash --delete-branch --subject "${title} (#${number})" --body "" >/dev/null || {
     echo "Error: could not merge PR #$number on $repo_ref" >&2

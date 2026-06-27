@@ -20,6 +20,14 @@ ID="${ID#\#}"
   exit 1
 }
 
+# Try the local issue state first (avoids an extra GitHub API call)
+SCRIPT_DIR_SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cached_number=$("${SCRIPT_DIR_SELF}/../../_lib/issue_state.sh" get "$ID" pr_id 2>/dev/null || true)
+if [[ -n "$cached_number" ]]; then
+  echo "$cached_number"
+  exit 0
+fi
+
 _ensure_gh_user
 repo_ref=$(get_repo_ref)
 branch=$(git branch --show-current)
