@@ -62,7 +62,18 @@ scripts/create_branch.sh <PLAN_DIR> <id>
 
 This reads the branch name from `## Branch` in `plan.md`, falling back to `issue-<id>`, and checks out (creating if needed) that branch. All subsequent work happens here.
 
-Once the above completes successfully, record the step:
+Then bring the branch up to date with `main` before any agent is dispatched:
+
+```bash
+scripts/merge_main.sh
+```
+
+> Resolve `scripts/merge_main.sh` relative to the `auto-fix-issue` skill folder.
+
+- **`STATUS=ok`**: continue below.
+- **`STATUS=conflict`**: apply the same responsible-agent-selection approach as [../auto-fix-all/steps/handle_comment.md](../auto-fix-all/steps/handle_comment.md)'s "Choosing the responsible agent(s)" section, treating each conflicted path it printed like a failed check-run name — dispatch the responsible specialist(s) (or resolve it yourself, as architect, if none seem responsible) to fix the conflict, then `git add` the resolved paths and run `git commit` with no message argument (the merge-commit message `git merge --no-edit` already prepared is reused as-is). No user interaction.
+
+Once the branch is checked out and merged up to date with `main` (conflict resolved, if any), record the step:
 
 ```bash
 scripts/issue_state.sh set <id> step branch_created

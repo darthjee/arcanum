@@ -56,7 +56,11 @@ This is the one point in the whole pipeline where you ask the user something —
 > 1. Reimplement from scratch (start over from a clean `main` for this issue)
 > 2. Skip this issue and move on to the next one
 
-- **Reimplement** — go back to Step 2 (the id stays at the front of the queue; a fresh `architect` agent will check out a clean branch from `main` again via `process_one_issue.md`).
+- **Reimplement** — the rejected branch must be discarded first, since `process_one_issue.md`'s branch bootstrap now reuses an existing `issue-<id>` branch instead of always recreating it:
+  ```bash
+  scripts/github.sh cleanup-branch <id>
+  ```
+  Then go back to Step 2 (the id stays at the front of the queue; a fresh `architect` agent will find no existing `issue-<id>` branch and create a genuinely clean one from `main` via `process_one_issue.md`).
 - **Skip** — `scripts/queue.sh pop`, then go back to Step 2.
 
 ## Step 4 — Done
