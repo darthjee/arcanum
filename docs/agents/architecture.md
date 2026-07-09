@@ -74,6 +74,21 @@ Skills store runtime state and configuration under `.claude/`:
 
 Never write to these files directly — always use the dedicated scripts (e.g. `queue.sh push`, `queue.sh pop`) that handle locking and atomicity.
 
+## Branch Bootstrap and Merge Conflicts
+
+`_lib/git_branch.sh` exposes two shared functions used whenever a skill needs to bring an issue branch up to date with `main`: `git_branch_fetch_main` (fetches `origin main`, tolerating a missing remote ref) and `git_branch_merge_main` (fetches, then merges `origin/main` into whatever branch is currently checked out via `git merge --no-edit`, without aborting on conflict — it leaves the conflict markers in place and reports the conflicted paths).
+
+- `auto-fix-all/scripts/checkout_from_main.sh <id>` uses it to bootstrap the `issue-<id>` branch at the start of `process_one_issue.md`: it reuses the branch (local or remote) merged up to date with `origin/main` when it already exists — e.g. because `discuss-issue` committed an issue file and/or plan to it earlier — and only creates it fresh from `origin/main` when it doesn't exist at all. It never unconditionally discards an existing branch.
+- `auto-fix-issue/scripts/merge_main.sh` uses it in `auto-fix-issue/steps/run.md`'s Step 2, right after the branch is checked out and before any specialist agent is dispatched, so implementation always starts from a branch merged up to date with `main`.
+
+Both scripts print `STATUS=ok` or `STATUS=conflict` (plus the conflicted-file list on conflict) and exit `0`/`2` accordingly. On `STATUS=conflict`, the calling `.md` step applies the same responsible-agent-selection approach `handle_comment.md`'s "Choosing the responsible agent(s)" section already uses for PR comments and CI failures — treating each conflicted path like a failed check-run name — to resolve the conflict and commit, with no user interaction.
+
+`auto-fix-all/SKILL.md`'s "closed PR" reimplement path is the one case that still wants a truly clean branch: since the user explicitly asked to start over, it runs `scripts/github.sh cleanup-branch <id>` to delete the rejected branch *before* looping back to `process_one_issue.md`, so the reuse-based bootstrap above finds nothing to reuse and creates a fresh branch.
+
+## Cross-Skill References
+
+Skills may reference another skill's `steps/*.md` or `scripts/*.sh` directly via a relative path, rather than duplicating logic — e.g. `auto-fix-all/steps/handle_comment.md` calls `auto-plan-issue/scripts/list_agents.sh`, and `auto-fix-all/steps/process_one_issue.md` reads `auto-new-issue`/`auto-plan-issue`/`auto-fix-issue`'s `steps/run.md` directly (as the architect, without spawning a nested `Agent(architect)` — see "Architect Delegation" above). `discuss-issue/steps/discuss_and_save.md` follows the same pattern: once the user confirms they want planning to start right after discussion, it calls `auto-fix-all/scripts/checkout_from_main.sh` (to bootstrap the branch) and `auto-new-issue/scripts/commit_issue.sh` (to commit+push the issue file), then reads `auto-plan-issue/steps/run.md` directly, before pushing again — carrying discussion context straight into a committed plan without a separate `/auto-plan-issue` invocation losing it.
+
 ## Issue Tags
 
 Issue files (`docs/agents/issues/<id>-<name>.md`) may end with a trailing tags block:

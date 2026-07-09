@@ -14,7 +14,7 @@ OUTCOME=closed PR_NUMBER=<n>
 
 You have no `ScheduleWakeup` and no `AskUserQuestion` — the coordinator that spawned you handles clearing context between issues and asking the user what to do about a closed PR. Everything else (implementation, PR comments, CI failures, the pre-approval shortcut) is yours to handle autonomously, exactly as before.
 
-## 1. Start a clean branch from main
+## 1. Bootstrap the issue branch, merged up to date with main
 
 ```bash
 scripts/checkout_from_main.sh <id>
@@ -22,7 +22,10 @@ scripts/checkout_from_main.sh <id>
 
 > Resolve `scripts/checkout_from_main.sh` relative to the `auto-fix-all` skill folder.
 
-This fetches the latest `main`, hard-resets the local `main` to it, and (re)creates branch `issue-<id>` from it — even if `issue-<id>` already existed, it is discarded first. Every issue always starts from a clean, up-to-date `main`.
+This fetches `origin`, then either reuses branch `issue-<id>` — merging `origin/main` into it (`--no-edit`) if it already exists locally or remotely, e.g. because `discuss-issue` already prepared it — or creates it fresh from `origin/main` if it doesn't exist at all. Every issue always starts from a branch merged up to date with `main`, without discarding planning/discussion work already committed to it. Parse `STATUS` from its output:
+
+- **`STATUS=ok`**: continue to Step 2 below.
+- **`STATUS=conflict`**: apply the same responsible-agent-selection approach as [handle_comment.md](handle_comment.md)'s "Choosing the responsible agent(s)" section, treating each conflicted path the script printed like a failed check-run name — dispatch the responsible specialist(s) (or resolve it yourself, as architect, if none seem responsible) to fix the conflict, then `git add` the resolved paths and run `git commit` with no message argument (the merge-commit message `git merge --no-edit` already prepared is reused as-is). No user interaction. Then continue to Step 2.
 
 ## 2. Create the issue file
 

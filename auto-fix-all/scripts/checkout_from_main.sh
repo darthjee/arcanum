@@ -1,17 +1,31 @@
 #!/usr/bin/env bash
-# Start a clean branch for an issue from the latest main
+# Bootstrap or reuse the branch for an issue, merged up to date with main
 # Usage: checkout_from_main.sh <id>
 #
-# Fetches origin/main (a missing remote tracking ref is not a hard error,
-# but any other fetch failure is reported), checks out the local "main"
-# branch, and hard-resets it to "origin/main" when that ref exists
-# (otherwise main is used as-is). Then creates branch "issue-<id>" from
-# main; if "issue-<id>" already exists locally it is deleted first, so the
-# result is always a clean restart from the latest main — unlike
-# auto-fix-issue/scripts/create_branch.sh, which reuses an existing branch
-# instead of recreating it. Prints the resulting branch name to stdout.
+# Fetches "origin/main" and "origin/issue-<id>" (a missing remote ref for
+# either is not a hard error; any other fetch failure is reported).
+#
+# If "issue-<id>" already exists — locally or as "origin/issue-<id>" —
+# it is checked out (creating a local branch tracking the remote one
+# first, if it only exists remotely) and merged up to date with
+# "origin/main" (a no-op when there's no "origin/main" ref yet). This
+# reuses and merges an existing branch instead of destroying it — unlike
+# the previous behavior, which always deleted and recreated "issue-<id>"
+# from "main".
+#
+# If "issue-<id>" doesn't exist at all (neither local nor remote), it is
+# created fresh from "origin/main" (falling back to local "main" when
+# there's no "origin/main" ref) — no merge is needed in this case.
+#
+# Prints "BRANCH=<name>" then "STATUS=ok" or "STATUS=conflict" (with the
+# conflicted-file list, one path per line, printed after the STATUS line
+# when there's a conflict). Exits 0 on "ok", 2 on "conflict".
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../../_lib/git_branch.sh
+source "${SCRIPT_DIR}/../../_lib/git_branch.sh"
 
 ID="${1:-}"
 
@@ -20,29 +34,51 @@ ID="${1:-}"
   exit 1
 }
 
-if ! git fetch origin main 2>/tmp/checkout_from_main.fetch.$$; then
-  fetch_err=$(cat /tmp/checkout_from_main.fetch.$$ 2>/dev/null || true)
-  rm -f /tmp/checkout_from_main.fetch.$$
+BRANCH="issue-${ID}"
+
+git_branch_fetch_main
+
+if ! git fetch origin "${BRANCH}" 2>"/tmp/checkout_from_main.fetch_branch.$$"; then
+  fetch_err=$(cat "/tmp/checkout_from_main.fetch_branch.$$" 2>/dev/null || true)
+  rm -f "/tmp/checkout_from_main.fetch_branch.$$"
   if ! echo "$fetch_err" | grep -qiE "couldn't find remote ref|not found|no such ref"; then
-    echo "Error: git fetch origin main failed: $fetch_err" >&2
+    echo "Error: git fetch origin ${BRANCH} failed: $fetch_err" >&2
     exit 1
   fi
 else
-  rm -f /tmp/checkout_from_main.fetch.$$
+  rm -f "/tmp/checkout_from_main.fetch_branch.$$"
 fi
 
-git checkout main
+STATUS="ok"
+CONFLICTS=""
 
-if git show-ref --verify --quiet "refs/remotes/origin/main"; then
-  git reset --hard origin/main
+if git show-ref --verify --quiet "refs/heads/${BRANCH}" || git show-ref --verify --quiet "refs/remotes/origin/${BRANCH}"; then
+  if git show-ref --verify --quiet "refs/heads/${BRANCH}"; then
+    git checkout "${BRANCH}"
+  else
+    git checkout -b "${BRANCH}" "origin/${BRANCH}"
+  fi
+
+  if CONFLICTS=$(git_branch_merge_main); then
+    STATUS="ok"
+  else
+    STATUS="conflict"
+  fi
+else
+  if git show-ref --verify --quiet "refs/remotes/origin/main"; then
+    git checkout -b "${BRANCH}" origin/main
+  else
+    git checkout -b "${BRANCH}" main
+  fi
 fi
 
-BRANCH="issue-${ID}"
-
-if git show-ref --verify --quiet "refs/heads/${BRANCH}"; then
-  git branch -D "$BRANCH"
+echo "BRANCH=${BRANCH}"
+echo "STATUS=${STATUS}"
+if [[ "$STATUS" == "conflict" ]]; then
+  echo "$CONFLICTS"
 fi
 
-git checkout -b "$BRANCH" main
-
-echo "$BRANCH"
+if [[ "$STATUS" == "conflict" ]]; then
+  exit 2
+fi
+exit 0
