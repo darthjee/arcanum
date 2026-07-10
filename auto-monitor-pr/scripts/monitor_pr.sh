@@ -114,7 +114,7 @@ load_comments_state() {
       echo '{"pr_comments":[],"last_comment_time":"1970-01-01T00:00:00Z"}'
     fi
   else
-    cat "$COMMENTS_FILE" 2>/dev/null || echo '{"comments":[],"last_comment_time":"1970-01-01T00:00:00Z"}'
+    cat "$COMMENTS_FILE" 2>/dev/null || echo '{"pr_comments":[],"last_comment_time":"1970-01-01T00:00:00Z"}'
   fi
 }
 
