@@ -16,7 +16,7 @@
 | `docs/agents/` | Documentação do próprio repositório (arquitetura, fluxo, issues, plans). |
 | `.github/` | Contém `copilot-instructions.md`, que aponta para AGENTS.md. |
 | `.claude/` | Configuração local do Claude Code para este repositório. Contém subpastas para estado de runtime e configuração de skills. |
-| `.claude/state/` | Runtime state files: queue JSON (`auto-fix-all-queue.json`), queue lock (`auto-fix-all-queue.lock`), per-PR comment tracking (`auto-monitor-pr-<pr_number>-comments.json`), rewrite queue JSON/lock (`monitor-issues-rewrite-queue.json`/`.lock`). |
+| `.claude/state/` | Runtime state files: queue JSON (`auto-fix-all-queue.json`), queue lock (`auto-fix-all-queue.lock`), per-PR comment tracking (`auto-monitor-pr-<pr_number>-comments.json`), rewrite queue JSON/lock (`monitor-issues-rewrite-queue.json`/`.lock`). In a repo initialized by `init-claude`, also holds `init-claude-config.json` (the label/color table synced by `setup_labels.md`). |
 | `.claude/configuration/` | Skill configuration files: e.g. `auto-fix-all.json` (controls ignored CI check patterns). |
 | `AGENTS.md` | Instruções compartilhadas do projeto. |
 | `CLAUDE.md` | Aponta para AGENTS.md. |

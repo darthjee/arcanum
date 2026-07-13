@@ -71,6 +71,7 @@ Skills store runtime state and configuration under `.claude/`:
 | `.claude/configuration/auto-fix-all.json` | Configuration for the `auto-fix-all` skill. Controls which CI check names are ignored when deciding pass/fail. | `{"ignored_check_patterns": ["<substring>", ...]}` |
 | `.claude/state/monitor-issues-rewrite-queue.json` | Queue of issue IDs awaiting a `:pencil2:` rewrite, drained by `auto-rewrite-issue`. | `[{"id": "<issue_id>"}, ...]` |
 | `.claude/state/monitor-issues-rewrite-queue.lock` | Lock file used during `rewrite_queue.sh push`/`pop` mutations to prevent concurrent writes. Contains the acquiring instance's unique ID. | Plain text (instance ID string) |
+| `.claude/state/init-claude-config.json` | Created by `init-claude`'s `setup_labels.md` step, in the **target repo being initialized** (not Arcanum's own state, unlike the other rows in this table). Stores the label/color table `init-claude/scripts/sync_labels.sh` renders and syncs to GitHub, so the script needs no CLI arguments to know the current table. Auto-populated with the standard 9 labels by `init-claude/scripts/lib/label_config.sh`'s `label_config_ensure_defaults` function whenever the file is missing or its `labels` array is empty; `init-claude/scripts/write_label_config.sh` rewrites it wholesale after a user-driven refinement loop. | `{"labels": [{"name": "<label name>", "color": "<hex color, no leading '#'>"}, ...]}` |
 
 Never write to these files directly — always use the dedicated scripts (e.g. `queue.sh push`, `queue.sh pop`) that handle locking and atomicity.
 
