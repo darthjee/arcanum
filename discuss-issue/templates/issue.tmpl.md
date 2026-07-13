@@ -9,5 +9,3 @@
 %%SOLUTION%%
 
 %%BENEFITS%%
-
-%%TAGS%%

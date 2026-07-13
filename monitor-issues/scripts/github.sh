@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # GitHub operations script for monitor-issues
 # Usage: github.sh <command> [args]
-#   remove-tag <id> <tag>   Remove a single tag (colon or emoji form) from
-#                           GitHub issue <id>'s trailing `Tags:` line, and
-#                           push the updated body via `gh issue edit`.
+#   remove-tag <id> <tag>   Remove a single tag from GitHub issue <id>,
+#                           mapped to a real GitHub label via the
+#                           canonical-tag/label-name table in `_lib/tags.sh`.
 
 set -euo pipefail
 
@@ -26,7 +26,7 @@ cmd_remove_tag() {
   local repo_ref
   repo_ref=$(get_repo_ref)
 
-  tag_mutate_fetch_and_push "$id" "$repo_ref" tag_mutate_remove "$tag" || exit 1
+  tag_mutate_remove_label "$id" "$repo_ref" "$tag" || exit 1
 }
 
 case "${1:-}" in
@@ -34,7 +34,7 @@ case "${1:-}" in
   *)
     echo "Usage: $0 <command> [args]" >&2
     echo "Commands:" >&2
-    echo "  remove-tag <id> <tag>   Remove a single tag (colon or emoji form) from GitHub issue <id>'s trailing 'Tags:' line" >&2
+    echo "  remove-tag <id> <tag>   Remove a single tag from GitHub issue <id>, mapped to a real GitHub label via _lib/tags.sh" >&2
     exit 1
     ;;
 esac

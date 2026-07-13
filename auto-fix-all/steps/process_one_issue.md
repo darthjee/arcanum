@@ -60,25 +60,16 @@ Record the issue's title and the PR URL/number it reports — you will need them
 
 ## 5. Check for pre-approval
 
-Pre-approval is expressed in this family of skills via either of two independent sources — a `shipit` label on the GitHub issue, or a `tags:` line at the end of the local issue body containing a `:shipit:` token:
+Pre-approval is expressed via a `shipit` label on the GitHub issue — `shipit` is human-only, so this is the sole source (no script ever adds or removes it):
 
 ```bash
 scripts/github.sh has-shipit-label <id>
 ```
 
-```bash
-../auto-plan-issue/scripts/resolve_plan_paths.sh docs/agents/issues docs/agents/plans <id>
-```
-(parse `ISSUE_FILE` from its output, resolved relative to the `auto-plan-issue` skill folder)
+> Resolve `scripts/github.sh` relative to the `auto-fix-all` skill folder.
 
-```bash
-scripts/has_shipit_tag.sh <ISSUE_FILE>
-```
-
-> Resolve all of the above relative to the `auto-fix-all` skill folder (except `resolve_plan_paths.sh`, noted above).
-
-- **Either command exits 0** — the issue is pre-approved. Skip straight to "If approved" below.
-- **Both exit 1** — continue to "Monitor the PR" below.
+- **Exits 0** — the issue is pre-approved. Skip straight to "If approved" below.
+- **Exits 1** — continue to "Monitor the PR" below.
 
 ## Monitor the PR
 

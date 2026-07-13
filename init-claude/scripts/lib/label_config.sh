@@ -77,6 +77,7 @@ DEFAULT_LABEL_PAIRS=(
   Created:024fa5
   Working:c314d7
   Question:5319e7
+  Fetched:bfd4f2
 )
 
 label_config_validate_pair() {

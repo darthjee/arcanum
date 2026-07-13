@@ -90,18 +90,6 @@ normalize_title() {
     | sed 's/-$//'
 }
 
-extract_tags_block() {
-  local body="$1"
-  local tags_block
-  tags_block=$(perl -0777 -ne 'if (/(?:[ \t]*\n)+---[ \t]*(?:[ \t]*\n)+((?:(?i)tags:.*\n?)+)$/) { print $1 }' <<< "$body")
-  printf '%s' "$tags_block" | sed -e 's/[[:space:]]*$//'
-}
-
-strip_tags_block() {
-  local body="$1"
-  perl -0777 -pe 's/(?:[ \t]*\n)+---[ \t]*(?:[ \t]*\n)+(?:(?i)tags:.*\n?)+$//' <<< "$body"
-}
-
 # --- Commands ---
 
 cmd_fetch() {
@@ -126,13 +114,6 @@ cmd_fetch() {
   issue_state=$(echo "$result" | jq -r '.state')
   updated_at=$(echo "$result" | jq -r '.updated_at')
 
-  local tags_block
-  tags_block=$(extract_tags_block "$body")
-
-  if [[ -n "$tags_block" ]]; then
-    body=$(strip_tags_block "$body")
-  fi
-
   local normalized
   normalized=$(normalize_title "$title")
 
@@ -145,10 +126,11 @@ cmd_fetch() {
   # Persist metadata to per-issue JSON state file
   local issue_state_script="${SCRIPT_DIR}/issue_state.sh"
 
-  # Build tags JSON array from tags_block (wrap each bare name with colons)
+  # Build tags JSON array from the issue's GitHub labels.
   # Uses jq to safely produce a valid JSON array; empty input yields [].
-  local tags_json
-  tags_json=$(extract_tags "$tags_block" | jq -R '":"+.+":"' | jq -s '.')
+  local labels_text tags_json
+  labels_text=$(echo "$result" | jq -r '.labels[].name')
+  tags_json=$(extract_tags "$labels_text" | jq -R . | jq -s .)
 
   "$issue_state_script" set-json "$id" tags "$tags_json"
   "$issue_state_script" set      "$id" updated_at "$updated_at"
@@ -159,12 +141,6 @@ cmd_fetch() {
   echo "FILE=$filepath"
   echo "DOMAIN=$_ORIGIN_DOMAIN"
   echo "REPO=$_ORIGIN_REPO_PATH"
-
-  if [[ -n "$tags_block" ]]; then
-    echo "TAGS_BEGIN"
-    printf '%s\n' "$tags_block"
-    echo "TAGS_END"
-  fi
 }
 
 cmd_update() {

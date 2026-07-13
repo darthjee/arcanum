@@ -2,7 +2,7 @@
 # Continuous issue monitor for the current repository.
 #
 # Polls GitHub every 5 seconds for issues created/updated since the last
-# check, parses tags from the issue body, and writes metadata to
+# check, parses tags from the issue's labels, and writes metadata to
 # .claude/state/issues.json. Runs forever; stop with Ctrl-C or SIGTERM.
 #
 # Usage: monitor_issues.sh  (no arguments)
@@ -81,7 +81,7 @@ _poll_once() {
       -R "$REPO_REF" \
       --author "$GH_USER" \
       --state open \
-      --json number,title,updatedAt,body,labels \
+      --json number,title,updatedAt,labels \
       --search "updated:>$SINCE" \
       --limit 100 2>&1) || {
       _log "ERROR: gh issue list failed: $ISSUES_JSON"
@@ -91,7 +91,7 @@ _poll_once() {
     ISSUES_JSON=$(gh issue list \
       -R "$REPO_REF" \
       --state open \
-      --json number,title,updatedAt,body,labels \
+      --json number,title,updatedAt,labels \
       --search "updated:>$SINCE" \
       --limit 100 2>&1) || {
       _log "ERROR: gh issue list failed: $ISSUES_JSON"
@@ -108,7 +108,7 @@ _poll_once() {
   if (( ISSUE_COUNT > 0 )); then
     local i
     for i in $(seq 0 $((ISSUE_COUNT - 1))); do
-      local ISSUE ISSUE_ID GH_UPDATED_AT STORED_UPDATED_AT BODY TAGS_JSON NOW
+      local ISSUE ISSUE_ID GH_UPDATED_AT STORED_UPDATED_AT LABELS TAGS_JSON NOW
       ISSUE=$(echo "$ISSUES_JSON" | jq ".[$i]")
       ISSUE_ID=$(echo "$ISSUE" | jq -r '.number | tostring')
       GH_UPDATED_AT=$(echo "$ISSUE" | jq -r '.updatedAt')
@@ -123,10 +123,10 @@ _poll_once() {
         continue
       fi
 
-      BODY=$(echo "$ISSUE" | jq -r '.body // ""')
+      LABELS=$(echo "$ISSUE" | jq -r '.labels[].name')
 
-      # Build tags JSON array from body.
-      TAGS_JSON=$(extract_tags "$BODY" | jq -R . | jq -s .)
+      # Build tags JSON array from labels.
+      TAGS_JSON=$(extract_tags "$LABELS" | jq -R . | jq -s .)
 
       _log "Processing #${ISSUE_ID} — tags: ${TAGS_JSON}"
 
@@ -154,7 +154,7 @@ _poll_once() {
             "$QUEUE_SCRIPT" push "$ISSUE_ID" || { _log "ERROR: failed to push #${ISSUE_ID} to the queue"; ISSUE_DISPATCH_FAILED=1; }
             ;;
         esac
-      done < <(actionable_tags "$BODY")
+      done < <(actionable_tags "$LABELS")
 
       if [[ "$ISSUE_DISPATCH_FAILED" -eq 0 ]]; then
         NOW=$(date -u +%FT%TZ)
