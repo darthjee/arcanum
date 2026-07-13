@@ -18,10 +18,11 @@ _LIB_TAG_ACTIONS_LOADED=1
 # (colon-stripped) form, as also returned by extract_tags.
 ACTIONABLE_TAGS=(question pencil2 clipboard)
 
-# actionable_tags <text>
-#   Scans <text> (raw issue body, or any text extract_tags can run on) and
-#   prints, one per line, each of ACTIONABLE_TAGS that is present — in the
-#   fixed order: question, pencil2, clipboard. Tags not present in <text>
+# actionable_tags <labels_text>
+#   Scans <labels_text> (a newline-separated list of GitHub label names,
+#   the same input shape as _lib/tags.sh's extract_tags) and prints, one
+#   per line, each of ACTIONABLE_TAGS that is present — in the fixed
+#   order: question, pencil2, clipboard. Tags not present in <labels_text>
 #   are omitted. Prints nothing if none are present.
 #   Exit status: 0 if at least one actionable tag was found, 1 otherwise.
 actionable_tags() {

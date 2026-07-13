@@ -16,8 +16,6 @@ The script guarantees `FILE` exists on disk once it exits `STATUS=ok` — the sc
 
 `ID`, `TITLE`, and `FILE` are set; `FILE` already has content on disk. Proceed straight to [discuss_and_save.md](discuss_and_save.md) using `FILE` as the starting material.
 
-If the output includes a `TAGS_BEGIN`/`TAGS_END` block, remember it for [discuss_and_save.md](discuss_and_save.md), which re-appends it verbatim at the end of the final file.
-
 ### STATUS=error
 
 Tell the user `<ERROR>`, then ask:

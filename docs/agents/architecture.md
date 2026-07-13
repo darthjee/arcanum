@@ -71,7 +71,7 @@ Skills store runtime state and configuration under `.claude/`:
 | `.claude/configuration/auto-fix-all.json` | Configuration for the `auto-fix-all` skill. Controls which CI check names are ignored when deciding pass/fail. | `{"ignored_check_patterns": ["<substring>", ...]}` |
 | `.claude/state/monitor-issues-rewrite-queue.json` | Queue of issue IDs awaiting a `:pencil2:` rewrite, drained by `auto-rewrite-issue`. | `[{"id": "<issue_id>"}, ...]` |
 | `.claude/state/monitor-issues-rewrite-queue.lock` | Lock file used during `rewrite_queue.sh push`/`pop` mutations to prevent concurrent writes. Contains the acquiring instance's unique ID. | Plain text (instance ID string) |
-| `.claude/state/init-claude-config.json` | Created by `init-claude`'s `setup_labels.md` step, in the **target repo being initialized** (not Arcanum's own state, unlike the other rows in this table). Stores the label/color table `init-claude/scripts/sync_labels.sh` renders and syncs to GitHub, so the script needs no CLI arguments to know the current table. Auto-populated with the standard 9 labels by `init-claude/scripts/lib/label_config.sh`'s `label_config_ensure_defaults` function whenever the file is missing or its `labels` array is empty; `init-claude/scripts/write_label_config.sh <replace\|remove\|add> <config_path> ...` mutates it during a user-driven refinement loop — `replace` overwrites the whole `labels` array, `remove` deletes named labels, `add` upserts `<name>:<color>` pairs. | `{"labels": [{"name": "<label name>", "color": "<hex color, no leading '#'>"}, ...]}` |
+| `.claude/state/init-claude-config.json` | Created by `init-claude`'s `setup_labels.md` step, in the **target repo being initialized** (not Arcanum's own state, unlike the other rows in this table). Stores the label/color table `init-claude/scripts/sync_labels.sh` renders and syncs to GitHub, so the script needs no CLI arguments to know the current table. Auto-populated with the standard 10 labels (including `Fetched`, backing the `eyes` issue tag) by `init-claude/scripts/lib/label_config.sh`'s `label_config_ensure_defaults` function whenever the file is missing or its `labels` array is empty; `init-claude/scripts/write_label_config.sh <replace\|remove\|add> <config_path> ...` mutates it during a user-driven refinement loop — `replace` overwrites the whole `labels` array, `remove` deletes named labels, `add` upserts `<name>:<color>` pairs. | `{"labels": [{"name": "<label name>", "color": "<hex color, no leading '#'>"}, ...]}` |
 
 Never write to these files directly — always use the dedicated scripts (e.g. `queue.sh push`, `queue.sh pop`) that handle locking and atomicity.
 
@@ -92,29 +92,30 @@ Skills may reference another skill's `steps/*.md` or `scripts/*.sh` directly via
 
 ## Issue Tags
 
-Issue files (`docs/agents/issues/<id>-<name>.md`) may end with a trailing tags block:
+Issue status is tracked via real GitHub labels on the issue — labels are the sole source of truth; there is no body-embedded tags block. Reading a tag means checking whether a specific label is present on the issue's `labels`; writing a tag means adding or removing that label via `gh issue edit --add-label`/`--remove-label`. `_lib/tags.sh` defines the canonical-tag/label-name mapping (both directions) and exposes `extract_tags`/`has_tag`, which operate on a newline-separated list of label names (e.g. the output of `gh issue view ... --json labels -q '.labels[].name'`) rather than free body text — unrecognized labels are silently ignored.
 
-```markdown
----
+| Canonical tag | GitHub label |
+| --- | --- |
+| `pencil2` | `Created` |
+| `clipboard` | `Ready` |
+| `shipit` | `shipit` |
+| `construction` | `Working` |
+| `question` | `Question` |
+| `eyes` | `Fetched` |
 
-Tags: <list of tags>
-```
+**`shipit`** is human-only: no script ever adds or removes the `shipit` label (`_lib/tag_mutate.sh` refuses any attempt at the shared-library level). It marks an issue as pre-approved, so `auto-fix-all` skips PR review/monitoring and merges directly once CI passes, checked via `auto-fix-all/scripts/github.sh has-shipit-label` — the pipeline's only interaction with this tag is reading it.
 
-Tags are free-form `:word:` tokens (e.g. `Tags: :shipit: :urgent:`), parsed by `_lib/tags.sh`'s `extract_tags`/`has_tag` helpers (case-insensitive, full-line match per tag). Skills never invent this block — it only exists when a GitHub fetch (`github.sh fetch`) found one in the issue body, and it is carried over verbatim by whichever skill wrote the file. Five of the tags below may also be written as an emoji instead of the `:word:` form — `extract_tags` normalizes the emoji to its canonical name internally, so `has_tag` and every other consumer never need to know which form was used.
+**`question`** marks an issue as having a question for the agent. `monitor-issues` detects it (via `_lib/tag_actions.sh`'s `actionable_tags`) and logs that it needs an answer — actually answering it requires AI judgment, so that step is left to architect-level reasoning, not the polling script. Once answered, the label should be removed from the live GitHub issue via `monitor-issues/scripts/github.sh remove-tag <id> question`.
 
-**`:shipit:`** is the only tag with defined meaning today: it marks an issue as pre-approved, so `auto-fix-all` skips PR review/monitoring and merges directly once CI passes (checked via `has_shipit_tag.sh`/`has-shipit-label`, the same pre-approval signal as the GitHub issue's `shipit` label).
+**`pencil2`** marks an issue as ready to be read and rewritten by the agent. Unlike `question`, this action is now fully wired end-to-end: `monitor_issues.sh` pushes the issue id onto `monitor-issues/scripts/rewrite_queue.sh`'s queue (`.claude/state/monitor-issues-rewrite-queue.json`) as soon as the label is detected. The `auto-rewrite-issue` skill drains that queue: for each id it fetches the issue body, rewrites it (architect-level AI judgment, the same kind of rewrite `discuss-issue/steps/discuss_and_save.md` performs but fully autonomous), pushes the new body to GitHub, then removes the label via `monitor-issues/scripts/github.sh remove-tag <id> pencil2`.
 
-**`:question:` / ❓** marks an issue as having a question for the agent. `monitor-issues` detects it (via `_lib/tag_actions.sh`'s `actionable_tags`) and logs that it needs an answer — actually answering it requires AI judgment, so that step is left to architect-level reasoning, not the polling script. Once answered, the tag should be removed from the live GitHub issue body via `monitor-issues/scripts/github.sh remove-tag <id> question`.
+**`clipboard`** marks an issue as ready to be pushed to the `auto-fix-all` queue. Unlike the two tags above, this action is fully deterministic, so `monitor_issues.sh` performs it directly: it pushes the issue id via `auto-fix-all/scripts/queue.sh push <id>` as soon as the label is detected.
 
-**`:pencil2:` / ✏️** marks an issue as ready to be read and rewritten by the agent. Unlike `:question:`, this action is now fully wired end-to-end: `monitor_issues.sh` pushes the issue id onto `monitor-issues/scripts/rewrite_queue.sh`'s queue (`.claude/state/monitor-issues-rewrite-queue.json`) as soon as the tag is detected. The `auto-rewrite-issue` skill drains that queue: for each id it fetches the issue body, rewrites it (architect-level AI judgment, the same kind of rewrite `discuss-issue/steps/discuss_and_save.md` performs but fully autonomous), pushes the new body to GitHub, then removes the tag via `monitor-issues/scripts/github.sh remove-tag <id> pencil2`.
-
-**`:clipboard:` / 📋** marks an issue as ready to be pushed to the `auto-fix-all` queue. Unlike the two tags above, this action is fully deterministic, so `monitor_issues.sh` performs it directly: it pushes the issue id via `auto-fix-all/scripts/queue.sh push <id>` as soon as the tag is detected.
-
-**`:eyes:` / 👀** and **`:construction:` / 🚧** are pipeline-status tags, not actionable ones — `monitor-issues` does not detect or act on them (they are not part of `_lib/tag_actions.sh`'s `ACTIONABLE_TAGS`). They exist purely so the GitHub issue list reflects `auto-fix-all`'s progress at a glance: `auto-fix-all` pushes `:eyes:` onto the live issue right after fetching/checking it (`auto-fix-all/steps/process_one_issue.md` step 2), then swaps it for `:construction:` once the implementation plan has been written and coding is about to start (step 3). This applies only to the `auto-fix-all` pipeline — the manual `/new-issue`, `/plan-issue`, and `/discuss-issue` skills never push either tag.
+**`eyes`** and **`construction`** are pipeline-status tags, not actionable ones — `monitor-issues` does not detect or act on them (they are not part of `_lib/tag_actions.sh`'s `ACTIONABLE_TAGS`). They exist purely so the GitHub issue list reflects `auto-fix-all`'s progress at a glance: `auto-fix-all` pushes `eyes` onto the live issue right after fetching/checking it (`auto-fix-all/steps/process_one_issue.md` step 2), then swaps it for `construction` once the implementation plan has been written and coding is about to start (step 3). This applies only to the `auto-fix-all` pipeline — the manual `/new-issue`, `/plan-issue`, and `/discuss-issue` skills never push either label.
 
 ### Tag mutation primitives
 
-`_lib/tag_mutate.sh` exposes the shared `add`/`remove` primitives that operate on an issue body's trailing `---`/`Tags:` block: `tag_mutate_add`/`tag_mutate_remove` (pure body-string mutation, given a body and a canonical tag name) and `tag_mutate_fetch_and_push` (fetches an issue's current body via `gh issue view`, applies one of the two mutation functions, and pushes the result via `gh issue edit`). `monitor-issues/scripts/github.sh remove-tag` and `auto-fix-all/scripts/github.sh add-tag`/`remove-tag` are thin CLI wrappers around this shared library — new skills needing to mutate issue tags should add their own thin wrapper rather than re-implementing the body-parsing logic.
+`_lib/tag_mutate.sh` exposes `tag_mutate_add_label <id> <repo_ref> <tag>` and `tag_mutate_remove_label <id> <repo_ref> <tag>`, which resolve the canonical tag name to a label via `_lib/tags.sh`, fetch the issue's current labels to decide whether the mutation is a no-op, and otherwise call `gh issue edit --add-label`/`--remove-label` directly — no body fetch/splice/push round-trip. Both refuse to mutate `shipit`. `monitor-issues/scripts/github.sh remove-tag` and `auto-fix-all/scripts/github.sh add-tag`/`remove-tag` are thin CLI wrappers around this shared library — new skills needing to mutate issue tags should add their own thin wrapper rather than re-implementing the label lookup/fetch logic.
 
 ## Lock System
 

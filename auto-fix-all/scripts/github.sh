@@ -6,12 +6,12 @@
 #   pr-merge                Squash-merge the current branch's PR, print its URL
 #   cleanup-branch <id>     Delete the issue's remote and local branch, switch back to main
 #   has-shipit-label <id>   Exit 0 if GitHub issue <id> has a "shipit" label, else exit 1
-#   add-tag <id> <tag>      Add a single tag (colon or emoji form) to GitHub
-#                           issue <id>'s trailing `Tags:` line, and push the
-#                           updated body via `gh issue edit`.
-#   remove-tag <id> <tag>   Remove a single tag (colon or emoji form) from
-#                           GitHub issue <id>'s trailing `Tags:` line, and
-#                           push the updated body via `gh issue edit`.
+#   add-tag <id> <tag>      Add a single tag to GitHub issue <id>, mapped to
+#                           a real GitHub label via the canonical-tag/
+#                           label-name table in `_lib/tags.sh`.
+#   remove-tag <id> <tag>   Remove a single tag from GitHub issue <id>,
+#                           mapped to a real GitHub label via the
+#                           canonical-tag/label-name table in `_lib/tags.sh`.
 
 set -euo pipefail
 
@@ -165,7 +165,7 @@ cmd_add_tag() {
   local repo_ref
   repo_ref=$(get_repo_ref)
 
-  tag_mutate_fetch_and_push "$id" "$repo_ref" tag_mutate_add "$tag" || exit 1
+  tag_mutate_add_label "$id" "$repo_ref" "$tag" || exit 1
 }
 
 cmd_remove_tag() {
@@ -179,7 +179,7 @@ cmd_remove_tag() {
   local repo_ref
   repo_ref=$(get_repo_ref)
 
-  tag_mutate_fetch_and_push "$id" "$repo_ref" tag_mutate_remove "$tag" || exit 1
+  tag_mutate_remove_label "$id" "$repo_ref" "$tag" || exit 1
 }
 
 case "${1:-}" in
@@ -198,8 +198,8 @@ case "${1:-}" in
     echo "  pr-merge                Squash-merge the current branch's PR, print its URL" >&2
     echo "  cleanup-branch <id>     Delete the issue's remote and local branch, switch back to main" >&2
     echo "  has-shipit-label <id>   Exit 0 if GitHub issue <id> has a 'shipit' label, else exit 1" >&2
-    echo "  add-tag <id> <tag>      Add a single tag (colon or emoji form) to GitHub issue <id>'s trailing 'Tags:' line" >&2
-    echo "  remove-tag <id> <tag>   Remove a single tag (colon or emoji form) from GitHub issue <id>'s trailing 'Tags:' line" >&2
+    echo "  add-tag <id> <tag>      Add a single tag to GitHub issue <id>, mapped to a real GitHub label via _lib/tags.sh" >&2
+    echo "  remove-tag <id> <tag>   Remove a single tag from GitHub issue <id>, mapped to a real GitHub label via _lib/tags.sh" >&2
     exit 1
     ;;
 esac

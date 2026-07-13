@@ -10,8 +10,7 @@
 #
 # Output (key=value lines):
 #   STATUS=ok      ID, TITLE, FILE always set; DOMAIN, REPO set only when
-#                  freshly fetched (TAGS_BEGIN/TAGS_END block follows when
-#                  the fetched body had one)
+#                  freshly fetched
 #   STATUS=error   ERROR set, ID set when a numeric id was given
 
 set -euo pipefail

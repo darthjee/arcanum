@@ -29,8 +29,6 @@ For the id popped in Step 1:
 
 2. **Draft the rewritten body.** Apply the same judgment `discuss-issue/steps/discuss_and_save.md` step 2 uses — draft Description/Problem/Expected Behavior/Solution/Benefits sections (only the ones relevant to this issue) from the current content — but fully autonomous: skip any clarifying questions and skip the "Did I comprehend the issue?" loop entirely. Always write in English, translating if the fetched content is in another language.
 
-   If the body ends with a trailing `---` / `Tags:` block, preserve it verbatim in the rewritten body — do not hand-edit it here. Removing the `pencil2` tag itself happens in sub-step 4 below, not as part of this rewrite.
-
 3. **Push the rewritten body.** Write the drafted body to a temp file, then:
 
    ```bash

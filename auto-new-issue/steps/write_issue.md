@@ -37,5 +37,3 @@ Use this structure (adapted from the Context/What/Acceptance-criteria shape used
   ```
 
 Save the result at `FILE`, overwriting only if the file did not already exist (per `STATUS=new` from Step 1 — this step is never reached when `STATUS=existing`).
-
-If Step 2's `github.sh fetch` call printed a `TAGS_BEGIN`/`TAGS_END` block, append it verbatim at the very end of the saved file (separated by a blank line), exactly as captured — do not edit, summarize, or reformat it. If no such block was printed, do not add anything; never invent a tags line.
