@@ -42,19 +42,21 @@ Interpret its output:
 
 Only entered from the "change the list" branch above.
 
-Read the current table from `.claude/state/init-claude-config.json` (`jq '.labels'`) and show it to the user. Let them, in a loop, do any of the following until they say they're satisfied:
-- Add a label (color optional at this point)
-- Remove a label
-- Update a label's color
-- Replace one or more entries
-- Replace the whole table (colors optional at that point)
-
-Once the user is satisfied, if any label in the table still has a `null`/missing color, ask for it directly — the config requires every label to have a color. Then persist the updated table:
+`scripts/write_label_config.sh` (resolve relative to the `init-claude` skill folder) takes a subcommand as its first argument, so each edit below is persisted to `.claude/state/init-claude-config.json` immediately rather than batched:
 
 ```bash
-scripts/write_label_config.sh .claude/state/init-claude-config.json <Label1>:<color1> [<Label2>:<color2> ...]
+scripts/write_label_config.sh replace <config_path> <Label1>:<color1> [<Label2>:<color2> ...]
+scripts/write_label_config.sh remove  <config_path> <Label1> [<Label2> ...]
+scripts/write_label_config.sh add     <config_path> <Label1>:<color1> [<Label2>:<color2> ...]
 ```
 
-> Resolve `scripts/write_label_config.sh` relative to the `init-claude` skill folder. Pass every label currently in the table (not just the changed ones) as `<name>:<hex color>`, color without a leading `#` — this call replaces the file's `labels` array wholesale.
+`<config_path>` is `.claude/state/init-claude-config.json`. `replace` overwrites the whole `labels` array wholesale; `remove` deletes the named labels (by name) from the array, leaving the rest untouched; `add` upserts each `<name>:<color>` pair — updating the color if the name already exists, appending it otherwise.
 
-Then go back to Step 2 and re-invoke `scripts/sync_labels.sh` (still with no argument — it now reads the table you just wrote).
+Read the current table from `.claude/state/init-claude-config.json` (`jq '.labels'`) and show it to the user. Let them, in a loop, do any of the following until they say they're satisfied — apply each action to the file as soon as it's decided, using the matching subcommand:
+- **Add a label** — ask for its color now (the `add` subcommand requires one per pair), then run `write_label_config.sh add <config_path> <name>:<color>`.
+- **Remove a label** — run `write_label_config.sh remove <config_path> <name>`.
+- **Update a label's color** — run `write_label_config.sh add <config_path> <name>:<new color>` (upsert overwrites the existing entry).
+- **Replace one or more entries** — combine `remove`/`add` calls as above for each affected label.
+- **Replace the whole table** — collect the user's full desired table first (asking for any missing colors, since `replace` requires one per pair), then run a single `write_label_config.sh replace <config_path> <name1>:<color1> [<name2>:<color2> ...]` with the entire new table.
+
+Once the user says they're satisfied (all edits already persisted via the calls above), go back to Step 2 and re-invoke `scripts/sync_labels.sh` (still with no argument — it reads whatever is currently in the file).
