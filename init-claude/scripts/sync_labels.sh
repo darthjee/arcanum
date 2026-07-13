@@ -47,7 +47,7 @@ while IFS= read -r pair; do
 
   NAMES+=("${pair%%:*}")
   COLORS+=("${pair#*:}")
-done < <(jq -r '.labels[] | .name + ":" + .color' "$CONFIG_PATH")
+done < <(label_config_read_pairs "$CONFIG_PATH")
 
 # --- Print the table ---
 
