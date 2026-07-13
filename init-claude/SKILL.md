@@ -62,3 +62,7 @@ After the contributing guide is created, read and follow [setup_agents.md](setup
 ## Step 9 — Setup CI monitoring options
 
 After the agents are set up, read and follow [setup_ci_monitoring.md](setup_ci_monitoring.md).
+
+## Step 10 — Setup repository labels
+
+After the CI monitoring options are set up, read and follow [setup_labels.md](setup_labels.md).
