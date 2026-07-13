@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 # Print a label/color table, confirm interactively, then sync to GitHub.
-# Usage: sync_labels.sh <Label1>:<color1> [<Label2>:<color2> ...]
-#   Each argument is <label name>:<hex color> (color without a leading '#',
-#   e.g. Bug:b60205). Every entry must have a color.
+# Usage: sync_labels.sh [<config_path>]
+#   config_path defaults to lib/label_config.sh's DEFAULT_LABEL_CONFIG_PATH
+#   (.claude/state/init-claude-config.json, relative to cwd).
+#
+# The label/color table is read from the JSON config file, schema:
+#   { "labels": [ { "name": "<label name>", "color": "<hex, no '#'>" } ] }
+# If the file is missing, empty, or its "labels" array is missing/empty,
+# it is first initialized with the standard default labels (see
+# lib/label_config.sh) before anything is printed or synced.
 #
 # Prints the table as markdown, then prompts on stdout:
 #   Sync these labels to GitHub? [y/n]:
@@ -12,47 +18,36 @@
 #   `gh label create` / `gh label edit`, prints STATUS=synced followed by
 #   one CREATED=<name>/UPDATED=<name> line per label, exits 0.
 # On "no": prints STATUS=discuss, exits 1, no GitHub calls made.
-# On invalid arguments: prints a usage error to stderr, exits 2.
+# On invalid/malformed config contents: prints a usage-style error to
+#   stderr, exits 2.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../../_lib/origin.sh
 source "${SCRIPT_DIR}/../../_lib/origin.sh"
+# shellcheck source=lib/label_config.sh
+source "${SCRIPT_DIR}/lib/label_config.sh"
 
 usage() {
-  echo "Usage: $0 <Label1>:<color1> [<Label2>:<color2> ...]" >&2
-  echo "  Each pair is <label name>:<hex color>, color without a leading '#' (e.g. Bug:b60205)." >&2
+  echo "Usage: $0 [<config_path>]" >&2
+  echo "  config_path defaults to ${DEFAULT_LABEL_CONFIG_PATH}" >&2
   exit 2
 }
 
-[[ $# -ge 1 ]] || usage
+CONFIG_PATH="${1:-$DEFAULT_LABEL_CONFIG_PATH}"
+
+label_config_ensure_defaults "$CONFIG_PATH"
 
 NAMES=()
 COLORS=()
 
-for pair in "$@"; do
-  if [[ "$pair" != *:* ]]; then
-    echo "Error: invalid pair '$pair' — expected <label name>:<hex color>" >&2
-    usage
-  fi
+while IFS= read -r pair; do
+  label_config_validate_pair "$pair" || usage
 
-  name="${pair%%:*}"
-  color="${pair#*:}"
-
-  if [[ -z "$name" ]]; then
-    echo "Error: invalid pair '$pair' — label name is empty" >&2
-    usage
-  fi
-
-  if [[ ! "$color" =~ ^[0-9A-Fa-f]{6}$ ]]; then
-    echo "Error: invalid color '$color' for label '$name' — expected exactly 6 hex digits" >&2
-    usage
-  fi
-
-  NAMES+=("$name")
-  COLORS+=("$color")
-done
+  NAMES+=("${pair%%:*}")
+  COLORS+=("${pair#*:}")
+done < <(jq -r '.labels[] | .name + ":" + .color' "$CONFIG_PATH")
 
 # --- Print the table ---
 
