@@ -76,6 +76,7 @@ DEFAULT_LABEL_PAIRS=(
   shipit:0e8a16
   Created:024fa5
   Working:c314d7
+  Question:5319e7
 )
 
 label_config_validate_pair() {
