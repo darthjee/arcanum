@@ -23,6 +23,8 @@ _LIB_TAGS_LOADED=1
 #   construction    Working
 #   question        Question
 #   eyes            Fetched
+#   ready           Ready
+#   enqueued        Enqueued
 
 # _tag_label_for <canonical_tag>
 #   Echoes the GitHub label name for <canonical_tag>, or nothing if
@@ -35,6 +37,8 @@ _tag_label_for() {
     construction) echo "Working" ;;
     question)     echo "Question" ;;
     eyes)         echo "Fetched" ;;
+    ready)        echo "Ready" ;;
+    enqueued)     echo "Enqueued" ;;
   esac
 }
 
@@ -49,6 +53,8 @@ _tag_for_label() {
     Working)  echo "construction" ;;
     Question) echo "question" ;;
     Fetched)  echo "eyes" ;;
+    Ready)    echo "ready" ;;
+    Enqueued) echo "enqueued" ;;
   esac
 }
 

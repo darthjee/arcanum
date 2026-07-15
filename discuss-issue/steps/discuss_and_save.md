@@ -57,9 +57,10 @@ Run:
 
 ```bash
 ../scripts/github.sh update <id> "<Title>" <issue_file_path>
+../scripts/github.sh mark-ready <id>
 ```
 
-> Resolve `../scripts/github.sh` relative to this file's directory. The script resolves the GitHub domain and repository from `git remote get-url origin`, so no manual `-R` argument is needed. The body is read directly from file via `--body-file`/`cat`, avoiding quoting issues with multi-line content.
+> Resolve `../scripts/github.sh` relative to this file's directory. The script resolves the GitHub domain and repository from `git remote get-url origin`, so no manual `-R` argument is needed. The body is read directly from file via `--body-file`/`cat`, avoiding quoting issues with multi-line content. `mark-ready` adds the `Ready` label and removes `Created`, if present — best-effort, it never blocks this step.
 
 ## 8. Planning confirmation
 

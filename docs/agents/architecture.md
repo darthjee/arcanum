@@ -102,6 +102,8 @@ Issue status is tracked via real GitHub labels on the issue — labels are the s
 | `construction` | `Working` |
 | `question` | `Question` |
 | `eyes` | `Fetched` |
+| `ready` | `Ready` |
+| `enqueued` | `Enqueued` |
 
 **`shipit`** is human-only: no script ever adds or removes the `shipit` label (`_lib/tag_mutate.sh` refuses any attempt at the shared-library level). It marks an issue as pre-approved, so `auto-fix-all` skips PR review/monitoring and merges directly once CI passes, checked via `auto-fix-all/scripts/github.sh has-shipit-label` — the pipeline's only interaction with this tag is reading it.
 
@@ -112,6 +114,8 @@ Issue status is tracked via real GitHub labels on the issue — labels are the s
 **`clipboard`** marks an issue as ready to be pushed to the `auto-fix-all` queue, backed by the `Ready for Work` label (distinct from the plain `Ready` label, which developers may still use informally to mean "well-defined" without triggering auto-enqueuing). Unlike the two tags above, this action is fully deterministic, so `monitor_issues.sh` performs it directly: it pushes the issue id via `auto-fix-all/scripts/queue.sh push <id>` as soon as the label is detected.
 
 **`eyes`** and **`construction`** are pipeline-status tags, not actionable ones — `monitor-issues` does not detect or act on them (they are not part of `_lib/tag_actions.sh`'s `ACTIONABLE_TAGS`). They exist purely so the GitHub issue list reflects `auto-fix-all`'s progress at a glance: `auto-fix-all` pushes `eyes` onto the live issue right after fetching/checking it (`auto-fix-all/steps/process_one_issue.md` step 2), then swaps it for `construction` once the implementation plan has been written and coding is about to start (step 3). This applies only to the `auto-fix-all` pipeline — the manual `/new-issue`, `/plan-issue`, and `/discuss-issue` skills never push either label.
+
+**`ready`** and **`enqueued`** keep the live GitHub labels in sync with the pipeline stage an issue is actually in, so the label-based issue list doesn't drift stale while an issue is being discussed or queued. `ready` is applied by `_lib/github_issue.sh`'s `mark-ready` subcommand, called by `discuss-issue`'s "Push to GitHub" step right after its `update` call succeeds — it adds `Ready` and removes `Created`, if present. `_lib/github_issue.sh`'s shared `cmd_update` (also used by `auto-new-issue` to sync freshly authored issues) is untouched, so issues created that way are not marked `Ready`. `enqueued` is applied by `auto-fix-all/scripts/queue.sh`'s `_mark_enqueued` helper, called at the end of both the `save` and `push` cases — the only two places an id ever enters the queue — so it applies uniformly whether the id arrived via `auto-fix-all`'s initial seed, `monitor-issues` detecting `Ready for Work`, or `push-issue-to-queue`; it adds `Enqueued` and removes `Ready for Work`/`Created`, if present. Both mutations are best-effort: a `gh` failure logs a warning to stderr and never blocks the underlying issue-sync or queue write.
 
 ### Tag mutation primitives
 
