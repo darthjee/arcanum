@@ -42,6 +42,12 @@ mkdir -p "$STATE_DIR"
 
 # shellcheck source=../../_lib/lock.sh
 source "${SCRIPT_DIR}/../../_lib/lock.sh"
+# shellcheck source=../../_lib/origin.sh
+source "${SCRIPT_DIR}/../../_lib/origin.sh"
+# shellcheck source=../../_lib/tags.sh
+source "${SCRIPT_DIR}/../../_lib/tags.sh"
+# shellcheck source=../../_lib/tag_mutate.sh
+source "${SCRIPT_DIR}/../../_lib/tag_mutate.sh"
 
 # Reads the queue array from QUEUE_FILE, or "[]" if absent/empty.
 _read_queue() {
@@ -52,6 +58,26 @@ _read_queue() {
   fi
 }
 
+# _mark_enqueued <id...>
+#   Best-effort: adds the 'enqueued' tag and removes the 'clipboard'/
+#   'pencil2' tags (Ready for Work / Created) from each given issue id.
+#   A failed mutation warns to stderr and does not block the caller — the
+#   queue write itself has already happened by the time this runs.
+_mark_enqueued() {
+  local repo_ref
+  repo_ref=$(get_repo_ref)
+
+  local id
+  for id in "$@"; do
+    tag_mutate_add_label "$id" "$repo_ref" enqueued \
+      || echo "Warning: could not add 'enqueued' tag to issue #$id on $repo_ref" >&2
+    tag_mutate_remove_label "$id" "$repo_ref" clipboard \
+      || echo "Warning: could not remove 'clipboard' tag from issue #$id on $repo_ref" >&2
+    tag_mutate_remove_label "$id" "$repo_ref" pencil2 \
+      || echo "Warning: could not remove 'pencil2' tag from issue #$id on $repo_ref" >&2
+  done
+}
+
 case ${1:-} in
   save)
     shift
@@ -59,8 +85,10 @@ case ${1:-} in
       echo "Error: save requires at least one ID" >&2
       exit 1
     fi
-    printf '%s\n' "$@" | jq -R '{id: .}' | jq -s '.' > "$QUEUE_FILE"
-    echo "Queue saved: $*"
+    SAVE_IDS=("$@")
+    printf '%s\n' "${SAVE_IDS[@]}" | jq -R '{id: .}' | jq -s '.' > "$QUEUE_FILE"
+    echo "Queue saved: ${SAVE_IDS[*]}"
+    _mark_enqueued "${SAVE_IDS[@]}"
     ;;
 
   next)
@@ -80,12 +108,14 @@ case ${1:-} in
       echo "Error: push requires at least one ID" >&2
       exit 1
     fi
+    PUSH_IDS=("$@")
     _acquire_lock
-    NEW_ENTRIES=$(printf '%s\n' "$@" | jq -R '{id: .}' | jq -s '.')
+    NEW_ENTRIES=$(printf '%s\n' "${PUSH_IDS[@]}" | jq -R '{id: .}' | jq -s '.')
     _read_queue | jq --argjson new "$NEW_ENTRIES" '. + $new' > "${QUEUE_FILE}.tmp"
     mv "${QUEUE_FILE}.tmp" "$QUEUE_FILE"
     _release_lock
-    echo "Pushed: $*"
+    echo "Pushed: ${PUSH_IDS[*]}"
+    _mark_enqueued "${PUSH_IDS[@]}"
     ;;
 
   pop)
