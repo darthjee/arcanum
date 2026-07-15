@@ -18,7 +18,7 @@ _LIB_TAGS_LOADED=1
 #   Canonical tag   GitHub label
 #   -------------   ------------
 #   pencil2         Created
-#   clipboard       Ready
+#   clipboard       Ready for Work
 #   shipit          shipit
 #   construction    Working
 #   question        Question
@@ -30,7 +30,7 @@ _LIB_TAGS_LOADED=1
 _tag_label_for() {
   case "$1" in
     pencil2)      echo "Created" ;;
-    clipboard)    echo "Ready" ;;
+    clipboard)    echo "Ready for Work" ;;
     shipit)       echo "shipit" ;;
     construction) echo "Working" ;;
     question)     echo "Question" ;;
@@ -44,7 +44,7 @@ _tag_label_for() {
 _tag_for_label() {
   case "$1" in
     Created)  echo "pencil2" ;;
-    Ready)    echo "clipboard" ;;
+    "Ready for Work") echo "clipboard" ;;
     shipit)   echo "shipit" ;;
     Working)  echo "construction" ;;
     Question) echo "question" ;;

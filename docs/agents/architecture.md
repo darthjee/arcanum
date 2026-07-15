@@ -97,7 +97,7 @@ Issue status is tracked via real GitHub labels on the issue — labels are the s
 | Canonical tag | GitHub label |
 | --- | --- |
 | `pencil2` | `Created` |
-| `clipboard` | `Ready` |
+| `clipboard` | `Ready for Work` |
 | `shipit` | `shipit` |
 | `construction` | `Working` |
 | `question` | `Question` |
@@ -109,7 +109,7 @@ Issue status is tracked via real GitHub labels on the issue — labels are the s
 
 **`pencil2`** marks an issue as ready to be read and rewritten by the agent. Unlike `question`, this action is now fully wired end-to-end: `monitor_issues.sh` pushes the issue id onto `monitor-issues/scripts/rewrite_queue.sh`'s queue (`.claude/state/monitor-issues-rewrite-queue.json`) as soon as the label is detected. The `auto-rewrite-issue` skill drains that queue: for each id it fetches the issue body, rewrites it (architect-level AI judgment, the same kind of rewrite `discuss-issue/steps/discuss_and_save.md` performs but fully autonomous), pushes the new body to GitHub, then removes the label via `monitor-issues/scripts/github.sh remove-tag <id> pencil2`.
 
-**`clipboard`** marks an issue as ready to be pushed to the `auto-fix-all` queue. Unlike the two tags above, this action is fully deterministic, so `monitor_issues.sh` performs it directly: it pushes the issue id via `auto-fix-all/scripts/queue.sh push <id>` as soon as the label is detected.
+**`clipboard`** marks an issue as ready to be pushed to the `auto-fix-all` queue, backed by the `Ready for Work` label (distinct from the plain `Ready` label, which developers may still use informally to mean "well-defined" without triggering auto-enqueuing). Unlike the two tags above, this action is fully deterministic, so `monitor_issues.sh` performs it directly: it pushes the issue id via `auto-fix-all/scripts/queue.sh push <id>` as soon as the label is detected.
 
 **`eyes`** and **`construction`** are pipeline-status tags, not actionable ones — `monitor-issues` does not detect or act on them (they are not part of `_lib/tag_actions.sh`'s `ACTIONABLE_TAGS`). They exist purely so the GitHub issue list reflects `auto-fix-all`'s progress at a glance: `auto-fix-all` pushes `eyes` onto the live issue right after fetching/checking it (`auto-fix-all/steps/process_one_issue.md` step 2), then swaps it for `construction` once the implementation plan has been written and coding is about to start (step 3). This applies only to the `auto-fix-all` pipeline — the manual `/new-issue`, `/plan-issue`, and `/discuss-issue` skills never push either label.
 
