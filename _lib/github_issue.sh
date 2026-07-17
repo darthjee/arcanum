@@ -5,7 +5,8 @@
 #   fetch <id>                      Fetch a GitHub issue and save to docs/agents/issues/
 #   update <id> <title> <file>      Update a GitHub issue title and body from a file
 #   create <title> <file>           Create a new GitHub issue and save it to docs/agents/issues/
-#   mark-ready <id>                 Add the Ready label and remove Created, if present
+#   mark-refined <id>               Add the Refined label and remove Created, if present
+#   mark-ready <id>                 Add the Ready label and remove Refined, if present
 
 set -euo pipefail
 
@@ -229,6 +230,21 @@ cmd_info() {
   echo "REPO=$_ORIGIN_REPO_PATH"
 }
 
+cmd_mark_refined() {
+  local id="${1:-}"
+  [[ -n "$id" ]] || { echo "Usage: $0 mark-refined <id>" >&2; exit 1; }
+
+  _load_origin
+  local repo_ref="$_ORIGIN_REPO_PATH"
+
+  tag_mutate_add_label "$id" "$repo_ref" refined \
+    || echo "Warning: could not add 'refined' tag to issue #$id on $repo_ref" >&2
+  tag_mutate_remove_label "$id" "$repo_ref" pencil2 \
+    || echo "Warning: could not remove 'pencil2' tag from issue #$id on $repo_ref" >&2
+
+  return 0
+}
+
 cmd_mark_ready() {
   local id="${1:-}"
   [[ -n "$id" ]] || { echo "Usage: $0 mark-ready <id>" >&2; exit 1; }
@@ -238,18 +254,19 @@ cmd_mark_ready() {
 
   tag_mutate_add_label "$id" "$repo_ref" ready \
     || echo "Warning: could not add 'ready' tag to issue #$id on $repo_ref" >&2
-  tag_mutate_remove_label "$id" "$repo_ref" pencil2 \
-    || echo "Warning: could not remove 'pencil2' tag from issue #$id on $repo_ref" >&2
+  tag_mutate_remove_label "$id" "$repo_ref" refined \
+    || echo "Warning: could not remove 'refined' tag from issue #$id on $repo_ref" >&2
 
   return 0
 }
 
 case "${1:-}" in
-  info)       cmd_info ;;
-  fetch)      shift; cmd_fetch  "$@" ;;
-  update)     shift; cmd_update "$@" ;;
-  create)     shift; cmd_create "$@" ;;
-  mark-ready) shift; cmd_mark_ready "$@" ;;
+  info)         cmd_info ;;
+  fetch)        shift; cmd_fetch  "$@" ;;
+  update)       shift; cmd_update "$@" ;;
+  create)       shift; cmd_create "$@" ;;
+  mark-refined) shift; cmd_mark_refined "$@" ;;
+  mark-ready)   shift; cmd_mark_ready "$@" ;;
   *)
     echo "Usage: $0 <command> [args]" >&2
     echo "Commands:" >&2
@@ -257,7 +274,8 @@ case "${1:-}" in
     echo "  fetch <id>                      Fetch a GitHub issue and save to docs/agents/issues/" >&2
     echo "  update <id> <title> <file>      Update a GitHub issue title and body from a file" >&2
     echo "  create <title> <file>           Create a new GitHub issue and save it to docs/agents/issues/" >&2
-    echo "  mark-ready <id>                 Add the Ready label and remove Created, if present" >&2
+    echo "  mark-refined <id>               Add the Refined label and remove Created, if present" >&2
+    echo "  mark-ready <id>                 Add the Ready label and remove Refined, if present" >&2
     exit 1
     ;;
 esac
