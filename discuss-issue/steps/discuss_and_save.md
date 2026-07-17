@@ -57,10 +57,10 @@ Run:
 
 ```bash
 ../scripts/github.sh update <id> "<Title>" <issue_file_path>
-../scripts/github.sh mark-ready <id>
+../scripts/github.sh mark-refined <id>
 ```
 
-> Resolve `../scripts/github.sh` relative to this file's directory. The script resolves the GitHub domain and repository from `git remote get-url origin`, so no manual `-R` argument is needed. The body is read directly from file via `--body-file`/`cat`, avoiding quoting issues with multi-line content. `mark-ready` adds the `Ready` label and removes `Created`, if present — best-effort, it never blocks this step.
+> Resolve `../scripts/github.sh` relative to this file's directory. The script resolves the GitHub domain and repository from `git remote get-url origin`, so no manual `-R` argument is needed. The body is read directly from file via `--body-file`/`cat`, avoiding quoting issues with multi-line content. `mark-refined` adds the `Refined` label and removes `Created`, if present — best-effort, it never blocks this step.
 
 ## 8. Planning confirmation
 
@@ -84,4 +84,5 @@ Wait for the user's free-form reply, then pass it to the same script:
   2. Run `../../auto-new-issue/scripts/commit_issue.sh <issue_file_path> <id> "<your AI model name>" "<your AI model noreply email>"` — a cross-skill reference to the same script `auto-new-issue` uses (resolved relative to this file's directory: `../../auto-new-issue/scripts/commit_issue.sh`). This commits the already-drafted issue file into the branch and pushes it.
   3. As the architect, read [../../auto-plan-issue/steps/run.md](../../auto-plan-issue/steps/run.md) and follow all its steps for `<id>` directly — do not spawn a separate `Agent(architect)` for this, per this repo's convention for nested skill invocation (see [docs/agents/architecture.md](../../docs/agents/architecture.md)'s "Architect Delegation"). Its own Step 5 commits the plan locally but does not push.
   4. Run `git push` to push the plan commit too.
-  5. Report that the issue and plan are committed and pushed, and stop. Do not continue into `auto-fix-issue` in this run — implementation is a separate, later step.
+  5. Run `../scripts/github.sh mark-ready <id>` (resolved relative to this file's directory) to swap the `Refined` label for `Ready`, now that the issue + plan are committed and pushed — this is the point where the issue is actually ready for `auto-fix-all`/`auto-fix-issue` to pick up.
+  6. Report that the issue and plan are committed and pushed, and stop. Do not continue into `auto-fix-issue` in this run — implementation is a separate, later step.
