@@ -8,6 +8,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE=".claude/configuration/auto-fix-all.json"
+STATE_CONFIG_FILE=".claude/state/auto-fix-all-config.json"
 LOCK_FILE=".claude/state/auto-fix-all-config.lock"
 STATE_DIR=".claude/state"
 
@@ -16,10 +17,19 @@ mkdir -p "$STATE_DIR"
 # shellcheck source=../../_lib/lock.sh
 source "${SCRIPT_DIR}/../../_lib/lock.sh"
 
-# Reads the config object from CONFIG_FILE, or "{}" if absent/empty.
+# Returns the file that a given key should be read from/written to:
+# clear_context is personal, frequently-toggled state and lives in the
+# gitignored STATE_CONFIG_FILE; every other key lives in the committed
+# CONFIG_FILE.
+_config_file_for_key() {
+  [[ "$1" == "clear_context" ]] && echo "$STATE_CONFIG_FILE" || echo "$CONFIG_FILE"
+}
+
+# Reads the config object from the given file, or "{}" if absent/empty.
 _read_config() {
-  if [[ -s "$CONFIG_FILE" ]]; then
-    cat "$CONFIG_FILE"
+  local f="$1"
+  if [[ -s "$f" ]]; then
+    cat "$f"
   else
     echo "{}"
   fi
@@ -32,7 +42,8 @@ case ${1:-} in
       exit 1
     fi
     KEY="$2"
-    _read_config | jq -r --arg k "$KEY" '.[$k] // false'
+    TARGET_FILE="$(_config_file_for_key "$KEY")"
+    _read_config "$TARGET_FILE" | jq -r --arg k "$KEY" '.[$k] // false'
     ;;
 
   is-enabled)
@@ -41,7 +52,8 @@ case ${1:-} in
       exit 1
     fi
     KEY="$2"
-    VALUE=$(_read_config | jq -r --arg k "$KEY" '.[$k] // false')
+    TARGET_FILE="$(_config_file_for_key "$KEY")"
+    VALUE=$(_read_config "$TARGET_FILE" | jq -r --arg k "$KEY" '.[$k] // false')
     [[ "$VALUE" == "true" ]]
     ;;
 
@@ -56,9 +68,10 @@ case ${1:-} in
       echo "Error: value must be 'true' or 'false'" >&2
       exit 1
     fi
+    TARGET_FILE="$(_config_file_for_key "$KEY")"
     _acquire_lock
-    _read_config | jq --arg k "$KEY" --arg v "$VALUE" '.[$k] = ($v == "true")' > "${CONFIG_FILE}.tmp"
-    mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+    _read_config "$TARGET_FILE" | jq --arg k "$KEY" --arg v "$VALUE" '.[$k] = ($v == "true")' > "${TARGET_FILE}.tmp"
+    mv "${TARGET_FILE}.tmp" "$TARGET_FILE"
     _release_lock
     ;;
 
@@ -68,15 +81,16 @@ case ${1:-} in
       exit 1
     fi
     KEY="$2"
+    TARGET_FILE="$(_config_file_for_key "$KEY")"
     _acquire_lock
-    CURRENT=$(_read_config | jq -r --arg k "$KEY" '.[$k] // false')
+    CURRENT=$(_read_config "$TARGET_FILE" | jq -r --arg k "$KEY" '.[$k] // false')
     if [[ "$CURRENT" == "true" ]]; then
       NEW_VALUE="false"
     else
       NEW_VALUE="true"
     fi
-    _read_config | jq --arg k "$KEY" --arg v "$NEW_VALUE" '.[$k] = ($v == "true")' > "${CONFIG_FILE}.tmp"
-    mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+    _read_config "$TARGET_FILE" | jq --arg k "$KEY" --arg v "$NEW_VALUE" '.[$k] = ($v == "true")' > "${TARGET_FILE}.tmp"
+    mv "${TARGET_FILE}.tmp" "$TARGET_FILE"
     _release_lock
     echo "$NEW_VALUE"
     ;;
