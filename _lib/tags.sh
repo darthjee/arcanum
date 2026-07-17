@@ -23,6 +23,7 @@ _LIB_TAGS_LOADED=1
 #   construction    Working
 #   question        Question
 #   eyes            Fetched
+#   refined         Refined
 #   ready           Ready
 #   enqueued        Enqueued
 
@@ -37,6 +38,7 @@ _tag_label_for() {
     construction) echo "Working" ;;
     question)     echo "Question" ;;
     eyes)         echo "Fetched" ;;
+    refined)      echo "Refined" ;;
     ready)        echo "Ready" ;;
     enqueued)     echo "Enqueued" ;;
   esac
@@ -53,6 +55,7 @@ _tag_for_label() {
     Working)  echo "construction" ;;
     Question) echo "question" ;;
     Fetched)  echo "eyes" ;;
+    Refined)  echo "refined" ;;
     Ready)    echo "ready" ;;
     Enqueued) echo "enqueued" ;;
   esac
