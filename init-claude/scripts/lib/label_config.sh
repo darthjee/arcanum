@@ -80,6 +80,8 @@ DEFAULT_LABEL_PAIRS=(
   Working:c314d7
   Question:5319e7
   Fetched:bfd4f2
+  Idea:fbca04
+  Writting:79ff12
 )
 
 label_config_validate_pair() {
