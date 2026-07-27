@@ -82,6 +82,7 @@ DEFAULT_LABEL_PAIRS=(
   Fetched:bfd4f2
   Idea:fbca04
   Writting:79ff12
+  PR:31a5e0
 )
 
 label_config_validate_pair() {
