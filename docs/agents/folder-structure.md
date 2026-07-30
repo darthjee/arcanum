@@ -12,7 +12,7 @@
 | `new-issue/` | Skill `/new-issue` — cria um novo arquivo de issue. |
 | `plan-issue/` | Skill `/plan-issue` — cria o plano de implementação de uma issue existente. |
 | `push-issue-to-queue/` | Skill `/push-issue-to-queue` — adiciona um ou mais ids de issue ao final da fila do `auto-fix-all`. |
-| `auto-rewrite-issue/` | Skill `/auto-rewrite-issue` — esvazia a fila de rewrite do `monitor-issues`, reescrevendo o corpo de cada issue marcada com `:pencil2:` de forma autônoma e removendo a tag ao final. |
+| `auto-rewrite-issue/` | Skill `/auto-rewrite-issue` — esvazia a fila de rewrite do `monitor-issues`, reescrevendo o corpo de cada issue marcada com `created` de forma autônoma e removendo a tag ao final. |
 | `docs/agents/` | Documentação do próprio repositório (arquitetura, fluxo, issues, plans). |
 | `.github/` | Contém `copilot-instructions.md`, que aponta para AGENTS.md. |
 | `.claude/` | Configuração local do Claude Code para este repositório. Contém subpastas para estado de runtime e configuração de skills. |

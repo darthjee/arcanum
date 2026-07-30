@@ -59,8 +59,8 @@ _read_queue() {
 }
 
 # _mark_enqueued <id...>
-#   Best-effort: adds the 'enqueued' tag and removes the 'clipboard'/
-#   'pencil2' tags (Ready for Work / Created) from each given issue id.
+#   Best-effort: adds the 'enqueued' tag and removes the 'ready_for_work'/
+#   'created' tags (Ready for Work / Created) from each given issue id.
 #   A failed mutation warns to stderr and does not block the caller — the
 #   queue write itself has already happened by the time this runs.
 _mark_enqueued() {
@@ -71,10 +71,10 @@ _mark_enqueued() {
   for id in "$@"; do
     tag_mutate_add_label "$id" "$repo_ref" enqueued \
       || echo "Warning: could not add 'enqueued' tag to issue #$id on $repo_ref" >&2
-    tag_mutate_remove_label "$id" "$repo_ref" clipboard \
-      || echo "Warning: could not remove 'clipboard' tag from issue #$id on $repo_ref" >&2
-    tag_mutate_remove_label "$id" "$repo_ref" pencil2 \
-      || echo "Warning: could not remove 'pencil2' tag from issue #$id on $repo_ref" >&2
+    tag_mutate_remove_label "$id" "$repo_ref" ready_for_work \
+      || echo "Warning: could not remove 'ready_for_work' tag from issue #$id on $repo_ref" >&2
+    tag_mutate_remove_label "$id" "$repo_ref" created \
+      || echo "Warning: could not remove 'created' tag from issue #$id on $repo_ref" >&2
   done
 }
 

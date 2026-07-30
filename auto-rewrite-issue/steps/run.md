@@ -37,17 +37,17 @@ For the id popped in Step 1:
 
    This is a one-off, low-reuse call — call `gh` directly rather than adding a wrapper command. If this fails, log the failure and move on to the next id (back to Step 1) — do not remove the tag (next sub-step) if the push failed, and do not re-push to the queue.
 
-4. **Remove the `pencil2` tag.**
+4. **Remove the `created` tag.**
 
    ```bash
-   ../monitor-issues/scripts/github.sh remove-tag <id> pencil2
+   ../monitor-issues/scripts/github.sh remove-tag <id> created
    ```
 
    > Resolve `../monitor-issues/scripts/github.sh` relative to the `auto-rewrite-issue` skill folder.
 
-   If this fails, log the failure — the body was already rewritten on GitHub, but the tag remains, so a future poll will detect `pencil2` again and re-queue the id, triggering a re-rewrite (harmless, just redundant work).
+   If this fails, log the failure — the body was already rewritten on GitHub, but the tag remains, so a future poll will detect `created` again and re-queue the id, triggering a re-rewrite (harmless, just redundant work).
 
-Note on failures: on any failure in this sequence (fetch, rewrite, push, or tag removal), do not re-push the id to the queue from here. `monitor-issues` never recorded this issue's `updated_at` while `pencil2` was pending (it only writes `updated_at` after a successful push to the queue, not after the rewrite completes), so the next `monitor_issues.sh` poll will still see the GitHub `updatedAt` as newer than the stored value, re-detect the `pencil2` tag, and re-push the id on its own.
+Note on failures: on any failure in this sequence (fetch, rewrite, push, or tag removal), do not re-push the id to the queue from here. `monitor-issues` never recorded this issue's `updated_at` while `created` was pending (it only writes `updated_at` after a successful push to the queue, not after the rewrite completes), so the next `monitor_issues.sh` poll will still see the GitHub `updatedAt` as newer than the stored value, re-detect the `created` tag, and re-push the id on its own.
 
 ## Step 3 — Report
 
