@@ -16,14 +16,14 @@ _LIB_TAG_ACTIONS_LOADED=1
 
 # The three tags that drive monitor-issues dispatch, in canonical
 # (colon-stripped) form, as also returned by extract_tags.
-ACTIONABLE_TAGS=(question pencil2 clipboard)
+ACTIONABLE_TAGS=(question created ready_for_work)
 
 # actionable_tags <labels_text>
 #   Scans <labels_text> (a newline-separated list of GitHub label names,
 #   the same input shape as _lib/tags.sh's extract_tags) and prints, one
 #   per line, each of ACTIONABLE_TAGS that is present — in the fixed
-#   order: question, pencil2, clipboard. Tags not present in <labels_text>
-#   are omitted. Prints nothing if none are present.
+#   order: question, created, ready_for_work. Tags not present in
+#   <labels_text> are omitted. Prints nothing if none are present.
 #   Exit status: 0 if at least one actionable tag was found, 1 otherwise.
 actionable_tags() {
   local text="$1"

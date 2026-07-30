@@ -132,8 +132,8 @@ _poll_once() {
 
       # Dispatch any actionable tags found on this issue. `question` has no
       # dispatched action (it needs AI judgment to answer, left to a future
-      # architect-level step) and is log-only. `clipboard` (push to the
-      # auto-fix queue) and `pencil2` (push to the rewrite queue) are fully
+      # architect-level step) and is log-only. `ready_for_work` (push to the
+      # auto-fix queue) and `created` (push to the rewrite queue) are fully
       # deterministic dispatches handled here directly. `updated_at` for
       # this issue is only recorded once all dispatched actions for it have
       # succeeded — see below — so a failed dispatch gets retried next poll.
@@ -145,12 +145,12 @@ _poll_once() {
           question)
             _log "Issue #${ISSUE_ID} has actionable tag 'question' — needs an answer from the agent"
             ;;
-          pencil2)
-            _log "Issue #${ISSUE_ID} has actionable tag 'pencil2' — pushing to rewrite queue"
+          created)
+            _log "Issue #${ISSUE_ID} has actionable tag 'created' — pushing to rewrite queue"
             "$REWRITE_QUEUE_SCRIPT" push "$ISSUE_ID" || { _log "ERROR: failed to push #${ISSUE_ID} to the rewrite queue"; ISSUE_DISPATCH_FAILED=1; }
             ;;
-          clipboard)
-            _log "Issue #${ISSUE_ID} has actionable tag 'clipboard' — pushing to auto-fix-all queue"
+          ready_for_work)
+            _log "Issue #${ISSUE_ID} has actionable tag 'ready_for_work' — pushing to auto-fix-all queue"
             "$QUEUE_SCRIPT" push "$ISSUE_ID" || { _log "ERROR: failed to push #${ISSUE_ID} to the queue"; ISSUE_DISPATCH_FAILED=1; }
             ;;
         esac

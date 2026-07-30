@@ -17,12 +17,12 @@ _LIB_TAGS_LOADED=1
 #
 #   Canonical tag   GitHub label
 #   -------------   ------------
-#   pencil2         Created
-#   clipboard       Ready for Work
+#   created         Created
+#   ready_for_work  Ready for Work
 #   shipit          shipit
-#   construction    Working
+#   working         Working
 #   question        Question
-#   eyes            Fetched
+#   fetched         Fetched
 #   refined         Refined
 #   ready           Ready
 #   enqueued        Enqueued
@@ -32,15 +32,15 @@ _LIB_TAGS_LOADED=1
 #   <canonical_tag> is not recognized.
 _tag_label_for() {
   case "$1" in
-    pencil2)      echo "Created" ;;
-    clipboard)    echo "Ready for Work" ;;
-    shipit)       echo "shipit" ;;
-    construction) echo "Working" ;;
-    question)     echo "Question" ;;
-    eyes)         echo "Fetched" ;;
-    refined)      echo "Refined" ;;
-    ready)        echo "Ready" ;;
-    enqueued)     echo "Enqueued" ;;
+    created)        echo "Created" ;;
+    ready_for_work) echo "Ready for Work" ;;
+    shipit)         echo "shipit" ;;
+    working)        echo "Working" ;;
+    question)       echo "Question" ;;
+    fetched)        echo "Fetched" ;;
+    refined)        echo "Refined" ;;
+    ready)          echo "Ready" ;;
+    enqueued)       echo "Enqueued" ;;
   esac
 }
 
@@ -49,12 +49,12 @@ _tag_label_for() {
 #   <label_name> is not recognized.
 _tag_for_label() {
   case "$1" in
-    Created)  echo "pencil2" ;;
-    "Ready for Work") echo "clipboard" ;;
+    Created)  echo "created" ;;
+    "Ready for Work") echo "ready_for_work" ;;
     shipit)   echo "shipit" ;;
-    Working)  echo "construction" ;;
+    Working)  echo "working" ;;
     Question) echo "question" ;;
-    Fetched)  echo "eyes" ;;
+    Fetched)  echo "fetched" ;;
     Refined)  echo "refined" ;;
     Ready)    echo "ready" ;;
     Enqueued) echo "enqueued" ;;
