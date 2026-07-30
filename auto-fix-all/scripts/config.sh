@@ -18,11 +18,14 @@ mkdir -p "$STATE_DIR"
 source "${SCRIPT_DIR}/../../_lib/lock.sh"
 
 # Returns the file that a given key should be read from/written to:
-# clear_context is personal, frequently-toggled state and lives in the
-# gitignored STATE_CONFIG_FILE; every other key lives in the committed
-# CONFIG_FILE.
+# clear_context and finish_on_empty_queue are personal, frequently-toggled
+# state and live in the gitignored STATE_CONFIG_FILE; every other key lives
+# in the committed CONFIG_FILE.
 _config_file_for_key() {
-  [[ "$1" == "clear_context" ]] && echo "$STATE_CONFIG_FILE" || echo "$CONFIG_FILE"
+  case "$1" in
+    clear_context|finish_on_empty_queue) echo "$STATE_CONFIG_FILE" ;;
+    *) echo "$CONFIG_FILE" ;;
+  esac
 }
 
 # Reads the config object from the given file, or "{}" if absent/empty.
