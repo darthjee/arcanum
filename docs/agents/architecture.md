@@ -107,6 +107,9 @@ Issue status is tracked via real GitHub labels on the issue — labels are the s
 | `refined` | `Refined` |
 | `ready` | `Ready` |
 | `enqueued` | `Enqueued` |
+| `idea` | `Idea` |
+| `writting` | `Writting` |
+| `pr` | `PR` |
 
 **`shipit`** is human-only: no script ever adds or removes the `shipit` label (`_lib/tag_mutate.sh` refuses any attempt at the shared-library level). It marks an issue as pre-approved, so `auto-fix-all` skips PR review/monitoring and merges directly once CI passes, checked via `auto-fix-all/scripts/github.sh has-shipit-label` — the pipeline's only interaction with this tag is reading it.
 
@@ -121,6 +124,12 @@ Issue status is tracked via real GitHub labels on the issue — labels are the s
 **`refined`** marks an issue as discussed/confirmed but not yet planned. It's applied by `_lib/github_issue.sh`'s `mark-refined` subcommand, called by `discuss-issue`'s "Push to GitHub" step right after its `update` call succeeds — it adds `Refined` and removes `Created`, if present.
 
 **`ready`** and **`enqueued`** keep the live GitHub labels in sync with the pipeline stage an issue is actually in, so the label-based issue list doesn't drift stale while an issue is being discussed or queued. `ready` is applied by `_lib/github_issue.sh`'s `mark-ready` subcommand, called by `discuss-issue`'s step 8 right after the `git push` that publishes the `issue-<id>` branch with the committed issue + plan — this is the point where the issue + plan are actually ready for `auto-fix-all`/`auto-fix-issue` to pick up; it adds `Ready` and removes `Refined`, if present (not `Created` anymore). `_lib/github_issue.sh`'s shared `cmd_update` (also used by `auto-new-issue` to sync freshly authored issues) is untouched, so issues created that way are not marked `Ready`. `enqueued` is applied by `auto-fix-all/scripts/queue.sh`'s `_mark_enqueued` helper, called at the end of both the `save` and `push` cases — the only two places an id ever enters the queue — so it applies uniformly whether the id arrived via `auto-fix-all`'s initial seed, `monitor-issues` detecting `Ready for Work`, or `push-issue-to-queue`; it adds `Enqueued` and removes `Ready for Work`/`Created`, if present. Both mutations are best-effort: a `gh` failure logs a warning to stderr and never blocks the underlying issue-sync or queue write.
+
+**`idea`** and **`writting`** mark an issue as still being drafted by the user, before it reaches the `Created` stage — set manually by a human, not by any script. They are removed by `_lib/github_issue.sh`'s `mark-refined` subcommand alongside `created`, the same call `discuss-issue`'s "Push to GitHub" step already makes, so they never linger on an issue past refinement.
+
+**`pr`** is added by `auto-fix-issue`'s `pr-create`/`pr-ready` (`auto-fix-issue/scripts/github.sh`'s `_sync_pr_labels_and_state`, called from `cmd_pr_create`/`cmd_pr_ready`) once a PR exists for the issue, idempotently via `tag_mutate_add_label`, so the issue's label list reflects at a glance whether a PR is open. The same helper also refreshes `.claude/state/issue-<id>.json`'s `tags` field from the issue's current GitHub labels.
+
+`auto-shipit` (PR-only — deliberately not part of the canonical issue-tag table above, since it is never read from or written to an issue) is a purely informational label with no reader anywhere in the pipeline. `_sync_pr_labels_and_state` adds it directly to the PR (`gh pr edit --add-label auto-shipit`) whenever the issue's refreshed tags include `shipit`, so a developer glancing at the PR's labels can tell at a glance that the underlying issue already had `shipit` approval — the human-only `shipit` label on the issue itself is never touched.
 
 ### Tag mutation primitives
 

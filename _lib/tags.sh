@@ -26,6 +26,9 @@ _LIB_TAGS_LOADED=1
 #   refined         Refined
 #   ready           Ready
 #   enqueued        Enqueued
+#   idea            Idea
+#   writting        Writting
+#   pr              PR
 
 # _tag_label_for <canonical_tag>
 #   Echoes the GitHub label name for <canonical_tag>, or nothing if
@@ -41,6 +44,9 @@ _tag_label_for() {
     refined)        echo "Refined" ;;
     ready)          echo "Ready" ;;
     enqueued)       echo "Enqueued" ;;
+    idea)           echo "Idea" ;;
+    writting)       echo "Writting" ;;
+    pr)             echo "PR" ;;
   esac
 }
 
@@ -58,6 +64,9 @@ _tag_for_label() {
     Refined)  echo "refined" ;;
     Ready)    echo "ready" ;;
     Enqueued) echo "enqueued" ;;
+    Idea)     echo "idea" ;;
+    Writting) echo "writting" ;;
+    PR)       echo "pr" ;;
   esac
 }
 
