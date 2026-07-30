@@ -19,7 +19,7 @@ If no arguments were given, this is a re-invocation after context clearing — t
 
 ## Step 2 — Process the next issue
 
-Get the next id (blocks until the queue has one — if it's currently empty, it sleeps 5 seconds and checks again, forever, so a run that drains the queue keeps waiting for issues pushed onto it later, e.g. via `push-issue-to-queue`, instead of exiting):
+Get the next id (blocks until the queue has one — if it's currently empty, it sleeps 5 seconds and checks again, forever, so a run that drains the queue keeps waiting for issues pushed onto it later, e.g. via `push-issue-to-queue`, instead of exiting). A queue draining with `finish_on_empty_queue` on is intercepted one step earlier, in Step 3 below, right after the previous issue's id is popped — so this call is only ever reached when the run genuinely wants to keep waiting:
 
 ```bash
 scripts/queue.sh wait-next
@@ -38,6 +38,15 @@ Wait for the agent to finish, then parse `OUTCOME` from its report, and proceed 
 ```bash
 scripts/queue.sh pop
 ```
+
+Check whether the run should finish now that the queue may be empty:
+
+```bash
+scripts/queue.sh empty && scripts/config.sh is-enabled finish_on_empty_queue
+```
+
+- **Exit 0 (both true)**: the queue is empty and the user has opted into finishing instead of waiting. Skip the `clear_context` check below entirely — no `ScheduleWakeup`, no looping back to Step 2. Go straight to Step 4 and report the summary.
+- **Exit 1 (otherwise)**: continue to the `clear_context` check below, unchanged.
 
 Check whether to clear context:
 
@@ -65,6 +74,6 @@ This is the one point in the whole pipeline where you ask the user something —
 
 ## Step 4 — Done
 
-This skill runs forever by design — Step 2 blocks and waits whenever the queue is empty instead of stopping, so issues pushed onto the queue later are still picked up. This step is only reached if the run is stopped externally (e.g. the user interrupts it): report a summary at that point, for each ID processed so far, of the final PR URL and outcome (merged/skipped).
+This skill runs forever by design — Step 2 blocks and waits whenever the queue is empty instead of stopping, so issues pushed onto the queue later are still picked up. This step is reached either when the run is stopped externally (e.g. the user interrupts it) or when the queue emptied with `finish_on_empty_queue` on (Step 3 above): report a summary at that point, for each ID processed so far, of the final PR URL and outcome (merged/skipped). No separate message distinguishes the `finish_on_empty_queue` case from an externally-interrupted run.
 
 Do not ask for confirmation at any point except the single explicit question above for the `closed` outcome.
