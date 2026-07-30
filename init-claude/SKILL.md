@@ -66,3 +66,7 @@ After the agents are set up, read and follow [setup_ci_monitoring.md](setup_ci_m
 ## Step 10 — Setup repository labels
 
 After the CI monitoring options are set up, read and follow [setup_labels.md](setup_labels.md).
+
+## Step 11 — Setup `auto-fix-all` personal run behavior
+
+After the repository labels are set up, read and follow [setup_auto_fix_all_config.md](setup_auto_fix_all_config.md).
