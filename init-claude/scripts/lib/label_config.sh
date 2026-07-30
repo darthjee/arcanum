@@ -83,6 +83,7 @@ DEFAULT_LABEL_PAIRS=(
   Idea:fbca04
   Writting:79ff12
   PR:31a5e0
+  auto-shipit:ffb004
 )
 
 label_config_validate_pair() {

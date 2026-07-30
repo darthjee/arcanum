@@ -241,6 +241,10 @@ cmd_mark_refined() {
     || echo "Warning: could not add 'refined' tag to issue #$id on $repo_ref" >&2
   tag_mutate_remove_label "$id" "$repo_ref" created \
     || echo "Warning: could not remove 'created' tag from issue #$id on $repo_ref" >&2
+  tag_mutate_remove_label "$id" "$repo_ref" idea \
+    || echo "Warning: could not remove 'idea' tag from issue #$id on $repo_ref" >&2
+  tag_mutate_remove_label "$id" "$repo_ref" writting \
+    || echo "Warning: could not remove 'writting' tag from issue #$id on $repo_ref" >&2
 
   return 0
 }
