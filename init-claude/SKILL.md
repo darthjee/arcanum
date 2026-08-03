@@ -70,3 +70,7 @@ After the CI monitoring options are set up, read and follow [setup_labels.md](se
 ## Step 11 — Setup `auto-fix-all` personal run behavior
 
 After the repository labels are set up, read and follow [setup_auto_fix_all_config.md](setup_auto_fix_all_config.md).
+
+## Step 12 — Setup issue enhancement concerns
+
+After the `auto-fix-all` personal run behavior is set up, read and follow [setup_issue_enhancement.md](setup_issue_enhancement.md).

@@ -15,6 +15,7 @@ The script creates (skipping anything that already exists):
 - `docs/agents/plans/.gitkeep`
 - `docs/agents/architecture.md` (placeholder)
 - `docs/agents/flow.md` (placeholder)
+- `docs/agents/issue-enhancement.md` (placeholder)
 
 And appends the standard `## Documentation` section to `AGENTS.md` if that section is not already present.
 
