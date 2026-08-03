@@ -10,6 +10,7 @@
 | `auto-fix-all/` | Skill `/auto-fix-all` — orquestra o pipeline completo (issue → plano → fix → monitoramento) para uma fila de IDs, um por vez, reagindo a comentários, aprovações, falhas de CI e fechamentos de PR até esvaziar a fila. |
 | `init-claude/` | Skill `/init-claude` — configura AGENTS.md/CLAUDE.md/copilot-instructions.md e a estrutura de docs do projeto. |
 | `new-issue/` | Skill `/new-issue` — cria um novo arquivo de issue. |
+| `enhance-issue/` | Skill `/enhance-issue` — ajuda o usuário a amadurecer uma ideia de issue ainda vaga (tag `Idea`/`Writting`) através de diálogo guiado por uma lista de preocupações, antes de publicá-la como `Created`. |
 | `plan-issue/` | Skill `/plan-issue` — cria o plano de implementação de uma issue existente. |
 | `push-issue-to-queue/` | Skill `/push-issue-to-queue` — adiciona um ou mais ids de issue ao final da fila do `auto-fix-all`. |
 | `auto-rewrite-issue/` | Skill `/auto-rewrite-issue` — esvazia a fila de rewrite do `monitor-issues`, reescrevendo o corpo de cada issue marcada com `created` de forma autônoma e removendo a tag ao final. |
