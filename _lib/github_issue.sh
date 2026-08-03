@@ -5,6 +5,7 @@
 #   fetch <id>                      Fetch a GitHub issue and save to docs/agents/issues/
 #   update <id> <title> <file>      Update a GitHub issue title and body from a file
 #   create <title> <file>           Create a new GitHub issue and save it to docs/agents/issues/
+#   mark-created <id>               Add the Created label and remove Idea/Writting, if present
 #   mark-refined <id>               Add the Refined label and remove Created, if present
 #   mark-ready <id>                 Add the Ready label and remove Refined, if present
 
@@ -249,6 +250,23 @@ cmd_mark_refined() {
   return 0
 }
 
+cmd_mark_created() {
+  local id="${1:-}"
+  [[ -n "$id" ]] || { echo "Usage: $0 mark-created <id>" >&2; exit 1; }
+
+  _load_origin
+  local repo_ref="$_ORIGIN_REPO_PATH"
+
+  tag_mutate_add_label "$id" "$repo_ref" created \
+    || echo "Warning: could not add 'created' tag to issue #$id on $repo_ref" >&2
+  tag_mutate_remove_label "$id" "$repo_ref" idea \
+    || echo "Warning: could not remove 'idea' tag from issue #$id on $repo_ref" >&2
+  tag_mutate_remove_label "$id" "$repo_ref" writting \
+    || echo "Warning: could not remove 'writting' tag from issue #$id on $repo_ref" >&2
+
+  return 0
+}
+
 cmd_mark_ready() {
   local id="${1:-}"
   [[ -n "$id" ]] || { echo "Usage: $0 mark-ready <id>" >&2; exit 1; }
@@ -269,6 +287,7 @@ case "${1:-}" in
   fetch)        shift; cmd_fetch  "$@" ;;
   update)       shift; cmd_update "$@" ;;
   create)       shift; cmd_create "$@" ;;
+  mark-created) shift; cmd_mark_created "$@" ;;
   mark-refined) shift; cmd_mark_refined "$@" ;;
   mark-ready)   shift; cmd_mark_ready "$@" ;;
   *)
@@ -278,6 +297,7 @@ case "${1:-}" in
     echo "  fetch <id>                      Fetch a GitHub issue and save to docs/agents/issues/" >&2
     echo "  update <id> <title> <file>      Update a GitHub issue title and body from a file" >&2
     echo "  create <title> <file>           Create a new GitHub issue and save it to docs/agents/issues/" >&2
+    echo "  mark-created <id>               Add the Created label and remove Idea/Writting, if present" >&2
     echo "  mark-refined <id>               Add the Refined label and remove Created, if present" >&2
     echo "  mark-ready <id>                 Add the Ready label and remove Refined, if present" >&2
     exit 1

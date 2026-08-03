@@ -8,6 +8,7 @@
 #   docs/agents/plans/.gitkeep
 #   docs/agents/architecture.md  (placeholder)
 #   docs/agents/flow.md          (placeholder)
+#   docs/agents/issue-enhancement.md (placeholder)
 #
 # Appends the standard ## Documentation section to AGENTS.md if not already present.
 
@@ -50,6 +51,18 @@ _create_file "docs/agents/flow.md" \
 ## Overview
 
 _Describe the main runtime flow of the application here._"
+
+_create_file "docs/agents/issue-enhancement.md" \
+"# Issue Enhancement
+
+A checklist of concerns to consider when fleshing out a vague issue idea (tagged \`Idea\`/\`Writting\`) before it reaches the \`Created\` stage. Not exhaustive — adjust or extend the list for this project's needs.
+
+- **Scope boundaries** — what's explicitly in scope and what's explicitly out.
+- **Alternative solutions** — other ways to solve the same problem, and why this one was chosen.
+- **Edge cases** — inputs, states, or timing the happy path doesn't cover.
+- **Backward compatibility** — whether this breaks existing behavior, data, or integrations.
+- **Testing strategy** — how the change will be verified.
+- **Performance & security considerations** — anything relevant to load, latency, or attack surface."
 
 # --- AGENTS.md documentation section ---
 
