@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Print a label/color table, confirm interactively, then sync to GitHub.
-# Usage: sync_labels.sh [<config_path>]
+# Usage: sync_labels.sh <repo_path> [<config_path>]
+# repo_path is required — the local checkout path of the target repo,
+# used to resolve origin explicitly rather than trusting ambient cwd.
 #   config_path defaults to lib/label_config.sh's DEFAULT_LABEL_CONFIG_PATH
 #   (.claude/state/init-claude-config.json, relative to cwd).
 #
