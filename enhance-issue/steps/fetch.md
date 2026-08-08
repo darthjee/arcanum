@@ -3,7 +3,7 @@
 The id is always numeric and tied to a real GitHub issue — there is no local-only id convention. `enhance-issue` only operates on existing GitHub issues, whatever their current tags (`Idea`, `Writting`, or anything else), so resolving the id and fetching its content is a single script call reused directly from `discuss-issue`:
 
 ```bash
-../../discuss-issue/scripts/resolve_and_fetch.sh docs/agents/issues "<skill_args>"
+../../discuss-issue/scripts/resolve_and_fetch.sh "$REPO_PATH" docs/agents/issues "<skill_args>"
 ```
 
 > Resolve `../../discuss-issue/scripts/resolve_and_fetch.sh` relative to this file's directory (i.e. the `steps/` folder inside this skill).

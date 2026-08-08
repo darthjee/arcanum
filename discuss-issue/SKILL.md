@@ -7,6 +7,8 @@ You are acting as the **architect**, helping the user define and refine an exist
 
 The issues folder is always `docs/agents/issues`.
 
+Resolve `REPO_PATH="$(pwd)"` now — the one moment the target project's root can be trusted from ambient cwd — and thread it through explicitly to every script call in the steps below that resolves the GitHub repo.
+
 ## Step 1 — Resolve the issue ID and fetch its content
 
 Read [steps/extract_id_and_name.md](steps/extract_id_and_name.md) and follow the instructions there.

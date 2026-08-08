@@ -7,12 +7,16 @@ You are the coordinator. Your job is to manage the queue and the two things the 
 
 The issues folder is always `docs/agents/issues` and the plans folder is always `docs/agents/plans`.
 
+## Step 0 — Resolve REPO_PATH
+
+Resolve `REPO_PATH="$(pwd)"` — the one moment the target project's root can be trusted from ambient cwd. This coordinator layer runs every script call in this file directly (not via a spawned architect for its own queue/config bookkeeping), so `REPO_PATH` must be resolved fresh here on every invocation (including each `ScheduleWakeup` re-entry, since a fresh invocation is a fresh trust point) and threaded explicitly through every script call below, plus into the per-issue `Agent(architect, ...)` spawn in Step 2.
+
 ## Step 1 — Initialize the queue
 
 If skill arguments were provided (space-separated IDs), run:
 
 ```bash
-scripts/queue.sh save <id1> <id2> ...
+scripts/queue.sh save "$REPO_PATH" <id1> <id2> ...
 ```
 
 If no arguments were given, this is a re-invocation after context clearing — the queue already contains the remaining issues. Skip this step and go directly to Step 2.
@@ -22,12 +26,12 @@ If no arguments were given, this is a re-invocation after context clearing — t
 Get the next id (blocks until the queue has one — if it's currently empty, it sleeps 5 seconds and checks again, forever, so a run that drains the queue keeps waiting for issues pushed onto it later, e.g. via `push-issue-to-queue`, instead of exiting). A queue draining with `finish_on_empty_queue` on is intercepted one step earlier, in Step 3 below, right after the previous issue's id is popped — so this call is only ever reached when the run genuinely wants to keep waiting:
 
 ```bash
-scripts/queue.sh wait-next
+scripts/queue.sh wait-next "$REPO_PATH"
 ```
 
 Call this id `<id>`. Spawn:
 
-> Agent(subagent_type: "architect", prompt: "Read steps/process_one_issue.md (resolved relative to the `auto-fix-all` skill folder) and follow it for issue <id>. Report OUTCOME=merged or OUTCOME=closed PR_NUMBER=<n>.")
+> Agent(subagent_type: "architect", prompt: "Read steps/process_one_issue.md (resolved relative to the `auto-fix-all` skill folder) and follow it for issue <id>. REPO_PATH: <resolved_path>. Report OUTCOME=merged or OUTCOME=closed PR_NUMBER=<n>.")
 
 Wait for the agent to finish, then parse `OUTCOME` from its report, and proceed to Step 3.
 
@@ -36,13 +40,13 @@ Wait for the agent to finish, then parse `OUTCOME` from its report, and proceed 
 ### `OUTCOME=merged`
 
 ```bash
-scripts/queue.sh pop
+scripts/queue.sh pop "$REPO_PATH"
 ```
 
 Check whether the run should finish now that the queue may be empty:
 
 ```bash
-scripts/queue.sh empty && scripts/config.sh is-enabled finish_on_empty_queue
+scripts/queue.sh empty "$REPO_PATH" && scripts/config.sh is-enabled finish_on_empty_queue
 ```
 
 - **Exit 0 (both true)**: the queue is empty and the user has opted into finishing instead of waiting. Skip the `clear_context` check below entirely — no `ScheduleWakeup`, no looping back to Step 2. Go straight to Step 4 and report the summary.
@@ -67,10 +71,10 @@ This is the one point in the whole pipeline where you ask the user something —
 
 - **Reimplement** — the rejected branch must be discarded first, since `process_one_issue.md`'s branch bootstrap now reuses an existing `issue-<id>` branch instead of always recreating it:
   ```bash
-  scripts/github.sh cleanup-branch <id>
+  scripts/github.sh cleanup-branch "$REPO_PATH" <id>
   ```
   Then go back to Step 2 (the id stays at the front of the queue; a fresh `architect` agent will find no existing `issue-<id>` branch and create a genuinely clean one from `main` via `process_one_issue.md`).
-- **Skip** — `scripts/queue.sh pop`, then go back to Step 2.
+- **Skip** — `scripts/queue.sh pop "$REPO_PATH"`, then go back to Step 2.
 
 ## Step 4 — Done
 

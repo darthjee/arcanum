@@ -5,11 +5,11 @@ Once the user is satisfied with the issue overall (the end of the [dialogue.md](
 ## 1. Update the issue and swap tags
 
 ```bash
-../scripts/github.sh update <id> "<Title>" <issue_file_path>
-../scripts/github.sh mark-created <id>
+../scripts/github.sh update "$REPO_PATH" <id> "<Title>" <issue_file_path>
+../scripts/github.sh mark-created "$REPO_PATH" <id>
 ```
 
-> Resolve `../scripts/github.sh` relative to this file's directory. The script resolves the GitHub domain and repository from `git remote get-url origin`, so no manual `-R` argument is needed. `mark-created` adds the `Created` label and removes `Idea`/`Writting`, if present — best-effort, it never blocks this step.
+> Resolve `../scripts/github.sh` relative to this file's directory. `$REPO_PATH` (resolved once at the top of [SKILL.md](../SKILL.md)) is a required leading argument — the script resolves the GitHub domain and repository from it explicitly, rather than from ambient `git remote get-url origin`. `mark-created` adds the `Created` label and removes `Idea`/`Writting`, if present — best-effort, it never blocks this step.
 
 ## 2. Delete the local draft
 

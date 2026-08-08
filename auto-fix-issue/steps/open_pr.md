@@ -2,18 +2,20 @@
 
 This skill never replicates the metadata-file tracking used by Majora's `draft-pr`/`mark-ready` (no `.claude/state/metadata/issue_<id>.json` equivalent). Instead, it checks GitHub directly for an existing PR on the current branch.
 
+`REPO_PATH` (the target project's root) is carried in from [run.md](run.md) — thread it through to every `scripts/github.sh` call below.
+
 ## Check for an existing PR
 
 Run:
 
 ```bash
-scripts/github.sh pr-view
+scripts/github.sh pr-view "$REPO_PATH"
 ```
 
 - **Exit code 0** — a PR already exists for the current branch. Parse `URL=` and `IS_DRAFT=` from the output.
   - If `IS_DRAFT=true`, mark it ready:
     ```bash
-    scripts/github.sh pr-ready
+    scripts/github.sh pr-ready "$REPO_PATH"
     ```
   - If `IS_DRAFT=false`, the PR is already open and ready — nothing more to do.
 - **Exit code 1, no error message** — no PR exists yet for this branch. Proceed to "Create the PR" below.
@@ -42,7 +44,7 @@ Fixes #<id>
 Then run:
 
 ```bash
-scripts/github.sh pr-create "Fix #<id> — <title>" /tmp/pr_body_<id>.md
+scripts/github.sh pr-create "$REPO_PATH" "Fix #<id> — <title>" /tmp/pr_body_<id>.md
 ```
 
 > Resolve `scripts/github.sh` relative to the `auto-fix-issue` skill folder.

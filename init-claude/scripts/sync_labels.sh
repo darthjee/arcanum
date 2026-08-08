@@ -30,12 +30,13 @@ source "${SCRIPT_DIR}/../../_lib/origin.sh"
 source "${SCRIPT_DIR}/lib/label_config.sh"
 
 usage() {
-  echo "Usage: $0 [<config_path>]" >&2
+  echo "Usage: $0 <repo_path> [<config_path>]" >&2
   echo "  config_path defaults to ${DEFAULT_LABEL_CONFIG_PATH}" >&2
   exit 2
 }
 
-CONFIG_PATH="${1:-$DEFAULT_LABEL_CONFIG_PATH}"
+REPO_PATH="${1:?Usage: $0 <repo_path> [<config_path>]}"
+CONFIG_PATH="${2:-$DEFAULT_LABEL_CONFIG_PATH}"
 
 label_config_ensure_defaults "$CONFIG_PATH"
 
@@ -83,7 +84,7 @@ done
 
 # --- Sync to GitHub ---
 
-REPO=$(get_repo_ref)
+REPO=$(get_repo_ref "$REPO_PATH")
 
 EXISTING=$(gh label list -R "$REPO" --json name -q '.[].name')
 

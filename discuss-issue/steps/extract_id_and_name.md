@@ -3,7 +3,7 @@
 The id is always numeric and tied to a real GitHub issue — there is no local-only id convention. discuss-issue only operates on existing GitHub issues, so resolving the id and fetching its content is a single script call:
 
 ```bash
-../scripts/resolve_and_fetch.sh <issues_folder> "<skill_args>"
+../scripts/resolve_and_fetch.sh "$REPO_PATH" <issues_folder> "<skill_args>"
 ```
 
 > Resolve `../scripts/resolve_and_fetch.sh` relative to this file's directory (i.e., the `scripts/` folder inside this skill).

@@ -1,5 +1,7 @@
 You are the **architect**. Your job is to drain the `monitor-issues` rewrite queue, fully autonomously — no questions to the user, no confirmation loop. Follow the steps below precisely and in order.
 
+`REPO_PATH` (the target project's root) is carried in from your invocation prompt — thread it through to every script call below that resolves the GitHub repo.
+
 ## Step 1 — Drain the queue
 
 Loop:
@@ -40,7 +42,7 @@ For the id popped in Step 1:
 4. **Remove the `created` tag.**
 
    ```bash
-   ../monitor-issues/scripts/github.sh remove-tag <id> created
+   ../monitor-issues/scripts/github.sh remove-tag "$REPO_PATH" <id> created
    ```
 
    > Resolve `../monitor-issues/scripts/github.sh` relative to the `auto-rewrite-issue` skill folder.

@@ -2,6 +2,8 @@
 
 Unlike Majora's original `fix-all`, this skill never decides the responsible agent from a fixed set of stack keywords (React/Django/Docker/...). Instead it reads the target project's own specialist agent descriptions — the same source `auto-plan-issue` and `auto-fix-issue` already use — and reasons about which one(s) fit.
 
+`REPO_PATH` (the target project's root) is carried in from whichever caller ([process_one_issue.md](process_one_issue.md)) read this file directly — thread it through to the `reply_comment.sh` call in "Replying to a question" below.
+
 ## List the agents configured in the target project
 
 ```bash
@@ -66,7 +68,7 @@ For each comment judged a question/clarification above:
 2. Draft the reply body addressing the question. This is a judgment call, not scripted — the responsible agent (or you, as architect) writes the actual answer.
 3. Post it:
    ```bash
-   ../scripts/reply_comment.sh <id> <agent> "<your AI model name>" "<your AI model noreply email>" "<reply body>"
+   ../scripts/reply_comment.sh "$REPO_PATH" <id> <agent> "<your AI model name>" "<your AI model noreply email>" "<reply body>"
    ```
    (resolved relative to the `auto-fix-all` skill folder).
 4. No commit, no push, and no CI wait for a question reply — nothing changed in the working tree.
