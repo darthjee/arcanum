@@ -1,9 +1,11 @@
 You are the **architect**. Your job is to block until the given PR is merged, closed, approved, or commented on by its owner, then report the outcome — no confirmation loop. The underlying script reacts to comments to signal their open/addressed status, but you (the caller) decide what, if anything, to do about each comment.
 
+`REPO_PATH` (the target project's root) is carried in from your invocation prompt or from whichever nested caller read this file directly — thread it through to the script call below.
+
 ## Step 1 — Block on the monitor script
 
 ```bash
-scripts/monitor_pr.sh --pr-number <pr_number> [--issue-id <id>]
+scripts/monitor_pr.sh "$REPO_PATH" --pr-number <pr_number> [--issue-id <id>]
 ```
 
 > Resolve `scripts/monitor_pr.sh` relative to the `auto-monitor-pr` skill folder.

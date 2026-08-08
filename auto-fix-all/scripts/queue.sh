@@ -8,15 +8,18 @@
 # changing the overall shape. The first element is always the current
 # (in-progress) entry.
 #
-# Commands:
-#   save <id...>  — overwrite the queue with the given IDs
-#   next          — print the first ID without removing it (empty output = done)
-#   wait-next     — like `next`, but if the queue is empty, sleep 5s and retry
-#                   forever instead of returning empty
-#   push <id...>  — append the given IDs to the end of the queue (locked)
-#   pop           — remove the first ID (mark current issue as done) (locked)
-#   empty         — exit 0 if queue is empty, exit 1 if it has items
-#   list          — print all remaining IDs
+# Commands (every command takes <repo_path> as its own leading argument, for
+# one consistent calling convention across all subcommands — commands that
+# don't need it internally, e.g. next/wait-next/pop/empty/list, simply
+# ignore it):
+#   save <repo_path> <id...>  — overwrite the queue with the given IDs
+#   next <repo_path>          — print the first ID without removing it (empty output = done)
+#   wait-next <repo_path>     — like `next`, but if the queue is empty, sleep 5s and retry
+#                               forever instead of returning empty
+#   push <repo_path> <id...>  — append the given IDs to the end of the queue (locked)
+#   pop <repo_path>           — remove the first ID (mark current issue as done) (locked)
+#   empty <repo_path>         — exit 0 if queue is empty, exit 1 if it has items
+#   list <repo_path>          — print all remaining IDs
 #
 # `push` and `pop` both mutate the shared queue file, so they go through a
 # simple lock (.claude/state/auto-fix-all-queue.lock) to avoid one
@@ -58,14 +61,16 @@ _read_queue() {
   fi
 }
 
-# _mark_enqueued <id...>
+# _mark_enqueued <repo_path> <id...>
 #   Best-effort: adds the 'enqueued' tag and removes the 'ready_for_work'/
 #   'created' tags (Ready for Work / Created) from each given issue id.
 #   A failed mutation warns to stderr and does not block the caller — the
 #   queue write itself has already happened by the time this runs.
 _mark_enqueued() {
+  local repo_path="$1"
+  shift
   local repo_ref
-  repo_ref=$(get_repo_ref)
+  repo_ref=$(get_repo_ref "$repo_path")
 
   local id
   for id in "$@"; do
@@ -81,6 +86,8 @@ _mark_enqueued() {
 case ${1:-} in
   save)
     shift
+    REPO_PATH="${1:?Usage: $0 save <repo_path> <id...>}"
+    shift
     if [[ $# -eq 0 ]]; then
       echo "Error: save requires at least one ID" >&2
       exit 1
@@ -88,14 +95,18 @@ case ${1:-} in
     SAVE_IDS=("$@")
     printf '%s\n' "${SAVE_IDS[@]}" | jq -R '{id: .}' | jq -s '.' > "$QUEUE_FILE"
     echo "Queue saved: ${SAVE_IDS[*]}"
-    _mark_enqueued "${SAVE_IDS[@]}"
+    _mark_enqueued "$REPO_PATH" "${SAVE_IDS[@]}"
     ;;
 
   next)
+    shift
+    REPO_PATH="${1:?Usage: $0 next <repo_path>}"
     _read_queue | jq -r '.[0].id // ""'
     ;;
 
   wait-next)
+    shift
+    REPO_PATH="${1:?Usage: $0 wait-next <repo_path>}"
     while [[ "$(_read_queue | jq 'length')" -eq 0 ]]; do
       sleep 5
     done
@@ -103,6 +114,8 @@ case ${1:-} in
     ;;
 
   push)
+    shift
+    REPO_PATH="${1:?Usage: $0 push <repo_path> <id...>}"
     shift
     if [[ $# -eq 0 ]]; then
       echo "Error: push requires at least one ID" >&2
@@ -115,10 +128,12 @@ case ${1:-} in
     mv "${QUEUE_FILE}.tmp" "$QUEUE_FILE"
     _release_lock
     echo "Pushed: ${PUSH_IDS[*]}"
-    _mark_enqueued "${PUSH_IDS[@]}"
+    _mark_enqueued "$REPO_PATH" "${PUSH_IDS[@]}"
     ;;
 
   pop)
+    shift
+    REPO_PATH="${1:?Usage: $0 pop <repo_path>}"
     _acquire_lock
     _read_queue | jq '.[1:]' > "${QUEUE_FILE}.tmp"
     mv "${QUEUE_FILE}.tmp" "$QUEUE_FILE"
@@ -126,6 +141,8 @@ case ${1:-} in
     ;;
 
   empty)
+    shift
+    REPO_PATH="${1:?Usage: $0 empty <repo_path>}"
     if [[ "$(_read_queue | jq 'length')" -eq 0 ]]; then
       exit 0
     fi
@@ -133,6 +150,8 @@ case ${1:-} in
     ;;
 
   list)
+    shift
+    REPO_PATH="${1:?Usage: $0 list <repo_path>}"
     IDS=$(_read_queue | jq -r '.[].id')
     if [[ -n "$IDS" ]]; then
       echo "$IDS"
@@ -142,7 +161,7 @@ case ${1:-} in
     ;;
 
   *)
-    echo "Usage: $0 {save <id...>|next|wait-next|push <id...>|pop|empty|list}" >&2
+    echo "Usage: $0 {save <repo_path> <id...>|next <repo_path>|wait-next <repo_path>|push <repo_path> <id...>|pop <repo_path>|empty <repo_path>|list <repo_path>}" >&2
     exit 1
     ;;
 esac

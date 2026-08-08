@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # GitHub operations script for issue management
 # Usage: github_issue.sh <command> [args]
-#   info                            Print DOMAIN and REPO from git origin
-#   fetch <id>                      Fetch a GitHub issue and save to docs/agents/issues/
-#   update <id> <title> <file>      Update a GitHub issue title and body from a file
-#   create <title> <file>           Create a new GitHub issue and save it to docs/agents/issues/
-#   mark-created <id>               Add the Created label and remove Idea/Writting, if present
-#   mark-refined <id>               Add the Refined label and remove Created, if present
-#   mark-ready <id>                 Add the Ready label and remove Refined, if present
+#   info <repo_path>                            Print DOMAIN and REPO from git origin
+#   fetch <repo_path> <id>                      Fetch a GitHub issue and save to docs/agents/issues/
+#   update <repo_path> <id> <title> <file>      Update a GitHub issue title and body from a file
+#   create <repo_path> <title> <file>           Create a new GitHub issue and save it to docs/agents/issues/
+#   mark-created <repo_path> <id>               Add the Created label and remove Idea/Writting, if present
+#   mark-refined <repo_path> <id>               Add the Refined label and remove Created, if present
+#   mark-ready <repo_path> <id>                 Add the Ready label and remove Refined, if present
 
 set -euo pipefail
 
@@ -21,62 +21,10 @@ source "${SCRIPT_DIR}/tags.sh"
 # Source the shared tag-mutation library
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/tag_mutate.sh"
-
-# --- Origin helpers (cached) ---
-
-_ORIGIN_PARSED=0
-_ORIGIN_DOMAIN=""
-_ORIGIN_REPO_PATH=""
-
-_load_origin() {
-  [[ "$_ORIGIN_PARSED" -eq 1 ]] && return 0
-
-  local origin
-  origin=$(git remote get-url origin 2>/dev/null) || {
-    echo "Error: not a git repository or no 'origin' remote" >&2
-    exit 1
-  }
-
-  if [[ "$origin" =~ ^git@ ]]; then
-    _ORIGIN_DOMAIN="${origin#git@}"
-    _ORIGIN_DOMAIN="${_ORIGIN_DOMAIN%%:*}"
-    _ORIGIN_REPO_PATH="${origin#*:}"
-    _ORIGIN_REPO_PATH="${_ORIGIN_REPO_PATH%.git}"
-  elif [[ "$origin" =~ ^https?:// ]]; then
-    local stripped="${origin#*://}"
-    _ORIGIN_DOMAIN="${stripped%%/*}"
-    _ORIGIN_REPO_PATH="${stripped#*/}"
-    _ORIGIN_REPO_PATH="${_ORIGIN_REPO_PATH%.git}"
-  else
-    echo "Error: unrecognized origin format: $origin" >&2
-    exit 1
-  fi
-
-  _ORIGIN_PARSED=1
-}
-
-get_domain() {
-  _load_origin
-  echo "$_ORIGIN_DOMAIN"
-}
-
-get_repo_path() {
-  _load_origin
-  echo "$_ORIGIN_REPO_PATH"
-}
-
-get_gh_user() {
-  git config user.ghuser 2>/dev/null || git config --global user.ghuser 2>/dev/null || true
-}
-
-_ensure_gh_user() {
-  local ghuser
-  ghuser=$(get_gh_user)
-  if [[ -n "$ghuser" ]]; then
-    gh auth switch --user "$ghuser" >/dev/null 2>&1 || \
-      echo "Warning: gh auth switch --user $ghuser failed; proceeding with current gh user" >&2
-  fi
-}
+# shellcheck source=origin.sh
+# Source the shared origin-resolution library
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/origin.sh"
 
 get_github_token() {
   _ensure_gh_user
@@ -100,10 +48,11 @@ normalize_title() {
 # --- Commands ---
 
 cmd_fetch() {
-  local id="${1:-}"
-  [[ -n "$id" ]] || { echo "Usage: $0 fetch <id>" >&2; exit 1; }
+  local repo_path="${1:-}"
+  local id="${2:-}"
+  [[ -n "$repo_path" && -n "$id" ]] || { echo "Usage: $0 fetch <repo_path> <id>" >&2; exit 1; }
 
-  _load_origin
+  _load_origin "$repo_path"
 
   local token
   token=$(get_github_token)
@@ -151,13 +100,13 @@ cmd_fetch() {
 }
 
 cmd_update() {
-  local id="${1:-}" title="${2:-}" file="${3:-}"
-  [[ -n "$id" && -n "$title" && -n "$file" ]] || {
-    echo "Usage: $0 update <id> <title> <file>" >&2; exit 1
+  local repo_path="${1:-}" id="${2:-}" title="${3:-}" file="${4:-}"
+  [[ -n "$repo_path" && -n "$id" && -n "$title" && -n "$file" ]] || {
+    echo "Usage: $0 update <repo_path> <id> <title> <file>" >&2; exit 1
   }
   [[ -f "$file" ]] || { echo "Error: file not found: $file" >&2; exit 1; }
 
-  _load_origin
+  _load_origin "$repo_path"
 
   local token
   token=$(get_github_token)
@@ -182,13 +131,13 @@ cmd_update() {
 }
 
 cmd_create() {
-  local title="${1:-}" file="${2:-}"
-  [[ -n "$title" && -n "$file" ]] || {
-    echo "Usage: $0 create <title> <file>" >&2; exit 1
+  local repo_path="${1:-}" title="${2:-}" file="${3:-}"
+  [[ -n "$repo_path" && -n "$title" && -n "$file" ]] || {
+    echo "Usage: $0 create <repo_path> <title> <file>" >&2; exit 1
   }
   [[ -f "$file" ]] || { echo "Error: file not found: $file" >&2; exit 1; }
 
-  _load_origin
+  _load_origin "$repo_path"
 
   local token
   token=$(get_github_token)
@@ -226,16 +175,20 @@ cmd_create() {
 }
 
 cmd_info() {
-  _load_origin
+  local repo_path="${1:-}"
+  [[ -n "$repo_path" ]] || { echo "Usage: $0 info <repo_path>" >&2; exit 1; }
+
+  _load_origin "$repo_path"
   echo "DOMAIN=$_ORIGIN_DOMAIN"
   echo "REPO=$_ORIGIN_REPO_PATH"
 }
 
 cmd_mark_refined() {
-  local id="${1:-}"
-  [[ -n "$id" ]] || { echo "Usage: $0 mark-refined <id>" >&2; exit 1; }
+  local repo_path="${1:-}"
+  local id="${2:-}"
+  [[ -n "$repo_path" && -n "$id" ]] || { echo "Usage: $0 mark-refined <repo_path> <id>" >&2; exit 1; }
 
-  _load_origin
+  _load_origin "$repo_path"
   local repo_ref="$_ORIGIN_REPO_PATH"
 
   tag_mutate_add_label "$id" "$repo_ref" refined \
@@ -251,10 +204,11 @@ cmd_mark_refined() {
 }
 
 cmd_mark_created() {
-  local id="${1:-}"
-  [[ -n "$id" ]] || { echo "Usage: $0 mark-created <id>" >&2; exit 1; }
+  local repo_path="${1:-}"
+  local id="${2:-}"
+  [[ -n "$repo_path" && -n "$id" ]] || { echo "Usage: $0 mark-created <repo_path> <id>" >&2; exit 1; }
 
-  _load_origin
+  _load_origin "$repo_path"
   local repo_ref="$_ORIGIN_REPO_PATH"
 
   tag_mutate_add_label "$id" "$repo_ref" created \
@@ -268,10 +222,11 @@ cmd_mark_created() {
 }
 
 cmd_mark_ready() {
-  local id="${1:-}"
-  [[ -n "$id" ]] || { echo "Usage: $0 mark-ready <id>" >&2; exit 1; }
+  local repo_path="${1:-}"
+  local id="${2:-}"
+  [[ -n "$repo_path" && -n "$id" ]] || { echo "Usage: $0 mark-ready <repo_path> <id>" >&2; exit 1; }
 
-  _load_origin
+  _load_origin "$repo_path"
   local repo_ref="$_ORIGIN_REPO_PATH"
 
   tag_mutate_add_label "$id" "$repo_ref" ready \
@@ -283,7 +238,7 @@ cmd_mark_ready() {
 }
 
 case "${1:-}" in
-  info)         cmd_info ;;
+  info)         shift; cmd_info "$@" ;;
   fetch)        shift; cmd_fetch  "$@" ;;
   update)       shift; cmd_update "$@" ;;
   create)       shift; cmd_create "$@" ;;
@@ -293,13 +248,13 @@ case "${1:-}" in
   *)
     echo "Usage: $0 <command> [args]" >&2
     echo "Commands:" >&2
-    echo "  info                            Print DOMAIN and REPO from git origin" >&2
-    echo "  fetch <id>                      Fetch a GitHub issue and save to docs/agents/issues/" >&2
-    echo "  update <id> <title> <file>      Update a GitHub issue title and body from a file" >&2
-    echo "  create <title> <file>           Create a new GitHub issue and save it to docs/agents/issues/" >&2
-    echo "  mark-created <id>               Add the Created label and remove Idea/Writting, if present" >&2
-    echo "  mark-refined <id>               Add the Refined label and remove Created, if present" >&2
-    echo "  mark-ready <id>                 Add the Ready label and remove Refined, if present" >&2
+    echo "  info <repo_path>                            Print DOMAIN and REPO from git origin" >&2
+    echo "  fetch <repo_path> <id>                      Fetch a GitHub issue and save to docs/agents/issues/" >&2
+    echo "  update <repo_path> <id> <title> <file>      Update a GitHub issue title and body from a file" >&2
+    echo "  create <repo_path> <title> <file>           Create a new GitHub issue and save it to docs/agents/issues/" >&2
+    echo "  mark-created <repo_path> <id>               Add the Created label and remove Idea/Writting, if present" >&2
+    echo "  mark-refined <repo_path> <id>               Add the Refined label and remove Created, if present" >&2
+    echo "  mark-ready <repo_path> <id>                 Add the Ready label and remove Refined, if present" >&2
     exit 1
     ;;
 esac

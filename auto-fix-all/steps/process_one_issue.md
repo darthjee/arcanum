@@ -14,6 +14,8 @@ OUTCOME=closed PR_NUMBER=<n>
 
 You have no `ScheduleWakeup` and no `AskUserQuestion` — the coordinator that spawned you handles clearing context between issues and asking the user what to do about a closed PR. Everything else (implementation, PR comments, CI failures, the pre-approval shortcut) is yours to handle autonomously, exactly as before.
 
+Your invocation prompt also carries `REPO_PATH` (the target project's root, resolved once by the coordinator before spawning you) — thread it through explicitly as the leading argument to every script call below that resolves the GitHub repo, and pass it along unchanged into every nested `steps/run.md` you read directly (never re-resolve it from `pwd`).
+
 ## 1. Bootstrap the issue branch, merged up to date with main
 
 ```bash
@@ -29,12 +31,12 @@ This fetches `origin`, then either reuses branch `issue-<id>` — merging `origi
 
 ## 2. Create the issue file
 
-Read [../../auto-new-issue/steps/run.md](../../auto-new-issue/steps/run.md) and follow all its steps for `<id>`. Its final step commits the issue file — do not commit it again here. You're already running as the architect; do not spawn another `Agent(architect)` for this — just follow the steps directly.
+Read [../../auto-new-issue/steps/run.md](../../auto-new-issue/steps/run.md) and follow all its steps for `<id>`, carrying `REPO_PATH` forward unchanged. Its final step commits the issue file — do not commit it again here. You're already running as the architect; do not spawn another `Agent(architect)` for this — just follow the steps directly.
 
 Once that finishes, push a `fetched` status tag onto the live GitHub issue, to signal it has been fetched/checked:
 
 ```bash
-scripts/github.sh add-tag <id> fetched
+scripts/github.sh add-tag "$REPO_PATH" <id> fetched
 ```
 
 > Resolve `scripts/github.sh` relative to the `auto-fix-all` skill folder. This is `auto-fix-all`-specific pipeline signaling — it does not belong in `auto-new-issue/steps/run.md` itself, since that flow is also read by the manual `/new-issue` skill.
@@ -46,15 +48,15 @@ Read [../../auto-plan-issue/steps/run.md](../../auto-plan-issue/steps/run.md) an
 Once that finishes, swap the `fetched` tag for `working` on the live GitHub issue, to signal implementation is starting:
 
 ```bash
-scripts/github.sh remove-tag <id> fetched
-scripts/github.sh add-tag <id> working
+scripts/github.sh remove-tag "$REPO_PATH" <id> fetched
+scripts/github.sh add-tag "$REPO_PATH" <id> working
 ```
 
 > Resolve `scripts/github.sh` relative to the `auto-fix-all` skill folder. Same rationale as above — this belongs in `auto-fix-all`'s own flow, not in `auto-plan-issue/steps/run.md`, since that flow is also read by the manual `/plan-issue` skill.
 
 ## 4. Implement and open/mark-ready the PR
 
-Read [../../auto-fix-issue/steps/run.md](../../auto-fix-issue/steps/run.md) and follow all its steps for `<id>`. By the end of this, the branch has been implemented, committed, pushed, and a PR exists (opened by that skill, since no PR existed yet for this fresh branch).
+Read [../../auto-fix-issue/steps/run.md](../../auto-fix-issue/steps/run.md) and follow all its steps for `<id>`, carrying `REPO_PATH` forward unchanged. By the end of this, the branch has been implemented, committed, pushed, and a PR exists (opened by that skill, since no PR existed yet for this fresh branch).
 
 Record the issue's title and the PR URL/number it reports — you will need them below.
 
@@ -63,7 +65,7 @@ Record the issue's title and the PR URL/number it reports — you will need them
 Pre-approval is expressed via a `shipit` label on the GitHub issue — `shipit` is human-only, so this is the sole source (no script ever adds or removes it):
 
 ```bash
-scripts/github.sh has-shipit-label <id>
+scripts/github.sh has-shipit-label "$REPO_PATH" <id>
 ```
 
 > Resolve `scripts/github.sh` relative to the `auto-fix-all` skill folder.
@@ -75,14 +77,14 @@ scripts/github.sh has-shipit-label <id>
 
 Block on the monitor step:
 
-Read [../../auto-monitor-issue-pr/steps/run.md](../../auto-monitor-issue-pr/steps/run.md) and follow it for `<id>`. It resolves the PR for the current branch and **blocks** — looping internally (5s sleep, retries silently on transient errors) until the PR is merged, closed, approved, or the owner posts a new comment — then reports the outcome. The first output line is `merged`, `closed`, `approved`, or `commented`.
+Read [../../auto-monitor-issue-pr/steps/run.md](../../auto-monitor-issue-pr/steps/run.md) and follow it for `<id>`, carrying `REPO_PATH` forward unchanged. It resolves the PR for the current branch and **blocks** — looping internally (5s sleep, retries silently on transient errors) until the PR is merged, closed, approved, or the owner posts a new comment — then reports the outcome. The first output line is `merged`, `closed`, `approved`, or `commented`.
 
 ### If `merged`
 
 Run cleanup (the script infers the branch name from the issue ID):
 
 ```bash
-scripts/github.sh cleanup-branch <id>
+scripts/github.sh cleanup-branch "$REPO_PATH" <id>
 ```
 
 > Resolve `scripts/github.sh` relative to the `auto-fix-all` skill folder.
@@ -94,7 +96,7 @@ Report `OUTCOME=merged`. Done — stop here.
 Resolve `<pr_number>` first:
 
 ```bash
-scripts/github.sh pr-number
+scripts/github.sh pr-number "$REPO_PATH"
 ```
 
 > Resolve `scripts/github.sh` relative to the `auto-fix-all` skill folder.
@@ -110,7 +112,7 @@ Report `OUTCOME=closed PR_NUMBER=<pr_number>`. Done — stop here. Do not ask th
    `<issue_file>` and `<plan_dir>` are the same paths resolved by `../auto-plan-issue/scripts/resolve_plan_paths.sh docs/agents/issues docs/agents/plans <id>` (re-run it here, resolved relative to the `auto-plan-issue` skill folder, if you no longer have them at hand).
 2. Wait for CI:
    ```bash
-   scripts/wait_ci.sh
+   scripts/wait_ci.sh "$REPO_PATH"
    ```
    > **NEVER use `ScheduleWakeup`, a self-waking loop, or any other polling mechanism to wait for CI.** Always call `scripts/wait_ci.sh` directly and let it block. When invoking it via the Bash tool, set `timeout: 600000` (10 minutes — the tool's maximum) so the call cannot time out before CI finishes.
 
@@ -119,13 +121,13 @@ Report `OUTCOME=closed PR_NUMBER=<pr_number>`. Done — stop here. Do not ask th
 #### If CI `passed`
 
 ```bash
-scripts/github.sh pr-merge
+scripts/github.sh pr-merge "$REPO_PATH"
 ```
 
 Run cleanup (the script infers the branch name from the issue ID):
 
 ```bash
-scripts/github.sh cleanup-branch <id>
+scripts/github.sh cleanup-branch "$REPO_PATH" <id>
 ```
 
 > Resolve `scripts/github.sh` relative to the `auto-fix-all` skill folder.
@@ -142,6 +144,6 @@ After all agents commit, go back to step 3 above (`wait_ci.sh`) to re-check.
 
 The lines after the first are the new comments, one per `---`-separated block — only comments from `<pr_owner>` are included. Each block starts with an `id: <node id>` line and a `url: <html url>` line, followed by the comment body. The underlying monitor script already added a `:eyes:` reaction to each of these comments and recorded them as `open`; it will swap that to `:+1:` and mark them `addressed` the next time it (re)starts — i.e. after you push the fixes below.
 
-Read [handle_comment.md](handle_comment.md) and follow its instructions to dispatch each comment to the right agent(s) and apply the feedback. Some comments may be pure questions, replied to directly with no code change; others are actionable and result in a commit — see `handle_comment.md` for how it routes each.
+Read [handle_comment.md](handle_comment.md) and follow its instructions, carrying `REPO_PATH` forward unchanged, to dispatch each comment to the right agent(s) and apply the feedback. Some comments may be pure questions, replied to directly with no code change; others are actionable and result in a commit — see `handle_comment.md` for how it routes each.
 
 After all comments are handled, go back to "Monitor the PR" above (block on the monitor step again) to resume monitoring.

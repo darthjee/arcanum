@@ -21,10 +21,10 @@ Neither you nor `scripts/sync_labels.sh` need to hardcode a default table anymor
 ## Step 2 — Invoke the script
 
 ```bash
-scripts/sync_labels.sh
+scripts/sync_labels.sh "$REPO_PATH"
 ```
 
-> Resolve `scripts/sync_labels.sh` relative to the `init-claude` skill folder. With no argument it reads/writes `.claude/state/init-claude-config.json`; pass an explicit path as `$1` only if you have a reason to point it elsewhere.
+> Resolve `scripts/sync_labels.sh` relative to the `init-claude` skill folder. `REPO_PATH` (resolved once at the top of [SKILL.md](SKILL.md)) is now a required leading argument — the script resolves the GitHub repo from it explicitly rather than from ambient cwd. With no second argument it reads/writes `.claude/state/init-claude-config.json`; pass an explicit path as `$2` only if you have a reason to point it elsewhere.
 
 The script does everything in one shot: it ensures the config file exists and is populated (initializing the defaults if it was missing or empty), prints the current table as markdown, prompts `Sync these labels to GitHub? [y/n]:` on stdin, and on `y`/`yes` creates/updates the labels on GitHub. You do not ask this confirmation question yourself, and you do not need to render the table separately before calling it — its own printed table is what the user sees.
 
@@ -59,4 +59,4 @@ Read the current table from `.claude/state/init-claude-config.json` (`jq '.label
 - **Replace one or more entries** — combine `remove`/`add` calls as above for each affected label.
 - **Replace the whole table** — collect the user's full desired table first (asking for any missing colors, since `replace` requires one per pair), then run a single `write_label_config.sh replace <config_path> <name1>:<color1> [<name2>:<color2> ...]` with the entire new table.
 
-Once the user says they're satisfied (all edits already persisted via the calls above), go back to Step 2 and re-invoke `scripts/sync_labels.sh` (still with no argument — it reads whatever is currently in the file).
+Once the user says they're satisfied (all edits already persisted via the calls above), go back to Step 2 and re-invoke `scripts/sync_labels.sh "$REPO_PATH"` (still with no second argument — it reads whatever is currently in the file).

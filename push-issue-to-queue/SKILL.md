@@ -7,10 +7,10 @@ You are acting as the **architect**. Your job is to append the given issue IDs t
 
 ## Step 1 — Push the IDs
 
-Parse the issue IDs from the raw skill arguments (space-separated, with or without a leading `#` on each). Run:
+Resolve `REPO_PATH="$(pwd)"` — the one moment the target project's root can be trusted from ambient cwd. Parse the issue IDs from the raw skill arguments (space-separated, with or without a leading `#` on each). Run:
 
 ```bash
-../auto-fix-all/scripts/queue.sh push <id1> <id2> ...
+../auto-fix-all/scripts/queue.sh push "$REPO_PATH" <id1> <id2> ...
 ```
 
 This appends the IDs to the end of `.claude/state/auto-fix-all-queue.txt`, guarded by the same lock `auto-fix-all/scripts/queue.sh` uses for `pop`, so a concurrent `auto-fix-all` run popping the current issue can't race with this push.

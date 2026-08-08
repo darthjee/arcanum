@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # GitHub operations script for auto-fix-all
-# Usage: github.sh <command> [args]
-#   pr-number               Print the PR number (no '#') for the current branch
-#   pr-state                Print STATE=<OPEN|MERGED|CLOSED> for the current branch's PR
-#   pr-merge                Squash-merge the current branch's PR, print its URL
-#   cleanup-branch <id>     Delete the issue's remote and local branch, switch back to main
-#   has-shipit-label <id>   Exit 0 if GitHub issue <id> has a "shipit" label, else exit 1
-#   add-tag <id> <tag>      Add a single tag to GitHub issue <id>, mapped to
-#                           a real GitHub label via the canonical-tag/
-#                           label-name table in `_lib/tags.sh`.
-#   remove-tag <id> <tag>   Remove a single tag from GitHub issue <id>,
-#                           mapped to a real GitHub label via the
-#                           canonical-tag/label-name table in `_lib/tags.sh`.
+# Usage: github.sh <command> <repo_path> [args]
+#   pr-number <repo_path>               Print the PR number (no '#') for the current branch
+#   pr-state <repo_path>                Print STATE=<OPEN|MERGED|CLOSED> for the current branch's PR
+#   pr-merge <repo_path>                Squash-merge the current branch's PR, print its URL
+#   cleanup-branch <repo_path> <id>     Delete the issue's remote and local branch, switch back to main
+#   has-shipit-label <repo_path> <id>   Exit 0 if GitHub issue <id> has a "shipit" label, else exit 1
+#   add-tag <repo_path> <id> <tag>      Add a single tag to GitHub issue <id>, mapped to
+#                                       a real GitHub label via the canonical-tag/
+#                                       label-name table in `_lib/tags.sh`.
+#   remove-tag <repo_path> <id> <tag>   Remove a single tag from GitHub issue <id>,
+#                                       mapped to a real GitHub label via the
+#                                       canonical-tag/label-name table in `_lib/tags.sh`.
 
 set -euo pipefail
 
@@ -28,6 +28,12 @@ source "${SCRIPT_DIR}/../../_lib/tag_mutate.sh"
 # --- Commands ---
 
 cmd_pr_number() {
+  local repo_path="${1:-}"
+  [[ -n "$repo_path" ]] || {
+    echo "Usage: $0 pr-number <repo_path>" >&2
+    exit 1
+  }
+
   # Try issue state cache first
   local branch
   branch=$(git branch --show-current)
@@ -43,7 +49,7 @@ cmd_pr_number() {
 
   _ensure_gh_user
   local repo_ref
-  repo_ref=$(get_repo_ref)
+  repo_ref=$(get_repo_ref "$repo_path")
 
   local number
   number=$(gh pr view -R "$repo_ref" "$branch" --json number -q '.number' 2>/dev/null) || {
@@ -60,9 +66,15 @@ cmd_pr_number() {
 }
 
 cmd_pr_state() {
+  local repo_path="${1:-}"
+  [[ -n "$repo_path" ]] || {
+    echo "Usage: $0 pr-state <repo_path>" >&2
+    exit 1
+  }
+
   _ensure_gh_user
   local repo_ref branch
-  repo_ref=$(get_repo_ref)
+  repo_ref=$(get_repo_ref "$repo_path")
   branch=$(git branch --show-current)
 
   local state
@@ -75,6 +87,12 @@ cmd_pr_state() {
 }
 
 cmd_pr_merge() {
+  local repo_path="${1:-}"
+  [[ -n "$repo_path" ]] || {
+    echo "Usage: $0 pr-merge <repo_path>" >&2
+    exit 1
+  }
+
   local branch
   branch=$(git branch --show-current)
 
@@ -88,7 +106,7 @@ cmd_pr_merge() {
 
   _ensure_gh_user
   local repo_ref
-  repo_ref=$(get_repo_ref)
+  repo_ref=$(get_repo_ref "$repo_path")
 
   local title number url
   if [[ -n "$cached_number" && -n "$cached_url" ]]; then
@@ -118,9 +136,10 @@ cmd_pr_merge() {
 }
 
 cmd_cleanup_branch() {
-  local id="${1:-}"
-  [[ -n "$id" ]] || {
-    echo "Usage: $0 cleanup-branch <id>" >&2
+  local repo_path="${1:-}"
+  local id="${2:-}"
+  [[ -n "$repo_path" && -n "$id" ]] || {
+    echo "Usage: $0 cleanup-branch <repo_path> <id>" >&2
     exit 1
   }
 
@@ -138,15 +157,16 @@ cmd_cleanup_branch() {
 }
 
 cmd_has_shipit_label() {
-  local id="${1:-}"
-  [[ -n "$id" ]] || {
-    echo "Usage: $0 has-shipit-label <id>" >&2
+  local repo_path="${1:-}"
+  local id="${2:-}"
+  [[ -n "$repo_path" && -n "$id" ]] || {
+    echo "Usage: $0 has-shipit-label <repo_path> <id>" >&2
     exit 1
   }
 
   _ensure_gh_user
   local repo_ref
-  repo_ref=$(get_repo_ref)
+  repo_ref=$(get_repo_ref "$repo_path")
 
   local labels
   labels=$(gh issue view "$id" -R "$repo_ref" --json labels -q '.labels[].name' 2>/dev/null) || exit 1
@@ -155,51 +175,51 @@ cmd_has_shipit_label() {
 }
 
 cmd_add_tag() {
-  local id="${1:-}" tag="${2:-}"
-  [[ -n "$id" && -n "$tag" ]] || {
-    echo "Usage: $0 add-tag <id> <tag>" >&2
+  local repo_path="${1:-}" id="${2:-}" tag="${3:-}"
+  [[ -n "$repo_path" && -n "$id" && -n "$tag" ]] || {
+    echo "Usage: $0 add-tag <repo_path> <id> <tag>" >&2
     exit 1
   }
 
   _ensure_gh_user
   local repo_ref
-  repo_ref=$(get_repo_ref)
+  repo_ref=$(get_repo_ref "$repo_path")
 
   tag_mutate_add_label "$id" "$repo_ref" "$tag" || exit 1
 }
 
 cmd_remove_tag() {
-  local id="${1:-}" tag="${2:-}"
-  [[ -n "$id" && -n "$tag" ]] || {
-    echo "Usage: $0 remove-tag <id> <tag>" >&2
+  local repo_path="${1:-}" id="${2:-}" tag="${3:-}"
+  [[ -n "$repo_path" && -n "$id" && -n "$tag" ]] || {
+    echo "Usage: $0 remove-tag <repo_path> <id> <tag>" >&2
     exit 1
   }
 
   _ensure_gh_user
   local repo_ref
-  repo_ref=$(get_repo_ref)
+  repo_ref=$(get_repo_ref "$repo_path")
 
   tag_mutate_remove_label "$id" "$repo_ref" "$tag" || exit 1
 }
 
 case "${1:-}" in
-  pr-number)         cmd_pr_number ;;
-  pr-state)          cmd_pr_state ;;
-  pr-merge)          cmd_pr_merge ;;
+  pr-number)         shift; cmd_pr_number "$@" ;;
+  pr-state)          shift; cmd_pr_state "$@" ;;
+  pr-merge)          shift; cmd_pr_merge "$@" ;;
   cleanup-branch)    shift; cmd_cleanup_branch "$@" ;;
   has-shipit-label)  shift; cmd_has_shipit_label "$@" ;;
   add-tag)           shift; cmd_add_tag "$@" ;;
   remove-tag)        shift; cmd_remove_tag "$@" ;;
   *)
-    echo "Usage: $0 <command> [args]" >&2
+    echo "Usage: $0 <command> <repo_path> [args]" >&2
     echo "Commands:" >&2
-    echo "  pr-number               Print the PR number (no '#') for the current branch" >&2
-    echo "  pr-state                Print STATE=<OPEN|MERGED|CLOSED> for the current branch's PR" >&2
-    echo "  pr-merge                Squash-merge the current branch's PR, print its URL" >&2
-    echo "  cleanup-branch <id>     Delete the issue's remote and local branch, switch back to main" >&2
-    echo "  has-shipit-label <id>   Exit 0 if GitHub issue <id> has a 'shipit' label, else exit 1" >&2
-    echo "  add-tag <id> <tag>      Add a single tag to GitHub issue <id>, mapped to a real GitHub label via _lib/tags.sh" >&2
-    echo "  remove-tag <id> <tag>   Remove a single tag from GitHub issue <id>, mapped to a real GitHub label via _lib/tags.sh" >&2
+    echo "  pr-number <repo_path>               Print the PR number (no '#') for the current branch" >&2
+    echo "  pr-state <repo_path>                Print STATE=<OPEN|MERGED|CLOSED> for the current branch's PR" >&2
+    echo "  pr-merge <repo_path>                Squash-merge the current branch's PR, print its URL" >&2
+    echo "  cleanup-branch <repo_path> <id>     Delete the issue's remote and local branch, switch back to main" >&2
+    echo "  has-shipit-label <repo_path> <id>   Exit 0 if GitHub issue <id> has a 'shipit' label, else exit 1" >&2
+    echo "  add-tag <repo_path> <id> <tag>      Add a single tag to GitHub issue <id>, mapped to a real GitHub label via _lib/tags.sh" >&2
+    echo "  remove-tag <repo_path> <id> <tag>   Remove a single tag from GitHub issue <id>, mapped to a real GitHub label via _lib/tags.sh" >&2
     exit 1
     ;;
 esac

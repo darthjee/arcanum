@@ -6,7 +6,7 @@
 # was just fetched is an implementation detail callers don't need to know.
 # The only case outside of that is the GitHub issue not existing (or no id
 # being given at all), reported as STATUS=error.
-# Usage: resolve_and_fetch.sh <issues_folder> <arg_string>
+# Usage: resolve_and_fetch.sh <repo_path> <issues_folder> <arg_string>
 #
 # Output (key=value lines):
 #   STATUS=ok      ID, TITLE, FILE always set; DOMAIN, REPO set only when
@@ -15,10 +15,12 @@
 
 set -euo pipefail
 
-ISSUES_FOLDER="${1:-}"
-ARG_STRING="${2:-}"
+REPO_PATH="${1:-}"
+ISSUES_FOLDER="${2:-}"
+ARG_STRING="${3:-}"
 
-[[ -n "$ISSUES_FOLDER" ]] || { echo "Usage: $0 <issues_folder> [arg_string]" >&2; exit 1; }
+[[ -n "$REPO_PATH" ]] || { echo "Usage: $0 <repo_path> <issues_folder> [arg_string]" >&2; exit 1; }
+[[ -n "$ISSUES_FOLDER" ]] || { echo "Usage: $0 <repo_path> <issues_folder> [arg_string]" >&2; exit 1; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -45,7 +47,7 @@ if [[ "$STATUS" == "existing" ]]; then
 fi
 
 # STATUS=new + NEEDS_FETCH=true (the only remaining case once an id is known)
-if FETCH_OUTPUT=$("$SCRIPT_DIR/github.sh" fetch "$ID" 2>/tmp/resolve_and_fetch.err.$$); then
+if FETCH_OUTPUT=$("$SCRIPT_DIR/github.sh" fetch "$REPO_PATH" "$ID" 2>/tmp/resolve_and_fetch.err.$$); then
   rm -f /tmp/resolve_and_fetch.err.$$
   echo "STATUS=ok"
   echo "ID=$ID"
