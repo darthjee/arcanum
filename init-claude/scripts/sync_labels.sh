@@ -96,8 +96,14 @@ for i in "${!NAMES[@]}"; do
   name="${NAMES[$i]}"
   color="${COLORS[$i]}"
 
-  if grep -qxFi "$name" <<< "$EXISTING"; then
-    gh label edit "$name" -R "$REPO" --color "$color" >/dev/null
+  # GitHub label names are unique case-insensitively, so match existing
+  # names case-insensitively too — otherwise a same-name-different-case
+  # label (e.g. repo default "bug" vs. our "Bug") is missed and `create`
+  # fails on the case-insensitive collision instead of updating it.
+  existing_name=$(grep -ixF "$name" <<< "$EXISTING" || true)
+
+  if [[ -n "$existing_name" ]]; then
+    gh label edit "$existing_name" -R "$REPO" --name "$name" --color "$color" >/dev/null
     echo "UPDATED=$name"
   else
     gh label create "$name" -R "$REPO" --color "$color" >/dev/null
