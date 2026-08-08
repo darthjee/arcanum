@@ -73,7 +73,7 @@ DEFAULT_LABEL_PAIRS=(
   Feature:e9a20f
   Ready:247b61
   Refined:418193
-  Ready for Work:ffaa04
+  "Ready for Work:ffaa04"
   Refactor:983e7f
   shipit:0e8a16
   Created:024fa5
