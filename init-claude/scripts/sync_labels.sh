@@ -96,7 +96,7 @@ for i in "${!NAMES[@]}"; do
   name="${NAMES[$i]}"
   color="${COLORS[$i]}"
 
-  if grep -qxF "$name" <<< "$EXISTING"; then
+  if grep -qxFi "$name" <<< "$EXISTING"; then
     gh label edit "$name" -R "$REPO" --color "$color" >/dev/null
     echo "UPDATED=$name"
   else
