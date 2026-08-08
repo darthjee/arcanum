@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Wait for all CI check-runs on a PR's head commit to complete
-# Usage: wait_ci.sh
+# Usage: wait_ci.sh <repo_path>
 #
 # Blocking loop (5s sleep) that polls the GitHub Checks API for ALL
 # check-runs on the PR's head commit, from any CI provider (no filtering
@@ -27,6 +27,8 @@ set -euo pipefail
 
 export GH_INSECURE_SKIP_VERIFY=true
 
+REPO_PATH="${1:?Usage: $0 <repo_path>}"
+
 CONFIG_FILE=".claude/configuration/auto-fix-all.json"
 
 if [[ -f "$CONFIG_FILE" ]]; then
@@ -39,7 +41,7 @@ fi
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../_lib/origin.sh"
 
 _ensure_gh_user
-REPO_REF=$(get_repo_ref)
+REPO_REF=$(get_repo_ref "$REPO_PATH")
 
 branch=$(git branch --show-current)
 PR_NUMBER=$(gh pr view -R "$REPO_REF" "$branch" --json number -q '.number' 2>/dev/null) || {

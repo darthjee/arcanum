@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Resolve the PR number for an issue's branch
-# Usage: resolve_pr_number.sh <id>
+# Usage: resolve_pr_number.sh <repo_path> <id>
 #
 # <id> must be the numeric GitHub issue id (used only for validation/usage
 # clarity); the actual lookup is driven by the current branch, which the
@@ -12,11 +12,12 @@ set -euo pipefail
 # shellcheck source=../../_lib/origin.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../_lib/origin.sh"
 
-ID="${1:-}"
+REPO_PATH="${1:?Usage: $0 <repo_path> <id>}"
+ID="${2:-}"
 ID="${ID#\#}"
 
 [[ "$ID" =~ ^[0-9]+$ ]] || {
-  echo "Usage: $0 <id>" >&2
+  echo "Usage: $0 <repo_path> <id>" >&2
   exit 1
 }
 
@@ -29,7 +30,7 @@ if [[ -n "$cached_number" ]]; then
 fi
 
 _ensure_gh_user
-repo_ref=$(get_repo_ref)
+repo_ref=$(get_repo_ref "$REPO_PATH")
 branch=$(git branch --show-current)
 
 number=$(gh pr view -R "$repo_ref" "$branch" --json number -q '.number' 2>/dev/null) || {

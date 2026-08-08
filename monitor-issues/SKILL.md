@@ -7,8 +7,10 @@ You are acting as the **architect**. Your job is to run one polling cycle and th
 
 ## Step 1 — Run one polling cycle
 
+Resolve `REPO_PATH="$(pwd)"` — the one moment the target project's root can be trusted from ambient cwd (every loop iteration, including a fresh `ScheduleWakeup` re-entry, re-resolves it here, since each such re-entry is itself a fresh trust point). Then run:
+
 ```bash
-scripts/monitor_issues.sh
+scripts/monitor_issues.sh "$REPO_PATH"
 ```
 
 This runs one poll: fetches issues updated since the last check, updates `.claude/state/issues.json`, and exits. It does not loop internally.

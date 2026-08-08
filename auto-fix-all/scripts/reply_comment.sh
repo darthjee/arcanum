@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Post an attributed reply comment on the current branch's PR
-# Usage: reply_comment.sh <id> <agent> <model_name> <model_email> <reply_body>
+# Usage: reply_comment.sh <repo_path> <id> <agent> <model_name> <model_email> <reply_body>
 #
+# <repo_path>: local checkout path of the target repo, used to resolve
+# origin explicitly rather than trusting ambient shell cwd.
 # <id>: numeric GitHub issue id of the currently checked-out "issue-<id>"
 # branch; used only to resolve the PR via resolve_pr_number.sh, which reads
 # the current branch itself.
@@ -22,25 +24,27 @@ RESOLVE_PR_NUMBER="$SCRIPT_DIR/../../auto-monitor-issue-pr/scripts/resolve_pr_nu
 source "${SCRIPT_DIR}/../../_lib/origin.sh"
 source "${SCRIPT_DIR}/../../_lib/push.sh"
 
-ID="${1:-}"
-AGENT="${2:-}"
-MODEL_NAME="${3:-}"
-MODEL_EMAIL="${4:-}"
-REPLY_BODY="${5:-}"
+REPO_PATH="${1:-}"
+ID="${2:-}"
+AGENT="${3:-}"
+MODEL_NAME="${4:-}"
+MODEL_EMAIL="${5:-}"
+REPLY_BODY="${6:-}"
 ID="${ID#\#}"
 
 usage() {
-  echo "Usage: $0 <id> <agent> <model_name> <model_email> <reply_body>" >&2
+  echo "Usage: $0 <repo_path> <id> <agent> <model_name> <model_email> <reply_body>" >&2
   exit 1
 }
 
+[[ -n "$REPO_PATH" ]] || usage
 [[ "$ID" =~ ^[0-9]+$ ]] || usage
 [[ -n "$AGENT" && -n "$MODEL_NAME" && -n "$MODEL_EMAIL" && -n "$REPLY_BODY" ]] || usage
 
-PR_NUMBER=$("$RESOLVE_PR_NUMBER" "$ID")
+PR_NUMBER=$("$RESOLVE_PR_NUMBER" "$REPO_PATH" "$ID")
 
 _ensure_gh_user
-REPO_REF=$(get_repo_ref)
+REPO_REF=$(get_repo_ref "$REPO_PATH")
 
 content=$(cat "$TEMPLATE")
 content="${content/\%\%BODY\%\%/$REPLY_BODY}"

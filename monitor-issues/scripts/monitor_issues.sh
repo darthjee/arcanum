@@ -5,9 +5,11 @@
 # check, parses tags from the issue's labels, and writes metadata to
 # .claude/state/issues.json. Runs forever; stop with Ctrl-C or SIGTERM.
 #
-# Usage: monitor_issues.sh  (no arguments)
+# Usage: monitor_issues.sh <repo_path>
 
 set -uo pipefail
+
+REPO_PATH="${1:?Usage: monitor_issues.sh <repo_path>}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../../_lib/origin.sh
@@ -151,7 +153,7 @@ _poll_once() {
             ;;
           ready_for_work)
             _log "Issue #${ISSUE_ID} has actionable tag 'ready_for_work' — pushing to auto-fix-all queue"
-            "$QUEUE_SCRIPT" push "$ISSUE_ID" || { _log "ERROR: failed to push #${ISSUE_ID} to the queue"; ISSUE_DISPATCH_FAILED=1; }
+            "$QUEUE_SCRIPT" push "$REPO_PATH" "$ISSUE_ID" || { _log "ERROR: failed to push #${ISSUE_ID} to the queue"; ISSUE_DISPATCH_FAILED=1; }
             ;;
         esac
       done < <(actionable_tags "$LABELS")
@@ -175,7 +177,7 @@ _poll_once() {
 
 _ensure_gh_user
 
-REPO_REF=$(get_repo_ref)
+REPO_REF=$(get_repo_ref "$REPO_PATH")
 GH_USER=$(get_gh_user)
 
 _log "Starting issue monitor for repo=${REPO_REF} user=${GH_USER:-<default>}"

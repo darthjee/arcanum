@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # GitHub operations script
-# Usage: github.sh <command> [args]
-#   info                        Print DOMAIN and REPO from git origin
-#   pr-create <title> <file>    Create a pull request with title and body from a file
-#   pr-view                     Print URL and IS_DRAFT for the current branch's PR
-#   pr-ready                    Mark the current branch's PR as ready for review
+# Usage: github.sh <command> <repo_path> [args]
+#   info <repo_path>                        Print DOMAIN and REPO from git origin
+#   pr-create <repo_path> <title> <file>    Create a pull request with title and body from a file
+#   pr-view <repo_path>                     Print URL and IS_DRAFT for the current branch's PR
+#   pr-ready <repo_path>                    Mark the current branch's PR as ready for review
 
 set -euo pipefail
 
@@ -20,72 +20,10 @@ source "${SCRIPT_DIR}/../../_lib/tags.sh"
 # Source the shared tag-mutation library
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/../../_lib/tag_mutate.sh"
-
-# --- Origin helpers (cached) ---
-
-_ORIGIN_PARSED=0
-_ORIGIN_DOMAIN=""
-_ORIGIN_REPO_PATH=""
-
-_load_origin() {
-  [[ "$_ORIGIN_PARSED" -eq 1 ]] && return 0
-
-  local origin
-  origin=$(git remote get-url origin 2>/dev/null) || {
-    echo "Error: not a git repository or no 'origin' remote" >&2
-    exit 1
-  }
-
-  if [[ "$origin" =~ ^git@ ]]; then
-    _ORIGIN_DOMAIN="${origin#git@}"
-    _ORIGIN_DOMAIN="${_ORIGIN_DOMAIN%%:*}"
-    _ORIGIN_REPO_PATH="${origin#*:}"
-    _ORIGIN_REPO_PATH="${_ORIGIN_REPO_PATH%.git}"
-  elif [[ "$origin" =~ ^https?:// ]]; then
-    local stripped="${origin#*://}"
-    _ORIGIN_DOMAIN="${stripped%%/*}"
-    _ORIGIN_REPO_PATH="${stripped#*/}"
-    _ORIGIN_REPO_PATH="${_ORIGIN_REPO_PATH%.git}"
-  else
-    echo "Error: unrecognized origin format: $origin" >&2
-    exit 1
-  fi
-
-  _ORIGIN_PARSED=1
-}
-
-get_domain() {
-  _load_origin
-  echo "$_ORIGIN_DOMAIN"
-}
-
-get_repo_path() {
-  _load_origin
-  echo "$_ORIGIN_REPO_PATH"
-}
-
-# Returns [HOST/]OWNER/REPO as expected by gh -R flag
-get_repo_ref() {
-  _load_origin
-  if [[ "$_ORIGIN_DOMAIN" == "github.com" ]]; then
-    echo "$_ORIGIN_REPO_PATH"
-  else
-    echo "$_ORIGIN_DOMAIN/$_ORIGIN_REPO_PATH"
-  fi
-}
-
-get_gh_user() {
-  git config user.ghuser 2>/dev/null || git config --global user.ghuser 2>/dev/null || true
-}
-
-_ensure_gh_user() {
-  local ghuser
-  ghuser=$(get_gh_user)
-  if [[ -n "$ghuser" ]]; then
-    gh auth switch --user "$ghuser" >/dev/null 2>&1 || \
-      echo "Warning: gh auth switch --user $ghuser failed; proceeding with current gh user" >&2
-  fi
-}
+# shellcheck source=../../_lib/origin.sh
+# Source the shared origin-resolution library
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/../../_lib/origin.sh"
 
 # --- PR state persistence ---
 
@@ -120,12 +58,13 @@ _persist_pr_state() {
 #   construction, since that guard only protects the issue's `shipit`
 #   label). No-op silently if the current branch doesn't match `issue-<id>`.
 _sync_pr_labels_and_state() {
+  local repo_path="$1"
   local id
   id=$(_current_issue_id)
   [[ -n "$id" ]] || return 0
 
   local repo_ref branch
-  repo_ref=$(get_repo_ref)
+  repo_ref=$(get_repo_ref "$repo_path")
   branch=$(git branch --show-current)
 
   tag_mutate_add_label "$id" "$repo_ref" pr \
@@ -151,23 +90,26 @@ _sync_pr_labels_and_state() {
 # --- Commands ---
 
 cmd_info() {
-  _load_origin
+  local repo_path="${1:-}"
+  [[ -n "$repo_path" ]] || { echo "Usage: $0 info <repo_path>" >&2; exit 1; }
+
+  _load_origin "$repo_path"
   echo "DOMAIN=$_ORIGIN_DOMAIN"
   echo "REPO=$_ORIGIN_REPO_PATH"
 }
 
 cmd_pr_create() {
-  local title="${1:-}" file="${2:-}"
-  [[ -n "$title" && -n "$file" ]] || {
-    echo "Usage: $0 pr-create <title> <file>" >&2; exit 1
+  local repo_path="${1:-}" title="${2:-}" file="${3:-}"
+  [[ -n "$repo_path" && -n "$title" && -n "$file" ]] || {
+    echo "Usage: $0 pr-create <repo_path> <title> <file>" >&2; exit 1
   }
   [[ -f "$file" ]] || { echo "Error: file not found: $file" >&2; exit 1; }
 
   _ensure_gh_user
-  _load_origin
+  _load_origin "$repo_path"
 
   local repo_ref
-  repo_ref=$(get_repo_ref)
+  repo_ref=$(get_repo_ref "$repo_path")
 
   local url
   url=$(gh pr create -R "$repo_ref" --title "$title" --body-file "$file") || {
@@ -176,16 +118,19 @@ cmd_pr_create() {
   }
 
   _persist_pr_state "$url"
-  _sync_pr_labels_and_state
+  _sync_pr_labels_and_state "$repo_path"
   echo "$url"
 }
 
 cmd_pr_view() {
+  local repo_path="${1:-}"
+  [[ -n "$repo_path" ]] || { echo "Usage: $0 pr-view <repo_path>" >&2; exit 1; }
+
   _ensure_gh_user
-  _load_origin
+  _load_origin "$repo_path"
 
   local repo_ref branch
-  repo_ref=$(get_repo_ref)
+  repo_ref=$(get_repo_ref "$repo_path")
   branch=$(git branch --show-current)
 
   local output
@@ -206,11 +151,14 @@ cmd_pr_view() {
 }
 
 cmd_pr_ready() {
+  local repo_path="${1:-}"
+  [[ -n "$repo_path" ]] || { echo "Usage: $0 pr-ready <repo_path>" >&2; exit 1; }
+
   _ensure_gh_user
-  _load_origin
+  _load_origin "$repo_path"
 
   local repo_ref branch
-  repo_ref=$(get_repo_ref)
+  repo_ref=$(get_repo_ref "$repo_path")
   branch=$(git branch --show-current)
 
   gh pr ready -R "$repo_ref" "$branch" >/dev/null || {
@@ -223,23 +171,23 @@ cmd_pr_ready() {
   if [[ -n "$url" ]]; then
     _persist_pr_state "$url"
   fi
-  _sync_pr_labels_and_state
+  _sync_pr_labels_and_state "$repo_path"
 
   echo "OK"
 }
 
 case "${1:-}" in
-  info)      cmd_info ;;
+  info)      shift; cmd_info "$@" ;;
   pr-create) shift; cmd_pr_create "$@" ;;
-  pr-view)   cmd_pr_view ;;
-  pr-ready)  cmd_pr_ready ;;
+  pr-view)   shift; cmd_pr_view "$@" ;;
+  pr-ready)  shift; cmd_pr_ready "$@" ;;
   *)
-    echo "Usage: $0 <command> [args]" >&2
+    echo "Usage: $0 <command> <repo_path> [args]" >&2
     echo "Commands:" >&2
-    echo "  info                        Print DOMAIN and REPO from git origin" >&2
-    echo "  pr-create <title> <file>    Create a pull request with title and body from a file" >&2
-    echo "  pr-view                     Print URL and IS_DRAFT for the current branch's PR" >&2
-    echo "  pr-ready                    Mark the current branch's PR as ready for review" >&2
+    echo "  info <repo_path>                        Print DOMAIN and REPO from git origin" >&2
+    echo "  pr-create <repo_path> <title> <file>    Create a pull request with title and body from a file" >&2
+    echo "  pr-view <repo_path>                     Print URL and IS_DRAFT for the current branch's PR" >&2
+    echo "  pr-ready <repo_path>                    Mark the current branch's PR as ready for review" >&2
     exit 1
     ;;
 esac

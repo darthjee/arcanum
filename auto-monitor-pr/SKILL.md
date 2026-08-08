@@ -5,8 +5,10 @@ description: Monitors a given PR for merge/close/approval/new owner comments, bl
 
 You are the coordinator. Delegate this skill's work to the architect agent — do not perform the steps yourself.
 
+Resolve `REPO_PATH="$(pwd)"` — the one moment the target project's root can be trusted from ambient cwd — before spawning.
+
 Spawn:
 
-> Agent(subagent_type: "architect", prompt: "Read steps/run.md (resolved relative to the `auto-monitor-pr` skill folder) and follow it. ARGUMENTS: <raw skill arguments>")
+> Agent(subagent_type: "architect", prompt: "Read steps/run.md (resolved relative to the `auto-monitor-pr` skill folder) and follow it. ARGUMENTS: <raw skill arguments> REPO_PATH: <resolved_path>")
 
 Wait for the agent to finish, then relay its final report to the caller verbatim — do not summarize, reinterpret, or decide what to do about any comment it reports.

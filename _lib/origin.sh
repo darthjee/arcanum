@@ -3,19 +3,30 @@
 # This file is meant to be SOURCED, not executed directly — it defines
 # globals/functions used by scripts that need to resolve the git origin
 # domain and repository path.
+#
+# Every public function here takes the target repo's local checkout path
+# as a REQUIRED first argument (e.g. `get_repo_ref "$repo_path"`). There is
+# no ambient-cwd fallback and no `--repo-path` flag — a missing argument is
+# a hard usage error. This is intentional: callers must resolve the repo
+# path once, at the top of their own flow, and thread it through explicitly
+# rather than letting downstream steps re-derive it from whatever the shell's
+# cwd happens to be at call time.
 
 # --- Origin helpers (cached) ---
 
 _ORIGIN_PARSED=0
 _ORIGIN_DOMAIN=""
 _ORIGIN_REPO_PATH=""
+_ORIGIN_REPO_PATH_KEY=""
 
 _load_origin() {
-  [[ "$_ORIGIN_PARSED" -eq 1 ]] && return 0
+  local repo_path="${1:?_load_origin requires a repo path argument}"
+
+  [[ "$_ORIGIN_PARSED" -eq 1 && "$_ORIGIN_REPO_PATH_KEY" == "$repo_path" ]] && return 0
 
   local origin
-  origin=$(git remote get-url origin 2>/dev/null) || {
-    echo "Error: not a git repository or no 'origin' remote" >&2
+  origin=$(git -C "$repo_path" remote get-url origin 2>/dev/null) || {
+    echo "Error: '$repo_path' is not a git repository or has no 'origin' remote" >&2
     exit 1
   }
 
@@ -34,16 +45,30 @@ _load_origin() {
     exit 1
   fi
 
+  _ORIGIN_REPO_PATH_KEY="$repo_path"
   _ORIGIN_PARSED=1
 }
 
 get_repo_ref() {
-  _load_origin
+  local repo_path="${1:?get_repo_ref requires a repo path argument}"
+  _load_origin "$repo_path"
   if [[ "$_ORIGIN_DOMAIN" == "github.com" ]]; then
     echo "$_ORIGIN_REPO_PATH"
   else
     echo "$_ORIGIN_DOMAIN/$_ORIGIN_REPO_PATH"
   fi
+}
+
+get_domain() {
+  local repo_path="${1:?get_domain requires a repo path argument}"
+  _load_origin "$repo_path"
+  echo "$_ORIGIN_DOMAIN"
+}
+
+get_repo_path() {
+  local repo_path="${1:?get_repo_path requires a repo path argument}"
+  _load_origin "$repo_path"
+  echo "$_ORIGIN_REPO_PATH"
 }
 
 get_gh_user() {

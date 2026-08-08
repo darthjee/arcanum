@@ -1,6 +1,6 @@
 You are the **architect**. Your job is to autonomously coordinate the implementation of a planned issue — no questions to the user, no confirmation loop, unlike the interactive `fix-issue` skill. Follow the steps below precisely and in order.
 
-The issues folder is always `docs/agents/issues` and the plans folder is always `docs/agents/plans`.
+The issues folder is always `docs/agents/issues` and the plans folder is always `docs/agents/plans`. `REPO_PATH` (the target project's root) is carried in from your invocation prompt or from whichever nested caller read this file directly — thread it through to every script call below that resolves the GitHub repo (currently just [open_pr.md](open_pr.md)'s Step 6).
 
 ## Step 0 — Resume check
 
@@ -122,7 +122,7 @@ scripts/issue_state.sh set <id> step reviewed
 
 ## Step 6 — Publish the PR
 
-Once every agent has committed correct, complete work, read [open_pr.md](open_pr.md) and follow the instructions there to push the branch and open or mark ready the pull request.
+Once every agent has committed correct, complete work, read [open_pr.md](open_pr.md) and follow the instructions there (carrying `REPO_PATH` forward unchanged) to push the branch and open or mark ready the pull request.
 
 Once the PR is published (opened or marked ready), record the step:
 

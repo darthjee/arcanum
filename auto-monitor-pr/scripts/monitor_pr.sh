@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Monitor a PR for merge/close/approval/new-comments from its owner
-# Usage: monitor_pr.sh --pr-number <pr_number> [--issue-id <id>]
+# Usage: monitor_pr.sh <repo_path> --pr-number <pr_number> [--issue-id <id>]
 #
 # Resolves PR_OWNER via get_gh_user and derives COMMENTS_FILE as
 # .claude/state/auto-monitor-pr-<pr_number>-comments.json (when <id> is
@@ -61,6 +61,9 @@ source "${SCRIPT_DIR}/../../_lib/push.sh"
 
 ISSUE_STATE_SCRIPT="${SCRIPT_DIR}/../../auto-fix-issue/scripts/issue_state.sh"
 
+REPO_PATH="${1:?Usage: $0 <repo_path> --pr-number <pr_number> [--issue-id <id>]}"
+shift
+
 PR_NUMBER=""
 ISSUE_ID=""
 
@@ -75,7 +78,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     *)
-      echo "Usage: $0 --pr-number <pr_number> [--issue-id <id>]" >&2
+      echo "Usage: $0 <repo_path> --pr-number <pr_number> [--issue-id <id>]" >&2
       exit 1
       ;;
   esac
@@ -84,13 +87,13 @@ done
 PR_NUMBER="${PR_NUMBER#\#}"
 
 [[ -n "$PR_NUMBER" ]] || {
-  echo "Usage: $0 --pr-number <pr_number> [--issue-id <id>]" >&2
+  echo "Usage: $0 <repo_path> --pr-number <pr_number> [--issue-id <id>]" >&2
   exit 1
 }
 
 _ensure_gh_user
 PR_OWNER=$(get_gh_user)
-REPO_REF=$(get_repo_ref)
+REPO_REF=$(get_repo_ref "$REPO_PATH")
 COMMENTS_FILE=".claude/state/auto-monitor-pr-${PR_NUMBER}-comments.json"
 
 add_reaction() { # $1 = node id, $2 = ReactionContent (EYES|THUMBS_UP)
