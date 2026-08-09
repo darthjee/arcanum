@@ -1,0 +1,47 @@
+# CircleCI pipeline for arcanum.
+#
+# Requires a CircleCI project (or context) env var named GH_TOKEN, holding
+# a GitHub token with `repo` scope, so this job can create/update the
+# GitHub Release and upload the release zip asset for the pushed tag.
+#
+# Triggered only on tag pushes matching the repo's semver tag convention
+# (bare X.Y.Z, no "v" prefix — e.g. 0.9.10).
+
+version: 2.1
+
+jobs:
+  build-and-release:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - checkout
+      - run:
+          name: Install gh and zip
+          command: |
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt-get update
+            sudo apt-get install -y zip gh
+      - run:
+          name: Build release zip
+          command: |
+            ZIP_PATH=$(scripts/build_release_zip.sh)
+            echo "export ZIP_PATH=${ZIP_PATH}" >> "$BASH_ENV"
+      - run:
+          name: Authenticate gh
+          command: echo "${GH_TOKEN}" | gh auth login --with-token
+      - run:
+          name: Create or update GitHub release and upload asset
+          command: |
+            gh release view "$CIRCLE_TAG" || gh release create "$CIRCLE_TAG" --title "$CIRCLE_TAG" --notes ""
+            gh release upload "$CIRCLE_TAG" "$ZIP_PATH" --clobber
+
+workflows:
+  release:
+    jobs:
+      - build-and-release:
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^\d+\.\d+\.\d+$/

@@ -21,8 +21,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE="$SCRIPT_DIR/../templates/reply.tmpl.md"
 RESOLVE_PR_NUMBER="$SCRIPT_DIR/../../auto-monitor-issue-pr/scripts/resolve_pr_number.sh"
 
-source "${SCRIPT_DIR}/../../_lib/origin.sh"
-source "${SCRIPT_DIR}/../../_lib/push.sh"
+source "${SCRIPT_DIR}/../../arcanum/_lib/origin.sh"
+source "${SCRIPT_DIR}/../../arcanum/_lib/push.sh"
 
 REPO_PATH="${1:-}"
 ID="${2:-}"

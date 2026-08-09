@@ -1,7 +1,7 @@
 # Shared tag-to-action mapping for Arcanum skills.
 #
 # This file is meant to be SOURCED, not executed directly. It depends on
-# _lib/tags.sh (extract_tags/has_tag) being sourced first.
+# arcanum/_lib/tags.sh (extract_tags/has_tag) being sourced first.
 #
 # It exposes the canonical list of actionable tags and a single detection
 # function, actionable_tags. This is purely a detection/mapping layer — it
@@ -20,7 +20,7 @@ ACTIONABLE_TAGS=(question created ready_for_work)
 
 # actionable_tags <labels_text>
 #   Scans <labels_text> (a newline-separated list of GitHub label names,
-#   the same input shape as _lib/tags.sh's extract_tags) and prints, one
+#   the same input shape as arcanum/_lib/tags.sh's extract_tags) and prints, one
 #   per line, each of ACTIONABLE_TAGS that is present — in the fixed
 #   order: question, created, ready_for_work. Tags not present in
 #   <labels_text> are omitted. Prints nothing if none are present.

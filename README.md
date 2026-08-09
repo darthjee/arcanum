@@ -31,13 +31,31 @@ Skills are prompt files that Claude Code loads as slash commands. Each skill liv
 
 ## Installation
 
+### Option 1 — `curl | bash`
+
+Install without cloning a git repository, by downloading a trimmed release zip:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/darthjee/arcanum/main/arcanum/install/bootstrap.sh | bash
+```
+
+This fetches the latest known release, unzips it, and hands off to an interactive installer that prompts for the target directory (defaults to `~/.claude/skills`; press Enter to accept, or type another path). It refuses to overwrite a directory that already has an existing arcanum install (no update flow yet).
+
+To target a fork, or pin a specific version:
+
+```bash
+ARCANUM_REPO=your-fork/arcanum ARCANUM_VERSION=0.8.1 curl -fsSL https://raw.githubusercontent.com/your-fork/arcanum/main/arcanum/install/bootstrap.sh | bash
+```
+
+### Option 2 — `git clone`
+
 Clone this repository into your Claude Code skills directory:
 
 ```bash
 git clone git@github.com:darthjee/arcanum.git ~/.claude/skills
 ```
 
-Claude Code automatically discovers skills from that directory.
+Both options lay down the same skill folders. Claude Code automatically discovers skills from that directory.
 
 ## Skill structure
 

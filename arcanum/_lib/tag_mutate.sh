@@ -1,13 +1,13 @@
 # Shared tag-mutation library for Arcanum skills.
 #
 # This file is meant to be SOURCED, not executed directly. It depends on
-# _lib/tags.sh (has_tag, and the canonical-tag/label-name lookup) being
+# arcanum/_lib/tags.sh (has_tag, and the canonical-tag/label-name lookup) being
 # sourced first.
 #
 # It exposes functions to add/remove a single canonical tag to/from a
 # GitHub issue by mutating the issue's real GitHub labels directly via
 # `gh issue edit --add-label`/`--remove-label`, resolving the label name
-# from the canonical tag name via _lib/tags.sh's lookup table.
+# from the canonical tag name via arcanum/_lib/tags.sh's lookup table.
 #
 # Guard: `shipit` is human-only. Any attempt to add or remove it is
 # refused with an error — no script may mutate the `shipit` label.

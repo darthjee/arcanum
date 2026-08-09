@@ -26,8 +26,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=../../_lib/origin.sh
-source "${SCRIPT_DIR}/../../_lib/origin.sh"
+# shellcheck source=../../arcanum/_lib/origin.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/origin.sh"
 # shellcheck source=lib/label_config.sh
 source "${SCRIPT_DIR}/lib/label_config.sh"
 

@@ -12,18 +12,18 @@ export GH_INSECURE_SKIP_VERIFY=true
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# shellcheck source=../../_lib/tags.sh
+# shellcheck source=../../arcanum/_lib/tags.sh
 # Source the shared tag-parsing library
 # shellcheck disable=SC1091
-source "${SCRIPT_DIR}/../../_lib/tags.sh"
-# shellcheck source=../../_lib/tag_mutate.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/tags.sh"
+# shellcheck source=../../arcanum/_lib/tag_mutate.sh
 # Source the shared tag-mutation library
 # shellcheck disable=SC1091
-source "${SCRIPT_DIR}/../../_lib/tag_mutate.sh"
-# shellcheck source=../../_lib/origin.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/tag_mutate.sh"
+# shellcheck source=../../arcanum/_lib/origin.sh
 # Source the shared origin-resolution library
 # shellcheck disable=SC1091
-source "${SCRIPT_DIR}/../../_lib/origin.sh"
+source "${SCRIPT_DIR}/../../arcanum/_lib/origin.sh"
 
 # --- PR state persistence ---
 

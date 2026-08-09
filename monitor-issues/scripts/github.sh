@@ -3,17 +3,17 @@
 # Usage: github.sh <command> <repo_path> [args]
 #   remove-tag <repo_path> <id> <tag>   Remove a single tag from GitHub issue <id>,
 #                                       mapped to a real GitHub label via the
-#                                       canonical-tag/label-name table in `_lib/tags.sh`.
+#                                       canonical-tag/label-name table in `arcanum/_lib/tags.sh`.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=../../_lib/origin.sh
-source "${SCRIPT_DIR}/../../_lib/origin.sh"
-# shellcheck source=../../_lib/tags.sh
-source "${SCRIPT_DIR}/../../_lib/tags.sh"
-# shellcheck source=../../_lib/tag_mutate.sh
-source "${SCRIPT_DIR}/../../_lib/tag_mutate.sh"
+# shellcheck source=../../arcanum/_lib/origin.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/origin.sh"
+# shellcheck source=../../arcanum/_lib/tags.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/tags.sh"
+# shellcheck source=../../arcanum/_lib/tag_mutate.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/tag_mutate.sh"
 
 cmd_remove_tag() {
   local repo_path="${1:-}" id="${2:-}" tag="${3:-}"
@@ -34,7 +34,7 @@ case "${1:-}" in
   *)
     echo "Usage: $0 <command> <repo_path> [args]" >&2
     echo "Commands:" >&2
-    echo "  remove-tag <repo_path> <id> <tag>   Remove a single tag from GitHub issue <id>, mapped to a real GitHub label via _lib/tags.sh" >&2
+    echo "  remove-tag <repo_path> <id> <tag>   Remove a single tag from GitHub issue <id>, mapped to a real GitHub label via arcanum/_lib/tags.sh" >&2
     exit 1
     ;;
 esac

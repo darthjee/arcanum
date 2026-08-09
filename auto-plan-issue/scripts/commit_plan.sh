@@ -11,7 +11,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../../_lib/push.sh"
+source "${SCRIPT_DIR}/../../arcanum/_lib/push.sh"
 
 PLAN_DIR="${1:-}"
 ID="${2:-}"
