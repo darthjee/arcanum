@@ -43,14 +43,14 @@ LOCK_FILE="${STATE_DIR}/auto-fix-all-queue.lock"
 
 mkdir -p "$STATE_DIR"
 
-# shellcheck source=../../_lib/lock.sh
-source "${SCRIPT_DIR}/../../_lib/lock.sh"
-# shellcheck source=../../_lib/origin.sh
-source "${SCRIPT_DIR}/../../_lib/origin.sh"
-# shellcheck source=../../_lib/tags.sh
-source "${SCRIPT_DIR}/../../_lib/tags.sh"
-# shellcheck source=../../_lib/tag_mutate.sh
-source "${SCRIPT_DIR}/../../_lib/tag_mutate.sh"
+# shellcheck source=../../arcanum/_lib/lock.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/lock.sh"
+# shellcheck source=../../arcanum/_lib/origin.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/origin.sh"
+# shellcheck source=../../arcanum/_lib/tags.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/tags.sh"
+# shellcheck source=../../arcanum/_lib/tag_mutate.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/tag_mutate.sh"
 
 # Reads the queue array from QUEUE_FILE, or "[]" if absent/empty.
 _read_queue() {

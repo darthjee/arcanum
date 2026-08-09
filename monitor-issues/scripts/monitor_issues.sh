@@ -12,14 +12,14 @@ set -uo pipefail
 REPO_PATH="${1:?Usage: monitor_issues.sh <repo_path>}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=../../_lib/origin.sh
-source "${SCRIPT_DIR}/../../_lib/origin.sh"
-# shellcheck source=../../_lib/tags.sh
-source "${SCRIPT_DIR}/../../_lib/tags.sh"
-# shellcheck source=../../_lib/tag_actions.sh
-source "${SCRIPT_DIR}/../../_lib/tag_actions.sh"
-# shellcheck source=../../_lib/lock.sh
-source "${SCRIPT_DIR}/../../_lib/lock.sh"
+# shellcheck source=../../arcanum/_lib/origin.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/origin.sh"
+# shellcheck source=../../arcanum/_lib/tags.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/tags.sh"
+# shellcheck source=../../arcanum/_lib/tag_actions.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/tag_actions.sh"
+# shellcheck source=../../arcanum/_lib/lock.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/lock.sh"
 
 QUEUE_SCRIPT="${SCRIPT_DIR}/../../auto-fix-all/scripts/queue.sh"
 REWRITE_QUEUE_SCRIPT="${SCRIPT_DIR}/rewrite_queue.sh"

@@ -13,8 +13,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=../../_lib/git_branch.sh
-source "${SCRIPT_DIR}/../../_lib/git_branch.sh"
+# shellcheck source=../../arcanum/_lib/git_branch.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/git_branch.sh"
 
 STATUS="ok"
 CONFLICTS=""

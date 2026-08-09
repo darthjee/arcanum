@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Regression check for issue #111: _lib/origin.sh must resolve the target
+# Regression check for issue #111: arcanum/_lib/origin.sh must resolve the target
 # GitHub repo from an explicit repo_path argument, never from ambient shell
 # cwd. Reproduces the original incident (cwd drifted into an unrelated git
 # checkout mid-flow) and asserts the resolver still returns the intended
 # repo, plus asserts that calling without a repo_path argument is a hard
 # failure rather than a silent cwd fallback.
 #
-# Usage: bash _lib/test_origin_resolution.sh  (no arguments)
+# Usage: bash arcanum/_lib/test_origin_resolution.sh  (no arguments)
 # Standalone — not wired into any skill's flow. Exit 0 on success, non-zero
 # with a message on stderr on failure.
 
@@ -79,5 +79,5 @@ fi
 
 echo "OK: get_repo_ref with no repo_path argument hard-fails (no ambient-cwd fallback)"
 
-echo "PASS: _lib/origin.sh resolves the explicitly-passed repo_path, ignoring ambient shell cwd"
+echo "PASS: arcanum/_lib/origin.sh resolves the explicitly-passed repo_path, ignoring ambient shell cwd"
 exit 0

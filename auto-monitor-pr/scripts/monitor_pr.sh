@@ -54,10 +54,10 @@ set -euo pipefail
 export GH_INSECURE_SKIP_VERIFY=true
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=../../_lib/origin.sh
-source "${SCRIPT_DIR}/../../_lib/origin.sh"
-# shellcheck source=../../_lib/push.sh
-source "${SCRIPT_DIR}/../../_lib/push.sh"
+# shellcheck source=../../arcanum/_lib/origin.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/origin.sh"
+# shellcheck source=../../arcanum/_lib/push.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/push.sh"
 
 ISSUE_STATE_SCRIPT="${SCRIPT_DIR}/../../auto-fix-issue/scripts/issue_state.sh"
 

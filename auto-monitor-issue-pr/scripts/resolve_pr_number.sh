@@ -9,8 +9,8 @@
 
 set -euo pipefail
 
-# shellcheck source=../../_lib/origin.sh
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../_lib/origin.sh"
+# shellcheck source=../../arcanum/_lib/origin.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../arcanum/_lib/origin.sh"
 
 REPO_PATH="${1:?Usage: $0 <repo_path> <id>}"
 ID="${2:-}"
@@ -23,7 +23,7 @@ ID="${ID#\#}"
 
 # Try the local issue state first (avoids an extra GitHub API call)
 SCRIPT_DIR_SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cached_number=$("${SCRIPT_DIR_SELF}/../../_lib/issue_state.sh" get "$ID" pr_id 2>/dev/null || true)
+cached_number=$("${SCRIPT_DIR_SELF}/../../arcanum/_lib/issue_state.sh" get "$ID" pr_id 2>/dev/null || true)
 if [[ -n "$cached_number" ]]; then
   echo "$cached_number"
   exit 0

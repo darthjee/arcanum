@@ -8,22 +8,22 @@
 #   has-shipit-label <repo_path> <id>   Exit 0 if GitHub issue <id> has a "shipit" label, else exit 1
 #   add-tag <repo_path> <id> <tag>      Add a single tag to GitHub issue <id>, mapped to
 #                                       a real GitHub label via the canonical-tag/
-#                                       label-name table in `_lib/tags.sh`.
+#                                       label-name table in `arcanum/_lib/tags.sh`.
 #   remove-tag <repo_path> <id> <tag>   Remove a single tag from GitHub issue <id>,
 #                                       mapped to a real GitHub label via the
-#                                       canonical-tag/label-name table in `_lib/tags.sh`.
+#                                       canonical-tag/label-name table in `arcanum/_lib/tags.sh`.
 
 set -euo pipefail
 
 export GH_INSECURE_SKIP_VERIFY=true
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=../../_lib/origin.sh
-source "${SCRIPT_DIR}/../../_lib/origin.sh"
-# shellcheck source=../../_lib/tags.sh
-source "${SCRIPT_DIR}/../../_lib/tags.sh"
-# shellcheck source=../../_lib/tag_mutate.sh
-source "${SCRIPT_DIR}/../../_lib/tag_mutate.sh"
+# shellcheck source=../../arcanum/_lib/origin.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/origin.sh"
+# shellcheck source=../../arcanum/_lib/tags.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/tags.sh"
+# shellcheck source=../../arcanum/_lib/tag_mutate.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/tag_mutate.sh"
 
 # --- Commands ---
 
@@ -40,7 +40,7 @@ cmd_pr_number() {
   if [[ "$branch" =~ ^issue-([0-9]+)$ ]]; then
     local id="${BASH_REMATCH[1]}"
     local cached
-    cached=$("${SCRIPT_DIR}/../../_lib/issue_state.sh" get "$id" pr_id 2>/dev/null || true)
+    cached=$("${SCRIPT_DIR}/../../arcanum/_lib/issue_state.sh" get "$id" pr_id 2>/dev/null || true)
     if [[ -n "$cached" ]]; then
       echo "$cached"
       return 0
@@ -100,8 +100,8 @@ cmd_pr_merge() {
   local cached_number="" cached_url=""
   if [[ "$branch" =~ ^issue-([0-9]+)$ ]]; then
     local id="${BASH_REMATCH[1]}"
-    cached_number=$("${SCRIPT_DIR}/../../_lib/issue_state.sh" get "$id" pr_id 2>/dev/null || true)
-    cached_url=$("${SCRIPT_DIR}/../../_lib/issue_state.sh" get "$id" pr_url 2>/dev/null || true)
+    cached_number=$("${SCRIPT_DIR}/../../arcanum/_lib/issue_state.sh" get "$id" pr_id 2>/dev/null || true)
+    cached_url=$("${SCRIPT_DIR}/../../arcanum/_lib/issue_state.sh" get "$id" pr_url 2>/dev/null || true)
   fi
 
   _ensure_gh_user
@@ -218,8 +218,8 @@ case "${1:-}" in
     echo "  pr-merge <repo_path>                Squash-merge the current branch's PR, print its URL" >&2
     echo "  cleanup-branch <repo_path> <id>     Delete the issue's remote and local branch, switch back to main" >&2
     echo "  has-shipit-label <repo_path> <id>   Exit 0 if GitHub issue <id> has a 'shipit' label, else exit 1" >&2
-    echo "  add-tag <repo_path> <id> <tag>      Add a single tag to GitHub issue <id>, mapped to a real GitHub label via _lib/tags.sh" >&2
-    echo "  remove-tag <repo_path> <id> <tag>   Remove a single tag from GitHub issue <id>, mapped to a real GitHub label via _lib/tags.sh" >&2
+    echo "  add-tag <repo_path> <id> <tag>      Add a single tag to GitHub issue <id>, mapped to a real GitHub label via arcanum/_lib/tags.sh" >&2
+    echo "  remove-tag <repo_path> <id> <tag>   Remove a single tag from GitHub issue <id>, mapped to a real GitHub label via arcanum/_lib/tags.sh" >&2
     exit 1
     ;;
 esac

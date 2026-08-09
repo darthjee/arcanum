@@ -37,8 +37,8 @@ LOCK_FILE="${STATE_DIR}/monitor-issues-rewrite-queue.lock"
 
 mkdir -p "$STATE_DIR"
 
-# shellcheck source=../../_lib/lock.sh
-source "${SCRIPT_DIR}/../../_lib/lock.sh"
+# shellcheck source=../../arcanum/_lib/lock.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/lock.sh"
 
 # Reads the queue array from QUEUE_FILE, or "[]" if absent/empty.
 _read_queue() {
