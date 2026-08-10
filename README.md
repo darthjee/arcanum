@@ -39,7 +39,7 @@ Install without cloning a git repository, by downloading a trimmed release zip:
 curl -fsSL https://raw.githubusercontent.com/darthjee/arcanum/main/arcanum/install/bootstrap.sh | bash
 ```
 
-This fetches the latest known release, unzips it, and hands off to an interactive installer that prompts for the target directory (defaults to `~/.claude/skills`; press Enter to accept, or type another path). It refuses to overwrite a directory that already has an existing arcanum install (no update flow yet).
+This fetches the latest known release, unzips it, and hands off to an interactive installer that prompts for the target directory (defaults to `~/.claude/skills`; press Enter to accept, or type another path). It refuses to overwrite a directory that already has an existing arcanum install — pointing you at `update` instead (see below).
 
 To target a fork, or pin a specific version:
 
@@ -56,6 +56,31 @@ git clone git@github.com:darthjee/arcanum.git ~/.claude/skills
 ```
 
 Both options lay down the same skill folders. Claude Code automatically discovers skills from that directory.
+
+## Updating
+
+Brings an existing `curl | bash` install up to date with a newer release — adds new files, overwrites changed ones, and removes files no longer part of the release, without touching anything else in the install directory.
+
+The common case — run the copy already sitting inside your install, no flags needed:
+
+```bash
+bash ~/.claude/skills/arcanum/update/bootstrap.sh
+```
+
+Or fetch fresh via `curl | bash` (useful when there's no local checkout to run from, or to override the target/version/repo explicitly):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/darthjee/arcanum/main/arcanum/update/bootstrap.sh | bash
+```
+
+Defaults to the latest published release, and to the same repo (including forks) the install originally came from. Override either with `ARCANUM_VERSION`/`ARCANUM_REPO`, and set `ARCANUM_TARGET` when piping via `curl | bash` with no local install to infer the target from:
+
+```bash
+ARCANUM_REPO=your-fork/arcanum ARCANUM_VERSION=0.9.0 ARCANUM_TARGET=~/.claude/skills \
+  curl -fsSL https://raw.githubusercontent.com/your-fork/arcanum/main/arcanum/update/bootstrap.sh | bash
+```
+
+`git clone` installs update the usual git way (`git fetch && git checkout <tag>`, or `git pull`) — no separate update script needed for that path.
 
 ## Skill structure
 

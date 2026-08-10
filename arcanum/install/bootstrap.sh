@@ -7,6 +7,9 @@
 # downloads that release's trimmed zip, unzips it, and hands off to the
 # heavier, versioned installer bundled inside the zip. Nothing else.
 #
+# REPO/VERSION are exported so installer.sh (execed below) can read them
+# to write arcanum.json.
+#
 # Env vars:
 #   ARCANUM_REPO    GitHub "<owner>/<repo>" to install from. Default: darthjee/arcanum
 #   ARCANUM_VERSION Release tag to install (e.g. "0.8.1"). Default: DEFAULT_VERSION below,
@@ -18,6 +21,8 @@ DEFAULT_VERSION="0.8.1"
 
 REPO="${ARCANUM_REPO:-darthjee/arcanum}"
 VERSION="${ARCANUM_VERSION:-$DEFAULT_VERSION}"
+export REPO
+export VERSION
 
 ASSET="arcanum-${VERSION}.zip"
 URL="https://github.com/${REPO}/releases/download/${VERSION}/${ASSET}"
