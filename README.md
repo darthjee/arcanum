@@ -28,6 +28,7 @@ Skills are prompt files that Claude Code loads as slash commands. Each skill liv
 | [`/auto-monitor-issue-pr`](auto-monitor-issue-pr/) | Resolves the PR for an issue's currently checked-out branch, then monitors it for merge/close/approval/new owner comments, blocking until one of those occurs. Used by `auto-fix-all`. |
 | [`/push-issue-to-queue`](push-issue-to-queue/) | Pushes one or more issue IDs onto the end of the `auto-fix-all` queue, to be processed later. |
 | [`/auto-rewrite-issue`](auto-rewrite-issue/) | Autonomously drains the `monitor-issues` rewrite queue, rewriting each queued issue's body with no user interaction and removing its `created` tag once pushed. |
+| [`/arcanum-update`](arcanum-update/) | Updates this arcanum install to the latest (or a pinned) release from inside a Claude Code session — asks for explicit confirmation naming the repo and update method (zip download vs. git fetch/checkout), then streams the update's own progress output. |
 
 ## Installation
 
@@ -47,6 +48,8 @@ To target a fork, or pin a specific version:
 ARCANUM_REPO=your-fork/arcanum ARCANUM_VERSION=0.8.1 curl -fsSL https://raw.githubusercontent.com/your-fork/arcanum/main/arcanum/install/bootstrap.sh | bash
 ```
 
+Before downloading anything, the script prints the resolved repo/version/URL and asks for an explicit y/N confirmation (reads from `/dev/tty`). Set `ARCANUM_ASSUME_YES=1` to skip that prompt for unattended/CI use — meant as a one-off prefix on the command itself, not something to `export` permanently.
+
 ### Option 2 — `git clone`
 
 Clone this repository into your Claude Code skills directory:
@@ -59,7 +62,9 @@ Both options lay down the same skill folders. Claude Code automatically discover
 
 ## Updating
 
-Brings an existing `curl | bash` install up to date with a newer release — adds new files, overwrites changed ones, and removes files no longer part of the release, without touching anything else in the install directory.
+Brings an existing install up to date with a newer release. For a `curl | bash` (zip-tracked) install: adds new files, overwrites changed ones, and removes files no longer part of the release, without touching anything else in the install directory. For a `git clone` install: `git fetch --tags` then `git checkout` onto the resolved release tag (detached HEAD).
+
+From inside a Claude Code session, run `/arcanum-update` instead of any of the below — see the skills table above.
 
 The common case — run the copy already sitting inside your install, no flags needed:
 
@@ -80,7 +85,9 @@ ARCANUM_REPO=your-fork/arcanum ARCANUM_VERSION=0.9.0 ARCANUM_TARGET=~/.claude/sk
   curl -fsSL https://raw.githubusercontent.com/your-fork/arcanum/main/arcanum/update/bootstrap.sh | bash
 ```
 
-`git clone` installs update the usual git way (`git fetch && git checkout <tag>`, or `git pull`) — no separate update script needed for that path.
+Before doing anything, the script prints the resolved repo/version/method (release-zip download vs. `git fetch`/`git checkout`, detected automatically) and asks for an explicit y/N confirmation (reads from `/dev/tty`). Set `ARCANUM_ASSUME_YES=1` to skip that prompt for unattended/CI use — a one-off prefix on the command itself, not something to `export` permanently.
+
+A `git clone` install with uncommitted local changes fails fast with a message to commit/stash/discard first — no auto-stash, no checkout over local work.
 
 ## Skill structure
 
