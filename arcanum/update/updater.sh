@@ -10,7 +10,9 @@
 # Requires REPO/VERSION to be set in the environment (bootstrap.sh
 # exports both before exec'ing here) and jq to be installed. TARGET may
 # also be set (bootstrap.sh pre-resolves it when possible); if empty,
-# this script prompts interactively.
+# this script prompts interactively. ORIG_PWD, when set (bootstrap.sh
+# exports it), is the caller's working directory to restore on exit —
+# a safe no-op if unset (e.g. this script invoked directly).
 #
 # Usage: arcanum/update/updater.sh   (no arguments)
 
@@ -19,8 +21,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RELEASE_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 WORK_DIR="$RELEASE_ROOT"
+LOCK_DIR=""
 
-trap 'rm -rf "$WORK_DIR"' EXIT
+cleanup() {
+  cd "${ORIG_PWD:-.}" 2>/dev/null || true
+  [[ -n "$LOCK_DIR" ]] && rmdir "$LOCK_DIR" 2>/dev/null || true
+  rm -rf "$WORK_DIR"
+}
+trap cleanup EXIT
 
 : "${REPO:?REPO must be set (exported by bootstrap.sh)}"
 : "${VERSION:?VERSION must be set (exported by bootstrap.sh)}"
@@ -78,6 +86,18 @@ if [[ "$VERSION" == "$OLD_VERSION" ]]; then
   echo "Already on ${VERSION}." >&2
   exit 0
 fi
+
+# --- Acquire the concurrency lock -------------------------------------------
+#
+# Atomic (mkdir either succeeds or it doesn't — no read-modify-write race
+# window), and deliberately a separate directory rather than a field inside
+# arcanum.json (which is written last, on purpose, for safe retryability).
+
+if ! mkdir "${TARGET}/.arcanum-update.lock" 2>/dev/null; then
+  echo "An update is already running for this install. If you're sure this is stale from a crashed run, remove ${TARGET}/.arcanum-update.lock and retry." >&2
+  exit 1
+fi
+LOCK_DIR="${TARGET}/.arcanum-update.lock"
 
 # --- Add/update: same one-shot copy install uses ---------------------------
 

@@ -11,9 +11,13 @@
 # to write arcanum.json.
 #
 # Env vars:
-#   ARCANUM_REPO    GitHub "<owner>/<repo>" to install from. Default: darthjee/arcanum
-#   ARCANUM_VERSION Release tag to install (e.g. "0.8.1"). Default: DEFAULT_VERSION below,
-#                   kept in sync at release time by scripts/bump-version.sh.
+#   ARCANUM_REPO       GitHub "<owner>/<repo>" to install from. Default: darthjee/arcanum
+#   ARCANUM_VERSION    Release tag to install (e.g. "0.8.1"). Default: DEFAULT_VERSION below,
+#                      kept in sync at release time by scripts/bump-version.sh.
+#   ARCANUM_ASSUME_YES Set (any non-empty value) to skip the trust-confirmation
+#                      prompt below, e.g. for unattended/CI use. Meant as a
+#                      one-off command prefix (ARCANUM_ASSUME_YES=1 bash
+#                      bootstrap.sh), not something to export permanently.
 
 set -euo pipefail
 
@@ -26,6 +30,20 @@ export VERSION
 
 ASSET="arcanum-${VERSION}.zip"
 URL="https://github.com/${REPO}/releases/download/${VERSION}/${ASSET}"
+
+if [[ -z "${ARCANUM_ASSUME_YES:-}" ]]; then
+  echo "This will download and execute a release zip from ${REPO} (version ${VERSION})." >&2
+  echo "  URL: ${URL}" >&2
+  printf "Proceed? [y/N]: " >&2
+  read -r confirm < /dev/tty
+  case "$confirm" in
+    y|Y) ;;
+    *)
+      echo "Aborted: install not confirmed." >&2
+      exit 1
+      ;;
+  esac
+fi
 
 WORK_DIR="$(mktemp -d)"
 
