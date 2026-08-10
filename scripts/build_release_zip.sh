@@ -8,9 +8,12 @@
 #
 # Reads the version from arcanum.version at the repo root and packages
 # every git-tracked file except the dev-only paths listed in EXCLUDES
-# (skill folders, arcanum/, and arcanum.version itself all pass through
-# untouched). Prints the absolute path of the produced zip as the last
-# line of stdout.
+# (skill folders and arcanum/ pass through untouched; arcanum.version
+# itself is excluded — installs no longer read a shipped copy of it,
+# see arcanum/install/installer.sh). Also embeds a MANIFEST file at the
+# zip root, listing every packaged path one per line, so installer.sh/
+# updater.sh can reconcile an install without needing git. Prints the
+# absolute path of the produced zip as the last line of stdout.
 
 set -euo pipefail
 
@@ -31,6 +34,7 @@ EXCLUDES=(
   "ISSUE_TEMPLATE.md"
   ".gitignore"
   "scripts/"
+  "arcanum.version"
 )
 
 is_excluded() {
@@ -58,5 +62,10 @@ while IFS= read -r path; do
 done < <(git ls-files)
 
 zip -q "$ZIP_PATH" "${FILES[@]}"
+
+MANIFEST_PATH="${OUTPUT_DIR}/MANIFEST"
+printf '%s\n' "${FILES[@]}" > "$MANIFEST_PATH"
+zip -j -q "$ZIP_PATH" "$MANIFEST_PATH"
+rm -f "$MANIFEST_PATH"
 
 echo "$ZIP_PATH"
