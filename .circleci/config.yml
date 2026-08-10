@@ -6,6 +6,13 @@
 #
 # Triggered only on tag pushes matching the repo's semver tag convention
 # (bare X.Y.Z, no "v" prefix — e.g. 0.9.10).
+#
+# Talks to the GitHub REST API directly via curl (see scripts/
+# upload_release_asset.sh) rather than through the `gh` CLI. `gh` auto-
+# authenticates from a GH_TOKEN/GITHUB_TOKEN env var, which made the old
+# explicit `gh auth login --with-token` step both redundant and, once
+# GH_TOKEN was actually set, a hard failure. Mechanism documented in
+# release-zip.md.
 
 version: 2.1
 
@@ -16,25 +23,18 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Install gh and zip
+          name: Install zip and jq
           command: |
-            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
             sudo apt-get update
-            sudo apt-get install -y zip gh
+            sudo apt-get install -y zip jq
       - run:
           name: Build release zip
           command: |
             ZIP_PATH=$(scripts/build_release_zip.sh)
             echo "export ZIP_PATH=${ZIP_PATH}" >> "$BASH_ENV"
       - run:
-          name: Authenticate gh
-          command: echo "${GH_TOKEN}" | gh auth login --with-token
-      - run:
           name: Create or update GitHub release and upload asset
-          command: |
-            gh release view "$CIRCLE_TAG" || gh release create "$CIRCLE_TAG" --title "$CIRCLE_TAG" --notes ""
-            gh release upload "$CIRCLE_TAG" "$ZIP_PATH" --clobber
+          command: scripts/upload_release_asset.sh "$CIRCLE_TAG" "$ZIP_PATH"
 
 workflows:
   release:
