@@ -4,7 +4,11 @@
 #
 # Updates arcanum.version at the repo root, the baked-in default version
 # constant inside arcanum/install/bootstrap.sh (DEFAULT_VERSION), and the
-# "Current Version" / "Next Release" lines in README.md.
+# "Current Version" / "Next Release" lines in README.md. Also rolls
+# arcanum/migrations/repos/next/ (pending, unreleased per-repo migrations)
+# into arcanum/migrations/repos/<new-version>/, and recreates an empty
+# next/ (with a .keep placeholder) in its place, so a migration always
+# ships in the same release as the change it belongs to.
 # Does NOT commit or tag anything — that remains a separate, manual (or
 # future) step.
 #
@@ -19,6 +23,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 VERSION_FILE="${REPO_ROOT}/arcanum.version"
 BOOTSTRAP_FILE="${REPO_ROOT}/arcanum/install/bootstrap.sh"
 README_FILE="${REPO_ROOT}/README.md"
+MIGRATIONS_REPOS_DIR="${REPO_ROOT}/arcanum/migrations/repos"
 REPO_SLUG="darthjee/arcanum"
 
 NEW_VERSION="${1:-}"
@@ -52,6 +57,23 @@ sed -i.bak -E \
   "$README_FILE"
 rm -f "${README_FILE}.bak"
 
+NEXT_MIGRATIONS_DIR="${MIGRATIONS_REPOS_DIR}/next"
+VERSION_MIGRATIONS_DIR="${MIGRATIONS_REPOS_DIR}/${NEW_VERSION}"
+
+if [[ -d "$VERSION_MIGRATIONS_DIR" ]]; then
+  echo "Error: ${VERSION_MIGRATIONS_DIR} already exists — refusing to overwrite." >&2
+  exit 1
+fi
+if [[ ! -d "$NEXT_MIGRATIONS_DIR" ]]; then
+  echo "Error: ${NEXT_MIGRATIONS_DIR} is missing — expected it to always exist." >&2
+  exit 1
+fi
+
+mv "$NEXT_MIGRATIONS_DIR" "$VERSION_MIGRATIONS_DIR"
+mkdir -p "$NEXT_MIGRATIONS_DIR"
+touch "${NEXT_MIGRATIONS_DIR}/.keep"
+
 echo "New version:  ${NEW_VERSION}"
 echo "Next release: ${NEXT_RELEASE}"
 echo "Updated ${VERSION_FILE}, ${BOOTSTRAP_FILE}, and ${README_FILE}."
+echo "Moved ${NEXT_MIGRATIONS_DIR} -> ${VERSION_MIGRATIONS_DIR} and recreated an empty ${NEXT_MIGRATIONS_DIR}."
