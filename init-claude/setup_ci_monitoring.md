@@ -12,20 +12,19 @@ Wait for the response. Patterns are matched case-insensitively as regular expres
 
 ## Step 2 — Write the configuration
 
-- If the user listed one or more patterns: write `.claude/configuration/auto-fix-all.json` (creating `.claude/configuration/` if needed):
-  ```json
-  {
-    "ignored_check_patterns": ["<pattern-1>", "<pattern-2>"]
-  }
+- If the user listed one or more patterns, run:
+  ```bash
+  scripts/set_ci_ignored_patterns.sh "<pattern-1>" "<pattern-2>"
   ```
-- If the user said none: do not write the file at all — its absence already means no patterns are ignored, so there's nothing to record.
+  > Resolve `scripts/set_ci_ignored_patterns.sh` relative to the `init-claude` skill folder. This writes `ignored_check_patterns` into `.claude/configuration/arcanum-repo-config.json`'s `auto-fix-all` namespace (creating the file, and `.claude/configuration/`, if needed) — see `docs/guides/arcanum-repo-config.md` for the config-file layout. It never touches the legacy `.claude/configuration/auto-fix-all.json` file.
+- If the user said none: do not run the script at all — the absence of `ignored_check_patterns` already means no patterns are ignored, so there's nothing to record.
 
 ## Step 3 — Confirm
 
-If the file was written, tell the user:
+If the script was run, tell the user:
 
 ```
-.claude/configuration/auto-fix-all.json written, ignoring CI check-runs matching: <pattern-1>, <pattern-2>
+.claude/configuration/arcanum-repo-config.json written, ignoring CI check-runs matching: <pattern-1>, <pattern-2>
 ```
 
-If no file was written, no message is needed — silently proceed.
+If the script was not run, no message is needed — silently proceed.

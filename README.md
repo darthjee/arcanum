@@ -29,6 +29,7 @@ Skills are prompt files that Claude Code loads as slash commands. Each skill liv
 | [`/push-issue-to-queue`](push-issue-to-queue/) | Pushes one or more issue IDs onto the end of the `auto-fix-all` queue, to be processed later. |
 | [`/auto-rewrite-issue`](auto-rewrite-issue/) | Autonomously drains the `monitor-issues` rewrite queue, rewriting each queued issue's body with no user interaction and removing its `created` tag once pushed. |
 | [`/arcanum-update`](arcanum-update/) | Updates this arcanum install to the latest (or a pinned) release from inside a Claude Code session — asks for explicit confirmation naming the repo and update method (zip download vs. git fetch/checkout), then streams the update's own progress output. |
+| [`/arcanum-migrate`](arcanum-migrate/) | Walks this repo through pending per-repo structural changes introduced by newer arcanum versions (renamed/moved config files, new config shapes) — distinct from `/arcanum-update`, which updates the arcanum install itself, not artifacts inside the consuming repo. Lists pending migrations, asks for confirmation ([A]ll/[N]one/[S]elect), then applies them. |
 
 ## Installation
 

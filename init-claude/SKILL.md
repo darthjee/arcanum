@@ -76,3 +76,7 @@ After the repository labels are set up, read and follow [setup_auto_fix_all_conf
 ## Step 12 — Setup issue enhancement concerns
 
 After the `auto-fix-all` personal run behavior is set up, read and follow [setup_issue_enhancement.md](setup_issue_enhancement.md).
+
+## Step 13 — Stamp the arcanum version
+
+After the issue enhancement concerns are set up, read and follow [setup_arcanum_version.md](setup_arcanum_version.md).
