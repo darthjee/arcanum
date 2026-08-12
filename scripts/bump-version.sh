@@ -60,6 +60,11 @@ rm -f "${README_FILE}.bak"
 NEXT_MIGRATIONS_DIR="${MIGRATIONS_REPOS_DIR}/next"
 VERSION_MIGRATIONS_DIR="${MIGRATIONS_REPOS_DIR}/${NEW_VERSION}"
 
+is_migrations_dir_empty() {
+  local dir="$1"
+  [[ -z "$(find "$dir" -mindepth 1 ! -name '.keep')" ]]
+}
+
 if [[ -d "$VERSION_MIGRATIONS_DIR" ]]; then
   echo "Error: ${VERSION_MIGRATIONS_DIR} already exists — refusing to overwrite." >&2
   exit 1
@@ -69,11 +74,16 @@ if [[ ! -d "$NEXT_MIGRATIONS_DIR" ]]; then
   exit 1
 fi
 
-mv "$NEXT_MIGRATIONS_DIR" "$VERSION_MIGRATIONS_DIR"
-mkdir -p "$NEXT_MIGRATIONS_DIR"
-touch "${NEXT_MIGRATIONS_DIR}/.keep"
-
 echo "New version:  ${NEW_VERSION}"
 echo "Next release: ${NEXT_RELEASE}"
 echo "Updated ${VERSION_FILE}, ${BOOTSTRAP_FILE}, and ${README_FILE}."
-echo "Moved ${NEXT_MIGRATIONS_DIR} -> ${VERSION_MIGRATIONS_DIR} and recreated an empty ${NEXT_MIGRATIONS_DIR}."
+
+if is_migrations_dir_empty "$NEXT_MIGRATIONS_DIR"; then
+  touch "${NEXT_MIGRATIONS_DIR}/.keep"   # defensive: keep it git-trackable even if .keep was missing
+  echo "No pending migrations in ${NEXT_MIGRATIONS_DIR} — skipping rename."
+else
+  mv "$NEXT_MIGRATIONS_DIR" "$VERSION_MIGRATIONS_DIR"
+  mkdir -p "$NEXT_MIGRATIONS_DIR"
+  touch "${NEXT_MIGRATIONS_DIR}/.keep"
+  echo "Moved ${NEXT_MIGRATIONS_DIR} -> ${VERSION_MIGRATIONS_DIR} and recreated an empty ${NEXT_MIGRATIONS_DIR}."
+fi
