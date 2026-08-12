@@ -15,10 +15,14 @@
 # Check-runs whose name case-insensitively contains any pattern in the
 # project's configured ignored_check_patterns are excluded entirely from
 # the passed/failed/total accounting (neither blocking the PR nor required
-# to pass). Patterns are read from the target project's own
-# .claude/configuration/auto-fix-all.json (relative to the current working
-# directory), field "ignored_check_patterns" (an array of regex strings).
-# If the file or field is missing, no patterns are ignored. This exists
+# to pass). Patterns are read (relative to the current working directory)
+# from the target project's own
+# .claude/configuration/arcanum-repo-config.json, namespace "auto-fix-all",
+# field "ignored_check_patterns" (an array of regex strings) — falling
+# back to the legacy .claude/configuration/auto-fix-all.json (same field,
+# top level) if the new file/key is absent, with a warning. See
+# arcanum/_lib/repo_config.sh and docs/guides/arcanum-repo-config.md.
+# If neither file/field is present, no patterns are ignored. This exists
 # because some check-runs (e.g. Codacy) can report a "action_required"
 # conclusion that is neither success nor a failure state, which would
 # otherwise hang this script forever unless ignored.
@@ -29,16 +33,16 @@ export GH_INSECURE_SKIP_VERIFY=true
 
 REPO_PATH="${1:?Usage: $0 <repo_path>}"
 
-CONFIG_FILE=".claude/configuration/auto-fix-all.json"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-if [[ -f "$CONFIG_FILE" ]]; then
-  ignored_json=$(jq -c '.ignored_check_patterns // []' "$CONFIG_FILE")
-else
-  ignored_json="[]"
-fi
+# shellcheck source=../../arcanum/_lib/repo_config.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/repo_config.sh"
+
+ignored_json=$(repo_config_read ".claude/configuration/arcanum-repo-config.json" ".claude/configuration/auto-fix-all.json" auto-fix-all ignored_check_patterns)
+ignored_json="${ignored_json:-[]}"
 
 # shellcheck source=../../arcanum/_lib/origin.sh
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../arcanum/_lib/origin.sh"
+source "${SCRIPT_DIR}/../../arcanum/_lib/origin.sh"
 
 _ensure_gh_user
 REPO_REF=$(get_repo_ref "$REPO_PATH")
