@@ -14,7 +14,15 @@ The script guarantees `FILE` exists on disk once it exits `STATUS=ok` — the sc
 
 ### STATUS=ok
 
-`ID`, `TITLE`, and `FILE` are set; `FILE` already has content on disk. Proceed straight to [explore.md](explore.md) using `FILE` as the starting material.
+`ID`, `TITLE`, and `FILE` are set; `FILE` already has content on disk. Right after this resolves, mark the issue as actively being enhanced:
+
+```bash
+../scripts/github.sh mark-enhancing "$REPO_PATH" <id>
+```
+
+> Resolve `../scripts/github.sh` relative to this file's directory — the same wrapper [publish.md](publish.md) already uses for `mark-created`. This runs unconditionally whenever `STATUS=ok` is reached, whether the draft was freshly fetched from GitHub or resumed from an existing local file, and is best-effort — it never blocks proceeding to [explore.md](explore.md).
+
+Proceed straight to [explore.md](explore.md) using `FILE` as the starting material.
 
 ### STATUS=error
 
