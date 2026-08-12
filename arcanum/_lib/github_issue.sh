@@ -5,9 +5,10 @@
 #   fetch <repo_path> <id>                      Fetch a GitHub issue and save to docs/agents/issues/
 #   update <repo_path> <id> <title> <file>      Update a GitHub issue title and body from a file
 #   create <repo_path> <title> <file>           Create a new GitHub issue and save it to docs/agents/issues/
-#   mark-created <repo_path> <id>               Add the Created label and remove Idea/Writting, if present
+#   mark-created <repo_path> <id>               Add the Created label and remove Idea/Writting/Enhancing, if present
 #   mark-refined <repo_path> <id>               Add the Refined label and remove Created, if present
 #   mark-ready <repo_path> <id>                 Add the Ready label and remove Refined, if present
+#   mark-enhancing <repo_path> <id>             Add the Enhancing label and remove Idea/Writting, if present
 
 set -euo pipefail
 
@@ -217,6 +218,26 @@ cmd_mark_created() {
     || echo "Warning: could not remove 'idea' tag from issue #$id on $repo_ref" >&2
   tag_mutate_remove_label "$id" "$repo_ref" writting \
     || echo "Warning: could not remove 'writting' tag from issue #$id on $repo_ref" >&2
+  tag_mutate_remove_label "$id" "$repo_ref" enhancing \
+    || echo "Warning: could not remove 'enhancing' tag from issue #$id on $repo_ref" >&2
+
+  return 0
+}
+
+cmd_mark_enhancing() {
+  local repo_path="${1:-}"
+  local id="${2:-}"
+  [[ -n "$repo_path" && -n "$id" ]] || { echo "Usage: $0 mark-enhancing <repo_path> <id>" >&2; exit 1; }
+
+  _load_origin "$repo_path"
+  local repo_ref="$_ORIGIN_REPO_PATH"
+
+  tag_mutate_add_label "$id" "$repo_ref" enhancing \
+    || echo "Warning: could not add 'enhancing' tag to issue #$id on $repo_ref" >&2
+  tag_mutate_remove_label "$id" "$repo_ref" idea \
+    || echo "Warning: could not remove 'idea' tag from issue #$id on $repo_ref" >&2
+  tag_mutate_remove_label "$id" "$repo_ref" writting \
+    || echo "Warning: could not remove 'writting' tag from issue #$id on $repo_ref" >&2
 
   return 0
 }
@@ -238,13 +259,14 @@ cmd_mark_ready() {
 }
 
 case "${1:-}" in
-  info)         shift; cmd_info "$@" ;;
-  fetch)        shift; cmd_fetch  "$@" ;;
-  update)       shift; cmd_update "$@" ;;
-  create)       shift; cmd_create "$@" ;;
-  mark-created) shift; cmd_mark_created "$@" ;;
-  mark-refined) shift; cmd_mark_refined "$@" ;;
-  mark-ready)   shift; cmd_mark_ready "$@" ;;
+  info)            shift; cmd_info "$@" ;;
+  fetch)           shift; cmd_fetch  "$@" ;;
+  update)          shift; cmd_update "$@" ;;
+  create)          shift; cmd_create "$@" ;;
+  mark-created)    shift; cmd_mark_created "$@" ;;
+  mark-refined)    shift; cmd_mark_refined "$@" ;;
+  mark-ready)      shift; cmd_mark_ready "$@" ;;
+  mark-enhancing)  shift; cmd_mark_enhancing "$@" ;;
   *)
     echo "Usage: $0 <command> [args]" >&2
     echo "Commands:" >&2
@@ -252,9 +274,10 @@ case "${1:-}" in
     echo "  fetch <repo_path> <id>                      Fetch a GitHub issue and save to docs/agents/issues/" >&2
     echo "  update <repo_path> <id> <title> <file>      Update a GitHub issue title and body from a file" >&2
     echo "  create <repo_path> <title> <file>           Create a new GitHub issue and save it to docs/agents/issues/" >&2
-    echo "  mark-created <repo_path> <id>               Add the Created label and remove Idea/Writting, if present" >&2
+    echo "  mark-created <repo_path> <id>               Add the Created label and remove Idea/Writting/Enhancing, if present" >&2
     echo "  mark-refined <repo_path> <id>               Add the Refined label and remove Created, if present" >&2
     echo "  mark-ready <repo_path> <id>                 Add the Ready label and remove Refined, if present" >&2
+    echo "  mark-enhancing <repo_path> <id>             Add the Enhancing label and remove Idea/Writting, if present" >&2
     exit 1
     ;;
 esac

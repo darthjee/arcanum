@@ -28,6 +28,7 @@ _LIB_TAGS_LOADED=1
 #   enqueued        Enqueued
 #   idea            Idea
 #   writting        Writting
+#   enhancing       Enhancing
 #   pr              PR
 
 # _tag_label_for <canonical_tag>
@@ -46,6 +47,7 @@ _tag_label_for() {
     enqueued)       echo "Enqueued" ;;
     idea)           echo "Idea" ;;
     writting)       echo "Writting" ;;
+    enhancing)      echo "Enhancing" ;;
     pr)             echo "PR" ;;
   esac
 }
@@ -66,6 +68,7 @@ _tag_for_label() {
     Enqueued) echo "enqueued" ;;
     Idea)     echo "idea" ;;
     Writting) echo "writting" ;;
+    Enhancing) echo "enhancing" ;;
     PR)       echo "pr" ;;
   esac
 }
