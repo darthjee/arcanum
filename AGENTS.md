@@ -13,6 +13,7 @@ Nenhuma linguagem de programação — o projeto é composto por arquivos markdo
 - Caminhos referenciados nas instruções (ex: "procure pelo arquivo X") devem ser relativos, nunca absolutos.
 - Quando um caminho absoluto for necessário (ex: dentro de um script), ele deve ser extraído para uma variável em vez de repetido inline.
 - Sempre que possível, extrair lógica das skills para scripts (em vez de instruções em linguagem natural), para tornar o comportamento determinístico e reduzir consumo de tokens.
+- Para skills que precisam de confirmação/seleção do usuário, prefira o padrão de script único conduzindo a interação via `/dev/tty` — ver as seções "Per-Repo Migrations" e "Repo Path Threading" em [docs/agents/architecture.md](docs/agents/architecture.md).
 
 ## Agents
 

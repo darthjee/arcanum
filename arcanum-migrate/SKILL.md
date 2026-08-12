@@ -1,56 +1,42 @@
 ---
 name: arcanum-migrate
-description: Walks this repo through pending per-repo structural changes (renamed/moved config files, new folders, new config shapes) introduced by newer arcanum versions since this repo's arcanum install last caught up — distinct from `/arcanum-update`, which updates the arcanum install itself, not artifacts inside this consuming repo. Reads the repo's recorded arcanum version from `.claude/configuration/arcanum-repo-config.json`, lists any pending migrations, asks for explicit confirmation naming what would run ([A]ll/[N]one/[S]elect), then applies them and relays their output live. Usage: /arcanum-migrate
+description: Walks this repo through pending per-repo structural changes (renamed/moved config files, new folders, new config shapes) introduced by newer arcanum versions since this repo's arcanum install last caught up — distinct from `/arcanum-update`, which updates the arcanum install itself, not artifacts inside this consuming repo. Reads the repo's recorded arcanum version from `.claude/configuration/arcanum-repo-config.json`, then drives a single interactive script that lists pending migrations and prompts directly in the terminal ([A]ll/[N]one/[S]elect/[C]hat) before applying them. Usage: /arcanum-migrate
 ---
 
-You are acting as the **architect**. Your job is to walk this repo through any pending per-repo migrations for the arcanum install it lives inside — one round of chat-level confirmation, then hand off to the deterministic scripts. No further questions once confirmed beyond picking which versions, if `[S]elect` is chosen; no auto-retry on failure.
+You are acting as the **architect**. Your job is to walk this repo through any pending per-repo migrations for the arcanum install it lives inside, via a single call into the deterministic script chain, which owns the whole check → confirm → apply flow itself through `/dev/tty` — including a `[C]hat` escape hatch back to you when the user wants to discuss a version/file before deciding.
 
-## Step 1 — Check for pending migrations
+Resolve `REPO_PATH="$(pwd)"` now — the one moment the target project's root can be trusted from ambient cwd — and thread it through explicitly to every call below.
 
-Run:
+## Step 1 — Warn about the terminal prompt, then make the single call
+
+Tell the user, immediately before the call, that they're about to be prompted directly in their terminal — not in this chat box — for `[A]ll/[N]one/[S]elect/[C]hat`.
+
+Then make exactly one call:
 
 ```bash
-../arcanum/migrations/run.sh check
+../arcanum/migrations/run.sh --repo "$REPO_PATH"
 ```
 
 > Resolve `../arcanum/migrations/run.sh` relative to this skill's own folder (`arcanum-migrate/`).
 
-- **Nonzero exit** — the recorded `.version` in `.claude/configuration/arcanum-repo-config.json` isn't valid semver. Relay the script's stderr verbatim and stop — this needs manual correction (see `docs/guides/arcanum-repo-version.md`), no auto-fix.
-- **Exit 0** — parse `CURRENT=<version>` (first line) and then either `STATUS=up_to_date` or one or more `PENDING=<version>` lines (ascending order).
-  - `STATUS=up_to_date` — report: "This repo is already up to date (version `<CURRENT>`)." Stop here.
-  - One or more `PENDING=<version>` lines — continue to Step 2.
+This single call owns the entire interactive flow — listing the current/pending versions, prompting `[A]ll/[N]one/[S]elect` (and `[C]hat` at every level of the chain) via `/dev/tty`, applying whatever was chosen, and printing any collected errors at the end. The user answers directly in their terminal; you only see the full output once the call returns.
 
-If `CURRENT` was not actually found in the config file (the underlying script treats a missing/absent version as `0.0.0` and prints a warning to stderr pointing at `docs/guides/arcanum-repo-version.md` in that case), relay that warning to the user alongside the version list below so they understand why every migration is pending.
+Once the call returns, relay its full captured stdout/stderr verbatim into the chat transcript (never summarized away, even though the user already saw it live in their terminal) — this includes the `CURRENT`/pending list, the prompt and chosen answer, every migration line, and any error-file dump. On top of that raw relay, add a short plain-language summary of the final outcome. Then branch on the exit code:
 
-## Step 2 — Ask for confirmation
+- **Exit `0`** — completed cleanly (parse the relayed output for an "up to date" vs. "advanced to `<version>`" summary; it may still have recorded skippable errors, already visible in the relay). Done — stop here.
+- **Exit `1`** — halted (a non-skippable migration failed, a usage/no-TTY/invalid-`--repo` error occurred, or the recorded version isn't valid semver); report the relayed error, note it's safely re-runnable since migrations are idempotent — `/arcanum-migrate` will resume from the same point. Done — stop here.
+- **Exit `3`** — `[C]hat` requested; continue to Step 2.
 
-Present the current version and the full pending list in conversation, e.g.:
+## Step 2 — Chat detour, then resume
 
-> This repo is at version `<CURRENT>`. The following migrations are pending, in order: `<PENDING-1>`, `<PENDING-2>`, ... . Run **[A]ll**, **[N]one**, or **[S]elect** specific ones?
+Parse `CHAT_CONTEXT=<version>[/<file>]` from the relayed output — the most specific thing the user asked about (a bare version, or a version plus a specific migration file). If a file is identified, read its paired `.md` description (same basename, `.sh` replaced with `.md`) when present, and hold a plain chat dialogue with the user about it — no `AskUserQuestion`, just ordinary conversation.
 
-Wait for an explicit answer.
-
-- **`[N]one`** — acknowledge and stop. Nothing was touched, this is not an error.
-- **`[A]ll`** — continue to Step 3 with every pending version, in the listed order.
-- **`[S]elect`** — ask which of the pending versions (from the list above) to run, confirm the resulting subset with the user, then continue to Step 3 with just that subset, in ascending order.
-
-## Step 3 — Apply
-
-For `[A]ll`, run once, relaying its stdout/stderr live to the user as it streams (do not hide it behind a summary):
+Once the user has decided what to do, resume with the existing non-interactive form — no re-entry into the `/dev/tty` prompt:
 
 ```bash
-../arcanum/migrations/run.sh apply --all
-```
-
-For `[S]elect`, run once per chosen version, in ascending order, each time relaying its stdout/stderr live before moving to the next one:
-
-```bash
-../arcanum/migrations/run.sh apply --select <version>
+../arcanum/migrations/run.sh apply --all|--none|--select <version> --repo "$REPO_PATH"
 ```
 
 > Resolve `../arcanum/migrations/run.sh` relative to this skill's own folder (`arcanum-migrate/`), same as Step 1.
 
-Each `apply` call already prints any collected errors (skippable or halting) at the end of its own run — that output is part of what you're relaying live, no need to re-summarize it separately.
-
-- **Exit 0** — the run completed with no halting failure (it may still have recorded skippable errors, already visible in the relayed output). If running multiple selected versions, continue to the next one; once all are done, report success and the new recorded version.
-- **Exit 1** — a non-skippable migration failed partway through; the recorded version is frozen at the last fully-clean point (already reported by the script's own output). Stop — do not continue to any further selected versions. Tell the user the run halted, point at the relayed error detail, and note that migration scripts are expected to be idempotent, so re-running `/arcanum-migrate` after a fix is safe and will resume from the same point.
+Relay this call's output the same way as Step 1, then branch on its exit code the same way (`0`/`1` both terminal here — `apply` never itself exits `3`, since the chat detour was already resolved before this call).
