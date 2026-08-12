@@ -1,8 +1,23 @@
 #!/usr/bin/env bash
 # Top-level per-repo migration runner entry point.
-# Usage: run.sh
-#        run.sh check
-#        run.sh apply --all|--none|--select <version>
+# Usage: run.sh [--repo <path>]
+#        run.sh [--repo <path>] check
+#        run.sh [--repo <path>] apply --all|--none|--select <version>
+#
+# --repo <path> is optional and may appear anywhere in the argument
+# list (it's extracted before subcommand dispatch, so `run.sh --repo
+# <path>`, `run.sh --repo <path> check`, and
+# `run.sh apply --all --repo <path>` are all equivalent ways to pass
+# it). Defaults to "." (today's cwd-relative behavior, unchanged, for
+# backward-compatible direct terminal use). When given, it is
+# validated (must exist and be a directory — a bad/malicious path
+# fails fast with a clear error to stderr, exit 1, rather than
+# silently misbehaving), then CONFIG_FILE/ERRORS_FILE resolve relative
+# to it instead of cwd, and it is forwarded verbatim into every
+# update_per_version.sh/select_version.sh call this script makes. The
+# arcanum install location itself (SCRIPT_DIR, derived from
+# BASH_SOURCE) is never affected by --repo — it always self-derives
+# from wherever this script is physically installed.
 #
 # Reads the repo's currently recorded arcanum version from the
 # top-level .version field in
@@ -16,14 +31,20 @@
 # compared numerically field-by-field (not lexicographically — e.g.
 # 0.10.0 > 0.9.0), sorted ascending.
 #
-# --- Form 1: `run.sh` (no args) --- fully interactive, direct terminal
-# use. Prints the current version and pending list, prompts (/dev/tty)
-# [A]ll/[N]one/[S]elect:
+# --- Form 1: `run.sh` (no subcommand) --- fully interactive, direct
+# terminal use. Prints the current version and pending list, verifies
+# /dev/tty is actually open/readable (failing fast to stderr, exit 1,
+# if not), then prompts (/dev/tty) [A]ll/[N]one/[S]elect/[C]hat:
 #   [A]ll     -> loops pending versions ascending, calling
 #                update_per_version.sh <version> --no-confirm for each;
 #                stops immediately if one exits 2 (halt).
 #   [N]one    -> exits 0, untouched.
 #   [S]elect  -> delegates to select_version.sh.
+#   [C]hat    -> prints CHAT_CONTEXT= (empty — nothing selected yet)
+#                and exits 3 immediately.
+# If [A]ll or [S]elect propagates exit 3 ([C]hat requested deeper in
+# the chain), it is re-propagated immediately (exit 3) instead of
+# falling through to the error dump.
 # If no pending versions: prints "Up to date (version <current>)." and
 # exits 0 without touching the errors file.
 #
@@ -49,14 +70,14 @@
 # contents are printed if non-empty. Exit code contract for forms 1 and
 # 3: 0 if the run completed without halting (even with skippable
 # errors recorded), 1 if a halt (exit-2 propagation) occurred anywhere
-# in the chain.
+# in the chain or on a usage/no-TTY/invalid-path error, 3 if [C]hat was
+# chosen at any level in the chain (propagated verbatim, unlike halt —
+# see CHAT_CONTEXT=<version>[/<file>] in the captured stdout).
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MIGRATIONS_SCRIPT_DIR="$SCRIPT_DIR"
-CONFIG_FILE=".claude/configuration/arcanum-repo-config.json"
-ERRORS_FILE=".claude/state/arcanum-errors.json"
 
 # shellcheck source=../_lib/repo_config.sh
 source "${SCRIPT_DIR}/../_lib/repo_config.sh"
@@ -64,6 +85,32 @@ source "${SCRIPT_DIR}/../_lib/repo_config.sh"
 source "${SCRIPT_DIR}/../_lib/lock.sh"
 # shellcheck source=_pending_versions.sh
 source "${SCRIPT_DIR}/_pending_versions.sh"
+
+# Extract an optional --repo <path> from anywhere in the argument
+# list, leaving the rest (subcommand + its own args) untouched in "$@".
+REPO_PATH="."
+ARGS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --repo)
+      REPO_PATH="${2:?Usage: $0 [--repo <path>] [check|apply --all|--none|--select <version>]}"
+      shift 2
+      ;;
+    *)
+      ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+set -- "${ARGS[@]+"${ARGS[@]}"}"
+
+if [[ ! -d "$REPO_PATH" ]]; then
+  echo "Error: --repo path '${REPO_PATH}' does not exist or is not a directory." >&2
+  exit 1
+fi
+
+CONFIG_FILE="${REPO_PATH}/.claude/configuration/arcanum-repo-config.json"
+ERRORS_FILE="${REPO_PATH}/.claude/state/arcanum-errors.json"
 
 # _resolve_current_version
 #   Prints the resolved current version (0.0.0 + stderr warning if
@@ -110,12 +157,14 @@ _pending_list() {
 
 # _run_all <version...>
 #   Loops update_per_version.sh --no-confirm over each given version,
-#   stopping immediately on a halt. Returns 2 on halt, 0 otherwise.
+#   stopping immediately on a halt or a chat request. Returns 2 on
+#   halt, 3 on [C]hat, 0 otherwise.
 _run_all() {
   local rc=0 v
   for v in "$@"; do
-    "${SCRIPT_DIR}/update_per_version.sh" "$v" --no-confirm || rc=$?
+    "${SCRIPT_DIR}/update_per_version.sh" "$v" --no-confirm --repo "$REPO_PATH" || rc=$?
     [[ "$rc" -eq 2 ]] && return 2
+    [[ "$rc" -eq 3 ]] && return 3
   done
   return 0
 }
@@ -166,7 +215,7 @@ cmd_apply() {
       local version="${2:?Usage: $0 apply --select <version>}"
       _reset_errors_file
       local rc=0
-      "${SCRIPT_DIR}/update_per_version.sh" "$version" --no-confirm || rc=$?
+      "${SCRIPT_DIR}/update_per_version.sh" "$version" --no-confirm --repo "$REPO_PATH" || rc=$?
       _print_errors
       [[ "$rc" -eq 2 ]] && exit 1
       exit 0
@@ -196,7 +245,12 @@ cmd_interactive() {
   for v in "${PENDING[@]}"; do
     echo "  $v"
   done
-  printf '[A]ll/[N]one/[S]elect: '
+
+  if ! ( exec 3< /dev/tty ) 2>/dev/null; then
+    echo "Error: no interactive terminal (/dev/tty) available to prompt for [A]ll/[N]one/[S]elect/[C]hat. Use 'check'/'apply' for non-interactive use, or run this from a real terminal." >&2
+    exit 1
+  fi
+  printf '[A]ll/[N]one/[S]elect/[C]hat: '
   read -r choice < /dev/tty
 
   local rc=0
@@ -205,12 +259,18 @@ cmd_interactive() {
       _run_all "${PENDING[@]}" || rc=$?
       ;;
     [Ss]*)
-      "${SCRIPT_DIR}/select_version.sh" || rc=$?
+      "${SCRIPT_DIR}/select_version.sh" --repo "$REPO_PATH" || rc=$?
+      ;;
+    [Cc]*)
+      echo "CHAT_CONTEXT="
+      exit 3
       ;;
     *)
       rc=0
       ;;
   esac
+
+  [[ "$rc" -eq 3 ]] && exit 3
 
   _print_errors
   [[ "$rc" -eq 2 ]] && exit 1
@@ -229,7 +289,7 @@ case "${1:-}" in
     cmd_interactive
     ;;
   *)
-    echo "Usage: $0 [check|apply --all|--none|--select <version>]" >&2
+    echo "Usage: $0 [--repo <path>] [check|apply --all|--none|--select <version>]" >&2
     exit 1
     ;;
 esac

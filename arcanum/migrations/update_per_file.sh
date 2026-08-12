@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
 # Run (or offer to run) a single repo-side migration file.
-# Usage: update_per_file.sh <version> <file_path> [--no-confirm]
+# Usage: update_per_file.sh <version> <file_path> [--no-confirm] [--repo <path>]
 #
 # <file_path> is the path to a migration's NNN.sh file (already
 # resolved by the caller, e.g. arcanum/migrations/repos/0.6.0/001.sh).
+#
+# --repo <path> is optional, trailing (after the required positionals,
+# in any order relative to --no-confirm), and defaults to "." (today's
+# cwd-relative behavior, unchanged). When given, CONFIG_FILE/
+# ERRORS_FILE resolve relative to it instead of cwd. The arcanum
+# install location itself (SCRIPT_DIR, derived from BASH_SOURCE) is
+# never affected by --repo — only target-repo-relative paths are.
 #
 # Every migration file must implement this contract:
 #   NNN.sh config   -> prints a JSON object to stdout, e.g.
@@ -17,8 +24,12 @@
 #
 # Without --no-confirm: prints the paired NNN.md content (same basename
 # as <file_path>, .sh replaced with .md) and prompts (via /dev/tty)
-# [R]un/[S]kip. [S] exits 0 without doing anything (no error recorded,
-# no version change).
+# [R]un/[S]kip/[C]hat. Before attempting the /dev/tty read, verifies
+# /dev/tty is actually open/readable; if not, fails fast to stderr
+# (exit 1) instead of blocking forever. [S] exits 0 without doing
+# anything (no error recorded, no version change). [C]hat prints
+# CHAT_CONTEXT=<version>/<file_basename> to stdout and exits 3 without
+# running the migration or advancing the recorded version.
 #
 # With --no-confirm, or after choosing [R]un above: calls
 # "<file_path> config" for {"skippable": ...}, then "<file_path> run".
@@ -42,32 +53,64 @@
 #                                        which must propagate it
 #                                        upward immediately rather than
 #                                        continuing.
+#
+# Exit code contract: 0 = success/skip, 2 = halt (non-skippable
+# failure), 3 = [C]hat requested (nothing run, version not advanced).
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE=".claude/configuration/arcanum-repo-config.json"
-ERRORS_FILE=".claude/state/arcanum-errors.json"
 
 # shellcheck source=../_lib/repo_config.sh
 source "${SCRIPT_DIR}/../_lib/repo_config.sh"
 # shellcheck source=../_lib/lock.sh
 source "${SCRIPT_DIR}/../_lib/lock.sh"
 
-VERSION="${1:?Usage: $0 <version> <file_path> [--no-confirm]}"
-FILE_PATH="${2:?Usage: $0 <version> <file_path> [--no-confirm]}"
+USAGE="Usage: $0 <version> <file_path> [--no-confirm] [--repo <path>]"
+
+VERSION="${1:?$USAGE}"
+FILE_PATH="${2:?$USAGE}"
+shift 2
+
 NO_CONFIRM=false
-[[ "${3:-}" == "--no-confirm" ]] && NO_CONFIRM=true
+REPO_PATH="."
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --no-confirm)
+      NO_CONFIRM=true
+      shift
+      ;;
+    --repo)
+      REPO_PATH="${2:?$USAGE}"
+      shift 2
+      ;;
+    *)
+      echo "$USAGE" >&2
+      exit 1
+      ;;
+  esac
+done
+
+CONFIG_FILE="${REPO_PATH}/.claude/configuration/arcanum-repo-config.json"
+ERRORS_FILE="${REPO_PATH}/.claude/state/arcanum-errors.json"
 
 if [[ "$NO_CONFIRM" != true ]]; then
   MD_PATH="${FILE_PATH%.sh}.md"
   if [[ -f "$MD_PATH" ]]; then
     cat "$MD_PATH"
   fi
-  printf '[R]un/[S]kip: '
+  if ! ( exec 3< /dev/tty ) 2>/dev/null; then
+    echo "Error: no interactive terminal (/dev/tty) available to prompt for [R]un/[S]kip/[C]hat. Pass --no-confirm, or run this from a real terminal." >&2
+    exit 1
+  fi
+  printf '[R]un/[S]kip/[C]hat: '
   read -r choice < /dev/tty
   case "$choice" in
     [Rr]*) ;;
+    [Cc]*)
+      echo "CHAT_CONTEXT=${VERSION}/$(basename "$FILE_PATH")"
+      exit 3
+      ;;
     *) exit 0 ;;
   esac
 fi
