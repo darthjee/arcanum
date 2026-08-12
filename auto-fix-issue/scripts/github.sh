@@ -24,6 +24,9 @@ source "${SCRIPT_DIR}/../../arcanum/_lib/tag_mutate.sh"
 # Source the shared origin-resolution library
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/../../arcanum/_lib/origin.sh"
+# shellcheck source=../../arcanum/_lib/repo_path.sh
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/../../arcanum/_lib/repo_path.sh"
 
 # --- PR state persistence ---
 
@@ -175,6 +178,12 @@ cmd_pr_ready() {
 
   echo "OK"
 }
+
+case "${1:-}" in
+  info|pr-create|pr-view|pr-ready)
+    repo_path_enter "${2:-}"
+    ;;
+esac
 
 case "${1:-}" in
   info)      shift; cmd_info "$@" ;;

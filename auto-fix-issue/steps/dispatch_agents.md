@@ -4,13 +4,13 @@ Launch one Agent per plan file found in Step 3 of `SKILL.md`, all at the same ti
 
 - `subagent_type`: the agent name itself (e.g. `backend`, `frontend`, `infra`, or whatever name `scripts/list_plan_agents.sh` printed). This agent must already exist as `.claude/agents/<agent-name>.md` in the target project — created by a human or by `/init-claude`. Do not invent or hardcode a fixed set of names; use exactly what the script reported.
 - The path to its plan file: `<PLAN_DIR>/<agent-name>.md`.
-- The instruction below.
+- The instruction below, with `<repo_path>` filled in with the literal `REPO_PATH` value — a spawned agent starts with no memory of this conversation and no `$REPO_PATH` shell variable set, so it must be given the actual path as text, not a shell reference.
 
-When `scripts/list_plan_agents.sh` printed no output (single unsplit plan, handled directly in Step 3 of `SKILL.md` instead of this step), follow the same development cycle yourself, scoped to the whole `PLAN_FILE`, using your own agent name (`architect`) when calling `scripts/commit_change.sh`.
+When `scripts/list_plan_agents.sh` printed no output (single unsplit plan, handled directly in Step 3 of `SKILL.md` instead of this step), follow the same development cycle yourself, scoped to the whole `PLAN_FILE`, using your own agent name (`architect`) when calling `scripts/commit_change.sh`, and `"$REPO_PATH"` since you already have it as a real shell variable.
 
 ## Instruction to each specialist agent
 
-> Read your plan file at `<path>`. Implement everything described in it.
+> The target project's root is `<repo_path>` (substitute the literal `REPO_PATH` value here). Read your plan file at `<path>`. Implement everything described in it.
 >
 > Follow the development cycle:
 > 1. Implement the changes.
@@ -22,8 +22,9 @@ When `scripts/list_plan_agents.sh` printed no output (single unsplit plan, handl
 > 3. Analyze whether refactoring is needed — if so, refactor and repeat from step 2.
 > 4. When clean: `git add` your changes, then commit them by running the helper script — never write the commit message or run `git commit` by hand:
 >    ```bash
->    scripts/commit_change.sh <type> <scope> <id> "<subject>" <agent> "<AI model name>" "<AI model email>" "<optional body>" "<optional comment_url>"
+>    scripts/commit_change.sh <repo_path> <type> <scope> <id> "<subject>" <agent> "<AI model name>" "<AI model email>" "<optional body>" "<optional comment_url>"
 >    ```
+>    - `<repo_path>`: the target project's root, already substituted with its literal value in this instruction (see the top of this prompt) — use it verbatim, do not treat it as a shell variable.
 >    - `<type>`: `feat`, `fix`, `refactor`, `docs`, `test`, or `chore` — whichever best matches this commit.
 >    - `<scope>`: your layer/area (e.g. `backend`, `frontend`, `infra` — match your own agent name unless the plan's `## Files to Change` clearly points to a different scope).
 >    - `<id>`: the issue number.

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Commit changes already staged by a specialist agent
-# Usage: commit_change.sh <type> <scope> <id> <subject> <agent> <model_name> <model_email> [body] [comment_url]
+# Usage: commit_change.sh <repo_path> <type> <scope> <id> <subject> <agent> <model_name> <model_email> [body] [comment_url]
 #
 # Builds a commit message using the repo's commit message template
 # (.github/commit_message_template.md) and commits with `git commit -F -`.
@@ -18,21 +18,25 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../arcanum/_lib/push.sh"
+source "${SCRIPT_DIR}/../../arcanum/_lib/repo_path.sh"
 
-TYPE="${1:-}"
-SCOPE="${2:-}"
-ID="${3:-}"
-SUBJECT="${4:-}"
-AGENT="${5:-}"
-MODEL_NAME="${6:-}"
-MODEL_EMAIL="${7:-}"
-BODY="${8:-}"
-COMMENT_URL="${9:-}"
+REPO_PATH="${1:-}"
+TYPE="${2:-}"
+SCOPE="${3:-}"
+ID="${4:-}"
+SUBJECT="${5:-}"
+AGENT="${6:-}"
+MODEL_NAME="${7:-}"
+MODEL_EMAIL="${8:-}"
+BODY="${9:-}"
+COMMENT_URL="${10:-}"
 
-[[ -n "$TYPE" && -n "$SCOPE" && -n "$ID" && -n "$SUBJECT" && -n "$AGENT" && -n "$MODEL_NAME" && -n "$MODEL_EMAIL" ]] || {
-  echo "Usage: $0 <type> <scope> <id> <subject> <agent> <model_name> <model_email> [body] [comment_url]" >&2
+[[ -n "$REPO_PATH" && -n "$TYPE" && -n "$SCOPE" && -n "$ID" && -n "$SUBJECT" && -n "$AGENT" && -n "$MODEL_NAME" && -n "$MODEL_EMAIL" ]] || {
+  echo "Usage: $0 <repo_path> <type> <scope> <id> <subject> <agent> <model_name> <model_email> [body] [comment_url]" >&2
   exit 1
 }
+
+repo_path_enter "$REPO_PATH"
 
 {
   echo "${TYPE}(${SCOPE}): ${SUBJECT} (issue #${ID})"

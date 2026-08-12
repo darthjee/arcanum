@@ -47,7 +47,7 @@ Launch the responsible agent(s) in parallel (single message, multiple Agent tool
 - The relevant plan file path(s) under `docs/agents/plans/<issue_dir>/` for context.
 - The instruction to implement the feedback (or fix the failure), run the full local dev/test/lint cycle, and commit via:
   ```bash
-  ../../auto-fix-issue/scripts/commit_change.sh <type> <scope> <id> "<subject>" <agent> "<AI model name>" "<AI model email>" "<optional body>" "<comment_url>"
+  ../../auto-fix-issue/scripts/commit_change.sh "$REPO_PATH" <type> <scope> <id> "<subject>" <agent> "<AI model name>" "<AI model email>" "<optional body>" "<comment_url>"
   ```
   (resolved relative to the `auto-fix-issue` skill folder, same script and conventions used during the original implementation step). Pass the comment's `url` (from its header line) as `<comment_url>` when this dispatch is for a specific PR comment; omit it entirely (no trailing argument) when handling a failed check-run, since that isn't tied to any one comment.
 
