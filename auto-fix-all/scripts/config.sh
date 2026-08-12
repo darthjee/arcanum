@@ -9,33 +9,31 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE=".claude/configuration/auto-fix-all.json"
 STATE_CONFIG_FILE=".claude/state/auto-fix-all-config.json"
-LOCK_FILE=".claude/state/auto-fix-all-config.lock"
-STATE_DIR=".claude/state"
+NEW_CONFIG_FILE=".claude/configuration/arcanum-repo-config.json"
+NEW_STATE_FILE=".claude/state/arcanum-config.json"
+NAMESPACE="auto-fix-all"
 
-mkdir -p "$STATE_DIR"
+# shellcheck source=../../arcanum/_lib/repo_config.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/repo_config.sh"
 
-# shellcheck source=../../arcanum/_lib/lock.sh
-source "${SCRIPT_DIR}/../../arcanum/_lib/lock.sh"
+# Returns the NEW (namespaced) file that a given key should be read
+# from/written to: clear_context and finish_on_empty_queue are personal,
+# frequently-toggled state and live in the gitignored state file; every
+# other key lives in the committed configuration file.
+_new_file_for_key() {
+  case "$1" in
+    clear_context|finish_on_empty_queue) echo "$NEW_STATE_FILE" ;;
+    *) echo "$NEW_CONFIG_FILE" ;;
+  esac
+}
 
-# Returns the file that a given key should be read from/written to:
-# clear_context and finish_on_empty_queue are personal, frequently-toggled
-# state and live in the gitignored STATE_CONFIG_FILE; every other key lives
-# in the committed CONFIG_FILE.
-_config_file_for_key() {
+# Returns the LEGACY file counterpart of _new_file_for_key, used as a
+# fallback by repo_config_read/repo_config_write.
+_legacy_file_for_key() {
   case "$1" in
     clear_context|finish_on_empty_queue) echo "$STATE_CONFIG_FILE" ;;
     *) echo "$CONFIG_FILE" ;;
   esac
-}
-
-# Reads the config object from the given file, or "{}" if absent/empty.
-_read_config() {
-  local f="$1"
-  if [[ -s "$f" ]]; then
-    cat "$f"
-  else
-    echo "{}"
-  fi
 }
 
 case ${1:-} in
@@ -45,8 +43,9 @@ case ${1:-} in
       exit 1
     fi
     KEY="$2"
-    TARGET_FILE="$(_config_file_for_key "$KEY")"
-    _read_config "$TARGET_FILE" | jq -r --arg k "$KEY" '.[$k] // false'
+    VALUE=$(repo_config_read "$(_new_file_for_key "$KEY")" "$(_legacy_file_for_key "$KEY")" "$NAMESPACE" "$KEY")
+    VALUE="${VALUE:-false}"
+    echo "$VALUE"
     ;;
 
   is-enabled)
@@ -55,8 +54,8 @@ case ${1:-} in
       exit 1
     fi
     KEY="$2"
-    TARGET_FILE="$(_config_file_for_key "$KEY")"
-    VALUE=$(_read_config "$TARGET_FILE" | jq -r --arg k "$KEY" '.[$k] // false')
+    VALUE=$(repo_config_read "$(_new_file_for_key "$KEY")" "$(_legacy_file_for_key "$KEY")" "$NAMESPACE" "$KEY")
+    VALUE="${VALUE:-false}"
     [[ "$VALUE" == "true" ]]
     ;;
 
@@ -71,11 +70,7 @@ case ${1:-} in
       echo "Error: value must be 'true' or 'false'" >&2
       exit 1
     fi
-    TARGET_FILE="$(_config_file_for_key "$KEY")"
-    _acquire_lock
-    _read_config "$TARGET_FILE" | jq --arg k "$KEY" --arg v "$VALUE" '.[$k] = ($v == "true")' > "${TARGET_FILE}.tmp"
-    mv "${TARGET_FILE}.tmp" "$TARGET_FILE"
-    _release_lock
+    repo_config_write "$(_new_file_for_key "$KEY")" "$(_legacy_file_for_key "$KEY")" "$NAMESPACE" "$KEY" "$VALUE"
     ;;
 
   toggle)
@@ -84,17 +79,14 @@ case ${1:-} in
       exit 1
     fi
     KEY="$2"
-    TARGET_FILE="$(_config_file_for_key "$KEY")"
-    _acquire_lock
-    CURRENT=$(_read_config "$TARGET_FILE" | jq -r --arg k "$KEY" '.[$k] // false')
+    CURRENT=$(repo_config_read "$(_new_file_for_key "$KEY")" "$(_legacy_file_for_key "$KEY")" "$NAMESPACE" "$KEY")
+    CURRENT="${CURRENT:-false}"
     if [[ "$CURRENT" == "true" ]]; then
       NEW_VALUE="false"
     else
       NEW_VALUE="true"
     fi
-    _read_config "$TARGET_FILE" | jq --arg k "$KEY" --arg v "$NEW_VALUE" '.[$k] = ($v == "true")' > "${TARGET_FILE}.tmp"
-    mv "${TARGET_FILE}.tmp" "$TARGET_FILE"
-    _release_lock
+    repo_config_write "$(_new_file_for_key "$KEY")" "$(_legacy_file_for_key "$KEY")" "$NAMESPACE" "$KEY" "$NEW_VALUE"
     echo "$NEW_VALUE"
     ;;
 

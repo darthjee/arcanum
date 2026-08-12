@@ -10,10 +10,14 @@
 # every git-tracked file except the dev-only paths listed in EXCLUDES
 # (skill folders and arcanum/ pass through untouched; arcanum.version
 # itself is excluded — installs no longer read a shipped copy of it,
-# see arcanum/install/installer.sh). Also embeds a MANIFEST file at the
-# zip root, listing every packaged path one per line, so installer.sh/
-# updater.sh can reconcile an install without needing git. Prints the
-# absolute path of the produced zip as the last line of stdout.
+# see arcanum/install/installer.sh). "docs/" is excluded except for
+# "docs/guides/" (packaged user-facing guides, e.g. linked from
+# arcanum/_lib/repo_config.sh's fallback warning) — every other doc
+# under docs/ stays dev-only and unshipped. Also embeds a MANIFEST file
+# at the zip root, listing every packaged path one per line, so
+# installer.sh/updater.sh can reconcile an install without needing git.
+# Prints the absolute path of the produced zip as the last line of
+# stdout.
 
 set -euo pipefail
 
@@ -41,7 +45,11 @@ is_excluded() {
   local path="$1"
   local exclude
   for exclude in "${EXCLUDES[@]}"; do
-    if [[ "$exclude" == */ ]]; then
+    if [[ "$exclude" == "docs/" ]]; then
+      # Carve-out: docs/ is excluded wholesale except docs/guides/,
+      # which is packaged (see header comment above).
+      [[ "$path" == docs/* && "$path" != docs/guides/* ]] && return 0
+    elif [[ "$exclude" == */ ]]; then
       [[ "$path" == "$exclude"* ]] && return 0
     else
       [[ "$path" == "$exclude" ]] && return 0
