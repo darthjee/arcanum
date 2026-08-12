@@ -8,3 +8,4 @@ A checklist of concerns to consider when fleshing out a vague issue idea (tagged
 - **Backward compatibility** — whether this breaks existing behavior, data, or integrations.
 - **Testing strategy** — how the change will be verified.
 - **Performance & security considerations** — anything relevant to load, latency, or attack surface.
+- **Migration needed?** — does this change require a migration script under `arcanum/migrations/repos/<version>/` so repos that already installed arcanum can catch up (e.g. a config file shape change, a renamed/moved file)? If so, note it so the migration ships in the same version as the change it belongs to.
