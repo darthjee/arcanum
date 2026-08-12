@@ -24,6 +24,8 @@ source "${SCRIPT_DIR}/../../arcanum/_lib/origin.sh"
 source "${SCRIPT_DIR}/../../arcanum/_lib/tags.sh"
 # shellcheck source=../../arcanum/_lib/tag_mutate.sh
 source "${SCRIPT_DIR}/../../arcanum/_lib/tag_mutate.sh"
+# shellcheck source=../../arcanum/_lib/repo_path.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/repo_path.sh"
 
 # --- Commands ---
 
@@ -201,6 +203,12 @@ cmd_remove_tag() {
 
   tag_mutate_remove_label "$id" "$repo_ref" "$tag" || exit 1
 }
+
+case "${1:-}" in
+  pr-number|pr-state|pr-merge|cleanup-branch|has-shipit-label|add-tag|remove-tag)
+    repo_path_enter "${2:-}"
+    ;;
+esac
 
 case "${1:-}" in
   pr-number)         shift; cmd_pr_number "$@" ;;

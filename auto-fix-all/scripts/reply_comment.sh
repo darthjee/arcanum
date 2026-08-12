@@ -23,6 +23,7 @@ RESOLVE_PR_NUMBER="$SCRIPT_DIR/../../auto-monitor-issue-pr/scripts/resolve_pr_nu
 
 source "${SCRIPT_DIR}/../../arcanum/_lib/origin.sh"
 source "${SCRIPT_DIR}/../../arcanum/_lib/push.sh"
+source "${SCRIPT_DIR}/../../arcanum/_lib/repo_path.sh"
 
 REPO_PATH="${1:-}"
 ID="${2:-}"
@@ -40,6 +41,8 @@ usage() {
 [[ -n "$REPO_PATH" ]] || usage
 [[ "$ID" =~ ^[0-9]+$ ]] || usage
 [[ -n "$AGENT" && -n "$MODEL_NAME" && -n "$MODEL_EMAIL" && -n "$REPLY_BODY" ]] || usage
+
+repo_path_enter "$REPO_PATH"
 
 PR_NUMBER=$("$RESOLVE_PR_NUMBER" "$REPO_PATH" "$ID")
 

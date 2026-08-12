@@ -17,7 +17,7 @@ Otherwise (the ID was already known from Step 1, e.g. an explicit numeric id or 
 Run:
 
 ```bash
-scripts/commit_issue.sh <FILE> <ID> "<your AI model name>" "<your AI model noreply email>"
+scripts/commit_issue.sh "$REPO_PATH" <FILE> <ID> "<your AI model name>" "<your AI model noreply email>"
 ```
 
 This stages `<FILE>` and commits it using the repo's commit message template (`.github/commit_message_template.md`), with `type=docs`, `scope=issue`, subject `"add issue file"`, and the agent fixed to `architect`. Never commit by hand — always go through this script.

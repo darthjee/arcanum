@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Bootstrap or reuse the branch for an issue, merged up to date with main
-# Usage: checkout_from_main.sh <id>
+# Usage: checkout_from_main.sh <repo_path> <id>
 #
 # Fetches "origin/main" and "origin/issue-<id>" (a missing remote ref for
 # either is not a hard error; any other fetch failure is reported).
@@ -26,13 +26,18 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../../arcanum/_lib/git_branch.sh
 source "${SCRIPT_DIR}/../../arcanum/_lib/git_branch.sh"
+# shellcheck source=../../arcanum/_lib/repo_path.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/repo_path.sh"
 
-ID="${1:-}"
+REPO_PATH="${1:-}"
+ID="${2:-}"
 
-[[ -n "$ID" ]] || {
-  echo "Usage: $0 <id>" >&2
+[[ -n "$REPO_PATH" && -n "$ID" ]] || {
+  echo "Usage: $0 <repo_path> <id>" >&2
   exit 1
 }
+
+repo_path_enter "$REPO_PATH"
 
 BRANCH="issue-${ID}"
 

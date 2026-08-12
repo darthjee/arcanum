@@ -9,8 +9,12 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # shellcheck source=../../arcanum/_lib/origin.sh
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../arcanum/_lib/origin.sh"
+source "${SCRIPT_DIR}/../../arcanum/_lib/origin.sh"
+# shellcheck source=../../arcanum/_lib/repo_path.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/repo_path.sh"
 
 REPO_PATH="${1:?Usage: $0 <repo_path> <id>}"
 ID="${2:-}"
@@ -20,6 +24,8 @@ ID="${ID#\#}"
   echo "Usage: $0 <repo_path> <id>" >&2
   exit 1
 }
+
+repo_path_enter "$REPO_PATH"
 
 # Try the local issue state first (avoids an extra GitHub API call)
 SCRIPT_DIR_SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

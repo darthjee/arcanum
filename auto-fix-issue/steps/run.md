@@ -1,6 +1,6 @@
 You are the **architect**. Your job is to autonomously coordinate the implementation of a planned issue — no questions to the user, no confirmation loop, unlike the interactive `fix-issue` skill. Follow the steps below precisely and in order.
 
-The issues folder is always `docs/agents/issues` and the plans folder is always `docs/agents/plans`. `REPO_PATH` (the target project's root) is carried in from your invocation prompt or from whichever nested caller read this file directly — thread it through to every script call below that resolves the GitHub repo (currently just [open_pr.md](open_pr.md)'s Step 6).
+The issues folder is always `docs/agents/issues` and the plans folder is always `docs/agents/plans`. `REPO_PATH` (the target project's root) is carried in from your invocation prompt or from whichever nested caller read this file directly — thread it through to every script call below that resolves the GitHub repo or performs a git operation (Step 2's `create_branch.sh`, Step 3/5's `commit_change.sh` fallback, and [open_pr.md](open_pr.md)'s Step 6).
 
 ## Step 0 — Resume check
 
@@ -55,7 +55,7 @@ scripts/issue_state.sh set <id> step plan_located
 Run:
 
 ```bash
-scripts/create_branch.sh <PLAN_DIR> <id>
+scripts/create_branch.sh "$REPO_PATH" <PLAN_DIR> <id>
 ```
 
 > Resolve `scripts/create_branch.sh` relative to the `auto-fix-issue` skill folder.
@@ -65,13 +65,13 @@ This reads the branch name from `## Branch` in `plan.md`, falling back to `issue
 Then bring the branch up to date with `main` before any agent is dispatched:
 
 ```bash
-scripts/merge_main.sh
+scripts/merge_main.sh "$REPO_PATH"
 ```
 
 > Resolve `scripts/merge_main.sh` relative to the `auto-fix-issue` skill folder.
 
 - **`STATUS=ok`**: continue below.
-- **`STATUS=conflict`**: apply the same responsible-agent-selection approach as [../auto-fix-all/steps/handle_comment.md](../auto-fix-all/steps/handle_comment.md)'s "Choosing the responsible agent(s)" section, treating each conflicted path it printed like a failed check-run name — dispatch the responsible specialist(s) (or resolve it yourself, as architect, if none seem responsible) to fix the conflict, then `git add` the resolved paths and run `git commit` with no message argument (the merge-commit message `git merge --no-edit` already prepared is reused as-is). No user interaction.
+- **`STATUS=conflict`**: apply the same responsible-agent-selection approach as [../auto-fix-all/steps/handle_comment.md](../auto-fix-all/steps/handle_comment.md)'s "Choosing the responsible agent(s)" section, treating each conflicted path it printed like a failed check-run name — dispatch the responsible specialist(s) (or resolve it yourself, as architect, if none seem responsible) to fix the conflict, then run `git -C "$REPO_PATH" add` on the resolved paths and `git -C "$REPO_PATH" commit` with no message argument (the merge-commit message `git merge --no-edit` already prepared is reused as-is) — never bare `git add`/`git commit`, which would operate against the Bash tool's ambient cwd instead of the target repo. No user interaction.
 
 Once the branch is checked out and merged up to date with `main` (conflict resolved, if any), record the step:
 

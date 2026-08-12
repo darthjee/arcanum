@@ -19,7 +19,7 @@ Your invocation prompt also carries `REPO_PATH` (the target project's root, reso
 ## 1. Bootstrap the issue branch, merged up to date with main
 
 ```bash
-scripts/checkout_from_main.sh <id>
+scripts/checkout_from_main.sh "$REPO_PATH" <id>
 ```
 
 > Resolve `scripts/checkout_from_main.sh` relative to the `auto-fix-all` skill folder.
@@ -27,7 +27,7 @@ scripts/checkout_from_main.sh <id>
 This fetches `origin`, then either reuses branch `issue-<id>` — merging `origin/main` into it (`--no-edit`) if it already exists locally or remotely, e.g. because `discuss-issue` already prepared it — or creates it fresh from `origin/main` if it doesn't exist at all. Every issue always starts from a branch merged up to date with `main`, without discarding planning/discussion work already committed to it. Parse `STATUS` from its output:
 
 - **`STATUS=ok`**: continue to Step 2 below.
-- **`STATUS=conflict`**: apply the same responsible-agent-selection approach as [handle_comment.md](handle_comment.md)'s "Choosing the responsible agent(s)" section, treating each conflicted path the script printed like a failed check-run name — dispatch the responsible specialist(s) (or resolve it yourself, as architect, if none seem responsible) to fix the conflict, then `git add` the resolved paths and run `git commit` with no message argument (the merge-commit message `git merge --no-edit` already prepared is reused as-is). No user interaction. Then continue to Step 2.
+- **`STATUS=conflict`**: apply the same responsible-agent-selection approach as [handle_comment.md](handle_comment.md)'s "Choosing the responsible agent(s)" section, treating each conflicted path the script printed like a failed check-run name — dispatch the responsible specialist(s) (or resolve it yourself, as architect, if none seem responsible) to fix the conflict, then run `git -C "$REPO_PATH" add` on the resolved paths and `git -C "$REPO_PATH" commit` with no message argument (the merge-commit message `git merge --no-edit` already prepared is reused as-is) — never bare `git add`/`git commit`, which would operate against the Bash tool's ambient cwd instead of the target repo. No user interaction. Then continue to Step 2.
 
 ## 2. Create the issue file
 
@@ -43,7 +43,7 @@ scripts/github.sh add-tag "$REPO_PATH" <id> fetched
 
 ## 3. Create the plan
 
-Read [../../auto-plan-issue/steps/run.md](../../auto-plan-issue/steps/run.md) and follow all its steps for `<id>`. Its final step commits the plan files — do not commit them again here.
+Read [../../auto-plan-issue/steps/run.md](../../auto-plan-issue/steps/run.md) and follow all its steps for `<id>`, carrying `REPO_PATH` forward unchanged. Its final step commits the plan files — do not commit them again here.
 
 Once that finishes, swap the `fetched` tag for `working` on the live GitHub issue, to signal implementation is starting:
 
@@ -107,7 +107,7 @@ Report `OUTCOME=closed PR_NUMBER=<pr_number>`. Done — stop here. Do not ask th
 
 1. Remove planning artifacts and commit (never commit this by hand):
    ```bash
-   scripts/cleanup_artifacts.sh <issue_file> <plan_dir> <id> "<your AI model name>" "<your AI model noreply email>"
+   scripts/cleanup_artifacts.sh "$REPO_PATH" <issue_file> <plan_dir> <id> "<your AI model name>" "<your AI model noreply email>"
    ```
    `<issue_file>` and `<plan_dir>` are the same paths resolved by `../auto-plan-issue/scripts/resolve_plan_paths.sh docs/agents/issues docs/agents/plans <id>` (re-run it here, resolved relative to the `auto-plan-issue` skill folder, if you no longer have them at hand).
 2. Wait for CI:

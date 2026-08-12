@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Merge origin/main into the currently checked-out issue branch
-# Usage: merge_main.sh
+# Usage: merge_main.sh <repo_path>
 #
 # Assumes the target issue branch is already checked out — this just
 # brings it up to date with "origin/main" (fetches, then merges with
@@ -12,7 +12,13 @@
 
 set -euo pipefail
 
+REPO_PATH="${1:?Usage: $0 <repo_path>}"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../../arcanum/_lib/repo_path.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/repo_path.sh"
+repo_path_enter "$REPO_PATH"
+
 # shellcheck source=../../arcanum/_lib/git_branch.sh
 source "${SCRIPT_DIR}/../../arcanum/_lib/git_branch.sh"
 

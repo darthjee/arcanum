@@ -1,6 +1,6 @@
 You are the **architect**. Your job is to autonomously produce a complete implementation plan for an issue — no questions to the user, no confirmation loop. Follow the steps below precisely and in order.
 
-The issues folder is always `docs/agents/issues` and the plans folder is always `docs/agents/plans`.
+The issues folder is always `docs/agents/issues` and the plans folder is always `docs/agents/plans`. `REPO_PATH` (the target project's root) is carried in from your invocation prompt or from whichever nested caller read this file directly — thread it through to Step 5's `commit_plan.sh` call.
 
 ## Step 1 — Resolve the issue ID and plan paths
 
@@ -37,7 +37,7 @@ Read [write_plan.md](write_plan.md) and follow the instructions there to write `
 Run:
 
 ```bash
-scripts/commit_plan.sh <PLAN_DIR> <id> "<your AI model name>" "<your AI model noreply email>"
+scripts/commit_plan.sh "$REPO_PATH" <PLAN_DIR> <id> "<your AI model name>" "<your AI model noreply email>"
 ```
 
 > Resolve `scripts/commit_plan.sh` relative to the `auto-plan-issue` skill folder.

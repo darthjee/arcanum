@@ -58,6 +58,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../arcanum/_lib/origin.sh"
 # shellcheck source=../../arcanum/_lib/push.sh
 source "${SCRIPT_DIR}/../../arcanum/_lib/push.sh"
+# shellcheck source=../../arcanum/_lib/repo_path.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/repo_path.sh"
 
 ISSUE_STATE_SCRIPT="${SCRIPT_DIR}/../../auto-fix-issue/scripts/issue_state.sh"
 
@@ -90,6 +92,8 @@ PR_NUMBER="${PR_NUMBER#\#}"
   echo "Usage: $0 <repo_path> --pr-number <pr_number> [--issue-id <id>]" >&2
   exit 1
 }
+
+repo_path_enter "$REPO_PATH"
 
 _ensure_gh_user
 PR_OWNER=$(get_gh_user)

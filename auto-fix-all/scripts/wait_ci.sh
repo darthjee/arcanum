@@ -35,6 +35,10 @@ REPO_PATH="${1:?Usage: $0 <repo_path>}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# shellcheck source=../../arcanum/_lib/repo_path.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/repo_path.sh"
+repo_path_enter "$REPO_PATH"
+
 # shellcheck source=../../arcanum/_lib/repo_config.sh
 source "${SCRIPT_DIR}/../../arcanum/_lib/repo_config.sh"
 
