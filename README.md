@@ -17,6 +17,7 @@ Skills are prompt files that Claude Code loads as slash commands. Each skill liv
 | Skill | Description |
 |-------|-------------|
 | [`/init-claude`](init-claude/) | Initializes a project's AI configuration: creates or consolidates `CLAUDE.md`, `.github/copilot-instructions.md`, and `AGENTS.md`, then scaffolds `docs/agents/` with architecture, folder structure, and contributing guides. |
+| [`/arcanum-split-issue`](arcanum-split-issue/) | Breaks a single GitHub issue into several sub-issues through interactive dialogue, generating one local draft file per sub-issue, then pushing each as a real GitHub issue linked to the parent via GitHub's native sub-issue relationship. |
 | [`/enhance-issue`](enhance-issue/) | Iteratively flesh out a still-vague GitHub issue idea (tagged `Idea`/`Writting`) through checklist-driven dialogue, before it's mature enough for `/discuss-issue`. |
 | [`/discuss-issue`](discuss-issue/) | Discusses and refines an existing GitHub issue through iterative dialogue, optionally spawning specialist agents to deepen understanding, then saves it and, on confirmation, kicks off planning on a committed branch. |
 | [`/plan-issue`](plan-issue/) | Reads an issue file, analyzes the codebase, and writes a structured implementation plan in `docs/agents/plans/`. |

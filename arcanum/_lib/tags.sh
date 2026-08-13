@@ -30,6 +30,8 @@ _LIB_TAGS_LOADED=1
 #   writting        Writting
 #   enhancing       Enhancing
 #   pr              PR
+#   planning        Planning
+#   split           Split
 
 # _tag_label_for <canonical_tag>
 #   Echoes the GitHub label name for <canonical_tag>, or nothing if
@@ -49,6 +51,8 @@ _tag_label_for() {
     writting)       echo "Writting" ;;
     enhancing)      echo "Enhancing" ;;
     pr)             echo "PR" ;;
+    planning)       echo "Planning" ;;
+    split)          echo "Split" ;;
   esac
 }
 
@@ -70,6 +74,8 @@ _tag_for_label() {
     Writting) echo "writting" ;;
     Enhancing) echo "enhancing" ;;
     PR)       echo "pr" ;;
+    Planning) echo "planning" ;;
+    Split)    echo "split" ;;
   esac
 }
 

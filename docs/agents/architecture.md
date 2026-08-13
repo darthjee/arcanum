@@ -91,7 +91,7 @@ The same convention applies to every script that **mutates local git state** (`g
 This is a distinct, broader pattern from `arcanum-migrate`'s optional `--repo <path>` flag (see "Per-Repo Migrations" below): that flag exists specifically because `arcanum-migrate` is a directly-terminal-invocable master script a human runs by hand, with cwd defaulting sensibly when the flag is omitted. The `repo_path`/`REPO_PATH` convention described here is the general one — required, no default, no cwd fallback — for every script/skill in the agent-driven `auto-*`/`discuss-issue`/`enhance-issue` chains.
 
 The convention: `REPO_PATH` is resolved exactly **once**, at the very top of a skill's run, the one moment ambient cwd can be trusted —
-- for a skill that runs entirely inline as the architect (no subagent spawn — e.g. `discuss-issue`, `enhance-issue`, `monitor-issues`, `init-claude`, `push-issue-to-queue`), that's the first step of its own `SKILL.md`;
+- for a skill that runs entirely inline as the architect (no subagent spawn — e.g. `discuss-issue`, `enhance-issue`, `arcanum-split-issue`, `monitor-issues`, `init-claude`, `push-issue-to-queue`), that's the first step of its own `SKILL.md`;
 - for a skill using the coordinator/architect-subagent split described above, that's the coordinator-layer `SKILL.md`, right before it spawns.
 
 From that point on, `REPO_PATH` is threaded explicitly — as the leading argument to every script call, and as part of the prompt text for every further `Agent(architect, ...)` spawn or direct nested `steps/*.md` read (see "Cross-Skill References" below) — for the rest of that run. It is never re-derived from `pwd` partway through, since downstream steps (or a spawned subagent) may have `cd`'d elsewhere by then. This applies just as much when a spawned specialist agent (not the architect itself) needs to call a git-mutating script (e.g. `commit_change.sh` from `auto-fix-issue/steps/dispatch_agents.md`'s development cycle): since a fresh `Agent` spawn has no `$REPO_PATH` shell variable set, the architect writing that agent's instructions substitutes the literal path as text, rather than a shell reference the agent has no way to resolve.
@@ -148,6 +148,8 @@ Issue status is tracked via real GitHub labels on the issue — labels are the s
 | `idea` | `Idea` |
 | `writting` | `Writting` |
 | `enhancing` | `Enhancing` |
+| `planning` | `Planning` |
+| `split` | `Split` |
 | `pr` | `PR` |
 
 **`shipit`** is human-only: no script ever adds or removes the `shipit` label (`arcanum/_lib/tag_mutate.sh` refuses any attempt at the shared-library level). It marks an issue as pre-approved, so `auto-fix-all` skips PR review/monitoring and merges directly once CI passes, checked via `auto-fix-all/scripts/github.sh has-shipit-label` — the pipeline's only interaction with this tag is reading it.
@@ -171,6 +173,8 @@ Issue status is tracked via real GitHub labels on the issue — labels are the s
 **`pr`** is added by `auto-fix-issue`'s `pr-create`/`pr-ready` (`auto-fix-issue/scripts/github.sh`'s `_sync_pr_labels_and_state`, called from `cmd_pr_create`/`cmd_pr_ready`) once a PR exists for the issue, idempotently via `tag_mutate_add_label`, so the issue's label list reflects at a glance whether a PR is open. The same helper also refreshes `.claude/state/issue-<id>.json`'s `tags` field from the issue's current GitHub labels.
 
 `auto-shipit` (PR-only — deliberately not part of the canonical issue-tag table above, since it is never read from or written to an issue) is a purely informational label with no reader anywhere in the pipeline. `_sync_pr_labels_and_state` adds it directly to the PR (`gh pr edit --add-label auto-shipit`) whenever the issue's refreshed tags include `shipit`, so a developer glancing at the PR's labels can tell at a glance that the underlying issue already had `shipit` approval — the human-only `shipit` label on the issue itself is never touched.
+
+**`planning`** and **`split`** track `arcanum-split-issue`'s own two-stage lifecycle on the *parent* issue being broken up — distinct from every tag above, none of which apply to a parent that stays open as a tracking issue after its work has moved to sub-issues. `planning` is applied by `arcanum/_lib/github_issue.sh`'s `mark-planning` subcommand, called by `arcanum-split-issue`'s fetch step as soon as the parent issue is fetched — it adds `Planning` and removes whichever of `Idea`/`Writting`/`Created` is present, since the skill can be invoked either before or after `enhance-issue`. `split` is applied by the same file's `mark-split` subcommand, called by `arcanum-split-issue`'s finishing script once every sub-issue has been pushed to GitHub and linked to the parent — it adds `Split` and removes `Planning`. The parent issue is never closed by this transition; it stays open, now labeled `Split`, as an umbrella issue that `auto-fix-all` does not pick up on its own. Each newly created sub-issue itself enters the pipeline fresh, labeled `Writting` (copied from the parent's labels with `Planning` swapped out), ready for `enhance-issue`/`discuss-issue`.
 
 ### Tag mutation primitives
 

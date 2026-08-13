@@ -9,6 +9,8 @@
 #   mark-refined <repo_path> <id>               Add the Refined label and remove Created, if present
 #   mark-ready <repo_path> <id>                 Add the Ready label and remove Refined, if present
 #   mark-enhancing <repo_path> <id>             Add the Enhancing label and remove Idea/Writting, if present
+#   mark-planning <repo_path> <id>               Add the Planning label and remove Idea/Writting/Created, if present
+#   mark-split <repo_path> <id>                  Add the Split label and remove Planning, if present
 
 set -euo pipefail
 
@@ -242,6 +244,42 @@ cmd_mark_enhancing() {
   return 0
 }
 
+cmd_mark_planning() {
+  local repo_path="${1:-}"
+  local id="${2:-}"
+  [[ -n "$repo_path" && -n "$id" ]] || { echo "Usage: $0 mark-planning <repo_path> <id>" >&2; exit 1; }
+
+  _load_origin "$repo_path"
+  local repo_ref="$_ORIGIN_REPO_PATH"
+
+  tag_mutate_add_label "$id" "$repo_ref" planning \
+    || echo "Warning: could not add 'planning' tag to issue #$id on $repo_ref" >&2
+  tag_mutate_remove_label "$id" "$repo_ref" idea \
+    || echo "Warning: could not remove 'idea' tag from issue #$id on $repo_ref" >&2
+  tag_mutate_remove_label "$id" "$repo_ref" writting \
+    || echo "Warning: could not remove 'writting' tag from issue #$id on $repo_ref" >&2
+  tag_mutate_remove_label "$id" "$repo_ref" created \
+    || echo "Warning: could not remove 'created' tag from issue #$id on $repo_ref" >&2
+
+  return 0
+}
+
+cmd_mark_split() {
+  local repo_path="${1:-}"
+  local id="${2:-}"
+  [[ -n "$repo_path" && -n "$id" ]] || { echo "Usage: $0 mark-split <repo_path> <id>" >&2; exit 1; }
+
+  _load_origin "$repo_path"
+  local repo_ref="$_ORIGIN_REPO_PATH"
+
+  tag_mutate_add_label "$id" "$repo_ref" split \
+    || echo "Warning: could not add 'split' tag to issue #$id on $repo_ref" >&2
+  tag_mutate_remove_label "$id" "$repo_ref" planning \
+    || echo "Warning: could not remove 'planning' tag from issue #$id on $repo_ref" >&2
+
+  return 0
+}
+
 cmd_mark_ready() {
   local repo_path="${1:-}"
   local id="${2:-}"
@@ -267,6 +305,8 @@ case "${1:-}" in
   mark-refined)    shift; cmd_mark_refined "$@" ;;
   mark-ready)      shift; cmd_mark_ready "$@" ;;
   mark-enhancing)  shift; cmd_mark_enhancing "$@" ;;
+  mark-planning)   shift; cmd_mark_planning "$@" ;;
+  mark-split)      shift; cmd_mark_split "$@" ;;
   *)
     echo "Usage: $0 <command> [args]" >&2
     echo "Commands:" >&2
@@ -278,6 +318,8 @@ case "${1:-}" in
     echo "  mark-refined <repo_path> <id>               Add the Refined label and remove Created, if present" >&2
     echo "  mark-ready <repo_path> <id>                 Add the Ready label and remove Refined, if present" >&2
     echo "  mark-enhancing <repo_path> <id>             Add the Enhancing label and remove Idea/Writting, if present" >&2
+    echo "  mark-planning <repo_path> <id>               Add the Planning label and remove Idea/Writting/Created, if present" >&2
+    echo "  mark-split <repo_path> <id>                  Add the Split label and remove Planning, if present" >&2
     exit 1
     ;;
 esac
