@@ -85,6 +85,7 @@ DEFAULT_LABEL_PAIRS=(
   Enhancing:335ecc
   PR:31a5e0
   auto-shipit:ffb004
+  Automated:d93f0b
 )
 
 label_config_validate_pair() {

@@ -28,6 +28,9 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y zip jq
       - run:
+          name: Check docs/agents/tag-mutations.md is up to date (non-blocking)
+          command: scripts/check_tags_table.sh
+      - run:
           name: Build release zip
           command: |
             ZIP_PATH=$(scripts/build_release_zip.sh)
