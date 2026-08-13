@@ -2,4 +2,4 @@
 # Thin wrapper — delegates to the canonical copy in arcanum/_lib/
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec "${SCRIPT_DIR}/../../arcanum/_lib/resolve_and_fetch.sh" "$@"
+exec "${SCRIPT_DIR}/../../arcanum/_lib/github_issue.sh" "$@"

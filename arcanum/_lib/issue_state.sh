@@ -5,6 +5,7 @@
 #   issue_state.sh get <id> <field>                   → prints value or empty string, exits 0
 #   issue_state.sh set <id> <field> <value>            → sets string field, exits 0
 #   issue_state.sh set-json <id> <field> <json_value>  → sets JSON field (array/object), exits 0
+#   issue_state.sh append-json <id> <field> <json_value>  → appends to a JSON array field, exits 0
 #
 # State file: .claude/state/issue-<id>.json
 # Lock file:  .claude/state/issue-<id>.lock
@@ -19,6 +20,7 @@ if [[ -z "$COMMAND" || -z "$ISSUE_ID" || -z "$FIELD" ]]; then
   echo "Usage: $0 get <id> <field>" >&2
   echo "       $0 set <id> <field> <value>" >&2
   echo "       $0 set-json <id> <field> <json_value>" >&2
+  echo "       $0 append-json <id> <field> <json_value>" >&2
   exit 1
 fi
 
@@ -101,11 +103,23 @@ case "$COMMAND" in
     trap - EXIT
     ;;
 
+  append-json)
+    JSON_VALUE="${4:-}"
+    _acquire_lock
+    trap '_release_lock' EXIT
+    CURRENT=$(_read_state)
+    UPDATED=$(echo "$CURRENT" | jq --arg field "$FIELD" --argjson value "$JSON_VALUE" '.[$field] = ((.[$field] // []) + [$value])')
+    _write_state "$UPDATED"
+    _release_lock
+    trap - EXIT
+    ;;
+
   *)
     echo "Unknown command: $COMMAND" >&2
     echo "Usage: $0 get <id> <field>" >&2
     echo "       $0 set <id> <field> <value>" >&2
     echo "       $0 set-json <id> <field> <json_value>" >&2
+    echo "       $0 append-json <id> <field> <json_value>" >&2
     exit 1
     ;;
 esac

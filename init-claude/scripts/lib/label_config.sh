@@ -86,6 +86,8 @@ DEFAULT_LABEL_PAIRS=(
   PR:31a5e0
   auto-shipit:ffb004
   Automated:d93f0b
+  Planning:c5def5
+  Split:000000
 )
 
 label_config_validate_pair() {

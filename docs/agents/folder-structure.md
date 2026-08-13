@@ -9,6 +9,7 @@
 | `auto-fix-issue/` | Skill `/auto-fix-issue` — implementa uma issue planejada de forma autônoma, despachando agentes especialistas em paralelo e abrindo/marcando pronto o PR. |
 | `auto-fix-all/` | Skill `/auto-fix-all` — orquestra o pipeline completo (issue → plano → fix → monitoramento) para uma fila de IDs, um por vez, reagindo a comentários, aprovações, falhas de CI e fechamentos de PR até esvaziar a fila. |
 | `init-claude/` | Skill `/init-claude` — configura AGENTS.md/CLAUDE.md/copilot-instructions.md e a estrutura de docs do projeto. |
+| `arcanum-split-issue/` | Skill `/arcanum-split-issue` — quebra uma issue ampla em várias sub-issues através de diálogo interativo, gera um arquivo local por sub-issue, e então publica cada uma como uma issue real no GitHub, ligada à issue-pai via relação nativa de sub-issue do GitHub. |
 | `new-issue/` | Skill `/new-issue` — cria um novo arquivo de issue. |
 | `enhance-issue/` | Skill `/enhance-issue` — ajuda o usuário a amadurecer uma ideia de issue ainda vaga (tag `Idea`/`Writting`) através de diálogo guiado por uma lista de preocupações, antes de publicá-la como `Created`. |
 | `plan-issue/` | Skill `/plan-issue` — cria o plano de implementação de uma issue existente. |

@@ -6,6 +6,7 @@ One row per call site, across all skills, that mutates a GitHub issue tag/label 
 
 | Skill | Step | Entrypoint | Tags Added | Tags Removed |
 |-------|------|------------|------------|--------------|
+| arcanum-split-issue | 1 (fetch.md) | `arcanum-split-issue/scripts/github.sh` | planning | idea,writting,created |
 | auto-fix-all | 2 (process_one_issue.md) | `auto-fix-all/scripts/github.sh` | fetched | - |
 | auto-fix-all | 2 (process_one_issue.md) | `auto-fix-all/scripts/github.sh` | - | fetched |
 | auto-fix-all | 2 (process_one_issue.md) | `auto-fix-all/scripts/github.sh` | working | - |
