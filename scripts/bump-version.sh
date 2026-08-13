@@ -8,7 +8,10 @@
 # arcanum/migrations/repos/next/ (pending, unreleased per-repo migrations)
 # into arcanum/migrations/repos/<new-version>/, and recreates an empty
 # next/ (with a .keep placeholder) in its place, so a migration always
-# ships in the same release as the change it belongs to.
+# ships in the same release as the change it belongs to. Also regenerates
+# docs/agents/tag-mutations.md (scripts/generate_tags_table.sh, default
+# non-interactive mode), so it self-heals at every release even if nobody
+# ran it manually mid-cycle.
 # Does NOT commit or tag anything — that remains a separate, manual (or
 # future) step.
 #
@@ -49,6 +52,8 @@ echo "$NEW_VERSION" > "$VERSION_FILE"
 sed -i.bak -E "s/^DEFAULT_VERSION=\"[^\"]*\"/DEFAULT_VERSION=\"${NEW_VERSION}\"/" "$BOOTSTRAP_FILE"
 rm -f "${BOOTSTRAP_FILE}.bak"
 
+"${SCRIPT_DIR}/generate_tags_table.sh"
+
 sed -i.bak -E \
   "s#\*\*Current Version:\*\* \[[0-9]+\.[0-9]+\.[0-9]+\]\(https://github.com/${REPO_SLUG}/releases/tag/[0-9]+\.[0-9]+\.[0-9]+\)#**Current Version:** [${NEW_VERSION}](https://github.com/${REPO_SLUG}/releases/tag/${NEW_VERSION})#" \
   "$README_FILE"
@@ -76,7 +81,7 @@ fi
 
 echo "New version:  ${NEW_VERSION}"
 echo "Next release: ${NEXT_RELEASE}"
-echo "Updated ${VERSION_FILE}, ${BOOTSTRAP_FILE}, and ${README_FILE}."
+echo "Updated ${VERSION_FILE}, ${BOOTSTRAP_FILE}, ${README_FILE}, and docs/agents/tag-mutations.md."
 
 if is_migrations_dir_empty "$NEXT_MIGRATIONS_DIR"; then
   touch "${NEXT_MIGRATIONS_DIR}/.keep"   # defensive: keep it git-trackable even if .keep was missing

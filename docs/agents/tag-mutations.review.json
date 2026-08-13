@@ -1,0 +1,60 @@
+{
+  "reviewed": [
+    {
+      "skill": "auto-fix-all",
+      "step_file": "process_one_issue.md",
+      "match": "scripts/github.sh add-tag \"$REPO_PATH\" <id> fetched",
+      "status": "confirmed",
+      "reason": "initial triage — real, correctly-detected call site"
+    },
+    {
+      "skill": "auto-fix-all",
+      "step_file": "process_one_issue.md",
+      "match": "scripts/github.sh remove-tag \"$REPO_PATH\" <id> fetched",
+      "status": "confirmed",
+      "reason": "initial triage — real, correctly-detected call site"
+    },
+    {
+      "skill": "auto-fix-all",
+      "step_file": "process_one_issue.md",
+      "match": "scripts/github.sh add-tag \"$REPO_PATH\" <id> working",
+      "status": "confirmed",
+      "reason": "initial triage — real, correctly-detected call site"
+    },
+    {
+      "skill": "auto-rewrite-issue",
+      "step_file": "run.md",
+      "match": "../monitor-issues/scripts/github.sh remove-tag \"$REPO_PATH\" <id> created",
+      "status": "confirmed",
+      "reason": "initial triage — real, correctly-detected call site"
+    },
+    {
+      "skill": "discuss-issue",
+      "step_file": "discuss_and_save.md",
+      "match": "../scripts/github.sh mark-refined \"$REPO_PATH\" <id>",
+      "status": "confirmed",
+      "reason": "initial triage — real, correctly-detected call site"
+    },
+    {
+      "skill": "discuss-issue",
+      "step_file": "discuss_and_save.md",
+      "match": "5. Run `../scripts/github.sh mark-ready \"$REPO_PATH\" <id>` (resolved relative to this file's directory) to swap the `Refined` label for `Ready`, now that the issue + plan are committed and pushed — this is the point where the issue is actually ready for `auto-fix-all`/`auto-fix-issue` to pick up.",
+      "status": "confirmed",
+      "reason": "initial triage — real, correctly-detected call site"
+    },
+    {
+      "skill": "enhance-issue",
+      "step_file": "fetch.md",
+      "match": "../scripts/github.sh mark-enhancing \"$REPO_PATH\" <id>",
+      "status": "confirmed",
+      "reason": "initial triage — real, correctly-detected call site"
+    },
+    {
+      "skill": "enhance-issue",
+      "step_file": "publish.md",
+      "match": "../scripts/github.sh mark-created \"$REPO_PATH\" <id>",
+      "status": "confirmed",
+      "reason": "initial triage — real, correctly-detected call site"
+    }
+  ]
+}
