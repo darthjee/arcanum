@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
-# Run (or offer to run) a single repo-side migration file.
+# Run (or offer to run) a single repo-side migration entry.
 # Usage: update_per_file.sh <version> <file_path> [--no-confirm]
 #                            [--skippable true|false] [--repo <path>]
+#                            [--type script|instructions]
+#                            [--instructions-file <path>] [--id <id>]
+#
+# --type defaults to "script", for backward compatibility with direct/
+# legacy calls. --instructions-file and --id are required when --type
+# instructions (ignored otherwise).
+#
+# --- type: script ---
 #
 # <file_path> is the path to a migration's NNN.sh file (already
 # resolved by the caller, e.g. arcanum/migrations/repos/0.6.0/001.sh).
+# Entirely unchanged from before this file's "instructions" support.
 #
 # --skippable <bool> is optional. update_per_version.sh (the only
 # caller) always resolves it from the entry's manifest (or, for legacy
@@ -17,13 +26,13 @@
 # manifest-aware rewrite.
 #
 # --repo <path> is optional, trailing (after the required positionals,
-# in any order relative to --no-confirm/--skippable), and defaults to
-# "." (today's cwd-relative behavior, unchanged). When given,
-# ERRORS_FILE resolves relative to it instead of cwd. The arcanum
-# install location itself (SCRIPT_DIR, derived from BASH_SOURCE) is
-# never affected by --repo — only target-repo-relative paths are.
+# in any order relative to the other flags), and defaults to "."
+# (today's cwd-relative behavior, unchanged). When given, ERRORS_FILE
+# resolves relative to it instead of cwd. The arcanum install location
+# itself (SCRIPT_DIR, derived from BASH_SOURCE) is never affected by
+# --repo — only target-repo-relative paths are.
 #
-# Every migration file must implement this contract:
+# Every "script" migration file must implement this contract:
 #   NNN.sh config   -> prints a JSON object to stdout, e.g.
 #                       {"skippable": true}, and exits 0. Only actually
 #                       called by this script when --skippable is
@@ -76,8 +85,31 @@
 #                                        their own version-advance step
 #                                        when this happens.
 #
+# --- type: instructions ---
+#
+# <file_path> is the entry's human-facing description .md, given
+# directly (there is no ".sh" to derive it from) — printed at the
+# confirm prompt exactly like a "script" entry's paired ".md", same UX.
+# Never shells out to "<file> config"/"<file> run" — there's nothing to
+# execute; a bash script cannot perform an instructions entry's work
+# itself.
+#
+#   [R]un (or --no-confirm) -> prints AI_INSTRUCTIONS=<version>/<id> to
+#                               stdout and exits 3 immediately. No
+#                               attempt to run anything.
+#   [S]kip                  -> exits 0, same as "script" (no ledger
+#                               write — relies on the same "skip
+#                               doesn't block version-advance"
+#                               semantics "script" entries already
+#                               have).
+#   [C]hat                  -> prints CHAT_CONTEXT=<version>/<id> (using
+#                               <id>, not a filename, since an
+#                               instructions entry has two files) and
+#                               exits 3.
+#
 # Exit code contract: 0 = success/skip, 2 = halt (non-skippable
-# failure), 3 = [C]hat requested (nothing run).
+# "script" failure), 3 = [C]hat requested or AI_INSTRUCTIONS hand-off
+# (nothing run by this script either way).
 
 set -euo pipefail
 
@@ -86,7 +118,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../_lib/lock.sh
 source "${SCRIPT_DIR}/../_lib/lock.sh"
 
-USAGE="Usage: $0 <version> <file_path> [--no-confirm] [--skippable true|false] [--repo <path>]"
+USAGE="Usage: $0 <version> <file_path> [--no-confirm] [--skippable true|false] [--repo <path>] [--type script|instructions] [--instructions-file <path>] [--id <id>]"
 
 VERSION="${1:?$USAGE}"
 FILE_PATH="${2:?$USAGE}"
@@ -95,6 +127,9 @@ shift 2
 NO_CONFIRM=false
 REPO_PATH="."
 SKIPPABLE=""
+TYPE="script"
+INSTRUCTIONS_FILE=""
+ID=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --no-confirm)
@@ -109,6 +144,18 @@ while [[ $# -gt 0 ]]; do
       REPO_PATH="${2:?$USAGE}"
       shift 2
       ;;
+    --type)
+      TYPE="${2:?$USAGE}"
+      shift 2
+      ;;
+    --instructions-file)
+      INSTRUCTIONS_FILE="${2:?$USAGE}"
+      shift 2
+      ;;
+    --id)
+      ID="${2:?$USAGE}"
+      shift 2
+      ;;
     *)
       echo "$USAGE" >&2
       exit 1
@@ -116,7 +163,46 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ "$TYPE" == "instructions" ]]; then
+  [[ -n "$INSTRUCTIONS_FILE" && -n "$ID" ]] || {
+    echo "Error: --type instructions requires --instructions-file <path> and --id <id>." >&2
+    exit 1
+  }
+  [[ -f "$INSTRUCTIONS_FILE" ]] || {
+    echo "Error: instructions file '${INSTRUCTIONS_FILE}' not found." >&2
+    exit 1
+  }
+fi
+
 ERRORS_FILE="${REPO_PATH}/.claude/state/arcanum-errors.json"
+
+if [[ "$TYPE" == "instructions" ]]; then
+  if [[ "$NO_CONFIRM" != true ]]; then
+    if [[ -f "$FILE_PATH" ]]; then
+      cat "$FILE_PATH"
+    fi
+    if ! ( exec 3< /dev/tty ) 2>/dev/null; then
+      echo "Error: no interactive terminal (/dev/tty) available to prompt for [R]un/[S]kip/[C]hat. Pass --no-confirm, or run this from a real terminal." >&2
+      exit 1
+    fi
+    printf '[R]un/[S]kip/[C]hat: '
+    read -r choice < /dev/tty
+    case "$choice" in
+      [Rr]*)
+        echo "AI_INSTRUCTIONS=${VERSION}/${ID}"
+        exit 3
+        ;;
+      [Cc]*)
+        echo "CHAT_CONTEXT=${VERSION}/${ID}"
+        exit 3
+        ;;
+      *) exit 0 ;;
+    esac
+  fi
+
+  echo "AI_INSTRUCTIONS=${VERSION}/${ID}"
+  exit 3
+fi
 
 if [[ "$NO_CONFIRM" != true ]]; then
   MD_PATH="${FILE_PATH%.sh}.md"
