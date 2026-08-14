@@ -15,6 +15,14 @@ Once the user is satisfied with the issue overall (the end of the [dialogue.md](
 
 Delete `FILE` (the local `docs/agents/issues/<id>-...md` draft) — unlike `discuss-issue`, this skill never commits its local file; it's transient working material only, and the live GitHub issue body is now the source of truth.
 
-## 3. Confirm
+## 3. Release the working tree
+
+```bash
+../../arcanum/_lib/checkout_safe_branch.sh "$REPO_PATH"
+```
+
+> Resolve `../../arcanum/_lib/checkout_safe_branch.sh` relative to this file's directory. This is a defensive no-op today — this skill never checks out `issue-<id>` itself — but keeps the working tree in the same known-safe state every one of `enhance-issue`/`discuss-issue`/`arcanum-split-issue` leaves it in at its true end point.
+
+## 4. Confirm
 
 Tell the user the issue has been updated on GitHub and is now tagged `Created`, ready to enter the `discuss-issue` → `plan-issue`/`auto-plan-issue` → `auto-fix-issue` pipeline.

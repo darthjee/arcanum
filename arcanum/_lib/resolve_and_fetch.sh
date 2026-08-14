@@ -6,6 +6,15 @@
 # was just fetched is an implementation detail callers don't need to know.
 # The only case outside of that is the GitHub issue not existing (or no id
 # being given at all), reported as STATUS=error.
+#
+# Before resolving/fetching anything, also fetches and checks out the
+# configured "safe" branch (arcanum/_lib/checkout_safe_branch.sh — see
+# arcanum/_lib/safe_branch.sh) so the working tree never sits on whatever
+# branch happened to be checked out before this ran. A dirty tracked-file
+# working tree makes that call fail hard (nonzero exit, stderr message,
+# no STATUS= line at all) — a failure mode outside the STATUS=ok/
+# STATUS=error contract below, which is specifically about "does the
+# GitHub issue exist."
 # Usage: resolve_and_fetch.sh <repo_path> <issues_folder> <arg_string>
 #
 # Output (key=value lines):
@@ -23,6 +32,18 @@ ARG_STRING="${3:-}"
 [[ -n "$ISSUES_FOLDER" ]] || { echo "Usage: $0 <repo_path> <issues_folder> [arg_string]" >&2; exit 1; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Park the working tree on the configured safe branch (default
+# "origin/main") before resolving/fetching anything below — this is the
+# opening checkout shared by enhance-issue, discuss-issue, and
+# arcanum-split-issue's Step 1, all of which call this file (directly or
+# through a thin wrapper). A dirty tracked-file working tree makes this
+# hard-error (message to stderr, exit 1) before any STATUS= line is ever
+# printed — deliberately outside this script's own STATUS=ok/STATUS=error
+# contract, which is specifically about "does the GitHub issue exist,"
+# not this. See docs/agents/architecture.md's "Branch Bootstrap and Merge
+# Conflicts" section for the full writeup.
+"${SCRIPT_DIR}/checkout_safe_branch.sh" "$REPO_PATH" >/dev/null
 
 SCENARIO="" ID="" TITLE="" FILE="" STATUS="" NEEDS_FETCH=""
 while IFS='=' read -r key value; do

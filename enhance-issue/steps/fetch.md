@@ -1,6 +1,6 @@
 # Resolve Issue ID and Fetch Content
 
-The id is always numeric and tied to a real GitHub issue — there is no local-only id convention. `enhance-issue` only operates on existing GitHub issues, whatever their current tags (`Idea`, `Writting`, or anything else), so resolving the id and fetching its content is a single script call reused directly from `discuss-issue`:
+The id is always numeric and tied to a real GitHub issue — there is no local-only id convention. `enhance-issue` only operates on existing GitHub issues, whatever their current tags (`Idea`, `Writting`, or anything else), so resolving the id and fetching its content is a single script call reused directly from `discuss-issue`. Before resolving/fetching anything, this call also fetches and checks out the configured safe branch (default `origin/main`, detached HEAD — see `arcanum/_lib/safe_branch.sh`), parking the working tree off whatever `issue-<id>` branch might already be checked out; a dirty tracked-file working tree makes the whole call fail (a plain script error surfaced to the user, not a `STATUS=error` case):
 
 ```bash
 ../../discuss-issue/scripts/resolve_and_fetch.sh "$REPO_PATH" docs/agents/issues "<skill_args>"
