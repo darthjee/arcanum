@@ -7,8 +7,9 @@
 # "Current Version" / "Next Release" lines in README.md. Also rolls
 # arcanum/migrations/repos/next/ (pending, unreleased per-repo migrations)
 # into arcanum/migrations/repos/<new-version>/, and recreates an empty
-# next/ (with a .keep placeholder) in its place, so a migration always
-# ships in the same release as the change it belongs to. Also regenerates
+# next/ (with a migrations.json containing []) in its place, so a
+# migration always ships in the same release as the change it belongs
+# to. Also regenerates
 # docs/agents/tag-mutations.md (scripts/generate_tags_table.sh, default
 # non-interactive mode), so it self-heals at every release even if nobody
 # ran it manually mid-cycle.
@@ -67,7 +68,8 @@ VERSION_MIGRATIONS_DIR="${MIGRATIONS_REPOS_DIR}/${NEW_VERSION}"
 
 is_migrations_dir_empty() {
   local dir="$1"
-  [[ -z "$(find "$dir" -mindepth 1 ! -name '.keep')" ]]
+  local manifest="${dir}/migrations.json"
+  [[ ! -f "$manifest" ]] || [[ "$(jq -c '.' "$manifest" 2>/dev/null)" == "[]" ]]
 }
 
 if [[ -d "$VERSION_MIGRATIONS_DIR" ]]; then
@@ -84,11 +86,12 @@ echo "Next release: ${NEXT_RELEASE}"
 echo "Updated ${VERSION_FILE}, ${BOOTSTRAP_FILE}, ${README_FILE}, and docs/agents/tag-mutations.md."
 
 if is_migrations_dir_empty "$NEXT_MIGRATIONS_DIR"; then
-  touch "${NEXT_MIGRATIONS_DIR}/.keep"   # defensive: keep it git-trackable even if .keep was missing
+  # defensive: keep migrations.json present even if it was missing
+  [[ -f "${NEXT_MIGRATIONS_DIR}/migrations.json" ]] || echo "[]" > "${NEXT_MIGRATIONS_DIR}/migrations.json"
   echo "No pending migrations in ${NEXT_MIGRATIONS_DIR} — skipping rename."
 else
   mv "$NEXT_MIGRATIONS_DIR" "$VERSION_MIGRATIONS_DIR"
   mkdir -p "$NEXT_MIGRATIONS_DIR"
-  touch "${NEXT_MIGRATIONS_DIR}/.keep"
+  echo "[]" > "${NEXT_MIGRATIONS_DIR}/migrations.json"
   echo "Moved ${NEXT_MIGRATIONS_DIR} -> ${VERSION_MIGRATIONS_DIR} and recreated an empty ${NEXT_MIGRATIONS_DIR}."
 fi

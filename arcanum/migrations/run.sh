@@ -19,17 +19,21 @@
 # BASH_SOURCE) is never affected by --repo — it always self-derives
 # from wherever this script is physically installed.
 #
-# Reads the repo's currently recorded arcanum version from the
-# top-level .version field in
-# .claude/configuration/arcanum-repo-config.json. If absent, treats it
-# as 0.0.0 and warns (all migrations will run — see
-# docs/guides/arcanum-repo-version.md). If present but not valid semver
-# (X.Y.Z), hard-errors rather than guessing.
+# Reads two version pointers: the committed one, from the top-level
+# .version field in .claude/configuration/arcanum-repo-config.json, and
+# the local-only one, from .claude/state/arcanum-config.json's
+# .migrations.version. If either is absent, it's treated as 0.0.0 and
+# warned about (all migrations gated by that axis will run — see
+# docs/guides/arcanum-repo-version.md). If either is present but not
+# valid semver (X.Y.Z), hard-errors rather than guessing.
 #
 # Pending versions are the folders under arcanum/migrations/repos/
-# (excluding "next") strictly greater than the current version,
-# compared numerically field-by-field (not lexicographically — e.g.
-# 0.10.0 > 0.9.0), sorted ascending.
+# whose manifest (migrations.json, or legacy glob discovery when
+# absent) has at least one "repo"-scoped entry beyond the committed
+# version, or at least one "local"-scoped entry beyond the local
+# version — compared numerically field-by-field (not lexicographically
+# — e.g. 0.10.0 > 0.9.0), sorted ascending. See _pending_versions.sh
+# and _manifest.sh for the exact dual-pointer/scope gating.
 #
 # --- Form 1: `run.sh` (no subcommand) --- fully interactive, direct
 # terminal use. Prints the current version and pending list, verifies
@@ -110,10 +114,11 @@ if [[ ! -d "$REPO_PATH" ]]; then
 fi
 
 CONFIG_FILE="${REPO_PATH}/.claude/configuration/arcanum-repo-config.json"
+LOCAL_CONFIG_FILE="${REPO_PATH}/.claude/state/arcanum-config.json"
 ERRORS_FILE="${REPO_PATH}/.claude/state/arcanum-errors.json"
 
 # _resolve_current_version
-#   Prints the resolved current version (0.0.0 + stderr warning if
+#   Prints the resolved committed version (0.0.0 + stderr warning if
 #   absent) on stdout and returns 0, or prints an error to stderr and
 #   returns 1 if the recorded version isn't valid semver.
 _resolve_current_version() {
@@ -126,6 +131,24 @@ _resolve_current_version() {
   fi
   if ! [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     echo "Error: version '${v}' is not valid semver." >&2
+    return 1
+  fi
+  echo "$v"
+}
+
+# _resolve_current_local_version
+#   Same as _resolve_current_version, but for the local-only pointer
+#   (.claude/state/arcanum-config.json's .migrations.version).
+_resolve_current_local_version() {
+  local v
+  v="$(repo_config_get_version "$LOCAL_CONFIG_FILE" migrations)"
+  if [[ -z "$v" ]]; then
+    echo "Warning: no local version found in ${LOCAL_CONFIG_FILE} (.migrations.version) — treating as 0.0.0, all local-scoped migrations will run. See docs/guides/arcanum-repo-version.md." >&2
+    echo "0.0.0"
+    return 0
+  fi
+  if ! [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "Error: local version '${v}' is not valid semver." >&2
     return 1
   fi
   echo "$v"
@@ -146,13 +169,13 @@ _print_errors() {
   fi
 }
 
-# _pending_list <current_version>
+# _pending_list <current_version> <current_local_version>
 #   Fills the global PENDING array from _pending_versions.
 _pending_list() {
   PENDING=()
   while IFS= read -r v; do
     [[ -n "$v" ]] && PENDING+=("$v")
-  done < <(_pending_versions "$1")
+  done < <(_pending_versions "$1" "$2")
 }
 
 # _run_all <version...>
@@ -170,12 +193,14 @@ _run_all() {
 }
 
 cmd_check() {
-  local current
+  local current local_current
   current="$(_resolve_current_version)" || exit 1
+  local_current="$(_resolve_current_local_version)" || exit 1
 
-  _pending_list "$current"
+  _pending_list "$current" "$local_current"
 
   echo "CURRENT=${current}"
+  echo "LOCAL=${local_current}"
   if [[ ${#PENDING[@]} -eq 0 ]]; then
     echo "STATUS=up_to_date"
   else
@@ -192,12 +217,13 @@ cmd_apply() {
 
   case "$mode" in
     --all)
-      local current
+      local current local_current
       current="$(_resolve_current_version)" || exit 1
-      _pending_list "$current"
+      local_current="$(_resolve_current_local_version)" || exit 1
+      _pending_list "$current" "$local_current"
 
       if [[ ${#PENDING[@]} -eq 0 ]]; then
-        echo "Up to date (version ${current})."
+        echo "Up to date (repo version ${current}, local version ${local_current})."
         exit 0
       fi
 
@@ -228,18 +254,20 @@ cmd_apply() {
 }
 
 cmd_interactive() {
-  local current
+  local current local_current
   current="$(_resolve_current_version)" || exit 1
-  _pending_list "$current"
+  local_current="$(_resolve_current_local_version)" || exit 1
+  _pending_list "$current" "$local_current"
 
   if [[ ${#PENDING[@]} -eq 0 ]]; then
-    echo "Up to date (version ${current})."
+    echo "Up to date (repo version ${current}, local version ${local_current})."
     exit 0
   fi
 
   _reset_errors_file
 
   echo "Current version: ${current}"
+  echo "Local version: ${local_current}"
   echo "Pending versions:"
   local v
   for v in "${PENDING[@]}"; do

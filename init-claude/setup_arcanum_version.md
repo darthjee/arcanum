@@ -12,7 +12,7 @@ scripts/stamp_arcanum_version.sh
 
 > Resolve `scripts/stamp_arcanum_version.sh` relative to the `init-claude` skill folder.
 
-This resolves the current arcanum install's version (from `arcanum.json` for a zip install, or the exact git tag for a `git clone` install) and, if it's a valid semver version, writes it to `.version` in `.claude/configuration/arcanum-repo-config.json`. If the version can't be resolved as valid semver (e.g. a git clone not checked out on a release tag), it skips the write — `arcanum/migrations/run.sh` already treats a missing `.version` as `0.0.0` and warns, which is an acceptable fallback for this case.
+This resolves the current arcanum install's version (from `arcanum.json` for a zip install, or the exact git tag for a `git clone` install) and, if it's a valid semver version, writes it to both `.version` in `.claude/configuration/arcanum-repo-config.json` (the committed pointer) and `.migrations.version` in `.claude/state/arcanum-config.json` (the local-only pointer — see `docs/guides/arcanum-repo-version.md` for why there are two). If the version can't be resolved as valid semver (e.g. a git clone not checked out on a release tag), it skips both writes — `arcanum/migrations/run.sh` already treats either missing pointer as `0.0.0` and warns, which is an acceptable fallback for this case.
 
 ## Step 2 — No confirmation needed
 

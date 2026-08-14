@@ -1,27 +1,28 @@
 #!/usr/bin/env bash
-# Compute the next pending-migration filename under
+# Compute the next pending-migration id under
 # arcanum/migrations/repos/next/.
 # Usage: generate_next.sh
 #
-# Looks at existing NNN.sh files (3-digit zero-padded) under repos/next/
-# and prints the next number, zero-padded to 3 digits, to stdout: "001"
-# if none exist yet, otherwise (highest existing number) + 1. Never
-# fills a gap left by a deleted/skipped file. Exits 0.
+# Reads repos/next/migrations.json (always present — an empty array
+# when nothing is pending yet) and prints the next id, zero-padded to
+# 3 digits, to stdout: "001" if the array is empty, otherwise (highest
+# existing "id" across all entries) + 1. Never fills a gap left by a
+# deleted/skipped entry. Exits 0.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-NEXT_DIR="${SCRIPT_DIR}/repos/next"
+NEXT_MANIFEST="${SCRIPT_DIR}/repos/next/migrations.json"
 
 HIGHEST=0
-shopt -s nullglob
-for f in "${NEXT_DIR}"/[0-9][0-9][0-9].sh; do
-  base="$(basename "$f" .sh)"
-  num=$((10#$base))
-  if (( num > HIGHEST )); then
-    HIGHEST=$num
-  fi
-done
-shopt -u nullglob
+if [[ -f "$NEXT_MANIFEST" ]]; then
+  while IFS= read -r id; do
+    [[ -n "$id" ]] || continue
+    num=$((10#$id))
+    if (( num > HIGHEST )); then
+      HIGHEST=$num
+    fi
+  done < <(jq -r '.[].id' "$NEXT_MANIFEST")
+fi
 
 printf '%03d\n' "$((HIGHEST + 1))"

@@ -1,20 +1,37 @@
 #!/usr/bin/env bash
 # Run (or offer to run) a single repo-side migration file.
-# Usage: update_per_file.sh <version> <file_path> [--no-confirm] [--repo <path>]
+# Usage: update_per_file.sh <version> <file_path> [--no-confirm]
+#                            [--skippable true|false] [--repo <path>]
 #
 # <file_path> is the path to a migration's NNN.sh file (already
 # resolved by the caller, e.g. arcanum/migrations/repos/0.6.0/001.sh).
 #
+# --skippable <bool> is optional. update_per_version.sh (the only
+# caller) always resolves it from the entry's manifest (or, for legacy
+# glob-discovered entries, from a live "<file_path> config" call) via
+# _manifest.sh before calling this script, and passes it straight
+# through — so this script itself never has to know whether the entry
+# it's running is manifest-driven or legacy. When --skippable is
+# omitted (e.g. a direct, ad-hoc invocation), this script falls back to
+# calling "<file_path> config" itself, same as before this file's
+# manifest-aware rewrite.
+#
 # --repo <path> is optional, trailing (after the required positionals,
-# in any order relative to --no-confirm), and defaults to "." (today's
-# cwd-relative behavior, unchanged). When given, CONFIG_FILE/
-# ERRORS_FILE resolve relative to it instead of cwd. The arcanum
+# in any order relative to --no-confirm/--skippable), and defaults to
+# "." (today's cwd-relative behavior, unchanged). When given,
+# ERRORS_FILE resolves relative to it instead of cwd. The arcanum
 # install location itself (SCRIPT_DIR, derived from BASH_SOURCE) is
 # never affected by --repo — only target-repo-relative paths are.
 #
 # Every migration file must implement this contract:
 #   NNN.sh config   -> prints a JSON object to stdout, e.g.
-#                       {"skippable": true}, and exits 0.
+#                       {"skippable": true}, and exits 0. Only actually
+#                       called by this script when --skippable is
+#                       omitted (legacy/ad-hoc path — see above); a
+#                       manifest-driven entry's "skippable" already
+#                       lives in migrations.json instead, so its own
+#                       config subcommand becomes redundant (kept for
+#                       backward compatibility, harmless either way).
 #   NNN.sh run      -> performs the migration; exits 0 on success,
 #                       nonzero on failure (failure message to stderr).
 #                       Must be idempotent (safe to re-run) — a
@@ -27,46 +44,49 @@
 # [R]un/[S]kip/[C]hat. Before attempting the /dev/tty read, verifies
 # /dev/tty is actually open/readable; if not, fails fast to stderr
 # (exit 1) instead of blocking forever. [S] exits 0 without doing
-# anything (no error recorded, no version change). [C]hat prints
+# anything (no error recorded). [C]hat prints
 # CHAT_CONTEXT=<version>/<file_basename> to stdout and exits 3 without
-# running the migration or advancing the recorded version.
+# running the migration.
 #
-# With --no-confirm, or after choosing [R]un above: calls
-# "<file_path> config" for {"skippable": ...}, then "<file_path> run".
+# With --no-confirm, or after choosing [R]un above: runs
+# "<file_path> run" (resolving skippable first, per --skippable above).
 #
-#   Success (exit 0)                 -> advances the recorded version
-#                                        in
-#                                        .claude/configuration/arcanum-repo-config.json
-#                                        to <version>. Exits 0.
+#   Success (exit 0)                 -> exits 0. Does NOT touch either
+#                                        version pointer itself anymore
+#                                        — update_per_version.sh owns
+#                                        advancing them, once, after its
+#                                        entire manifest for this
+#                                        version completes without a
+#                                        halt (the per-manifest, not
+#                                        per-file, version-advance
+#                                        fix).
 #   Failure, skippable == true       -> records an error entry to
-#                                        .claude/state/arcanum-errors.json,
-#                                        THEN still advances the version
-#                                        (the migration declares itself
-#                                        safe to consider done even if
-#                                        it failed). Exits 0.
-#   Failure, skippable == false      -> records the error, does NOT
-#                                        advance the version, and exits
-#                                        2. This exit code signals
-#                                        "halt" to callers
+#                                        .claude/state/arcanum-errors.json.
+#                                        Exits 0 (the migration declares
+#                                        itself safe to consider done
+#                                        even if it failed).
+#   Failure, skippable == false      -> records the error and exits 2.
+#                                        This exit code signals "halt"
+#                                        to callers
 #                                        (update_per_version.sh,
 #                                        select_version.sh, run.sh),
 #                                        which must propagate it
 #                                        upward immediately rather than
-#                                        continuing.
+#                                        continuing — and must skip
+#                                        their own version-advance step
+#                                        when this happens.
 #
 # Exit code contract: 0 = success/skip, 2 = halt (non-skippable
-# failure), 3 = [C]hat requested (nothing run, version not advanced).
+# failure), 3 = [C]hat requested (nothing run).
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# shellcheck source=../_lib/repo_config.sh
-source "${SCRIPT_DIR}/../_lib/repo_config.sh"
 # shellcheck source=../_lib/lock.sh
 source "${SCRIPT_DIR}/../_lib/lock.sh"
 
-USAGE="Usage: $0 <version> <file_path> [--no-confirm] [--repo <path>]"
+USAGE="Usage: $0 <version> <file_path> [--no-confirm] [--skippable true|false] [--repo <path>]"
 
 VERSION="${1:?$USAGE}"
 FILE_PATH="${2:?$USAGE}"
@@ -74,11 +94,16 @@ shift 2
 
 NO_CONFIRM=false
 REPO_PATH="."
+SKIPPABLE=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --no-confirm)
       NO_CONFIRM=true
       shift
+      ;;
+    --skippable)
+      SKIPPABLE="${2:?$USAGE}"
+      shift 2
       ;;
     --repo)
       REPO_PATH="${2:?$USAGE}"
@@ -91,7 +116,6 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-CONFIG_FILE="${REPO_PATH}/.claude/configuration/arcanum-repo-config.json"
 ERRORS_FILE="${REPO_PATH}/.claude/state/arcanum-errors.json"
 
 if [[ "$NO_CONFIRM" != true ]]; then
@@ -142,8 +166,10 @@ _record_error() {
   _release_lock
 }
 
-CONFIG_JSON="$("$FILE_PATH" config)"
-SKIPPABLE="$(jq -r '.skippable' <<<"$CONFIG_JSON")"
+if [[ -z "$SKIPPABLE" ]]; then
+  CONFIG_JSON="$("$FILE_PATH" config)"
+  SKIPPABLE="$(jq -r '.skippable' <<<"$CONFIG_JSON")"
+fi
 
 STDERR_TMP="$(mktemp)"
 trap 'rm -f "$STDERR_TMP"' EXIT
@@ -155,7 +181,6 @@ rm -f "$STDERR_TMP"
 trap - EXIT
 
 if [[ "$RC" -eq 0 ]]; then
-  repo_config_set_version "$CONFIG_FILE" "$VERSION"
   exit 0
 fi
 
@@ -164,7 +189,6 @@ MESSAGE="$STDERR_OUTPUT"
 
 if [[ "$SKIPPABLE" == "true" ]]; then
   _record_error "true" "$MESSAGE"
-  repo_config_set_version "$CONFIG_FILE" "$VERSION"
   exit 0
 else
   _record_error "false" "$MESSAGE"
