@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Finish up after all sub-issues have been pushed successfully: relabel the
-# parent issue (Planning -> Split) and delete the local working files.
+# parent issue (Planning -> Split), delete the local working files, and
+# release the working tree back to the configured safe branch.
 # Usage: finish.sh <repo_path> <issue_id>
 
 set -euo pipefail
@@ -18,6 +19,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../../arcanum/_lib/repo_path.sh
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/../../arcanum/_lib/repo_path.sh"
+# shellcheck source=../../arcanum/_lib/safe_branch.sh
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/../../arcanum/_lib/safe_branch.sh"
 
 repo_path_enter "$REPO_PATH"
 
@@ -45,3 +49,8 @@ if [[ ${#DELETED[@]} -gt 0 ]]; then
 else
   echo "Deleted: (nothing to clean up)"
 fi
+
+# Release the working tree back to the configured safe branch — defensive
+# no-op today (this skill never checks out "issue-<id>" itself), same
+# spirit as enhance-issue's closing call.
+safe_branch_checkout

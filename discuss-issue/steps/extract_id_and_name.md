@@ -1,6 +1,6 @@
 # Extract Issue ID and Fetch Content
 
-The id is always numeric and tied to a real GitHub issue — there is no local-only id convention. discuss-issue only operates on existing GitHub issues, so resolving the id and fetching its content is a single script call:
+The id is always numeric and tied to a real GitHub issue — there is no local-only id convention. discuss-issue only operates on existing GitHub issues, so resolving the id and fetching its content is a single script call. Before resolving/fetching anything, this call also fetches and checks out the configured safe branch (default `origin/main`, detached HEAD — see `arcanum/_lib/safe_branch.sh`), parking the working tree off whatever `issue-<id>` branch might already be checked out; a dirty tracked-file working tree makes the whole call fail (a plain script error surfaced to the user, not a `STATUS=error` case):
 
 ```bash
 ../scripts/resolve_and_fetch.sh "$REPO_PATH" <issues_folder> "<skill_args>"

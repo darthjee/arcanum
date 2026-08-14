@@ -1,6 +1,6 @@
 # Resolve Issue ID, Fetch Content, and Check for Existing Sub-Issues
 
-The id is always numeric and tied to a real GitHub issue — there is no local-only id convention. `arcanum-split-issue` only operates on existing GitHub issues, so resolving the id and fetching its content is a single script call — the same one `discuss-issue`/`enhance-issue` use, called directly from the canonical `_lib` copy rather than reaching into `discuss-issue/scripts/`:
+The id is always numeric and tied to a real GitHub issue — there is no local-only id convention. `arcanum-split-issue` only operates on existing GitHub issues, so resolving the id and fetching its content is a single script call — the same one `discuss-issue`/`enhance-issue` use, called directly from the canonical `_lib` copy rather than reaching into `discuss-issue/scripts/`. Before resolving/fetching anything, this call also fetches and checks out the configured safe branch (default `origin/main`, detached HEAD — see `arcanum/_lib/safe_branch.sh`), parking the working tree off whatever `issue-<id>` branch might already be checked out; a dirty tracked-file working tree makes the whole call fail (a plain script error surfaced to the user, not a `STATUS=error` case):
 
 ```bash
 ../../arcanum/_lib/resolve_and_fetch.sh "$REPO_PATH" docs/agents/issues "<skill_args>"

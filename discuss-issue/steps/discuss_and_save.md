@@ -76,7 +76,11 @@ Wait for the user's free-form reply, then pass it to the same script:
 ../scripts/confirm.sh "<raw reply>"
 ```
 
-- **Exit 1 (no)**: finish exactly as today — the issue is already pushed to GitHub; no branch or plan is created. Nothing further to do.
+- **Exit 1 (no)**: finish exactly as today — the issue is already pushed to GitHub; no branch or plan is created. Then release the working tree back to the configured safe branch (defensive no-op — this path never touches `issue-<id>`):
+  ```bash
+  ../../arcanum/_lib/checkout_safe_branch.sh "$REPO_PATH"
+  ```
+  > Resolve `../../arcanum/_lib/checkout_safe_branch.sh` relative to this file's directory. Nothing further to do.
 - **Exit 0 (yes)**:
   1. Run `../../auto-fix-all/scripts/checkout_from_main.sh "$REPO_PATH" <id>` — a cross-skill reference to the same reuse-and-merge branch bootstrap script `auto-fix-all` uses (resolved relative to this file's directory: `../../auto-fix-all/scripts/checkout_from_main.sh`). It fetches `origin`, reuses branch `issue-<id>` merged up to date with `origin/main` if it already exists locally or remotely, or creates it fresh from `origin/main` otherwise. Parse `STATUS` from its output.
      - **`STATUS=conflict`**: apply the same responsible-agent-selection approach as [`auto-fix-all/steps/handle_comment.md`](../../auto-fix-all/steps/handle_comment.md)'s "Choosing the responsible agent(s)" section, treating each conflicted path it printed like a failed check-run name — dispatch the responsible specialist(s) (or resolve it yourself, as architect, if none seem responsible) to fix the conflict, then run `git -C "$REPO_PATH" add` on the resolved paths and `git -C "$REPO_PATH" commit` with no message argument (the merge-commit message `git merge --no-edit` already prepared is reused as-is) — never bare `git add`/`git commit`, which would operate against the Bash tool's ambient cwd instead of the target repo. No user interaction.
@@ -86,3 +90,8 @@ Wait for the user's free-form reply, then pass it to the same script:
   4. Run `git -C "$REPO_PATH" push` to push the plan commit too — never a bare `git push`, for the same ambient-cwd reason as above.
   5. Run `../scripts/github.sh mark-ready "$REPO_PATH" <id>` (resolved relative to this file's directory) to swap the `Refined` label for `Ready`, now that the issue + plan are committed and pushed — this is the point where the issue is actually ready for `auto-fix-all`/`auto-fix-issue` to pick up.
   6. Report that the issue and plan are committed and pushed, and stop. Do not continue into `auto-fix-issue` in this run — implementation is a separate, later step.
+  7. Release the working tree back to the configured safe branch — this is the one real release among the three skills' closing checkout points: this path is the only one that actually leaves the working tree checked out on `issue-<id>` (via `checkout_from_main.sh` in step 1 above), so this call is what hands the branch back for other agents sharing the same `.git` to pick up:
+     ```bash
+     ../../arcanum/_lib/checkout_safe_branch.sh "$REPO_PATH"
+     ```
+     > Resolve `../../arcanum/_lib/checkout_safe_branch.sh` relative to this file's directory.
