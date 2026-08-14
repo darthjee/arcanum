@@ -111,22 +111,34 @@ repo_config_write() {
   _release_lock
 }
 
-# repo_config_get_version <file>
+# repo_config_get_version <file> [<namespace>]
 #   Prints .version (raw string) from <file>, or nothing if the file/
 #   field is absent or null. Read-only, no locking.
+#
+#   With <namespace> given, reads the namespaced pointer
+#   .<namespace>.version instead of the top-level one — used for the
+#   local-only migrations pointer (namespace "migrations") living in
+#   .claude/state/arcanum-config.json, alongside the committed,
+#   top-level .version in .claude/configuration/arcanum-repo-config.json.
+#   See docs/guides/arcanum-repo-version.md.
 repo_config_get_version() {
-  local file="$1"
+  local file="$1" namespace="${2:-}"
   [[ -f "$file" ]] || return 0
-  jq -r '.version // empty' "$file" 2>/dev/null
+  if [[ -n "$namespace" ]]; then
+    jq -r --arg ns "$namespace" '.[$ns].version // empty' "$file" 2>/dev/null
+  else
+    jq -r '.version // empty' "$file" 2>/dev/null
+  fi
 }
 
-# repo_config_set_version <file> <version>
+# repo_config_set_version <file> <version> [<namespace>]
 #   Lock-protected, using the same lock file <file>.lock so this can't
 #   race repo_config_write/repo_config_seed on the same file. Sets
-#   .version = "<version>" on <file>, creating it as {} first if
-#   absent, atomically.
+#   .version = "<version>" on <file> (or .<namespace>.version = "<version>"
+#   when <namespace> is given — see repo_config_get_version above),
+#   creating it as {} first if absent, atomically.
 repo_config_set_version() {
-  local file="$1" version="$2"
+  local file="$1" version="$2" namespace="${3:-}"
   mkdir -p "$(dirname "$file")"
   LOCK_FILE="${file}.lock"
   _acquire_lock
@@ -136,7 +148,12 @@ repo_config_set_version() {
     base="$(cat "$file")"
   fi
 
-  jq --arg v "$version" '.version = $v' <<<"$base" > "${file}.tmp"
+  if [[ -n "$namespace" ]]; then
+    jq --arg ns "$namespace" --arg v "$version" \
+      '.[$ns] = ((.[$ns] // {}) | .version = $v)' <<<"$base" > "${file}.tmp"
+  else
+    jq --arg v "$version" '.version = $v' <<<"$base" > "${file}.tmp"
+  fi
   mv "${file}.tmp" "$file"
 
   _release_lock

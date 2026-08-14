@@ -41,3 +41,7 @@ Two ways, either is fine:
 2. **Re-run `/init-claude`** — `init-claude/setup_ci_monitoring.md` and `init-claude/setup_auto_fix_all_config.md` already write straight to the new files going forward, so re-running those steps has the same effect for the keys they manage.
 
 You can also edit `.claude/configuration/arcanum-repo-config.json` / `.claude/state/arcanum-config.json` by hand — just nest whatever you're adding under the right feature's key.
+
+## Per-repo migrations use this same pair of files, for two independent version pointers
+
+The top-level `.version` field on `arcanum-repo-config.json` (committed, shared via git) and the namespaced `.migrations.version` field on `arcanum-config.json` (gitignored, local per clone) each track how far this repo/clone has caught up on `arcanum/migrations/repos/<version>/migrations.json`'s entries — one pointer per entry `applies_to` scope (`"repo"` or `"local"`). See `docs/guides/arcanum-repo-version.md` for why there are two pointers instead of one, and `docs/agents/architecture.md`'s "Per-Repo Migrations" section for the full `migrations.json` schema.

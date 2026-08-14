@@ -9,13 +9,14 @@
 # affected by --repo.
 #
 # Recomputes the pending-versions list (folders under
-# arcanum/migrations/repos/, excluding "next", strictly greater than
-# the repo's currently recorded version — same semver-aware comparison
-# run.sh uses, via the shared _pending_versions.sh helper) on every
-# loop iteration, since a prior iteration may have advanced the
-# recorded version. Prints the list plus [D]one and [C]hat options,
-# verifying /dev/tty is actually open/readable before each read
-# (failing fast to stderr, exit 1, if not).
+# arcanum/migrations/repos/ whose manifest has a "repo"-scoped entry
+# beyond the committed version or a "local"-scoped entry beyond the
+# local version — same dual-pointer, scope-aware comparison run.sh
+# uses, via the shared _pending_versions.sh/_manifest.sh helpers) on
+# every loop iteration, since a prior iteration may have advanced
+# either recorded version. Prints the list plus [D]one and [C]hat
+# options, verifying /dev/tty is actually open/readable before each
+# read (failing fast to stderr, exit 1, if not).
 #
 # On a version-like input (NOT validated against the pending list — any
 # string typed is accepted and passed straight through), calls
@@ -57,15 +58,18 @@ while [[ $# -gt 0 ]]; do
 done
 
 CONFIG_FILE="${REPO_PATH}/.claude/configuration/arcanum-repo-config.json"
+LOCAL_CONFIG_FILE="${REPO_PATH}/.claude/state/arcanum-config.json"
 
 while true; do
   CURRENT_VERSION="$(repo_config_get_version "$CONFIG_FILE")"
   CURRENT_VERSION="${CURRENT_VERSION:-0.0.0}"
+  CURRENT_LOCAL_VERSION="$(repo_config_get_version "$LOCAL_CONFIG_FILE" migrations)"
+  CURRENT_LOCAL_VERSION="${CURRENT_LOCAL_VERSION:-0.0.0}"
 
   PENDING=()
   while IFS= read -r v; do
     [[ -n "$v" ]] && PENDING+=("$v")
-  done < <(_pending_versions "$CURRENT_VERSION")
+  done < <(_pending_versions "$CURRENT_VERSION" "$CURRENT_LOCAL_VERSION")
 
   echo "Pending versions:"
   for v in "${PENDING[@]+"${PENDING[@]}"}"; do
