@@ -126,7 +126,7 @@ LOCAL_VERSION="${LOCAL_VERSION:-0.0.0}"
 
 HAS_REPO_ENTRY=false
 HAS_LOCAL_ENTRY=false
-ENTRY_ID=() ENTRY_TYPE=() ENTRY_FILE=() ENTRY_INSTRUCTIONS_FILE=() ENTRY_SKIPPABLE=() ENTRY_SCOPE=()
+ENTRY_ID=() ENTRY_TYPE=() ENTRY_FILE=() ENTRY_INSTRUCTIONS_FILE=() ENTRY_SKIPPABLE=()
 
 if [[ -d "$VERSION_DIR" ]]; then
   while IFS=$'\t' read -r id type primary_file instructions_file skippable applies_to; do
@@ -149,7 +149,6 @@ if [[ -d "$VERSION_DIR" ]]; then
     ENTRY_FILE+=("$primary_file")
     ENTRY_INSTRUCTIONS_FILE+=("$instructions_file")
     ENTRY_SKIPPABLE+=("$skippable")
-    ENTRY_SCOPE+=("$applies_to")
   done < <(_manifest_entries "$VERSION_DIR")
 fi
 

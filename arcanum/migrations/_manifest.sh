@@ -1,7 +1,7 @@
 # Shared helper: reads a per-repo-migration version folder's ordered
 # entries, either from its migrations.json manifest (preferred, every
-# version folder from 0.12.0 onward) or, when that file is absent, by
-# falling back to legacy glob discovery (0.9.3 and any future
+# version folder after 0.12.0) or, when that file is absent, by
+# falling back to legacy glob discovery (0.9.3, 0.12.0, and any future
 # not-yet-retrofitted folder) — implicit "repo" scope, skippable
 # sourced from "<file>.sh config", same as before this file existed.
 #
