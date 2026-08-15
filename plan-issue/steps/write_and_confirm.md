@@ -68,20 +68,28 @@ Repeat until the user confirms the plan is satisfactory.
 
 When the user asks you to look at the code (e.g., "check the code", "look at the codebase", "research it", or similar), then:
 
-1. Explore the relevant parts of the project folder identified earlier to understand:
+1. Prefer delegating to the target repo's own agents (set up via `init-claude`) over exploring inline yourself:
+   - Run `../scripts/list_agents.sh` (resolved relative to this file's directory; defaults to `.claude/agents` under the current project root) to list the repo's configured agents. Each line has the form `<name>|<description>`.
+   - **No output** — the repo has no `.claude/agents/` set up. Skip to step 2 below and explore inline yourself.
+   - **One or more lines** — detect a coordinator agent by description, reusing [`auto-plan-issue/steps/determine_agents.md`](../../auto-plan-issue/steps/determine_agents.md)'s "Exclude the coordinator" heuristic (description mentions things like "coordinator", "coordinates other agents", "spans more than one agent's scope").
+     - **Coordinator found** — delegate through it: `Agent(<coordinator-name>, ...)` with the research question; the coordinator decides whether to explore directly or fan out to its own specialists.
+     - **No coordinator, but specialist agents exist** — match the issue's topic/paths against each specialist's documented `description` and spawn the matching specialist directly.
+     - **No coordinator and no specialist agents remain** — skip to step 2 below and explore inline yourself.
+
+2. If no repo agent handled the investigation (no `.claude/agents/`, or no matching coordinator/specialist), explore the relevant parts of the project folder identified earlier yourself to understand:
    - What code is affected or needs to be created
    - Existing patterns, conventions, and structure
    - Dependencies or constraints
    - Which top-level folders will contain changes — then read `.circleci/config.yml` (if present) to identify which CI jobs apply to those folders and what local commands run them
 
-2. Update the plan with findings and add a `## CI Checks` section if applicable:
+3. Update the plan with findings (your own, or the dispatched agent's report) and add a `## CI Checks` section if applicable:
    ```markdown
    ## CI Checks
    Before opening a PR, run the following checks for the folders being modified:
    - `<folder>`: `<local command>` (CircleCI job: `<job name>`)
    ```
 
-3. Present the updated overview and ask again:
+4. Present the updated overview and ask again:
    ```
    Does this approach look correct? Anything to add or correct?
    ```
