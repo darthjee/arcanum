@@ -12,6 +12,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../arcanum/_lib/push.sh"
 source "${SCRIPT_DIR}/../../arcanum/_lib/repo_path.sh"
+source "${SCRIPT_DIR}/../../arcanum/_lib/commit_template.sh"
+source "${SCRIPT_DIR}/../../arcanum/_lib/agent_email.sh"
 
 REPO_PATH="${1:-}"
 FILE_PATH="${2:-}"
@@ -30,11 +32,16 @@ repo_path_enter "$REPO_PATH"
 
 git add "$FILE_PATH"
 
+AGENT_EMAIL="$MODEL_EMAIL"
+if [[ "$(commit_template_engine_get)" == "new" ]]; then
+  AGENT_EMAIL="$(agent_email_get "architect" "$MODEL_EMAIL")"
+fi
+
 {
   echo "docs(issue): add issue file (issue #${ID})"
   echo
   echo "Co-Authored-By: ${MODEL_NAME} <${MODEL_EMAIL}>"
-  echo "Co-Authored-By: architect agent <${MODEL_EMAIL}>"
+  echo "Co-Authored-By: architect agent <${AGENT_EMAIL}>"
 } | git commit -F -
 
 push_current_branch

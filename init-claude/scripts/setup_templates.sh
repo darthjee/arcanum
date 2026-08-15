@@ -9,7 +9,7 @@ mkdir -p .github
 created=()
 skipped=()
 
-for name in pull_request_template.md commit_message_template.md; do
+for name in pull_request_template.md commit_message_template.md commit_message_template-2.0.md; do
   dest=".github/$name"
   if [ -f "$dest" ]; then
     skipped+=("$name")
