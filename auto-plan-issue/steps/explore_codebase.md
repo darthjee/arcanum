@@ -10,9 +10,22 @@ Look for architecture or structure documentation in the project. Common location
 
 Read whatever is available to understand the high-level folder/module breakdown of the project.
 
+## Prefer delegating to the target repo's own agents
+
+Before reading any code yourself, check whether the target repo has its own agents (set up via `init-claude`) to delegate to:
+
+1. Run `scripts/list_agents.sh` (resolved relative to the `auto-plan-issue` skill folder; defaults to `.claude/agents` under `$REPO_PATH`) to list the repo's configured agents. Each line has the form `<name>|<description>`.
+2. **No output** — the repo has no `.claude/agents/` set up. Skip to "Explore freely" below.
+3. **One or more lines** — detect a coordinator agent by description, reusing [determine_agents.md](determine_agents.md)'s "Exclude the coordinator" heuristic (description mentions things like "coordinator", "coordinates other agents", "spans more than one agent's scope").
+   - **Coordinator found** — delegate through it: `Agent(<coordinator-name>, ...)` with the exploration question; the coordinator decides whether to explore directly or fan out to its own specialists.
+   - **No coordinator, but specialist agents exist** — match the issue's topic/paths against each specialist's documented `description` and spawn the matching specialist directly.
+   - **No coordinator and no specialist agents remain** — skip to "Explore freely" below.
+
+Use the dispatched agent's findings the same way "Explore freely" below would use your own — this only changes who does the reading, not whether confirmation is required (still none).
+
 ## Explore freely
 
-Unlike the interactive `plan-issue` skill, this skill never waits for permission to look at code. Based on the issue description and the architecture docs:
+Unlike the interactive `plan-issue` skill, this skill never waits for permission to look at code. Reached only when no repo agent handled the investigation above (no `.claude/agents/`, or no matching coordinator/specialist). Based on the issue description and the architecture docs:
 
 1. Identify which folder(s) or module(s) are likely involved.
 2. Read the relevant parts of the codebase to understand:

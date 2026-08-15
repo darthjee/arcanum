@@ -14,7 +14,16 @@ Based on the fetched/existing content, draft the section bodies (Description, Pr
 
 ## 3. Spawn specialist agents as needed
 
-You (the architect) handle the issue evaluation yourself by default. Before drafting clarifying questions, consider whether deeper context would sharpen them. If the issue plausibly touches existing code, behavior, or constraints you cannot judge from the description alone, spawn specialist agents to investigate — for example an `Explore` agent to locate relevant code paths, or a domain-specific agent if the project defines one. This step is optional: skip it when the issue is simple enough that the description is already self-contained.
+You (the architect) handle the issue evaluation yourself by default. Before drafting clarifying questions, consider whether deeper context would sharpen them. If the issue plausibly touches existing code, behavior, or constraints you cannot judge from the description alone, spawn specialist agents to investigate. This step is optional: skip it when the issue is simple enough that the description is already self-contained.
+
+When investigation is warranted, prefer delegating to the target repo's own agents (set up via `init-claude`) over a generic one:
+
+1. Run `../scripts/list_agents.sh` (resolved relative to this file's directory; defaults to `.claude/agents` under `$REPO_PATH`, the cwd already resolved at the top of [SKILL.md](../SKILL.md)) to list the repo's configured agents. Each line has the form `<name>|<description>`.
+2. **No output** — the repo has no `.claude/agents/` set up. Fall back to today's behavior: spawn a generic `Explore` agent to locate relevant code paths.
+3. **One or more lines** — detect a coordinator agent by description, reusing [`auto-plan-issue/steps/determine_agents.md`](../../auto-plan-issue/steps/determine_agents.md)'s "Exclude the coordinator" heuristic (description mentions things like "coordinator", "coordinates other agents", "spans more than one agent's scope").
+   - **Coordinator found** — always delegate through it: `Agent(<coordinator-name>, ...)` with the exploration question; the coordinator decides whether to explore directly or fan out to its own specialists.
+   - **No coordinator, but specialist agents exist** — match the issue's topic/paths against each specialist's documented `description` and spawn the matching specialist directly.
+   - **No coordinator and no specialist agents remain** — fall back to a generic `Explore` agent.
 
 Use any findings to inform the draft and the questions in the next step.
 

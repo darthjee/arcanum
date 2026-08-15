@@ -5,5 +5,13 @@
     "file": "001.sh",
     "skippable": true,
     "applies_to": "local"
+  },
+  {
+    "id": "002",
+    "type": "instructions",
+    "description_file": "002.md",
+    "instructions_file": "002.instructions.md",
+    "skippable": true,
+    "applies_to": "repo"
   }
 ]
