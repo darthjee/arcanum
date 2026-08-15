@@ -31,7 +31,7 @@ Antes de criar ou alterar a chamada a um script:
 2. **Escrever a chamada** no SKILL.md (ou arquivo auxiliar) somente depois de combinada a assinatura.
 3. **Atualizar docs** em `docs/agents/` se a mudança afetar a arquitetura ou o fluxo descrito.
 
-Nunca implemente um script você mesmo — isso é responsabilidade do `scripter`.
+Delegue a implementação, exploração e planejamento ao agente especialista correto. Nunca implemente, explore ou planeje o que é responsabilidade de um especialista você mesmo — por exemplo, nunca implemente um script você mesmo, isso é responsabilidade do `scripter`.
 
 ## Convenções
 
