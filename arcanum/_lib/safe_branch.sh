@@ -5,14 +5,13 @@
 # configurable, known-safe ref (default "origin/main") before/after
 # doing GitHub-only work (fetching/discussing/splitting an issue) that
 # doesn't need to happen on any particular branch. Kept separate from
-# git_branch.sh's fetch/merge-main concern (see docs/agents/architecture.md's
-# "Branch Bootstrap and Merge Conflicts" section) — this file never merges
-# anything, it only ever moves the working tree.
+# git_branch.sh's fetch/merge-main concern (see
+# docs/agents/architecture/branch-bootstrap-and-merge-conflicts.md) —
+# this file never merges anything, it only ever moves the working tree.
 #
 # No repo_path argument on either function below — operates on the
 # ambient cwd, which callers must have already entered via
-# repo_path_enter (see docs/agents/architecture.md's "Repo Path
-# Threading" section).
+# repo_path_enter (see docs/agents/architecture/repo-path-threading.md).
 #
 # Guard against double-sourcing:
 [[ -n "${_LIB_SAFE_BRANCH_LOADED:-}" ]] && return 0

@@ -360,7 +360,7 @@ done < "$CANDIDATES_FILE"
   echo
   echo "<!-- AUTO-GENERATED, DO NOT EDIT BY HAND. Run scripts/generate_tags_table.sh to refresh. -->"
   echo
-  echo "One row per call site, across all skills, that mutates a GitHub issue tag/label — both the semantic \`mark-*\` wrappers and the generic \`add-tag\`/\`remove-tag\` calls. Both mechanisms bottom out in the shared \`arcanum/_lib/tag_mutate.sh\` helpers (not repeated per row below). \`shipit\` is out of scope — it is human-only and never mutated by any script. See [architecture.md](architecture.md) for the narrative version."
+  echo "One row per call site, across all skills, that mutates a GitHub issue tag/label — both the semantic \`mark-*\` wrappers and the generic \`add-tag\`/\`remove-tag\` calls. Both mechanisms bottom out in the shared \`arcanum/_lib/tag_mutate.sh\` helpers (not repeated per row below). \`shipit\` is out of scope — it is human-only and never mutated by any script. See [architecture/issue-tags.md](architecture/issue-tags.md) for the narrative version."
   echo
   echo "| Skill | Step | Entrypoint | Tags Added | Tags Removed |"
   echo "|-------|------|------------|------------|--------------|"

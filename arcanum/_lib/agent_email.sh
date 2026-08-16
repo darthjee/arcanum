@@ -8,7 +8,7 @@
 #
 # No repo_path argument — operates on the ambient cwd, which callers
 # must have already entered via repo_path_enter (see
-# docs/agents/architecture.md's "Repo Path Threading" section).
+# docs/agents/architecture/repo-path-threading.md).
 #
 # Guard against double-sourcing:
 [[ -n "${_LIB_AGENT_EMAIL_LOADED:-}" ]] && return 0
