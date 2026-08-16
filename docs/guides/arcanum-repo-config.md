@@ -47,3 +47,12 @@ You can also edit `.claude/configuration/arcanum-repo-config.json` / `.claude/st
 The top-level `.version` field on `arcanum-repo-config.json` (committed, shared via git) and the namespaced `.migrations.version` field on `arcanum-config.json` (gitignored, local per clone) each track how far this repo/clone has caught up on `arcanum/migrations/repos/<version>/migrations.json`'s entries — one pointer per entry `applies_to` scope (`"repo"` or `"local"`). See `docs/guides/arcanum-repo-version.md` for why there are two pointers instead of one, and `docs/agents/architecture/per-repo-migrations.md` for the full `migrations.json` schema.
 
 `type: "instructions"` entries additionally rely on `.claude/state/arcanum-migrations-ledger.json` for per-entry resume tracking — deliberately *not* part of this config-file pair (it isn't a version pointer and doesn't route through `repo_config.sh`); see `docs/guides/arcanum-repo-version.md`'s "A third tracker" section.
+
+## A third, global tier on top of this pair
+
+Both files described above are repo-scoped — neither survives outside
+the repo it lives in. There's also a third, outermost tier, global and
+cross-project (scoped to your Claude Code account/profile instead of
+any one repo), consulted only when neither of these two has a value
+for a given key. See [`arcanum-global-config.md`](arcanum-global-config.md)
+for the full resolution order and how to set it.
