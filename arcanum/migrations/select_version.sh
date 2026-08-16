@@ -10,13 +10,14 @@
 #
 # Recomputes the pending-versions list (folders under
 # arcanum/migrations/repos/ whose manifest has a "repo"-scoped entry
-# beyond the committed version or a "local"-scoped entry beyond the
-# local version — same dual-pointer, scope-aware comparison run.sh
-# uses, via the shared _pending_versions.sh/_manifest.sh helpers) on
-# every loop iteration, since a prior iteration may have advanced
-# either recorded version. Prints the list plus [D]one and [C]hat
-# options, verifying /dev/tty is actually open/readable before each
-# read (failing fast to stderr, exit 1, if not).
+# beyond the committed version, a "local"-scoped entry beyond the local
+# version, or a "global"-scoped entry beyond the global version — same
+# three-pointer, scope-aware comparison run.sh uses, via the shared
+# _pending_versions.sh/_manifest.sh helpers) on every loop iteration,
+# since a prior iteration may have advanced any of the three recorded
+# versions. Prints the list plus [D]one and [C]hat options, verifying
+# /dev/tty is actually open/readable before each read (failing fast to
+# stderr, exit 1, if not).
 #
 # On a version-like input (NOT validated against the pending list — any
 # string typed is accepted and passed straight through), calls
@@ -38,6 +39,8 @@ MIGRATIONS_SCRIPT_DIR="$SCRIPT_DIR"
 
 # shellcheck source=../_lib/repo_config.sh
 source "${SCRIPT_DIR}/../_lib/repo_config.sh"
+# shellcheck source=../_lib/global_config.sh
+source "${SCRIPT_DIR}/../_lib/global_config.sh"
 # shellcheck source=_pending_versions.sh
 source "${SCRIPT_DIR}/_pending_versions.sh"
 
@@ -65,11 +68,13 @@ while true; do
   CURRENT_VERSION="${CURRENT_VERSION:-0.0.0}"
   CURRENT_LOCAL_VERSION="$(repo_config_get_version "$LOCAL_CONFIG_FILE" migrations)"
   CURRENT_LOCAL_VERSION="${CURRENT_LOCAL_VERSION:-0.0.0}"
+  CURRENT_GLOBAL_VERSION="$(global_config_get_version "$REPO_PATH")"
+  CURRENT_GLOBAL_VERSION="${CURRENT_GLOBAL_VERSION:-0.0.0}"
 
   PENDING=()
   while IFS= read -r v; do
     [[ -n "$v" ]] && PENDING+=("$v")
-  done < <(_pending_versions "$CURRENT_VERSION" "$CURRENT_LOCAL_VERSION")
+  done < <(_pending_versions "$CURRENT_VERSION" "$CURRENT_LOCAL_VERSION" "$CURRENT_GLOBAL_VERSION")
 
   echo "Pending versions:"
   for v in "${PENDING[@]+"${PENDING[@]}"}"; do

@@ -33,7 +33,12 @@
 #
 # "skippable": true / "applies_to": "local" are scaffolded defaults —
 # a placeholder for the author to adjust by hand, same spirit as
-# today's script skeleton being a stub to fill in.
+# today's script skeleton being a stub to fill in. "applies_to" also
+# accepts "repo" or "global" (the latter satisfied once the global,
+# cross-project version pointer advances — see
+# arcanum/_lib/global_config.sh and docs/guides/arcanum-repo-version.md)
+# — this script never validates the value against that enum, it's
+# always the author's to set by hand after generation.
 #
 # Exits 0 on success. Fails (exit 1) if a file it would create already
 # exists, rather than silently overwriting it.

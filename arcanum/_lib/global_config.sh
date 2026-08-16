@@ -12,16 +12,27 @@
 # file lives outside every repo, shared across every project the
 # active account/profile touches.
 #
-# This file is meant to be SOURCED, not executed directly. Both public
-# functions below take a leading <repo_path> argument for signature
+# This file is meant to be SOURCED, not executed directly. Every public
+# function below takes a leading <repo_path> argument for signature
 # consistency with every other arcanum script's repo_path-first-arg
 # convention (see docs/agents/architecture/repo-path-threading.md) —
 # it is accepted but unused/ignored here, since the global file's
 # location never depends on which repo is calling.
+#
+# Alongside the read/write pair (global_config_read/global_config_write)
+# for arbitrary namespaced keys, this file also carries the "global"
+# migration scope's version pointer (global_config_get_version/
+# global_config_set_version) — .migrations.version in the same file,
+# reusing repo_config_get_version/repo_config_set_version (see
+# repo_config.sh) against the resolved global file path. See
+# arcanum/migrations/_manifest.sh for how the "global" applies_to scope
+# uses this pointer.
 
 _GLOBAL_CONFIG_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lock.sh
 source "${_GLOBAL_CONFIG_LIB_DIR}/lock.sh"
+# shellcheck source=repo_config.sh
+source "${_GLOBAL_CONFIG_LIB_DIR}/repo_config.sh"
 
 # _global_config_file
 #   Prints the resolved path to the global config file, or nothing if
@@ -98,4 +109,38 @@ global_config_write() {
   mv "${file}.tmp" "$file"
 
   _release_lock
+}
+
+# global_config_get_version <repo_path>
+#   Prints the global, cross-project migrations version pointer
+#   (.migrations.version in the global config file — same namespaced
+#   shape the local-only pointer already uses in
+#   .claude/state/arcanum-config.json), or nothing if the global file's
+#   location can't be resolved, or the file/field is absent. Read-only,
+#   no locking. Always exits 0. <repo_path> is accepted but unused/
+#   ignored, see this file's header.
+global_config_get_version() {
+  local file
+  file="$(_global_config_file)"
+  [[ -n "$file" ]] || return 0
+  repo_config_get_version "$file" migrations
+}
+
+# global_config_set_version <repo_path> <version>
+#   Sets the global, cross-project migrations version pointer
+#   (.migrations.version in the global config file). Degrades silently
+#   (warns on stderr, writes nothing, still exits 0) if the global
+#   file's location can't be resolved — mirrors global_config_write's
+#   existing degrade-on-write behavior. Otherwise lock-protected,
+#   atomic write, via repo_config_set_version. <repo_path> is accepted
+#   but unused/ignored, see this file's header.
+global_config_set_version() {
+  local version="$2"
+  local file
+  file="$(_global_config_file)"
+  if [[ -z "$file" ]]; then
+    echo "Warning: could not resolve a global config location (no \$HOME or \$CLAUDE_CONFIG_DIR) — 'migrations.version' was not written." >&2
+    return 0
+  fi
+  repo_config_set_version "$file" "$version" migrations
 }

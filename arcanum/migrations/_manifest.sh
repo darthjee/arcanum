@@ -41,16 +41,25 @@
 #   "<file> config" only still matters for legacy (glob-discovered)
 #   entries, where this file's legacy fallback below still calls it.
 #   Always present for both types.
-# - "applies_to": "repo" or "local" — no combined "both" value; a
-#   change needing both kinds of effects is authored as two separate
-#   entries (see docs/guides/arcanum-repo-version.md for why). "repo"
-#   entries are satisfied once the committed version pointer
+# - "applies_to": "repo", "local", or "global" — no combined "both"
+#   value; a change needing more than one kind of effect is authored as
+#   separate entries, one per scope (see
+#   docs/guides/arcanum-repo-version.md for why). "repo" entries are
+#   satisfied once the committed version pointer
 #   (.claude/configuration/arcanum-repo-config.json's top-level
 #   .version) reaches this version folder's name; "local" entries are
 #   satisfied once the local version pointer
 #   (.claude/state/arcanum-config.json's .migrations.version) does,
-#   independently per clone — for "instructions" entries specifically,
-#   update_per_version.sh also treats an entry as satisfied once
+#   independently per clone; "global" entries are satisfied once the
+#   global, cross-project version pointer
+#   (${CLAUDE_CONFIG_DIR:-$HOME/.claude}/arcanum-config.json's
+#   .migrations.version, read/written via
+#   global_config_get_version/global_config_set_version in
+#   arcanum/_lib/global_config.sh) does — shared machine/account-wide,
+#   not per-clone or per-repo, so one repo advancing it satisfies every
+#   other repo on the same machine/account immediately — for
+#   "instructions" entries specifically, update_per_version.sh also
+#   treats an entry as satisfied once
 #   .claude/state/arcanum-migrations-ledger.json (see _ledger.sh) has
 #   recorded it complete, regardless of pointer position, so a resume
 #   mid-version never re-triggers an already-handled hand-off.
@@ -107,8 +116,8 @@ _manifest_entries() {
 
 # _manifest_has_scope <version_dir> <scope>
 #   Exits 0 if any entry in <version_dir>'s manifest (or legacy glob
-#   fallback) has applies_to == <scope> ("repo" or "local"), 1
-#   otherwise.
+#   fallback) has applies_to == <scope> ("repo", "local", or "global"),
+#   1 otherwise.
 _manifest_has_scope() {
   local version_dir="$1" scope="$2"
   local _id _type _primary_file _instructions_file _skippable applies_to

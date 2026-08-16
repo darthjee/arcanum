@@ -16,7 +16,8 @@
 # type, primary_file, instructions_file, skippable, applies_to — see
 # _manifest.sh) in order. Entries already satisfied by the relevant
 # pointer — a "repo" entry when the committed version already reaches
-# <version>, or a "local" entry when the local version already does —
+# <version>, a "local" entry when the local version already does, or a
+# "global" entry when the global, cross-project version already does —
 # are silently skipped, not even shown, same as a fully-passed version
 # isn't shown today. A "type": "instructions" entry is also considered
 # satisfied, regardless of pointer position, once
@@ -27,6 +28,12 @@
 # not-yet-completed one, instead of re-triggering the AI hand-off for
 # an already-handled entry. Only the remaining ("to-run") entries are
 # listed/executed below.
+#
+# A "global"-scoped entry that is not satisfied by the pointer check
+# above, but whose global config location can't be resolved at all (no
+# $HOME or CLAUDE_CONFIG_DIR), hard-errors instead of being silently
+# treated as pending forever — see the "global" entry handling below,
+# right after the manifest-reading loop.
 #
 # For a "type": "script" entry, calling update_per_file.sh is exactly
 # as before this file's "instructions" support: <primary_file> (its
@@ -66,11 +73,15 @@
 # processed, so the relevant pointer(s) advance — the committed one to
 # <version> if the manifest has any "repo"-scoped entry (and it isn't
 # already there), the local one to <version> if it has any
-# "local"-scoped entry (and it isn't already there). This is the
-# per-manifest (not per-file) version-advance fix: mid-version progress
-# lives in the errors file, not in an early, partial pointer bump. A
-# user-chosen [S]kip on an individual entry does not block this — it's
-# a deliberate "not applying this one" choice, not a halt.
+# "local"-scoped entry (and it isn't already there), the global one to
+# <version> if it has any "global"-scoped entry (and it isn't already
+# there, and no "global"-scoped entry hit the unresolvable-location
+# hard error below — the global pointer never advances past an entry
+# that was skipped rather than actually run). This is the per-manifest
+# (not per-file) version-advance fix: mid-version progress lives in the
+# errors file, not in an early, partial pointer bump. A user-chosen
+# [S]kip on an individual entry does not block this — it's a
+# deliberate "not applying this one" choice, not a halt.
 #
 # Exit code contract: 0 = completed (or nothing to do / [N]one chosen),
 # 2 = halt (propagated from update_per_file.sh), 3 = [C]hat requested
@@ -84,6 +95,8 @@ MIGRATIONS_SCRIPT_DIR="$SCRIPT_DIR"
 
 # shellcheck source=../_lib/repo_config.sh
 source "${SCRIPT_DIR}/../_lib/repo_config.sh"
+# shellcheck source=../_lib/global_config.sh
+source "${SCRIPT_DIR}/../_lib/global_config.sh"
 # shellcheck source=_manifest.sh
 source "${SCRIPT_DIR}/_manifest.sh"
 # shellcheck source=_pending_versions.sh
@@ -123,9 +136,13 @@ COMMITTED="$(repo_config_get_version "$CONFIG_FILE")"
 COMMITTED="${COMMITTED:-0.0.0}"
 LOCAL_VERSION="$(repo_config_get_version "$LOCAL_CONFIG_FILE" migrations)"
 LOCAL_VERSION="${LOCAL_VERSION:-0.0.0}"
+GLOBAL_VERSION="$(global_config_get_version "$REPO_PATH")"
+GLOBAL_VERSION="${GLOBAL_VERSION:-0.0.0}"
 
 HAS_REPO_ENTRY=false
 HAS_LOCAL_ENTRY=false
+HAS_GLOBAL_ENTRY=false
+GLOBAL_ENTRY_UNRESOLVABLE=false
 ENTRY_ID=() ENTRY_TYPE=() ENTRY_FILE=() ENTRY_INSTRUCTIONS_FILE=() ENTRY_SKIPPABLE=()
 
 if [[ -d "$VERSION_DIR" ]]; then
@@ -133,16 +150,25 @@ if [[ -d "$VERSION_DIR" ]]; then
     [[ -n "$id" ]] || continue
     [[ "$applies_to" == "repo" ]] && HAS_REPO_ENTRY=true
     [[ "$applies_to" == "local" ]] && HAS_LOCAL_ENTRY=true
+    [[ "$applies_to" == "global" ]] && HAS_GLOBAL_ENTRY=true
 
     satisfied=false
     if [[ "$applies_to" == "repo" ]] && ! _version_gt "$VERSION" "$COMMITTED"; then
       satisfied=true
     elif [[ "$applies_to" == "local" ]] && ! _version_gt "$VERSION" "$LOCAL_VERSION"; then
       satisfied=true
+    elif [[ "$applies_to" == "global" ]] && ! _version_gt "$VERSION" "$GLOBAL_VERSION"; then
+      satisfied=true
     elif [[ "$type" == "instructions" ]] && _ledger_is_complete "$REPO_PATH" "$VERSION" "$id"; then
       satisfied=true
     fi
     [[ "$satisfied" == true ]] && continue
+
+    if [[ "$applies_to" == "global" && -z "$(_global_config_file)" ]]; then
+      echo "Error: cannot resolve the global config location (no \$HOME or \$CLAUDE_CONFIG_DIR) — \"global\"-scoped entry ${id} in version ${VERSION} cannot be processed." >&2
+      GLOBAL_ENTRY_UNRESOLVABLE=true
+      continue
+    fi
 
     ENTRY_ID+=("$id")
     ENTRY_TYPE+=("$type")
@@ -172,6 +198,14 @@ _advance_pointers() {
     cur="${cur:-0.0.0}"
     if _version_gt "$VERSION" "$cur"; then
       repo_config_set_version "$LOCAL_CONFIG_FILE" "$VERSION" migrations
+    fi
+  fi
+  if [[ "$HAS_GLOBAL_ENTRY" == true && "$GLOBAL_ENTRY_UNRESOLVABLE" == false ]]; then
+    local cur
+    cur="$(global_config_get_version "$REPO_PATH")"
+    cur="${cur:-0.0.0}"
+    if _version_gt "$VERSION" "$cur"; then
+      global_config_set_version "$REPO_PATH" "$VERSION"
     fi
   fi
 }
