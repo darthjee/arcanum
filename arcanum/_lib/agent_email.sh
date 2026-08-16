@@ -15,22 +15,25 @@
 _LIB_AGENT_EMAIL_LOADED=1
 
 _AGENT_EMAIL_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=repo_config.sh
-source "${_AGENT_EMAIL_LIB_DIR}/repo_config.sh"
+# shellcheck source=config_chain.sh
+source "${_AGENT_EMAIL_LIB_DIR}/config_chain.sh"
 
 # agent_email_get <agent> <model_email>
 #   Prints the commit-author email for <agent>: the "git"."email"
-#   pattern from .claude/state/arcanum-config.json (local), falling
-#   back to .claude/configuration/arcanum-repo-config.json (repo),
-#   falling back to <model_email> when neither has a usable value.
-#   A JSON `null` value is treated identically to an absent key.
-#   The resolved pattern has every "{agent}" occurrence substituted
-#   with the literal <agent> name before being printed.
+#   pattern resolved via config_chain_read (local state ->
+#   repo config -> global user config), falling back to <model_email>
+#   when none of the three tiers has a usable value. A JSON `null`
+#   value at any tier is treated identically to an absent key. The
+#   resolved pattern has every "{agent}" occurrence substituted with
+#   the literal <agent> name before being printed.
+#
+#   No repo_path argument of its own (see this file's header) — "."
+#   (the already-entered ambient cwd) is passed through to
+#   config_chain_read, whose own repo_path argument is unused/ignored
+#   by the global tier anyway (see global_config.sh).
 agent_email_get() {
   local agent="$1" model_email="$2" email
-  email=$(repo_config_read ".claude/state/arcanum-config.json" "" "git" "email")
-  [[ -n "$email" && "$email" != "null" ]] || \
-    email=$(repo_config_read ".claude/configuration/arcanum-repo-config.json" "" "git" "email")
+  email=$(config_chain_read "." "git" "email")
   email="${email//\"/}"
   [[ -n "$email" && "$email" != "null" ]] || { echo "$model_email"; return; }
   echo "${email//\{agent\}/$agent}"
