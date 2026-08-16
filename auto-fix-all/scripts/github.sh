@@ -3,7 +3,7 @@
 # Usage: github.sh <command> <repo_path> [args]
 #   pr-number <repo_path>               Print the PR number (no '#') for the current branch
 #   pr-state <repo_path>                Print STATE=<OPEN|MERGED|CLOSED> for the current branch's PR
-#   pr-merge <repo_path>                Squash-merge the current branch's PR, print its URL
+#   pr-merge <repo_path> [model_email]  Squash-merge the current branch's PR, print its URL
 #   cleanup-branch <repo_path> <id>     Delete the issue's remote and local branch, switch back to main
 #   has-shipit-label <repo_path> <id>   Exit 0 if GitHub issue <id> has a "shipit" label, else exit 1
 #   add-tag <repo_path> <id> <tag>      Add a single tag to GitHub issue <id>, mapped to
@@ -26,6 +26,8 @@ source "${SCRIPT_DIR}/../../arcanum/_lib/tags.sh"
 source "${SCRIPT_DIR}/../../arcanum/_lib/tag_mutate.sh"
 # shellcheck source=../../arcanum/_lib/repo_path.sh
 source "${SCRIPT_DIR}/../../arcanum/_lib/repo_path.sh"
+# shellcheck source=../../arcanum/_lib/merge_body.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/merge_body.sh"
 
 # --- Commands ---
 
@@ -90,8 +92,9 @@ cmd_pr_state() {
 
 cmd_pr_merge() {
   local repo_path="${1:-}"
+  local model_email="${2:-}"
   [[ -n "$repo_path" ]] || {
-    echo "Usage: $0 pr-merge <repo_path>" >&2
+    echo "Usage: $0 pr-merge <repo_path> [model_email]" >&2
     exit 1
   }
 
@@ -129,7 +132,28 @@ cmd_pr_merge() {
     url=$(echo "$output" | jq -r '.url')
   fi
 
-  gh pr merge "$number" -R "$repo_ref" --squash --delete-branch --subject "${title} (#${number})" --body "" >/dev/null || {
+  local -a merge_args=("$number" -R "$repo_ref" --squash --delete-branch --subject "${title} (#${number})")
+
+  local mode
+  mode=$(merge_body_mode)
+  case "$mode" in
+    empty)
+      merge_args+=(--body "")
+      ;;
+    full)
+      # Omit --body entirely so gh/GitHub picks its own default squash body.
+      ;;
+    coauthors)
+      local body
+      body=$(merge_body_coauthors_list "$repo_path" "$repo_ref" "$number" "$model_email")
+      if [[ -n "$body" ]]; then
+        merge_args+=(--body "$body")
+      fi
+      # else: fall back to "full" mode's behavior (omit --body).
+      ;;
+  esac
+
+  gh pr merge "${merge_args[@]}" >/dev/null || {
     echo "Error: could not merge PR #$number on $repo_ref" >&2
     exit 1
   }
@@ -223,7 +247,7 @@ case "${1:-}" in
     echo "Commands:" >&2
     echo "  pr-number <repo_path>               Print the PR number (no '#') for the current branch" >&2
     echo "  pr-state <repo_path>                Print STATE=<OPEN|MERGED|CLOSED> for the current branch's PR" >&2
-    echo "  pr-merge <repo_path>                Squash-merge the current branch's PR, print its URL" >&2
+    echo "  pr-merge <repo_path> [model_email]  Squash-merge the current branch's PR, print its URL" >&2
     echo "  cleanup-branch <repo_path> <id>     Delete the issue's remote and local branch, switch back to main" >&2
     echo "  has-shipit-label <repo_path> <id>   Exit 0 if GitHub issue <id> has a 'shipit' label, else exit 1" >&2
     echo "  add-tag <repo_path> <id> <tag>      Add a single tag to GitHub issue <id>, mapped to a real GitHub label via arcanum/_lib/tags.sh" >&2
