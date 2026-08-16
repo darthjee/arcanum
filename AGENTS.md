@@ -13,7 +13,7 @@ Nenhuma linguagem de programação — o projeto é composto por arquivos markdo
 - Caminhos referenciados nas instruções (ex: "procure pelo arquivo X") devem ser relativos, nunca absolutos.
 - Quando um caminho absoluto for necessário (ex: dentro de um script), ele deve ser extraído para uma variável em vez de repetido inline.
 - Sempre que possível, extrair lógica das skills para scripts (em vez de instruções em linguagem natural), para tornar o comportamento determinístico e reduzir consumo de tokens.
-- Para skills que precisam de confirmação/seleção do usuário, prefira o padrão de script único conduzindo a interação via `/dev/tty` — ver as seções "Per-Repo Migrations" e "Repo Path Threading" em [docs/agents/architecture.md](docs/agents/architecture.md).
+- Para skills que precisam de confirmação/seleção do usuário, prefira o padrão de script único conduzindo a interação via `/dev/tty` — ver [Per-Repo Migrations](docs/agents/architecture/per-repo-migrations.md) e [Repo Path Threading](docs/agents/architecture/repo-path-threading.md).
 
 ## Agents
 
@@ -32,7 +32,7 @@ All project documentation lives under [`docs/agents/`](docs/agents/):
 | File | Contents |
 |------|----------|
 | [Folder Structure](docs/agents/folder-structure.md) | Top-level directory layout and the role of each folder. |
-| [Architecture](docs/agents/architecture.md) | Source layout, modules, code style, and implementation guidelines. |
+| [Architecture](docs/agents/architecture.md) | Hub linking to `docs/agents/architecture/` — arcanum's internals by topic (source layout, agents, repo path threading, config, migrations, etc.). |
 | [Flow](docs/agents/flow.md) | Main runtime flow of the application. |
 | [Plans](docs/agents/plans/) | Implementation plans for ongoing or upcoming features. |
 | [Issues](docs/agents/issues/) | Detailed specs for open issues. |

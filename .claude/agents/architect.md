@@ -44,7 +44,7 @@ Delegue a implementação, exploração e planejamento ao agente especialista co
 | Arquivo | Conteúdo |
 |------|----------|
 | `folder-structure.md` | Layout de pastas do repositório |
-| `architecture.md` | Estrutura das skills e preferência por scripts |
+| `architecture.md` | Hub para `docs/agents/architecture/` — arquitetura interna do arcanum, por tópico |
 | `flow.md` | Ciclo de vida de uma skill sendo invocada |
 | `plans/` | Planos de implementação em andamento |
 | `issues/` | Specs detalhadas de issues abertas |

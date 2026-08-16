@@ -10,8 +10,8 @@
 #
 # No repo_path argument — like safe_branch.sh/agent_email.sh, operates
 # on the ambient cwd, which callers must have already entered via
-# repo_path_enter (see docs/agents/architecture.md's "Repo Path
-# Threading" section) before calling this. All three commit_*.sh
+# repo_path_enter (see docs/agents/architecture/repo-path-threading.md)
+# before calling this. All three commit_*.sh
 # callers already do this before their commit logic runs, so there is
 # no need for this lib to take an explicit <repo_path> and re-resolve
 # paths outside the ambient cwd.

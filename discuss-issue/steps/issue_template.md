@@ -12,4 +12,4 @@ Each `<..._section>` argument is the **full block** including its own `## Headin
 
 There is no "See issue for details" link in the rendered output — unlike `new-issue`, discuss-issue always starts from an existing GitHub issue, so a self-referential link back to that same issue is redundant.
 
-Issue status (e.g. pre-approval, pipeline stage) is tracked via real GitHub labels on the live issue — see [../../docs/agents/architecture.md](../../docs/agents/architecture.md)'s "Issue Tags" section — not via anything embedded in this file's content.
+Issue status (e.g. pre-approval, pipeline stage) is tracked via real GitHub labels on the live issue — see [Issue Tags](../../docs/agents/architecture/issue-tags.md) — not via anything embedded in this file's content.

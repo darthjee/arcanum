@@ -1,0 +1,51 @@
+# Issue Tags
+
+Issue status is tracked via real GitHub labels on the issue — labels are the sole source of truth; there is no body-embedded tags block. Reading a tag means checking whether a specific label is present on the issue's `labels`; writing a tag means adding or removing that label via `gh issue edit --add-label`/`--remove-label`. `arcanum/_lib/tags.sh` defines the canonical-tag/label-name mapping (both directions) and exposes `extract_tags`/`has_tag`, which operate on a newline-separated list of label names (e.g. the output of `gh issue view ... --json labels -q '.labels[].name'`) rather than free body text — unrecognized labels are silently ignored.
+
+| Canonical tag | GitHub label |
+| --- | --- |
+| `created` | `Created` |
+| `ready_for_work` | `Ready for Work` |
+| `shipit` | `shipit` |
+| `working` | `Working` |
+| `question` | `Question` |
+| `fetched` | `Fetched` |
+| `refined` | `Refined` |
+| `ready` | `Ready` |
+| `enqueued` | `Enqueued` |
+| `idea` | `Idea` |
+| `writting` | `Writting` |
+| `enhancing` | `Enhancing` |
+| `planning` | `Planning` |
+| `split` | `Split` |
+| `pr` | `PR` |
+
+**`shipit`** is human-only: no script ever adds or removes the `shipit` label (`arcanum/_lib/tag_mutate.sh` refuses any attempt at the shared-library level). It marks an issue as pre-approved, so `auto-fix-all` skips PR review/monitoring and merges directly once CI passes, checked via `auto-fix-all/scripts/github.sh has-shipit-label` — the pipeline's only interaction with this tag is reading it.
+
+**`question`** marks an issue as having a question for the agent. `monitor-issues` detects it (via `arcanum/_lib/tag_actions.sh`'s `actionable_tags`) and logs that it needs an answer — actually answering it requires AI judgment, so that step is left to architect-level reasoning, not the polling script. Once answered, the label should be removed from the live GitHub issue via `monitor-issues/scripts/github.sh remove-tag <repo_path> <id> question`.
+
+**`created`** marks an issue as ready to be read and rewritten by the agent. Unlike `question`, this action is now fully wired end-to-end: `monitor_issues.sh` pushes the issue id onto `monitor-issues/scripts/rewrite_queue.sh`'s queue (`.claude/state/monitor-issues-rewrite-queue.json`) as soon as the label is detected. The `auto-rewrite-issue` skill drains that queue: for each id it fetches the issue body, rewrites it (architect-level AI judgment, the same kind of rewrite `discuss-issue/steps/discuss_and_save.md` performs but fully autonomous), pushes the new body to GitHub, then removes the label via `monitor-issues/scripts/github.sh remove-tag <repo_path> <id> created`. The label is also applied earlier in the pipeline, through an interactive human dialogue rather than a poll: `arcanum/_lib/github_issue.sh`'s `mark-created` subcommand, called by `enhance-issue`'s "Publish back to GitHub" step once a still-vague `Idea`/`Writting` issue has been fleshed out through the checklist-driven dialogue, adds `Created` and removes `Idea`/`Writting`/`Enhancing`, if present — deliberately never touching `refined`/`ready`, unlike `mark-refined`.
+
+**`ready_for_work`** marks an issue as ready to be pushed to the `auto-fix-all` queue, backed by the `Ready for Work` label (distinct from the plain `Ready` label, which developers may still use informally to mean "well-defined" without triggering auto-enqueuing). Unlike the two tags above, this action is fully deterministic, so `monitor_issues.sh` performs it directly: it pushes the issue id via `auto-fix-all/scripts/queue.sh push <repo_path> <id>` as soon as the label is detected.
+
+**`fetched`** and **`working`** are pipeline-status tags, not actionable ones — `monitor-issues` does not detect or act on them (they are not part of `arcanum/_lib/tag_actions.sh`'s `ACTIONABLE_TAGS`). They exist purely so the GitHub issue list reflects `auto-fix-all`'s progress at a glance: `auto-fix-all` pushes `fetched` onto the live issue right after fetching/checking it (`auto-fix-all/steps/process_one_issue.md` step 2), then swaps it for `working` once the implementation plan has been written and coding is about to start (step 3). This applies only to the `auto-fix-all` pipeline — the manual `/new-issue`, `/plan-issue`, and `/discuss-issue` skills never push either label.
+
+**`refined`** marks an issue as discussed/confirmed but not yet planned. It's applied by `arcanum/_lib/github_issue.sh`'s `mark-refined` subcommand, called by `discuss-issue`'s "Push to GitHub" step right after its `update` call succeeds — it adds `Refined` and removes `Created`, if present.
+
+**`ready`** and **`enqueued`** keep the live GitHub labels in sync with the pipeline stage an issue is actually in, so the label-based issue list doesn't drift stale while an issue is being discussed or queued. `ready` is applied by `arcanum/_lib/github_issue.sh`'s `mark-ready` subcommand, called by `discuss-issue`'s step 8 right after the `git push` that publishes the `issue-<id>` branch with the committed issue + plan — this is the point where the issue + plan are actually ready for `auto-fix-all`/`auto-fix-issue` to pick up; it adds `Ready` and removes `Refined`, if present (not `Created` anymore). `arcanum/_lib/github_issue.sh`'s shared `cmd_update` (also used by `auto-new-issue` to sync freshly authored issues) is untouched, so issues created that way are not marked `Ready`. `enqueued` is applied by `auto-fix-all/scripts/queue.sh`'s `_mark_enqueued` helper, called at the end of both the `save` and `push` cases — the only two places an id ever enters the queue — so it applies uniformly whether the id arrived via `auto-fix-all`'s initial seed, `monitor-issues` detecting `Ready for Work`, or `push-issue-to-queue`; it adds `Enqueued` and removes `Ready for Work`/`Created`, if present. Both mutations are best-effort: a `gh` failure logs a warning to stderr and never blocks the underlying issue-sync or queue write.
+
+**`idea`** and **`writting`** mark an issue as still being drafted by the user, before it reaches the `Created` stage — set manually by a human, not by any script. They're removed by `arcanum/_lib/github_issue.sh`'s `mark-created` subcommand, called by `enhance-issue`'s "Publish back to GitHub" step once the dialogue concludes — and, as a fallback for issues that skip `enhance-issue` and go straight to `discuss-issue`, also by `mark-refined` alongside `created`, the same call `discuss-issue`'s "Push to GitHub" step already makes — so they never linger on an issue past refinement either way.
+
+**`enhancing`** marks an issue as actively being worked by `enhance-issue`'s AI-assisted dialogue, distinct from the passive `Idea`/`Writting` backlog state. It's applied by `arcanum/_lib/github_issue.sh`'s new `mark-enhancing` subcommand, called by `enhance-issue`'s fetch step as soon as an `Idea`/`Writting` issue is fetched for enhancement (removing `Idea`/`Writting`); it's removed again by the existing `mark-created` subcommand once `enhance-issue` publishes, alongside `Idea`/`Writting`. It is purely transient and scoped to `enhance-issue` only — `discuss-issue` does not use it.
+
+**`pr`** is added by `auto-fix-issue`'s `pr-create`/`pr-ready` (`auto-fix-issue/scripts/github.sh`'s `_sync_pr_labels_and_state`, called from `cmd_pr_create`/`cmd_pr_ready`) once a PR exists for the issue, idempotently via `tag_mutate_add_label`, so the issue's label list reflects at a glance whether a PR is open. The same helper also refreshes `.claude/state/issue-<id>.json`'s `tags` field from the issue's current GitHub labels.
+
+`auto-shipit` (PR-only — deliberately not part of the canonical issue-tag table above, since it is never read from or written to an issue) is a purely informational label with no reader anywhere in the pipeline. `_sync_pr_labels_and_state` adds it directly to the PR (`gh pr edit --add-label auto-shipit`) whenever the issue's refreshed tags include `shipit`, so a developer glancing at the PR's labels can tell at a glance that the underlying issue already had `shipit` approval — the human-only `shipit` label on the issue itself is never touched.
+
+**`planning`** and **`split`** track `arcanum-split-issue`'s own two-stage lifecycle on the *parent* issue being broken up — distinct from every tag above, none of which apply to a parent that stays open as a tracking issue after its work has moved to sub-issues. `planning` is applied by `arcanum/_lib/github_issue.sh`'s `mark-planning` subcommand, called by `arcanum-split-issue`'s fetch step as soon as the parent issue is fetched — it adds `Planning` and removes whichever of `Idea`/`Writting`/`Created` is present, since the skill can be invoked either before or after `enhance-issue`. `split` is applied by the same file's `mark-split` subcommand, called by `arcanum-split-issue`'s finishing script once every sub-issue has been pushed to GitHub and linked to the parent — it adds `Split` and removes `Planning`. The parent issue is never closed by this transition; it stays open, now labeled `Split`, as an umbrella issue that `auto-fix-all` does not pick up on its own. Each newly created sub-issue itself enters the pipeline fresh, labeled `Writting` (copied from the parent's labels with `Planning` swapped out), ready for `enhance-issue`/`discuss-issue`.
+
+## Tag mutation primitives
+
+`arcanum/_lib/tag_mutate.sh` exposes `tag_mutate_add_label <id> <repo_ref> <tag>` and `tag_mutate_remove_label <id> <repo_ref> <tag>`, which resolve the canonical tag name to a label via `arcanum/_lib/tags.sh`, fetch the issue's current labels to decide whether the mutation is a no-op, and otherwise call `gh issue edit --add-label`/`--remove-label` directly — no body fetch/splice/push round-trip. Both refuse to mutate `shipit`. `monitor-issues/scripts/github.sh remove-tag` and `auto-fix-all/scripts/github.sh add-tag`/`remove-tag` are thin CLI wrappers around this shared library — new skills needing to mutate issue tags should add their own thin wrapper rather than re-implementing the label lookup/fetch logic.
+
+For the full per-skill call-site table (skill, step, entrypoint, tags added/removed), see [tag-mutations.md](../tag-mutations.md) — generated by `scripts/generate_tags_table.sh`, self-healing at every release via `scripts/bump-version.sh`.
