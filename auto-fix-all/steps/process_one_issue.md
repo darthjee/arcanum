@@ -70,7 +70,7 @@ scripts/github.sh has-shipit-label "$REPO_PATH" <id>
 
 > Resolve `scripts/github.sh` relative to the `auto-fix-all` skill folder.
 
-- **Exits 0** — the issue is pre-approved. Skip straight to "If approved" below.
+- **Exits 0** — the issue is pre-approved. Skip straight to "If pre-approved via shipit" below.
 - **Exits 1** — continue to "Monitor the PR" below.
 
 ## Monitor the PR
@@ -103,7 +103,9 @@ scripts/github.sh pr-number "$REPO_PATH"
 
 Report `OUTCOME=closed PR_NUMBER=<pr_number>`. Done — stop here. Do not ask the user anything; that's the coordinator's job.
 
-### If `approved` (also reached directly from "Check for pre-approval" above when the issue has the `shipit` label/tag)
+### If approved via review
+
+Reached only from "Monitor the PR" → `approved` — a human approved the PR via GitHub review. Claude Code's own permission classifier still confirms the merge call below; that confirmation is a separate, deliberate gate from GitHub review and is untouched by `shipit` (see "If pre-approved via shipit" below for the pre-approved path).
 
 1. Remove planning artifacts and commit (never commit this by hand):
    ```bash
@@ -139,6 +141,31 @@ Report `OUTCOME=merged`. Done — stop here.
 Read [handle_comment.md](handle_comment.md)'s **"Choosing the responsible agent(s)"** section and apply the same agent-selection approach to the failed check-run names: dispatch the responsible specialist agent(s) (or yourself, as architect, if none seem responsible) in parallel with the instruction to investigate the CI failure, fix it, run the full dev cycle locally, and commit via `../../auto-fix-issue/scripts/commit_change.sh` (resolved relative to the `auto-fix-issue` skill folder).
 
 After all agents commit, go back to step 3 above (`wait_ci.sh`) to re-check.
+
+### If pre-approved via shipit
+
+Reached only from "Check for pre-approval" above, when `has-shipit-label` exits 0. Unlike the review-approved path above, the wait-then-merge call below is a single, distinctly-named Bash invocation (`wait_ci_and_merge.sh`) that Claude Code's own permission classifier can be allowlisted to run without confirmation — see `docs/agents/architecture/issue-tags.md`'s `shipit` paragraph and `arcanum/migrations/repos/next/001.sh`/`002.sh`/`003.sh` for how that allowlist entry gets provisioned. It never touches `wait_ci.sh`/`scripts/github.sh pr-merge` directly, and the review-approved path above stays exactly as it was, still classifier-confirmed either way.
+
+1. Remove planning artifacts and commit (never commit this by hand):
+   ```bash
+   scripts/cleanup_artifacts.sh "$REPO_PATH" <issue_file> <plan_dir> <id> "<your AI model name>" "<your AI model noreply email>"
+   ```
+   `<issue_file>` and `<plan_dir>` are the same paths resolved by `../auto-plan-issue/scripts/resolve_plan_paths.sh docs/agents/issues docs/agents/plans <id>` (re-run it here, resolved relative to the `auto-plan-issue` skill folder, if you no longer have them at hand).
+2. Wait for CI, then merge if it passes — one combined call:
+   ```bash
+   scripts/wait_ci_and_merge.sh "$REPO_PATH"
+   ```
+   > Resolve `scripts/wait_ci_and_merge.sh` relative to the `auto-fix-all` skill folder. Same **NEVER poll** rule as `wait_ci.sh` above — call it directly and let it block, with `timeout: 600000` when invoking it via the Bash tool.
+
+   First output line `passed`: the merge already happened internally (second line is the merged PR's URL) — nothing left to call. Run cleanup (the script infers the branch name from the issue ID):
+   ```bash
+   scripts/github.sh cleanup-branch "$REPO_PATH" <id>
+   ```
+   > Resolve `scripts/github.sh` relative to the `auto-fix-all` skill folder.
+
+   Report `OUTCOME=merged`. Done — stop here.
+
+   First output line `failed`: subsequent lines are the failed check-run names, CI never reached a merge attempt. Read [handle_comment.md](handle_comment.md)'s **"Choosing the responsible agent(s)"** section and apply the same agent-selection approach to the failed check-run names: dispatch the responsible specialist agent(s) (or yourself, as architect, if none seem responsible) in parallel with the instruction to investigate the CI failure, fix it, run the full dev cycle locally, and commit via `../../auto-fix-issue/scripts/commit_change.sh` (resolved relative to the `auto-fix-issue` skill folder). After all agents commit, go back to step 2 above (`wait_ci_and_merge.sh`, not `wait_ci.sh`) to re-check.
 
 ### If `commented`
 
