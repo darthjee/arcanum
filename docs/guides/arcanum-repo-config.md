@@ -48,6 +48,18 @@ The top-level `.version` field on `arcanum-repo-config.json` (committed, shared 
 
 `type: "instructions"` entries additionally rely on `.claude/state/arcanum-migrations-ledger.json` for per-entry resume tracking — deliberately *not* part of this config-file pair (it isn't a version pointer and doesn't route through `repo_config.sh`); see `docs/guides/arcanum-repo-version.md`'s "A third tracker" section.
 
+## Documented keys
+
+A few `git`-namespaced keys, read through this config pair (and, for
+some of them, the global tier described below), control commit
+behavior directly:
+
+| Key | Type | Default | Chain | Notes |
+|---|---|---|---|---|
+| `git.email` | string (`{agent}` template) | — | local → repo → global | Per-agent commit-author email pattern used by `commit_change.sh`/`commit_issue.sh`/`commit_plan.sh` (see `arcanum/_lib/agent_email.sh`). See [`arcanum-global-config.md`](arcanum-global-config.md). |
+| `git.safe_branch` | string | `origin/main` | local state only | The ref `arcanum/_lib/safe_branch.sh` checks out via `enhance-issue`/`discuss-issue`/`arcanum-split-issue`. See [Branch Bootstrap and Merge Conflicts](../agents/architecture/branch-bootstrap-and-merge-conflicts.md). |
+| `git.omit_model_coauthor` | boolean | `false` | local → repo → global | When `true`, `auto-fix-issue`/`auto-new-issue`/`auto-plan-issue`'s commit scripts (`commit_change.sh`, `commit_issue.sh`, `commit_plan.sh`) skip emitting the model's `Co-Authored-By` trailer, keeping only the agent's own line. Resolved through the full 3-tier chain, same as `git.email` — see [`arcanum-global-config.md`](arcanum-global-config.md). |
+
 ## A third, global tier on top of this pair
 
 Both files described above are repo-scoped — neither survives outside
