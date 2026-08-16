@@ -73,14 +73,18 @@ After the CI monitoring options are set up, read and follow [setup_labels.md](se
 
 After the repository labels are set up, read and follow [setup_auto_fix_all_config.md](setup_auto_fix_all_config.md).
 
-## Step 12 — Setup issue enhancement concerns
+## Step 12 — Setup the `shipit`-merge permission exemption
 
-After the `auto-fix-all` personal run behavior is set up, read and follow [setup_issue_enhancement.md](setup_issue_enhancement.md).
+After the `auto-fix-all` personal run behavior is set up, read and follow [setup_permissions.md](setup_permissions.md).
 
-## Step 13 — Setup arcanum-split-issue concerns
+## Step 13 — Setup issue enhancement concerns
+
+After the `shipit`-merge permission exemption is set up, read and follow [setup_issue_enhancement.md](setup_issue_enhancement.md).
+
+## Step 14 — Setup arcanum-split-issue concerns
 
 After the issue enhancement concerns are set up, read and follow [setup_arcanum_split_issue.md](setup_arcanum_split_issue.md).
 
-## Step 14 — Stamp the arcanum version
+## Step 15 — Stamp the arcanum version
 
 After the arcanum-split-issue concerns are set up, read and follow [setup_arcanum_version.md](setup_arcanum_version.md).
