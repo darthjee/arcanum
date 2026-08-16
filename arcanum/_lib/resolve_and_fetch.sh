@@ -41,8 +41,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # hard-error (message to stderr, exit 1) before any STATUS= line is ever
 # printed — deliberately outside this script's own STATUS=ok/STATUS=error
 # contract, which is specifically about "does the GitHub issue exist,"
-# not this. See docs/agents/architecture.md's "Branch Bootstrap and Merge
-# Conflicts" section for the full writeup.
+# not this. See docs/agents/architecture/branch-bootstrap-and-merge-conflicts.md
+# for the full writeup.
 "${SCRIPT_DIR}/checkout_safe_branch.sh" "$REPO_PATH" >/dev/null
 
 SCENARIO="" ID="" TITLE="" FILE="" STATUS="" NEEDS_FETCH=""
