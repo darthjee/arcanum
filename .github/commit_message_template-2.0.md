@@ -18,6 +18,12 @@ docs/guides/arcanum-repo-config.md. When "git.email" is unset, the agent
 line falls back to the same address as the model line, reproducing the
 old, single-shared-email template's output.
 
+The model line above can be omitted entirely by setting the
+"git.omit_model_coauthor" key to "true" in the same three locations
+(local state, repo config, or global config — see
+docs/guides/arcanum-repo-config.md) — the agent line is always still
+emitted regardless of this setting.
+
 This file's mere presence (as "commit_message_template-2.0.md", not its
 content) is what switches the commit scripts onto this new, two-distinct-
 email behavior — the content itself is never parsed at runtime, it is
