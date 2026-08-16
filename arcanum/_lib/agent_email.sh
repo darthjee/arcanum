@@ -38,3 +38,15 @@ agent_email_get() {
   [[ -n "$email" && "$email" != "null" ]] || { echo "$model_email"; return; }
   echo "${email//\{agent\}/$agent}"
 }
+
+# model_coauthor_omitted
+#   Prints "true" if the "git"."omit_model_coauthor" key (resolved via
+#   config_chain_read: local state -> repo config -> global) is truthy,
+#   "false" otherwise (including when absent/null/any other value) —
+#   default false, purely opt-in.
+model_coauthor_omitted() {
+  local value
+  value=$(config_chain_read "." "git" "omit_model_coauthor")
+  [[ "$value" == "true" ]] && { echo "true"; return; }
+  echo "false"
+}

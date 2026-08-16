@@ -56,7 +56,9 @@ fi
     echo "Addresses-Comment: ${COMMENT_URL}"
   fi
   echo
-  echo "Co-Authored-By: ${MODEL_NAME} <${MODEL_EMAIL}>"
+  if [[ "$(model_coauthor_omitted)" != "true" ]]; then
+    echo "Co-Authored-By: ${MODEL_NAME} <${MODEL_EMAIL}>"
+  fi
   echo "Co-Authored-By: ${AGENT} agent <${AGENT_EMAIL}>"
 } | git commit -F -
 

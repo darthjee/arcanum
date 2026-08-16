@@ -40,7 +40,9 @@ fi
 {
   echo "docs(issue): add issue file (issue #${ID})"
   echo
-  echo "Co-Authored-By: ${MODEL_NAME} <${MODEL_EMAIL}>"
+  if [[ "$(model_coauthor_omitted)" != "true" ]]; then
+    echo "Co-Authored-By: ${MODEL_NAME} <${MODEL_EMAIL}>"
+  fi
   echo "Co-Authored-By: architect agent <${AGENT_EMAIL}>"
 } | git commit -F -
 
