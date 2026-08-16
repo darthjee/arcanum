@@ -63,6 +63,27 @@ namespaced keys (e.g. `auto-fix-all`'s `ignored_check_patterns`) still
 only read the two per-repo files; they may adopt the global chain later,
 feature by feature.
 
+## The `migrations.version` pointer
+
+Separately from `config_chain_read`'s namespaced-key resolution above,
+this same file also carries a `.migrations.version` pointer — the
+third, "global" scope in arcanum's per-repo migration manifest
+(`arcanum/migrations/repos/<version>/migrations.json`'s `applies_to`),
+alongside the existing `"repo"`/`"local"` scopes. A `"global"`-scoped
+migration entry is satisfied once this pointer reaches the entry's
+version folder — shared machine/account-wide like everything else in
+this file, so one repo's run advancing it satisfies every other repo
+immediately. Read/written via `global_config_get_version`/
+`global_config_set_version` in `arcanum/_lib/global_config.sh` (reusing
+`repo_config_get_version`/`repo_config_set_version` against this file's
+resolved path), never via `config_chain_read`/`global_config_read`
+directly. See
+[`docs/agents/architecture/per-repo-migrations.md`](../agents/architecture/per-repo-migrations.md)
+and
+[`docs/guides/arcanum-repo-version.md`](arcanum-repo-version.md) for
+the full three-pointer migration story, including the hard-error
+behavior when this file's location can't be resolved.
+
 ## How to set it
 
 Two ways:
