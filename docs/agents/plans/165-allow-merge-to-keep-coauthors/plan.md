@@ -102,7 +102,67 @@ Replace the hardcoded `--body ""` in `cmd_pr_merge`
   behavior (omit `--body`) rather than forcing an empty string — per the
   issue's edge-case decision.
 
-### Step 5 — Manual verification
+### Step 5 — Seed `git.merge_body_mode` via migration, across all 3 config scopes
+
+Per explicit follow-up feedback on this issue: unlike the "no migration"
+precedent set by `git.omit_model_coauthor` (see `## Notes` below, kept
+for context), this key does get a migration — one entry per config
+scope in the local → repo → global chain, so the new setting can be
+seeded consistently everywhere rather than only wherever a contributor
+happens to set it by hand. Three new `script`-type entries in
+`arcanum/migrations/repos/next/migrations.json` (scaffold each via
+`arcanum/migrations/generate_next.sh --type script`, then adjust
+`applies_to` and fill in the skeleton — same shape as the `git.email`
+precedent, `arcanum/migrations/repos/0.14.0/002.sh`/`003.sh`):
+
+- **`applies_to: "local"`** — writes to
+  `.claude/state/arcanum-config.json` via `repo_config_write` (same
+  call shape as `0.14.0/002.sh`'s `git.email` write, different
+  namespace/key: `"git" "merge_body_mode"`).
+- **`applies_to: "repo"`** — writes to
+  `.claude/configuration/arcanum-repo-config.json` via
+  `repo_config_write` (same shape as `0.14.0/003.sh`), with the same
+  "this value will be committed to the repo and visible to all
+  contributors" warning before prompting.
+- **`applies_to: "global"`** — writes via `global_config_write` (see
+  `arcanum/_lib/global_config.sh`) to the resolved
+  `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/arcanum-config.json` — this is
+  arcanum's own global config file (namespace/key `"git"
+  "merge_body_mode"`), **not** Claude Code's native
+  `settings.json` that `0.16.0/003.sh` wrote to for the unrelated
+  `shipit` permission-grant precedent; source
+  `arcanum/_lib/global_config.sh` directly rather than
+  `repo_config_write` + a hand-resolved path.
+
+Unlike `git.email`, there is no derivable guess (no existing git config
+value to split/reuse) — this is a pure preference choice among the
+three enum values, so all three scripts share the same interactive
+shape instead of `git.email`'s guess-then-confirm one: when an
+interactive terminal is available (`exec 3< /dev/tty` check, same
+pattern as every migration above), prompt
+`[E]mpty/[F]ull/[C]oauthors/[S]kip`, defaulting to the same `"empty"`
+value the config-chain itself falls back to when the choice is
+`[E]mpty` or when input doesn't match any of `e/f/c`; `[S]kip` writes
+nothing (`merge_body_mode()`'s own hardcoded-default fallback applies
+at use-time, same as skipping `git.email`/`git.omit_model_coauthor`
+leaves those unset). When no interactive terminal is available (e.g.
+automated/CI-style runs), skip silently, writing nothing — there is no
+guess to fall back to the way `git.email`'s scripts have, and this is
+a preference rather than a security-relevant gate (unlike the `shipit`
+permission-grant migrations' loosen-only-on-explicit-yes reasoning,
+this one simply has nothing safe to assume either way), so silent
+no-op is the correct default, matching `git.omit_model_coauthor`'s own
+"ship without a migration at all" spirit as closely as possible while
+still fulfilling this issue's explicit ask for one.
+
+Each of the three writes the identical value the human chooses at that
+scope's own prompt — the three scripts are independent per-scope
+choices, not one shared prompt fanned out to three files (a
+contributor could reasonably want `coauthors` locally but leave the
+repo-wide/global tiers at `empty`, exactly like `git.email`'s existing
+local vs. repo split already allows).
+
+### Step 6 — Manual verification
 
 No automated test suite exists in this repo (pure markdown + bash
 skills). Verify by hand against a real PR with multiple coauthored
@@ -117,6 +177,12 @@ commits:
    from before this issue).
 4. Set it to an invalid value (e.g. `"bogus"`), confirm a stderr warning
    is printed and behavior falls back to `empty`.
+5. Run each of the three new migration scripts (`... run`) interactively,
+   confirm the `[E]mpty/[F]ull/[C]oauthors/[S]kip` prompt writes the
+   chosen value into the right file (local/repo/global respectively) and
+   that `[S]kip` leaves the key absent; then run each `... run` again
+   with stdin/tty unavailable (e.g. `</dev/null`) and confirm it exits 0
+   without writing anything.
 
 ## Files to Change
 
@@ -132,6 +198,12 @@ commits:
 - `auto-fix-all/steps/process_one_issue.md` — update the documented
   `pr-merge` invocation if a model email becomes available to thread
   through.
+- `arcanum/migrations/repos/next/migrations.json` — three new `script`
+  entries (`applies_to`: `local`, `repo`, `global`) seeding
+  `git.merge_body_mode`.
+- `arcanum/migrations/repos/next/<NNN>.sh` / `<NNN>.md` (×3) — the new
+  migration scripts and their human-facing descriptions, one pair per
+  scope (see Step 5).
 
 ## Notes
 
@@ -145,3 +217,9 @@ commits:
 - No CI job in `.circleci/config.yml` runs against skill/script changes
   on regular branches (it only triggers on release tag pushes), so there
   is no `## CI Checks` section for this plan.
+- The issue's original "No init-claude step, no migration" call (see the
+  issue file's `## Solution` section) is superseded by explicit
+  follow-up feedback requesting a migration after all — Step 5 above
+  implements it. The issue file itself is left as originally
+  written/committed (not amended after the fact); this plan is the
+  source of truth for what actually ships.
