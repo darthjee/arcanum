@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Wait for CI, then merge the PR internally — the `shipit`-preapproved
 # merge path only (see issue #170).
-# Usage: wait_ci_and_merge.sh <repo_path>
+# Usage: wait_ci_and_merge.sh <repo_path> [model_email]
 #
 # Thin orchestrator over the two existing, unmodified scripts
 # `wait_ci.sh` and `github.sh pr-merge` — no duplicated CI-polling or
@@ -31,7 +31,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_PATH="${1:?Usage: $0 <repo_path>}"
+REPO_PATH="${1:?Usage: $0 <repo_path> [model_email]}"
+MODEL_EMAIL="${2:-}"
 
 output="$("${SCRIPT_DIR}/wait_ci.sh" "$REPO_PATH")"
 status="$(head -1 <<<"$output")"
@@ -42,4 +43,4 @@ if [[ "$status" != "passed" ]]; then
 fi
 
 echo "passed"
-"${SCRIPT_DIR}/github.sh" pr-merge "$REPO_PATH"
+"${SCRIPT_DIR}/github.sh" pr-merge "$REPO_PATH" "$MODEL_EMAIL"
