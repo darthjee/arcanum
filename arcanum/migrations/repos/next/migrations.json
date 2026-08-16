@@ -1,16 +1,1 @@
-[
-  {
-    "id": "001",
-    "type": "script",
-    "file": "001.sh",
-    "skippable": true,
-    "applies_to": "local"
-  },
-  {
-    "id": "002",
-    "type": "script",
-    "file": "002.sh",
-    "skippable": true,
-    "applies_to": "global"
-  }
-]
+[]
