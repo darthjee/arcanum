@@ -4,7 +4,7 @@ Arcanum — a collection of Claude Code skills (slash commands), reusable across
 
 ## Stack
 
-No programming language — the project is composed of markdown files.
+Markdown files drive every skill — there is no build step and no application runtime for the skills themselves. A Node.js `core/` package is part of the architecture going forward, though: skill entrypoint scripts (`<skill>/scripts/*.sh`, `arcanum/_lib/*.sh`) are migrating, per-entrypoint, from bash to native Node.js. See [Script Engine](docs/agents/architecture/script-engine.md) for the full design — `core/` does not exist in the repo yet, and every entrypoint still runs as shell until its native counterpart ships.
 
 ## Conventions
 
