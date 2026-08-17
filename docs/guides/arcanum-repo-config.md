@@ -56,6 +56,7 @@ behavior directly:
 
 | Key | Type | Default | Chain | Notes |
 |---|---|---|---|---|
+| `git.agents` | object (map of agent name -> email) | — | local → repo → global | Per-agent explicit `agent name -> concrete email` mapping, consulted before `git.email` at each tier (see `arcanum/_lib/agent_email.sh`). Lets multiple agent names share a single GitHub identity instead of requiring one dedicated account per agent name. See [`arcanum-global-config.md`](arcanum-global-config.md). |
 | `git.email` | string (`{agent}` template) | — | local → repo → global | Per-agent commit-author email pattern used by `commit_change.sh`/`commit_issue.sh`/`commit_plan.sh` (see `arcanum/_lib/agent_email.sh`). See [`arcanum-global-config.md`](arcanum-global-config.md). |
 | `git.safe_branch` | string | `origin/main` | local state only | The ref `arcanum/_lib/safe_branch.sh` checks out via `enhance-issue`/`discuss-issue`/`arcanum-split-issue`. See [Branch Bootstrap and Merge Conflicts](../agents/architecture/branch-bootstrap-and-merge-conflicts.md). |
 | `git.omit_model_coauthor` | boolean | `false` | local → repo → global | When `true`, `auto-fix-issue`/`auto-new-issue`/`auto-plan-issue`'s commit scripts (`commit_change.sh`, `commit_issue.sh`, `commit_plan.sh`) skip emitting the model's `Co-Authored-By` trailer, keeping only the agent's own line. Resolved through the full 3-tier chain, same as `git.email` — see [`arcanum-global-config.md`](arcanum-global-config.md). |
