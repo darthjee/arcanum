@@ -34,7 +34,7 @@ Set `AGENT_SPLIT=false`. The plan will be a single `plan.md` with no `## Agents 
 For each candidate agent, read its `description` and judge — based on the issue and the codebase exploration from the previous step — whether this issue requires changes within that agent's scope.
 
 - If **none** of the candidate agents have work (unlikely, but possible for a purely cross-cutting issue), fall back to "No split" above.
-- If **exactly one** candidate agent has work, set `AGENT_SPLIT=false` but still write that agent's plan as the single `plan.md` content (no need for a separate file or a "Shared contracts" section, since there is nothing to share) — there's no benefit to splitting when only one agent is involved.
+- If **exactly one** candidate agent has work, set `AGENT_SPLIT=false` **and** record that agent's name as the single owner (`SINGLE_OWNER=<agent-name>`). This drives Step 4: instead of an anonymous `plan.md`, the plan content is written into `<agent-name>.md`, plus a minimal pointer `plan.md` (see `write_plan.md`'s Case A2) — preserving the owner's name on disk without the overhead of a full split (no `## Shared contracts` section is needed, since there is nothing to share with zero other involved agents).
 - If **two or more** candidate agents have work, set `AGENT_SPLIT=true` and record the list of involved agents (name + description). This list drives Step 4.
 
 ## Identify shared contracts (only when AGENT_SPLIT=true)

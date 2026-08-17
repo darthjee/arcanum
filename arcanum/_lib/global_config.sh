@@ -53,13 +53,26 @@ _global_config_file() {
 #   value". Always exits 0 — callers apply their own default for an
 #   empty result. <repo_path> is accepted but unused/ignored, see this
 #   file's header.
+#
+#   <key> may be a dot-separated path (e.g. "agents.architect"), in
+#   which case it's resolved as a nested path under <namespace> via jq
+#   getpath instead of direct indexing, mirroring repo_config_read (see
+#   repo_config.sh) — a getpath lookup that doesn't exist and one
+#   that's explicitly `null` both count as "absent". Keys without a "."
+#   behave exactly as before (direct .[$ns][$k] indexing).
 global_config_read() {
   local namespace="$2" key="$3"
   local file
   file="$(_global_config_file)"
   [[ -n "$file" && -f "$file" ]] || return 0
 
-  if jq -e --arg ns "$namespace" --arg k "$key" \
+  if [[ "$key" == *.* ]]; then
+    if jq -e --arg ns "$namespace" --arg k "$key" \
+        '($k | split(".")) as $p | (.[$ns] // {}) | getpath($p) != null' "$file" >/dev/null 2>&1; then
+      jq -c --arg ns "$namespace" --arg k "$key" \
+        '($k | split(".")) as $p | (.[$ns] // {}) | getpath($p)' "$file"
+    fi
+  elif jq -e --arg ns "$namespace" --arg k "$key" \
       '(.[$ns] // {}) | has($k)' "$file" >/dev/null 2>&1; then
     jq -c --arg ns "$namespace" --arg k "$key" '.[$ns][$k]' "$file"
   fi
