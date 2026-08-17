@@ -26,10 +26,27 @@ source "${_REPO_CONFIG_LIB_DIR}/lock.sh"
 #   level, prints that value (jq -c) and warns on stderr that the
 #   config has moved. Otherwise prints nothing. Always exits 0 —
 #   callers apply their own default for an empty result.
+#
+#   <key> may be a dot-separated path (e.g. "agents.architect"), in
+#   which case it's resolved as a nested path under <namespace> via jq
+#   getpath instead of direct indexing — e.g. "agents.architect" under
+#   namespace "git" resolves `.git | getpath(["agents","architect"])`.
+#   A getpath lookup that doesn't exist and one that's explicitly
+#   `null` both count as "absent", same convention already used for
+#   flat keys. Keys without a "." behave exactly as before (direct
+#   .[$ns][$k] indexing). The <legacy_file> fallback only supports flat
+#   keys — no dotted-path lookup is attempted there.
 repo_config_read() {
   local new_file="$1" legacy_file="$2" namespace="$3" key="$4"
 
-  if [[ -f "$new_file" ]] && jq -e --arg ns "$namespace" --arg k "$key" \
+  if [[ "$key" == *.* ]]; then
+    if [[ -f "$new_file" ]] && jq -e --arg ns "$namespace" --arg k "$key" \
+        '($k | split(".")) as $p | (.[$ns] // {}) | getpath($p) != null' "$new_file" >/dev/null 2>&1; then
+      jq -c --arg ns "$namespace" --arg k "$key" \
+        '($k | split(".")) as $p | (.[$ns] // {}) | getpath($p)' "$new_file"
+      return 0
+    fi
+  elif [[ -f "$new_file" ]] && jq -e --arg ns "$namespace" --arg k "$key" \
       '(.[$ns] // {}) | has($k)' "$new_file" >/dev/null 2>&1; then
     jq -c --arg ns "$namespace" --arg k "$key" '.[$ns][$k]' "$new_file"
     return 0
