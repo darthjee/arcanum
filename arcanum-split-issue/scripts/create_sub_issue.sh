@@ -4,10 +4,18 @@
 # .claude/state/issue-<issue_id>.json.
 # Usage: create_sub_issue.sh <repo_path> <issue_id> <sub_issue_file>
 #
+# Delegates the actual create + label + link work to the shared
+# arcanum/_lib/spawn_issue.sh --as-subissue (parent's labels with every
+# pipeline tag stripped, plus the permanent Spawned label — see
+# spawn_issue.sh for the full label allow-list policy and retry/
+# linking/cleanup behavior), keeping only this script's own
+# count-segment logging and .claude/state/issue-<issue_id>.json
+# "sub-issues" tracking on top of the returned ID.
+#
 # On success prints:
 #   STATUS=ok
 #   ID=<new_id>
-# and exits 0. On failure (gh issue create exhausts its retry budget)
+# and exits 0. On failure (spawn_issue.sh exhausts its retry budget)
 # prints:
 #   STATUS=failed
 # and exits 1.
@@ -29,12 +37,6 @@ LIB_DIR="${SCRIPT_DIR}/../../arcanum/_lib"
 # shellcheck source=../../arcanum/_lib/repo_path.sh
 # shellcheck disable=SC1091
 source "${LIB_DIR}/repo_path.sh"
-# shellcheck source=../../arcanum/_lib/origin.sh
-# shellcheck disable=SC1091
-source "${LIB_DIR}/origin.sh"
-# shellcheck source=../../arcanum/_lib/repo_config.sh
-# shellcheck disable=SC1091
-source "${LIB_DIR}/repo_config.sh"
 
 repo_path_enter "$REPO_PATH"
 
@@ -52,87 +54,37 @@ BODY=$(awk 'NR==1{next} !found && /^$/{found=1; next} found{print}' "$SUB_ISSUE_
 # --- Best-effort count segment for logging only ---
 
 BASE="$(basename "$SUB_ISSUE_FILE")"
-REST="${BASE#${ISSUE_ID}_}"
+REST="${BASE#"${ISSUE_ID}"_}"
 COUNT_SEGMENT="${REST%%_*}"
 if [[ ! "$COUNT_SEGMENT" =~ ^[0-9]+$ ]]; then
   COUNT_SEGMENT=""
 fi
-
-_load_origin "$REPO_PATH"
-repo_ref="$_ORIGIN_REPO_PATH"
-
-# --- Build the label list: parent's labels with Planning swapped for Writting ---
-
-LABELS=()
-HAS_WRITTING=0
-while IFS= read -r label; do
-  [[ -n "$label" ]] || continue
-  if [[ "$label" == "Planning" ]]; then
-    LABELS+=("Writting")
-    HAS_WRITTING=1
-  else
-    LABELS+=("$label")
-    [[ "$label" == "Writting" ]] && HAS_WRITTING=1
-  fi
-done < <(gh issue view "$ISSUE_ID" -R "$repo_ref" --json labels -q '.labels[].name')
-
-if [[ "$HAS_WRITTING" -eq 0 ]]; then
-  LABELS+=("Writting")
-fi
-
-LABEL_ARGS=()
-for label in "${LABELS[@]+"${LABELS[@]}"}"; do
-  LABEL_ARGS+=(--label "$label")
-done
-
-# --- Retry config ---
-
-max_retry=$(repo_config_read ".claude/state/arcanum-config.json" "" "plan-issues" "max-retry-count")
-max_retry="${max_retry//\"/}"
-[[ -n "$max_retry" ]] || max_retry=5
-
-error_sleep=$(repo_config_read ".claude/state/arcanum-config.json" "" "plan-issues" "error-sleep-time")
-error_sleep="${error_sleep//\"/}"
-[[ -n "$error_sleep" ]] || error_sleep=5
-
-# --- Retry loop around gh issue create ---
-
-new_id=""
-attempt=0
-success=0
 count_label="${COUNT_SEGMENT:-?}"
-while (( attempt < max_retry )); do
-  attempt=$((attempt + 1))
-  echo "Creating sub-issue ${count_label} for issue #${ISSUE_ID}: ${TITLE} (attempt ${attempt}/${max_retry})"
 
-  err_output=""
-  if url=$(gh issue create -R "$repo_ref" --title "$TITLE" --body "$BODY" "${LABEL_ARGS[@]}" 2>/tmp/create_sub_issue.err.$$); then
-    rm -f /tmp/create_sub_issue.err.$$
-    new_id="${url##*/}"
-    success=1
-    break
-  else
-    err_output=$(cat /tmp/create_sub_issue.err.$$ 2>/dev/null || true)
-    rm -f /tmp/create_sub_issue.err.$$
-    echo "Warning: gh issue create failed (attempt ${attempt}/${max_retry}): ${err_output}" >&2
-    if (( attempt < max_retry )); then
-      sleep "$error_sleep"
-    fi
-  fi
-done
+# --- Write the parsed body to a temp scratch file, spawn_issue.sh's own
+# create-call input (spawn_issue.sh deletes ITS OWN scratch copy under
+# docs/agents/issues/ once done; this temp file is ours to clean up) ---
 
-if [[ "$success" -ne 1 ]]; then
+TMP_BODY_FILE="$(mktemp)"
+trap 'rm -f "$TMP_BODY_FILE"' EXIT
+
+printf '%s\n' "$BODY" > "$TMP_BODY_FILE"
+
+echo "Creating sub-issue ${count_label} for issue #${ISSUE_ID}: ${TITLE}"
+
+SPAWN_OUTPUT=""
+if ! SPAWN_OUTPUT=$("${LIB_DIR}/spawn_issue.sh" "$REPO_PATH" "$ISSUE_ID" "$TITLE" "$TMP_BODY_FILE" --as-subissue); then
+  echo "$SPAWN_OUTPUT"
   echo "STATUS=failed"
   exit 1
 fi
 
-# --- Link as a native GitHub sub-issue (best-effort) ---
+# Surface spawn_issue.sh's own progress lines, but not its STATUS/ID/URL
+# summary — this script keeps its own historical two-line output
+# contract (STATUS=ok / ID=<new_id>) below instead.
+grep -v -E '^(STATUS=|ID=|URL=)' <<< "$SPAWN_OUTPUT" || true
 
-parent_node_id=$(gh issue view "$ISSUE_ID" -R "$repo_ref" --json id -q .id)
-sub_node_id=$(gh issue view "$new_id" -R "$repo_ref" --json id -q .id)
-
-gh api graphql -f query='mutation($issueId:ID!,$subIssueId:ID!){addSubIssue(input:{issueId:$issueId,subIssueId:$subIssueId}){subIssue{id}}}' -F issueId="$parent_node_id" -F subIssueId="$sub_node_id" >/dev/null 2>&1 \
-  || echo "Warning: could not link issue #$new_id as a native sub-issue of #$ISSUE_ID — created but not linked; link it manually on GitHub" >&2
+new_id=$(grep '^ID=' <<< "$SPAWN_OUTPUT" | head -1 | cut -d= -f2-)
 
 # --- Track the new id in state (regardless of linking outcome) ---
 
