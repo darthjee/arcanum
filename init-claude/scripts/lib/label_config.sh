@@ -88,6 +88,7 @@ DEFAULT_LABEL_PAIRS=(
   Automated:d93f0b
   Planning:c5def5
   Split:000000
+  Spawned:6a737d
 )
 
 label_config_validate_pair() {

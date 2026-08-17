@@ -30,6 +30,8 @@ Hold an open dialogue about the chosen topic: propose alternatives, ask follow-u
 
 Append the outcome to `FILE` (the local issue draft from [fetch.md](fetch.md)) — add or update a section capturing what was decided, in whatever shape fits the topic (e.g. a `## <Topic>` subsection, or folded into an existing `## Description`/`## Solution` section if that reads better). Always write in English, translating if the conversation was in another language.
 
+If the digging surfaces something that deserves its own GitHub issue instead of folding into `FILE`, spin it off with `../../arcanum/_lib/spawn_issue.sh "$REPO_PATH" <id> "<title>" <body_file>` rather than drafting a file to commit directly. Whether to pass `--as-subissue` is a judgment call each time: pass it when the new issue is genuinely a piece of this issue's own work breakdown, omit it (the default — a comment-only cross-reference) when it's a tangential/independent concern.
+
 ## 5. Repeat or finish
 
 Return to step 2 to refresh the checklist (the item just discussed is now ✅) and present it again.
