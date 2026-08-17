@@ -4,7 +4,11 @@ Write all plan content in English, regardless of the language used in the issue.
 
 ## Case A — AGENT_SPLIT=false
 
-Write a single `plan.md`:
+`AGENT_SPLIT=false` covers two distinct scenarios from `determine_agents.md`'s "Decide which candidate agents have work" section, and they produce different file shapes:
+
+### Case A1 — no owner (genuinely cross-cutting)
+
+None of the candidate agents have work, or no agents are configured at all. Write a single `plan.md`:
 
 ```markdown
 # Plan: <Issue Title>
@@ -39,6 +43,23 @@ Issue: [<id>_<slug>.md](../issues/<id>_<slug>.md)
 ```
 
 If the plan is genuinely large, you may split it into multiple files inside `PLAN_DIR` (e.g. `plan.md`, `plan_api.md`) with `plan.md` acting as the index — same judgment call as in `plan-issue`. This is independent of the agent split in Case B.
+
+### Case A2 — single owner
+
+Exactly one candidate agent has work (`determine_agents.md` recorded `SINGLE_OWNER=<agent-name>`). Write the plan content into `<agent-name>.md`, using the same body shape as Case A1's `plan.md` (`## Overview`, `## Context`, `## Implementation Steps`, `## Files to Change`, optional `## CI Checks`, `## Notes`), and write a minimal pointer `plan.md` instead of the full content:
+
+```markdown
+# Plan: <Issue Title>
+
+Issue: [<id>_<slug>.md](../issues/<id>_<slug>.md)
+
+## Overview
+<Brief description of what this plan covers>
+
+See [<agent-name>.md](<agent-name>.md) for the full plan.
+```
+
+This preserves the owner's name on disk — `list_plan_agents.sh` picks up `<agent-name>.md` the same way it does for a Case B file — without the overhead of a `## Shared contracts` section, since there is nothing to share with zero other involved agents.
 
 ## Case B — AGENT_SPLIT=true
 
