@@ -1,13 +1,25 @@
 {
   "auto-fix-all": {
-    "ignored_check_patterns": [
-      "Codacy"
-    ]
+    "clear_context": true,
+    "finish_on_empty_queue": true
   },
-  "version": "0.16.1",
+  "plan-issues": {
+    "error-sleep-type": 5,
+    "max-retry-count": 5
+  },
   "git": {
+    "safe_branch": "origin/main",
     "email": "darthjee+{agent}@gmail.com",
     "omit_model_coauthor": true,
-    "merge_body_mode": "coauthors"
+    "merge_body_mode": "coauthors",
+    "agents": {
+      "architect": "darthjee+architect@gmail.com",
+      "scripter": "darthjee+backend@gmail.com",
+      "skill-reviewer": "darthjee+product-owner@gmail.com",
+      "skill-writer": "darthjee+frontend@gmail.com"
+    }
+  },
+  "migrations": {
+    "version": "0.16.1"
   }
 }
