@@ -1,0 +1,71 @@
+# Script Engine (Shell → Node.js Migration)
+
+Arcanum's skill entrypoint scripts (`<skill>/scripts/*.sh`, `arcanum/_lib/*.sh`) are migrating, incrementally and per-entrypoint, from bash to a native Node.js implementation. This doc captures the permanent design decided in #168 and refined in #189, before any of the implementation sub-issues (#190 scaffolding, #191 CI, #192 dispatch guard, #193 first entrypoint) start building against it. Nothing here is implemented yet — `core/` and `arcanum/_lib/engine_dispatch.sh` do not exist in the repo as of this doc. Treat this as the target design for those sub-issues to build toward, not a description of current behavior.
+
+## The `engine` config key
+
+Which implementation (shell or native) actually runs for a given entrypoint is controlled by the `engine` config key, resolved through the existing 3-tier chain documented in [Shared State & Configuration Files](shared-state-and-configuration.md) — local state (`.claude/state/arcanum-config.json`) → repo config (`.claude/configuration/arcanum-repo-config.json`) → global config (`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/arcanum-config.json`), read via `arcanum/_lib/config_chain.sh`'s `config_chain_read`.
+
+`engine` is its own top-level namespace — not nested under any one skill or feature — since which engine runs is cross-cutting infrastructure, the same way `git` (holding `git.email`, `git.safe_branch`) is its own top-level namespace rather than living under a specific skill. The finalized key path is `engine.mode`, resolved with `config_chain_read <repo_path> engine mode`. Its value is one of `shell` (the current, default behavior — used whenever the key is absent at every tier), `native` (prefer the Node.js implementation when one exists for the entrypoint being called), or `docker` (run the native implementation inside the Docker test image described below, reusing the same `core/bin/arcanum` invocation — the execution environment changes, not the calling convention).
+
+## The dispatch guard
+
+`arcanum/_lib/engine_dispatch.sh` is a shared bash helper, sourced (or otherwise consulted) by every migrated entrypoint's shim script, parameterized by the command/script name being invoked. It is the single place that decides, for that one call, whether to run the existing shell implementation or the native one.
+
+To make that decision it consults a migration-status map — which entrypoints already have a native implementation. This doc deliberately does not pin down that map's exact file path or format; #192 (the dispatch guard implementation sub-issue) decides that as an implementation detail. What's fixed here is the map's *role*: it is only ever consulted (read) by `engine_dispatch.sh` to answer "does a native implementation exist for this entrypoint yet", never invoked or executed itself.
+
+Fallback and failure rules, given the resolved `engine.mode` and the migration-status map's answer for the current entrypoint:
+
+- `engine.mode=native` (or `docker`) configured, but the migration-status map says no native implementation exists yet for this entrypoint: silent fallback to the shell implementation, with a warning printed (not a hard error) — an unmigrated entrypoint should never block a caller just because native mode is configured globally.
+- `engine.mode=native` (or `docker`) configured, and a native implementation exists, but it crashes or throws at runtime: this is a real bug in the native implementation, distinct from "not implemented yet" — it fails loud, with no automatic fallback to shell. Silently falling back would mask exactly the bugs this migration needs surfaced.
+
+## The centralized native entrypoint
+
+Every migrated entrypoint's native path goes through one single executable interface: `core/bin/arcanum`. It has no `.js` extension and a `#!/usr/bin/env node` shebang, so its calling convention already looks like a real CLI binary — `core/bin/arcanum <command> <args...>` — rather than a per-script `node core/lib/<script>.js` invocation. `engine_dispatch.sh` invokes it this way, passing the command name (identifying which entrypoint is being called) as the first argument, followed by that entrypoint's own arguments; `core/bin/arcanum` routes internally to the matching module under `core/lib/`.
+
+No migrated entrypoint is ever called as a direct `node core/lib/<script>.js` from outside `core/bin/arcanum` itself. Keeping every native call going through this one seam means a later port of execution to Docker (see below) or to a single compiled binary only ever has to touch this one call site, not every individual shim script.
+
+## Env-var passing
+
+Before invoking `core/bin/arcanum <command> <args...>`, `engine_dispatch.sh` sets an explicit, per-command allowlist of environment variables — never the full inherited ambient environment. This keeps the exact same explicit shape a future `docker run -e VAR=value <image> <command> <args...>` would need, so switching `engine.mode` to `docker` later doesn't require redesigning how each command's environment is assembled — only where it's assembled to point.
+
+## The output/exit-code contract
+
+A native implementation of a given entrypoint must be byte-identical to its shell counterpart in both stdout and exit code — the same `KEY=value` line protocol (or whatever plain-text contract the shell script already prints) and the same exit code for the same inputs. This is what lets every skill's `.md` steps stay engine-agnostic: they call a script by name and parse its documented output, never knowing or caring whether `engine_dispatch.sh` routed that call to shell or native.
+
+## The `core/` package layout
+
+A single, central Node package at `core/` — not one Node package per skill. `core/package.json` declares Yarn as the package manager and zero runtime npm dependencies (built-in Node APIs only, including the global `fetch` for GitHub REST/GraphQL calls instead of a GitHub SDK — mirroring how today's shell scripts already avoid the `gh issue`/`gh api` subcommands in favor of `curl` plus `gh auth token`). Source lives under `core/lib/`; `core/bin/arcanum` is the one executable entrypoint described above.
+
+An ESLint flat config enforces: 2-space indentation, single quotes, semicolons, `const`/`let` only (no `var`), strict `===`, no `console.log` (use whatever structured stdout-writing convention the entrypoint's output contract requires instead), and JSDoc on public functions.
+
+`core/spec/` mirrors `core/lib/` 1:1; spec files are named `<Name>_spec.js`. Shared test helpers live under `core/spec/support/{factories,dummies,utils,fixtures}`.
+
+## Testing conventions
+
+- **Jasmine** is the test runner.
+- **c8** provides coverage (lcov reporter); thresholds are declared in config but not yet hard-enforced in CI.
+- **JSCPD** checks duplication, informational only (not a CI gate yet).
+- **`yarn audit`** runs informationally, to catch devDependency supply-chain risk (there are no runtime dependencies to audit).
+- A **parity test is required for every migrated entrypoint** — shell vs. native, identical inputs, asserting identical stdout and exit code — in addition to that entrypoint's regular native unit tests. This is what actually enforces the output/exit-code contract above, rather than leaving it as an unchecked convention.
+- No real network calls happen in CI: `fetch` is mocked/stubbed using fixture data under `core/spec/support/fixtures/`.
+
+## The Docker test image
+
+A Docker image based on `darthjee/node` (Node plus a warm Yarn cache) is used for running `core/`'s test suite. Source is bind-mounted at runtime rather than baked into the image, so local edits are picked up without a rebuild. The same image later doubles as the base for the `engine.mode=docker` execution path described above — one image serves both the CI/test use case and the eventual runtime `docker run` use case.
+
+## Security requirements
+
+- No string-interpolated shell execution from native code. Any `child_process` call (e.g. shelling out to `gh auth token`, `git`) must use `execFile`/`spawn` with an argument array, never a string-interpolated `exec()` — these scripts process untrusted GitHub content (issue titles/bodies), so building a shell command by string concatenation is a command-injection risk.
+- The GitHub token obtained via `gh auth token` must never be printed to stdout or logs, in either the shell or the native implementation.
+
+## Scope boundaries
+
+- Only skill entrypoints are in scope for migration: `<skill>/scripts/*.sh` and `arcanum/_lib/*.sh`. The unrelated top-level `scripts/` folder (this repo's own release/versioning tooling, e.g. `scripts/bump-version.sh`) is out of scope.
+- No per-repo migration script is needed for consuming repos: the `engine.mode` key's absence defaults to `shell`, today's existing behavior, so a repo that hasn't opted in is unaffected.
+- No standalone, wholesale `_lib` migration. Native equivalents of shared bash helper logic grow inside `core/lib/` per-entrypoint need only, as each entrypoint that depends on that helper logic gets migrated — the original `arcanum/_lib/*.sh` files stay untouched for callers still running in `shell` mode.
+
+## See also
+
+- [Shared State & Configuration Files](shared-state-and-configuration.md) — the `engine.mode` config key's row and the 3-tier resolution chain it uses.
+- [Script Preference](script-preference.md) — why deterministic logic belongs in scripts at all, the general rule this migration's output/exit-code contract keeps intact across engines.
