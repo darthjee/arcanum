@@ -6,7 +6,9 @@ Launch one Agent per plan file found in Step 3 of `SKILL.md`, all at the same ti
 - The path to its plan file: `<PLAN_DIR>/<agent-name>.md`.
 - The instruction below, with `<repo_path>` filled in with the literal `REPO_PATH` value — a spawned agent starts with no memory of this conversation and no `$REPO_PATH` shell variable set, so it must be given the actual path as text, not a shell reference.
 
-When `scripts/list_plan_agents.sh` printed no output (single unsplit plan, handled directly in Step 3 of `SKILL.md` instead of this step), follow the same development cycle yourself, scoped to the whole `PLAN_FILE`, using your own agent name (`architect`) when calling `scripts/commit_change.sh`, and `"$REPO_PATH"` since you already have it as a real shell variable.
+`scripts/list_plan_agents.sh` printing no output means **no specialist agent owns any of the work** — not merely "the plan wasn't split." A single-owner unsplit plan (`determine_agents.md`'s "exactly one candidate has work" branch) now surfaces as its own `<agent-name>.md` file (see `auto-plan-issue/steps/write_plan.md`'s Case A2) and is dispatched above like any other entry, exactly as if it had been part of a multi-agent split. No output is only possible for genuinely unowned, cross-cutting work — e.g. `docs/agents/**`, root files, or decisions spanning multiple agents — never for work that belongs to a specific specialist.
+
+When that happens (handled directly in Step 3 of `SKILL.md` instead of this step), follow the same development cycle yourself, scoped to the whole `PLAN_FILE`, using your own agent name (`architect`) when calling `scripts/commit_change.sh`, and `"$REPO_PATH"` since you already have it as a real shell variable.
 
 ## Instruction to each specialist agent
 

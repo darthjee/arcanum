@@ -1,19 +1,19 @@
 # Project Instructions
 
-Arcanum — coleção de skills (slash commands) do Claude Code, reutilizáveis entre projetos.
+Arcanum — a collection of Claude Code skills (slash commands), reusable across projects.
 
 ## Stack
 
-Nenhuma linguagem de programação — o projeto é composto por arquivos markdown.
+No programming language — the project is composed of markdown files.
 
 ## Conventions
 
-- Cada skill é uma pasta na raiz contendo um `SKILL.md` como entrypoint (carregado quando `/skill-name` é invocado) e arquivos markdown auxiliares opcionais, referenciados a partir do `SKILL.md`.
-- O `SKILL.md` exige um frontmatter com `name` e `description`.
-- Caminhos referenciados nas instruções (ex: "procure pelo arquivo X") devem ser relativos, nunca absolutos.
-- Quando um caminho absoluto for necessário (ex: dentro de um script), ele deve ser extraído para uma variável em vez de repetido inline.
-- Sempre que possível, extrair lógica das skills para scripts (em vez de instruções em linguagem natural), para tornar o comportamento determinístico e reduzir consumo de tokens.
-- Para skills que precisam de confirmação/seleção do usuário, prefira o padrão de script único conduzindo a interação via `/dev/tty` — ver [Per-Repo Migrations](docs/agents/architecture/per-repo-migrations.md) e [Repo Path Threading](docs/agents/architecture/repo-path-threading.md).
+- Each skill is a folder at the project root containing a `SKILL.md` as entrypoint (loaded when `/skill-name` is invoked) and optional auxiliary markdown files, referenced from `SKILL.md`.
+- `SKILL.md` requires frontmatter with `name` and `description`.
+- Paths referenced in instructions (e.g. "look for file X") must be relative, never absolute.
+- When an absolute path is required (e.g. inside a script), it must be extracted into a variable instead of repeated inline.
+- Whenever possible, extract skill logic into scripts (instead of natural-language instructions), to make behavior deterministic and reduce token consumption.
+- For skills that need user confirmation/selection, prefer the single-script pattern driving the interaction via `/dev/tty` — see [Per-Repo Migrations](docs/agents/architecture/per-repo-migrations.md) and [Repo Path Threading](docs/agents/architecture/repo-path-threading.md).
 
 ## Agents
 
@@ -21,8 +21,9 @@ Specialist agents are defined in `.claude/agents/`. Each has a specific scope wi
 
 | Agent | Scope |
 |-------|-------|
-| `architect` | Skills (SKILL.md and auxiliary `.md` files), project documentation, root-level files, and decisions that span more than one agent. Coordinates the other specialists. |
-| `scripter` | `<skill-name>/scripts/` — bash scripts that extract deterministic logic out of skills. |
+| `architect` | Project documentation, root-level files, and decisions that span more than one agent. Coordinates the other specialists. |
+| `scripter` | `<skill-name>/scripts/` and `arcanum/_lib/` — bash scripts that extract deterministic logic out of skills. |
+| `skill-writer` | `SKILL.md` and auxiliary `steps/*.md` files of any skill — writes or edits skill files. |
 | `skill-reviewer` | Reviews skill files (SKILL.md and step `.md` files) modified in a PR and flags any complex inline bash that should be extracted to a script. Reports violations to the architect; does not fix them. |
 
 ## Documentation
