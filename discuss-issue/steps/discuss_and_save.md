@@ -41,6 +41,8 @@ Show the questions to the user and wait for their response.
 
 Incorporate the user's answers into the issue file (rewriting `FILE` in place, same rules as step 2).
 
+If the dialogue surfaces something that deserves its own GitHub issue instead of folding into `FILE`, spin it off with `../../arcanum/_lib/spawn_issue.sh "$REPO_PATH" <id> "<title>" <body_file>` rather than drafting a file to commit directly. Whether to pass `--as-subissue` is a judgment call each time: pass it when the new issue is genuinely a piece of this issue's own work breakdown, omit it (the default — a comment-only cross-reference) when it's a tangential/independent concern.
+
 ## 7. Comprehension confirmation
 
 After updating the draft, summarize your current understanding in 2–3 sentences and ask:
