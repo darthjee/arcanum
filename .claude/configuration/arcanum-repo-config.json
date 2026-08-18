@@ -16,7 +16,9 @@
       "architect": "darthjee+architect@gmail.com",
       "scripter": "darthjee+backend@gmail.com",
       "skill-reviewer": "darthjee+product-owner@gmail.com",
-      "skill-writer": "darthjee+frontend@gmail.com"
+      "skill-writer": "darthjee+frontend@gmail.com",
+      "node": "darthjee+backend@gmail.com",
+      "infra": "darthjee+infra@gmail.com"
     }
   },
   "migrations": {

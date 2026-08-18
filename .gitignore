@@ -1,1 +1,4 @@
 .claude/state/
+core/node_modules/
+core/coverage/
+

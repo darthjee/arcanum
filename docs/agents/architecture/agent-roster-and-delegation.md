@@ -9,6 +9,8 @@ Specialist agents are defined in `.claude/agents/`. The architect coordinates th
 | `scripter` | `<skill-name>/scripts/` and `arcanum/_lib/` — writes and edits bash scripts | Whenever a skill needs deterministic logic extracted into a new or updated script |
 | `skill-writer` | `SKILL.md` and auxiliary `steps/*.md` files of any skill — writes and edits skill files | Whenever a skill's `SKILL.md` or step files need to be created or edited |
 | `skill-reviewer` | Reads skill files (SKILL.md + step `.md` files) changed in a PR and reports complex inline bash that violates the script-extraction rule | During PR review, after implementation, to validate that no complex logic was left inline |
+| `node` | `core/`'s Node.js source/config (`core/lib/`, `core/spec/`, `core/bin/`, `core/package.json`, `core/eslint.config.mjs`) — the native counterpart of scripts migrating from bash, per [Script Engine](script-engine.md) | Whenever a migrated entrypoint's native implementation, its spec, or `core/`'s own tooling config needs to be written or edited |
+| `infra` | Docker, docker-compose, and Makefile files repo-wide (e.g. `core/Dockerfile`, `core/docker-compose.yml`, the root `Makefile`'s `core-*` targets) | Whenever the `core/` test image or a build/run target for it needs to be created or edited |
 
 `skill-reviewer` is a **read-only** agent: it never commits, never fixes violations — it only reports findings. The architect decides what to do (usually: dispatch `scripter` to extract the flagged logic, or `skill-writer` to rewrite the surrounding skill text).
 

@@ -4,7 +4,7 @@ Arcanum — a collection of Claude Code skills (slash commands), reusable across
 
 ## Stack
 
-Markdown files drive every skill — there is no build step and no application runtime for the skills themselves. A Node.js `core/` package is part of the architecture going forward, though: skill entrypoint scripts (`<skill>/scripts/*.sh`, `arcanum/_lib/*.sh`) are migrating, per-entrypoint, from bash to native Node.js. See [Script Engine](docs/agents/architecture/script-engine.md) for the full design — `core/` does not exist in the repo yet, and every entrypoint still runs as shell until its native counterpart ships.
+Markdown files drive every skill — there is no build step and no application runtime for the skills themselves. A Node.js `core/` package holds the ongoing shell→native migration: skill entrypoint scripts (`<skill>/scripts/*.sh`, `arcanum/_lib/*.sh`) are migrating, per-entrypoint, from bash to native Node.js. See [Script Engine](docs/agents/architecture/script-engine.md) for the full design — `core/` exists as scaffolding (Yarn, Jasmine/c8/JSCPD, ESLint), but every entrypoint still runs as shell until its native counterpart ships.
 
 ## Conventions
 
@@ -25,6 +25,8 @@ Specialist agents are defined in `.claude/agents/`. Each has a specific scope wi
 | `scripter` | `<skill-name>/scripts/` and `arcanum/_lib/` — bash scripts that extract deterministic logic out of skills. |
 | `skill-writer` | `SKILL.md` and auxiliary `steps/*.md` files of any skill — writes or edits skill files. |
 | `skill-reviewer` | Reviews skill files (SKILL.md and step `.md` files) modified in a PR and flags any complex inline bash that should be extracted to a script. Reports violations to the architect; does not fix them. |
+| `node` | `core/`'s Node.js source/config (`core/lib/`, `core/spec/`, `core/bin/`, `core/package.json`, `core/eslint.config.mjs`) — the native counterpart of scripts migrating from bash. |
+| `infra` | Docker, docker-compose, and Makefile files repo-wide — e.g. `core/Dockerfile`, `core/docker-compose.yml`, the root `Makefile`'s `core-*` targets. |
 
 ## Documentation
 

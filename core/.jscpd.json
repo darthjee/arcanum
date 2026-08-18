@@ -1,0 +1,7 @@
+{
+  "path": ["lib"],
+  "ignore": ["**/spec/**"],
+  "reporters": ["console"],
+  "threshold": 100,
+  "absolute": false
+}
