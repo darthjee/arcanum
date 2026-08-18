@@ -16,3 +16,4 @@ This is a hub into arcanum's internals, split by topic into `docs/agents/archite
 | [Lock System](architecture/lock-system.md) | The lock/mutate/release pattern used to guard concurrent writes to shared JSON state files. |
 | [Per-Repo Migrations](architecture/per-repo-migrations.md) | How `arcanum/migrations/` catches a consuming repo up on repo-side structural changes shipped by a later arcanum version. |
 | [Script Engine](architecture/script-engine.md) | The shell → Node.js migration for skill entrypoint scripts: the `engine` config key, the dispatch guard, the centralized `core/bin/arcanum` entrypoint, the `core/` package layout, and testing/security conventions. |
+| [Dispatch Permissions](architecture/dispatch-permissions.md) | The audit of specialist-dispatch commands, and the policy for when a routine dispatch gets a `permission_grant.sh` allowlist entry versus relying on the `OUTCOME=blocked` escalation path. |
