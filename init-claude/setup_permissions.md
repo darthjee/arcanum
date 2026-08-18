@@ -29,3 +29,37 @@ On yes, run:
 > Resolve `../arcanum/_lib/permission_grant.sh` relative to the `init-claude` skill folder.
 
 This appends the pattern to `.permissions.allow` in the target repo's `.claude/settings.json`, deduped, without disturbing any other content already in that file.
+
+# Setup the Common Specialist-Dispatch Permission Exemption
+
+Optionally seed the common specialist-dispatch permission exemption bundle into this freshly onboarded repo's shared, committed `.claude/settings.json`, so `auto-fix-issue`/`auto-fix-all` specialist dispatches can commit their own work end-to-end from day one, instead of waiting for the `arcanum/migrations/repos/next/003.sh` migration to run separately (see issue #205).
+
+## Step 1 — Ask the user
+
+```
+Would you like to grant the common specialist-dispatch scripts (commit_change.sh, run_checks.sh) and git add permission to run without confirmation, in this repo's shared .claude/settings.json (committed, visible to all contributors)? [y/n]
+```
+
+If the user says no, skip silently — do not write anything.
+
+## Step 2 — Explain
+
+If the user has not already seen the rationale (e.g. via the paired `arcanum/migrations/repos/next/003.md` prompt), explain in plain language:
+
+- Every specialist agent dispatched by `auto-fix-issue`/`auto-fix-all` runs `auto-fix-issue/scripts/run_checks.sh` and `auto-fix-issue/scripts/commit_change.sh` (plus a plain `git add` beforehand) on every commit it makes — without this exemption, autonomous runs risk stopping at that step to ask for confirmation.
+- This bundle does not exempt any other Bash command, git/gh write operations in general, or any specialist's own ad hoc implementation commands (e.g. build/test tooling) — see `docs/agents/architecture/dispatch-permissions.md` for the full policy this generalizes from.
+- This value gets committed to `.claude/settings.json` and is visible to every contributor.
+
+## Step 3 — Write the exemption
+
+On yes, run:
+
+```bash
+../arcanum/_lib/permission_grant.sh add .claude/settings.json "Bash(auto-fix-issue/scripts/commit_change.sh *)"
+../arcanum/_lib/permission_grant.sh add .claude/settings.json "Bash(auto-fix-issue/scripts/run_checks.sh *)"
+../arcanum/_lib/permission_grant.sh add .claude/settings.json "Bash(git add *)"
+```
+
+> Resolve `../arcanum/_lib/permission_grant.sh` relative to the `init-claude` skill folder.
+
+This appends each pattern to `.permissions.allow` in the target repo's `.claude/settings.json`, deduped, without disturbing any other content already in that file.
