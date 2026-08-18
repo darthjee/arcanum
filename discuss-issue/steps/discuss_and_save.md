@@ -31,6 +31,8 @@ Use any findings to inform the draft and the questions in the next step.
 
 Based on the current draft and any agent findings, generate a short list of clarifying questions that would meaningfully change the issue file — scope boundaries, constraints, edge cases, intent behind ambiguous requests. Do not ask questions the draft already answers.
 
+Always check one more thing before deciding there are no open questions: does this issue describe introducing a new **top-level (root) folder** in the repo? If so, the draft is not complete until an explicit owning agent is named — extend an existing agent's scope, assign a new specialist, or deliberately record `architect` for genuinely cross-cutting/root-level folders — never left unanswered because no specialist obviously fits. If the draft doesn't already answer this, add "which agent should own `<folder>`?" to the clarifying questions below, phrased to require naming one agent rather than a yes/no.
+
 If there are no meaningful open questions, treat comprehension as already satisfied and skip directly to step 7 (the comprehension check) without presenting questions.
 
 ## 5. Present questions and wait
