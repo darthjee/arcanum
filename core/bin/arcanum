@@ -1,12 +1,59 @@
 #!/usr/bin/env node
 
-// Stub for arcanum's centralized native CLI entrypoint.
+// Centralized native CLI entrypoint for arcanum's migrated skill
+// entrypoints — see docs/agents/architecture/script-engine.md.
 //
-// Every migrated entrypoint's native path goes through this single
-// executable — see docs/agents/architecture/script-engine.md. For this
-// issue (#190) it is only a stub proving the file is executable and wired
-// into the `core/` package; real command routing to `core/lib/` modules
-// lands in #192.
+// `arcanum/_lib/engine_dispatch.sh` invokes this file as plain argv:
+// `core/bin/arcanum <command> <args...>`. This router takes the first
+// argument as the command name, looks it up in the COMMANDS registry
+// below, and dispatches to the matching module under `core/lib/`,
+// passing the remaining arguments through. Real migrated entrypoints are
+// wired into COMMANDS incrementally, one command at a time; this issue
+// only wires the `dispatch-fixture`/`dispatch-fixture-crash` proof
+// commands.
 
-process.stdout.write('arcanum: no commands implemented yet\n');
-process.exit(0);
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const libDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'lib');
+
+/**
+ * Registry mapping each supported command name to the `core/lib/`
+ * module and method that implements it. Keeping this table as the
+ * single source of truth is what lets this router stay generic: adding
+ * a migrated entrypoint only ever means adding one entry here.
+ * @type {object}
+ */
+const COMMANDS = {
+  'dispatch-fixture': { module: 'DispatchFixture.js', method: 'run' },
+  'dispatch-fixture-crash': { module: 'DispatchFixture.js', method: 'crash' }
+};
+
+/**
+ * Dispatch a single CLI invocation to its matching `core/lib/` module.
+ * @param {string} command - the command name, e.g. `dispatch-fixture`.
+ * @param {string[]} args - the command's own remaining arguments.
+ * @returns {Promise<void>} resolves once the command has run.
+ */
+async function dispatch(command, args) {
+  const entry = COMMANDS[command];
+
+  if (!entry) {
+    throw new Error(`unknown command '${command}'`);
+  }
+
+  const modulePath = pathToFileURL(path.join(libDir, entry.module)).href;
+  const { default: ModuleClass } = await import(modulePath);
+  const output = new ModuleClass()[entry.method](...args);
+
+  if (typeof output === 'string') {
+    process.stdout.write(output);
+  }
+}
+
+const [command, ...args] = process.argv.slice(2);
+
+dispatch(command, args).catch((error) => {
+  process.stderr.write(`arcanum: ${error.message}\n`);
+  process.exitCode = 1;
+});
