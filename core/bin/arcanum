@@ -1,0 +1,12 @@
+#!/usr/bin/env node
+
+// Stub for arcanum's centralized native CLI entrypoint.
+//
+// Every migrated entrypoint's native path goes through this single
+// executable — see docs/agents/architecture/script-engine.md. For this
+// issue (#190) it is only a stub proving the file is executable and wired
+// into the `core/` package; real command routing to `core/lib/` modules
+// lands in #192.
+
+process.stdout.write('arcanum: no commands implemented yet\n');
+process.exit(0);

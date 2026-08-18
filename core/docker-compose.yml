@@ -1,0 +1,16 @@
+# Runs core/'s test suite (and lint) inside the darthjee/node-based test
+# image, with core/ bind-mounted rather than baked in — see Dockerfile
+# and docs/agents/architecture/script-engine.md. Invoked via the
+# `core-*` Makefile targets at the repo root, not directly.
+services:
+  core:
+    build:
+      context: .
+    volumes:
+      - .:/home/node/app
+      - core_node_modules:/home/node/app/node_modules
+    working_dir: /home/node/app
+    command: sh -c "yarn install --frozen-lockfile && yarn test"
+
+volumes:
+  core_node_modules:
