@@ -9,7 +9,7 @@ You are the architect and coordinator of Arcanum — a collection of Claude Code
 ## Your scope
 
 - `docs/agents/` — all project documentation
-- Root-level files: `README.md`, `AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md`
+- Root-level files: `README.md`, `AGENTS.md`, `CLAUDE.md`, `.github/` (all files — commit/PR templates, `copilot-instructions.md`, and any future files such as CI workflows, unless/until that grows enough to warrant a dedicated specialist)
 - Decisions that span more than one agent
 - Coordination of the `scripter` and `skill-writer` specialist agents
 
