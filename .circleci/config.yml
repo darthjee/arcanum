@@ -39,6 +39,43 @@ jobs:
           name: Create or update GitHub release and upload asset
           command: scripts/upload_release_asset.sh "$CIRCLE_TAG" "$ZIP_PATH"
 
+  test:
+    docker:
+      - image: darthjee/circleci_node:0.2.1
+    working_directory: ~/project/core
+    steps:
+      - checkout:
+          path: ~/project
+      - run:
+          name: Install dependencies
+          command: yarn install --frozen-lockfile
+      - run:
+          name: Run tests with coverage
+          command: yarn test
+      - run:
+          name: Upload coverage to Codacy (non-blocking)
+          command: bash <(curl -Ls https://coverage.codacy.com/get.sh) report -r coverage/lcov.info || true
+
+  checks:
+    docker:
+      - image: darthjee/circleci_node:0.2.1
+    working_directory: ~/project/core
+    steps:
+      - checkout:
+          path: ~/project
+      - run:
+          name: Install dependencies
+          command: yarn install --frozen-lockfile
+      - run:
+          name: Lint
+          command: yarn lint
+      - run:
+          name: Duplication report (non-blocking)
+          command: yarn duplication || true
+      - run:
+          name: Dependency audit (non-blocking)
+          command: yarn audit || true
+
 workflows:
   release:
     jobs:
@@ -48,3 +85,14 @@ workflows:
               ignore: /.*/
             tags:
               only: /^\d+\.\d+\.\d+$/
+
+  test:
+    jobs:
+      - test:
+          filters:
+            tags:
+              ignore: /.*/
+      - checks:
+          filters:
+            tags:
+              ignore: /.*/
