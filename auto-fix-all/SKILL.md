@@ -1,9 +1,9 @@
 ---
 name: auto-fix-all
-description: Autonomously runs the full pipeline (new issue → plan → fix → monitor) for a queue of issue IDs, one at a time, forever — waiting for new IDs to be pushed onto the queue whenever it runs dry — with no user interaction except when a PR is closed without merging. Usage: /auto-fix-all <id1> <id2> ...
+description: Autonomously runs the full pipeline (new issue → plan → fix → monitor) for a queue of issue IDs, one at a time, forever — waiting for new IDs to be pushed onto the queue whenever it runs dry — with no user interaction except when a PR is closed without merging or a specialist dispatch is blocked. Usage: /auto-fix-all <id1> <id2> ...
 ---
 
-You are the coordinator. Your job is to manage the queue and the two things the `architect` agent cannot do itself (`ScheduleWakeup` between issues, asking the user what to do about a closed PR) — everything else (implementation, PR review, comments, CI) is delegated to a spawned `architect` agent, one per issue. Follow the steps below precisely and in order.
+You are the coordinator. Your job is to manage the queue and the things the `architect` agent cannot do itself (`ScheduleWakeup` between issues, asking the user what to do about a closed PR, asking the user what to do about a blocked specialist dispatch) — everything else (implementation, PR review, comments, CI) is delegated to a spawned `architect` agent, one per issue. Follow the steps below precisely and in order.
 
 The issues folder is always `docs/agents/issues` and the plans folder is always `docs/agents/plans`.
 
@@ -31,7 +31,7 @@ scripts/queue.sh wait-next "$REPO_PATH"
 
 Call this id `<id>`. Spawn:
 
-> Agent(subagent_type: "architect", prompt: "Read steps/process_one_issue.md (resolved relative to the `auto-fix-all` skill folder) and follow it for issue <id>. REPO_PATH: <resolved_path>. Report OUTCOME=merged or OUTCOME=closed PR_NUMBER=<n>.")
+> Agent(subagent_type: "architect", prompt: "Read steps/process_one_issue.md (resolved relative to the `auto-fix-all` skill folder) and follow it for issue <id>. REPO_PATH: <resolved_path>. Report OUTCOME=merged, OUTCOME=closed PR_NUMBER=<n>, or OUTCOME=blocked AGENT=<agent-name> ACTION=<description>.")
 
 Wait for the agent to finish, then parse `OUTCOME` from its report, and proceed to Step 3.
 
@@ -63,7 +63,7 @@ scripts/config.sh is-enabled clear_context
 
 ### `OUTCOME=closed PR_NUMBER=<n>`
 
-This is the one point in the whole pipeline where you ask the user something — the spawned architect agent cannot, so it stopped and handed this back to you.
+This is one of the two points in the whole pipeline where you ask the user something — the spawned architect agent cannot, so it stopped and handed this back to you.
 
 > PR #`<n>` for issue `<id>` was closed without merging. What would you like to do?
 > 1. Reimplement from scratch (start over from a clean `main` for this issue)
@@ -76,8 +76,21 @@ This is the one point in the whole pipeline where you ask the user something —
   Then go back to Step 2 (the id stays at the front of the queue; a fresh `architect` agent will find no existing `issue-<id>` branch and create a genuinely clean one from `main` via `process_one_issue.md`).
 - **Skip** — `scripts/queue.sh pop "$REPO_PATH"`, then go back to Step 2.
 
+### `OUTCOME=blocked AGENT=<agent> ACTION=<description>`
+
+This is the other point in the pipeline where you ask the user something — a specialist dispatch was denied by Claude Code's own permission classifier, so the spawned architect agent stopped instead of silently doing the work itself.
+
+> A specialist dispatch to `<agent>` was blocked while processing issue `<id>` (action: `<description>`). What would you like to do?
+> 1. Retry (e.g. after granting the needed permission out-of-band)
+> 2. Skip this issue and move on to the next one
+
+- **Retry** — go back to Step 2 and re-spawn a fresh `architect` agent for the same `<id>`. `process_one_issue.md`'s branch bootstrap already reuses an existing `issue-<id>` branch/PR, so this naturally resumes from where the block occurred rather than starting over.
+- **Skip** — `scripts/queue.sh pop "$REPO_PATH"`, then go back to Step 2, same as the `closed` branch's skip option above.
+
+Deliberately no "do it yourself" option here — that would recreate the exact behavior this outcome exists to prevent. If it's ever wanted, it should be a separate, explicit decision made in the open by a human, not a default silently offered right back on every block.
+
 ## Step 4 — Done
 
 This skill runs forever by design — Step 2 blocks and waits whenever the queue is empty instead of stopping, so issues pushed onto the queue later are still picked up. This step is reached either when the run is stopped externally (e.g. the user interrupts it) or when the queue emptied with `finish_on_empty_queue` on (Step 3 above): report a summary at that point, for each ID processed so far, of the final PR URL and outcome (merged/skipped). No separate message distinguishes the `finish_on_empty_queue` case from an externally-interrupted run.
 
-Do not ask for confirmation at any point except the single explicit question above for the `closed` outcome.
+Do not ask for confirmation at any point except the two explicit questions above, for the `closed` and `blocked` outcomes.

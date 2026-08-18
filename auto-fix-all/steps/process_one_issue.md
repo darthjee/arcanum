@@ -12,7 +12,13 @@ or
 OUTCOME=closed PR_NUMBER=<n>
 ```
 
-You have no `ScheduleWakeup` and no `AskUserQuestion` — the coordinator that spawned you handles clearing context between issues and asking the user what to do about a closed PR. Everything else (implementation, PR comments, CI failures, the pre-approval shortcut) is yours to handle autonomously, exactly as before.
+or
+
+```
+OUTCOME=blocked AGENT=<agent-name> ACTION=<description>
+```
+
+You have no `ScheduleWakeup` and no `AskUserQuestion` — the coordinator that spawned you handles clearing context between issues, asking the user what to do about a closed PR, and asking the user what to do about a blocked specialist dispatch. Everything else (implementation, PR comments, CI failures, the pre-approval shortcut) is yours to handle autonomously, exactly as before.
 
 Your invocation prompt also carries `REPO_PATH` (the target project's root, resolved once by the coordinator before spawning you) — thread it through explicitly as the leading argument to every script call below that resolves the GitHub repo, and pass it along unchanged into every nested `steps/run.md` you read directly (never re-resolve it from `pwd`).
 
@@ -27,7 +33,7 @@ scripts/checkout_from_main.sh "$REPO_PATH" <id>
 This fetches `origin`, then either reuses branch `issue-<id>` — merging `origin/main` into it (`--no-edit`) if it already exists locally or remotely, e.g. because `discuss-issue` already prepared it — or creates it fresh from `origin/main` if it doesn't exist at all. Every issue always starts from a branch merged up to date with `main`, without discarding planning/discussion work already committed to it. Parse `STATUS` from its output:
 
 - **`STATUS=ok`**: continue to Step 2 below.
-- **`STATUS=conflict`**: apply the same responsible-agent-selection approach as [handle_comment.md](handle_comment.md)'s "Choosing the responsible agent(s)" section, treating each conflicted path the script printed like a failed check-run name — dispatch the responsible specialist(s) (or resolve it yourself, as architect, if none seem responsible) to fix the conflict, then run `git -C "$REPO_PATH" add` on the resolved paths and `git -C "$REPO_PATH" commit` with no message argument (the merge-commit message `git merge --no-edit` already prepared is reused as-is) — never bare `git add`/`git commit`, which would operate against the Bash tool's ambient cwd instead of the target repo. No user interaction. Then continue to Step 2.
+- **`STATUS=conflict`**: apply the same responsible-agent-selection approach as [handle_comment.md](handle_comment.md)'s "Choosing the responsible agent(s)" section, treating each conflicted path the script printed like a failed check-run name — dispatch the responsible specialist(s) (or resolve it yourself, as architect, if none seem responsible) to fix the conflict, then run `git -C "$REPO_PATH" add` on the resolved paths and `git -C "$REPO_PATH" commit` with no message argument (the merge-commit message `git merge --no-edit` already prepared is reused as-is) — never bare `git add`/`git commit`, which would operate against the Bash tool's ambient cwd instead of the target repo. No user interaction. If a dispatch is blocked (see [handle_comment.md](handle_comment.md)'s "Dispatching" → "If a dispatch is blocked"), stop immediately and report that same `OUTCOME=blocked AGENT=<agent-name> ACTION="<description>"` at the top level — do not continue to Step 2. Otherwise, continue to Step 2.
 
 ## 2. Create the issue file
 
@@ -142,6 +148,8 @@ Report `OUTCOME=merged`. Done — stop here.
 
 Read [handle_comment.md](handle_comment.md)'s **"Choosing the responsible agent(s)"** section and apply the same agent-selection approach to the failed check-run names: dispatch the responsible specialist agent(s) (or yourself, as architect, if none seem responsible) in parallel with the instruction to investigate the CI failure, fix it, run the full dev cycle locally, and commit via `../../auto-fix-issue/scripts/commit_change.sh` (resolved relative to the `auto-fix-issue` skill folder).
 
+If a dispatch is blocked (see [handle_comment.md](handle_comment.md)'s "Dispatching" → "If a dispatch is blocked"), stop immediately and report that same `OUTCOME=blocked AGENT=<agent-name> ACTION="<description>"` at the top level.
+
 After all agents commit, go back to step 3 above (`wait_ci.sh`) to re-check.
 
 ### If pre-approved via shipit
@@ -167,12 +175,14 @@ Reached only from "Check for pre-approval" above, when `has-shipit-label` exits 
 
    Report `OUTCOME=merged`. Done — stop here.
 
-   First output line `failed`: subsequent lines are the failed check-run names, CI never reached a merge attempt. Read [handle_comment.md](handle_comment.md)'s **"Choosing the responsible agent(s)"** section and apply the same agent-selection approach to the failed check-run names: dispatch the responsible specialist agent(s) (or yourself, as architect, if none seem responsible) in parallel with the instruction to investigate the CI failure, fix it, run the full dev cycle locally, and commit via `../../auto-fix-issue/scripts/commit_change.sh` (resolved relative to the `auto-fix-issue` skill folder). After all agents commit, go back to step 2 above (`wait_ci_and_merge.sh`, not `wait_ci.sh`) to re-check.
+   First output line `failed`: subsequent lines are the failed check-run names, CI never reached a merge attempt. Read [handle_comment.md](handle_comment.md)'s **"Choosing the responsible agent(s)"** section and apply the same agent-selection approach to the failed check-run names: dispatch the responsible specialist agent(s) (or yourself, as architect, if none seem responsible) in parallel with the instruction to investigate the CI failure, fix it, run the full dev cycle locally, and commit via `../../auto-fix-issue/scripts/commit_change.sh` (resolved relative to the `auto-fix-issue` skill folder). If a dispatch is blocked (see [handle_comment.md](handle_comment.md)'s "Dispatching" → "If a dispatch is blocked"), stop immediately and report that same `OUTCOME=blocked AGENT=<agent-name> ACTION="<description>"` at the top level. After all agents commit, go back to step 2 above (`wait_ci_and_merge.sh`, not `wait_ci.sh`) to re-check.
 
 ### If `commented`
 
 The lines after the first are the new comments, one per `---`-separated block — only comments from `<pr_owner>` are included. Each block starts with an `id: <node id>` line and a `url: <html url>` line, followed by the comment body. The underlying monitor script already added a `:eyes:` reaction to each of these comments and recorded them as `open`; it will swap that to `:+1:` and mark them `addressed` the next time it (re)starts — i.e. after you push the fixes below.
 
 Read [handle_comment.md](handle_comment.md) and follow its instructions, carrying `REPO_PATH` forward unchanged, to dispatch each comment to the right agent(s) and apply the feedback. Some comments may be pure questions, replied to directly with no code change; others are actionable and result in a commit — see `handle_comment.md` for how it routes each.
+
+If `handle_comment.md` reports `OUTCOME=blocked AGENT=<agent-name> ACTION="<description>"` instead of completing normally, stop processing this issue immediately and report that same outcome at the top level — do not return to "Monitor the PR".
 
 After all comments are handled, go back to "Monitor the PR" above (block on the monitor step again) to resume monitoring.
