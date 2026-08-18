@@ -53,6 +53,18 @@ Launch the responsible agent(s) in parallel (single message, multiple Agent tool
 
 If you (architect) are handling a comment/failure yourself, follow the same cycle and commit through the same script with `<agent>` set to `architect`.
 
+### If a dispatch is blocked
+
+This is a *different* condition from "Choosing the responsible agent(s)" step 4 above ("if no agent seems responsible, treat it yourself as architect") — that fallback is untouched; it only applies when nobody was judged responsible in the first place. The case below applies only when an agent *was* judged responsible and a dispatch to it was actually attempted.
+
+If any `Agent(...)` call launched above is denied/blocked by Claude Code's own permission classifier (a tool-permission denial on the dispatch itself, not anything the dispatched agent said once running), do **not** fall back to performing that agent's action yourself. Stop dispatching immediately — abandon any other in-flight dispatches from the same batch, including ones already launched in the same parallel message — and report:
+
+```
+OUTCOME=blocked AGENT=<agent-name> ACTION="<one-line description of what was being dispatched>"
+```
+
+up to whichever caller in [process_one_issue.md](process_one_issue.md) read this file, instead of continuing to "After dispatching" below.
+
 ## After dispatching
 
 Wait for every dispatched agent (and your own work, if any) to report back, confirming tests/lint passed and the commit hash. Then:
