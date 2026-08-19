@@ -130,8 +130,8 @@ save_comments_state() {
     local comments last_time
     comments=$(echo "$1" | jq -c '.pr_comments // []')
     last_time=$(echo "$1" | jq -r '.last_comment_time // "1970-01-01T00:00:00Z"')
-    "$ISSUE_STATE_SCRIPT" set-json "$ISSUE_ID" pr_comments "$comments"
-    "$ISSUE_STATE_SCRIPT" set "$ISSUE_ID" last_comment_time "$last_time"
+    "$ISSUE_STATE_SCRIPT" "$REPO_PATH" set-json "$ISSUE_ID" pr_comments "$comments"
+    "$ISSUE_STATE_SCRIPT" "$REPO_PATH" set "$ISSUE_ID" last_comment_time "$last_time"
   else
     mkdir -p "$(dirname "$COMMENTS_FILE")"
     echo "$1" > "$COMMENTS_FILE"

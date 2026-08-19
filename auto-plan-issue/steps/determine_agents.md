@@ -7,10 +7,10 @@ The goal is to decide whether the plan should be a single generic `plan.md`, or 
 Run:
 
 ```bash
-scripts/list_agents.sh
+scripts/list_agents.sh "$REPO_PATH"
 ```
 
-(defaults to `.claude/agents`; pass a different path only if the project documents one elsewhere).
+(`repo_path` is a required leading argument; the script resolves `.claude/agents` relative to it, unless a different path is passed as an optional second argument).
 
 Each line of output has the form `<name>|<description>`.
 

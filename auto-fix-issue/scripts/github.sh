@@ -42,13 +42,14 @@ _current_issue_id() {
 }
 
 _persist_pr_state() {
-  local url="$1"
+  local repo_path="$1"
+  local url="$2"
   local id
   id=$(_current_issue_id)
   if [[ -n "$id" ]]; then
     local number="${url##*/}"
-    "${SCRIPT_DIR}/issue_state.sh" set "$id" pr_url "$url" 2>/dev/null || true
-    "${SCRIPT_DIR}/issue_state.sh" set "$id" pr_id  "$number" 2>/dev/null || true
+    "${SCRIPT_DIR}/issue_state.sh" "$repo_path" set "$id" pr_url "$url" 2>/dev/null || true
+    "${SCRIPT_DIR}/issue_state.sh" "$repo_path" set "$id" pr_id  "$number" 2>/dev/null || true
   fi
 }
 
@@ -79,7 +80,7 @@ _sync_pr_labels_and_state() {
     return 0
   }
   tags_json=$(extract_tags "$labels" | jq -R . | jq -s .)
-  "${SCRIPT_DIR}/issue_state.sh" set-json "$id" tags "$tags_json" 2>/dev/null \
+  "${SCRIPT_DIR}/issue_state.sh" "$repo_path" set-json "$id" tags "$tags_json" 2>/dev/null \
     || echo "Warning: could not persist refreshed tags for issue #$id" >&2
 
   if echo "$tags_json" | jq -e 'index("shipit")' >/dev/null 2>&1; then
@@ -120,7 +121,7 @@ cmd_pr_create() {
     exit 1
   }
 
-  _persist_pr_state "$url"
+  _persist_pr_state "$repo_path" "$url"
   _sync_pr_labels_and_state "$repo_path"
   echo "$url"
 }
@@ -141,7 +142,7 @@ cmd_pr_view() {
     local url is_draft
     url=$(echo "$output" | jq -r '.url')
     is_draft=$(echo "$output" | jq -r '.isDraft')
-    _persist_pr_state "$url"
+    _persist_pr_state "$repo_path" "$url"
     echo "URL=$url"
     echo "IS_DRAFT=$is_draft"
   else
@@ -172,7 +173,7 @@ cmd_pr_ready() {
   local url
   url=$(gh pr view -R "$repo_ref" "$branch" --json url -q '.url' 2>/dev/null) || true
   if [[ -n "$url" ]]; then
-    _persist_pr_state "$url"
+    _persist_pr_state "$repo_path" "$url"
   fi
   _sync_pr_labels_and_state "$repo_path"
 

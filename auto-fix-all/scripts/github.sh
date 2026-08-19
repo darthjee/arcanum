@@ -44,7 +44,7 @@ cmd_pr_number() {
   if [[ "$branch" =~ ^issue-([0-9]+)$ ]]; then
     local id="${BASH_REMATCH[1]}"
     local cached
-    cached=$("${SCRIPT_DIR}/../../arcanum/_lib/issue_state.sh" get "$id" pr_id 2>/dev/null || true)
+    cached=$("${SCRIPT_DIR}/../../arcanum/_lib/issue_state.sh" "$repo_path" get "$id" pr_id 2>/dev/null || true)
     if [[ -n "$cached" ]]; then
       echo "$cached"
       return 0
@@ -105,8 +105,8 @@ cmd_pr_merge() {
   local cached_number="" cached_url=""
   if [[ "$branch" =~ ^issue-([0-9]+)$ ]]; then
     local id="${BASH_REMATCH[1]}"
-    cached_number=$("${SCRIPT_DIR}/../../arcanum/_lib/issue_state.sh" get "$id" pr_id 2>/dev/null || true)
-    cached_url=$("${SCRIPT_DIR}/../../arcanum/_lib/issue_state.sh" get "$id" pr_url 2>/dev/null || true)
+    cached_number=$("${SCRIPT_DIR}/../../arcanum/_lib/issue_state.sh" "$repo_path" get "$id" pr_id 2>/dev/null || true)
+    cached_url=$("${SCRIPT_DIR}/../../arcanum/_lib/issue_state.sh" "$repo_path" get "$id" pr_url 2>/dev/null || true)
   fi
 
   _ensure_gh_user

@@ -7,10 +7,10 @@ Unlike Majora's original `fix-all`, this skill never decides the responsible age
 ## List the agents configured in the target project
 
 ```bash
-../auto-plan-issue/scripts/list_agents.sh
+../auto-plan-issue/scripts/list_agents.sh "$REPO_PATH"
 ```
 
-(defaults to `.claude/agents`; resolve this path relative to the `auto-plan-issue` skill folder, or copy the script's behavior if that relative path is inconvenient from the current working directory — it simply lists `.claude/agents/*.md` frontmatter `name`/`description` pairs).
+(resolve this path relative to the `auto-plan-issue` skill folder, or copy the script's behavior if that relative path is inconvenient from the current working directory — it simply lists `.claude/agents/*.md` frontmatter `name`/`description` pairs. `repo_path` is a required leading argument; the script resolves `.claude/agents` relative to it).
 
 Each line has the form `<name>|<description>`.
 
