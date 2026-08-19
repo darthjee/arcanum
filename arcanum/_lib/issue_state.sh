@@ -2,27 +2,35 @@
 # Safe read/write of .claude/state/issue-<id>.json
 #
 # Usage:
-#   issue_state.sh get <id> <field>                   → prints value or empty string, exits 0
-#   issue_state.sh set <id> <field> <value>            → sets string field, exits 0
-#   issue_state.sh set-json <id> <field> <json_value>  → sets JSON field (array/object), exits 0
-#   issue_state.sh append-json <id> <field> <json_value>  → appends to a JSON array field, exits 0
+#   issue_state.sh <repo_path> get <id> <field>                   → prints value or empty string, exits 0
+#   issue_state.sh <repo_path> set <id> <field> <value>            → sets string field, exits 0
+#   issue_state.sh <repo_path> set-json <id> <field> <json_value>  → sets JSON field (array/object), exits 0
+#   issue_state.sh <repo_path> append-json <id> <field> <json_value>  → appends to a JSON array field, exits 0
 #
-# State file: .claude/state/issue-<id>.json
-# Lock file:  .claude/state/issue-<id>.lock
+# State file: <repo_path>/.claude/state/issue-<id>.json
+# Lock file:  <repo_path>/.claude/state/issue-<id>.lock
 
 set -uo pipefail
 
-COMMAND="${1:-}"
-ISSUE_ID="${2:-}"
-FIELD="${3:-}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=repo_path.sh
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/repo_path.sh"
 
-if [[ -z "$COMMAND" || -z "$ISSUE_ID" || -z "$FIELD" ]]; then
-  echo "Usage: $0 get <id> <field>" >&2
-  echo "       $0 set <id> <field> <value>" >&2
-  echo "       $0 set-json <id> <field> <json_value>" >&2
-  echo "       $0 append-json <id> <field> <json_value>" >&2
+REPO_PATH="${1:-}"
+COMMAND="${2:-}"
+ISSUE_ID="${3:-}"
+FIELD="${4:-}"
+
+if [[ -z "$REPO_PATH" || -z "$COMMAND" || -z "$ISSUE_ID" || -z "$FIELD" ]]; then
+  echo "Usage: $0 <repo_path> get <id> <field>" >&2
+  echo "       $0 <repo_path> set <id> <field> <value>" >&2
+  echo "       $0 <repo_path> set-json <id> <field> <json_value>" >&2
+  echo "       $0 <repo_path> append-json <id> <field> <json_value>" >&2
   exit 1
 fi
+
+repo_path_enter "$REPO_PATH"
 
 STATE_DIR=".claude/state"
 STATE_FILE="${STATE_DIR}/issue-${ISSUE_ID}.json"
@@ -82,7 +90,7 @@ case "$COMMAND" in
     ;;
 
   set)
-    VALUE="${4:-}"
+    VALUE="${5:-}"
     _acquire_lock
     trap '_release_lock' EXIT
     CURRENT=$(_read_state)
@@ -93,7 +101,7 @@ case "$COMMAND" in
     ;;
 
   set-json)
-    JSON_VALUE="${4:-}"
+    JSON_VALUE="${5:-}"
     _acquire_lock
     trap '_release_lock' EXIT
     CURRENT=$(_read_state)
@@ -104,7 +112,7 @@ case "$COMMAND" in
     ;;
 
   append-json)
-    JSON_VALUE="${4:-}"
+    JSON_VALUE="${5:-}"
     _acquire_lock
     trap '_release_lock' EXIT
     CURRENT=$(_read_state)
@@ -116,10 +124,10 @@ case "$COMMAND" in
 
   *)
     echo "Unknown command: $COMMAND" >&2
-    echo "Usage: $0 get <id> <field>" >&2
-    echo "       $0 set <id> <field> <value>" >&2
-    echo "       $0 set-json <id> <field> <json_value>" >&2
-    echo "       $0 append-json <id> <field> <json_value>" >&2
+    echo "Usage: $0 <repo_path> get <id> <field>" >&2
+    echo "       $0 <repo_path> set <id> <field> <value>" >&2
+    echo "       $0 <repo_path> set-json <id> <field> <json_value>" >&2
+    echo "       $0 <repo_path> append-json <id> <field> <json_value>" >&2
     exit 1
     ;;
 esac

@@ -28,6 +28,10 @@ source "${SCRIPT_DIR}/tag_mutate.sh"
 # Source the shared origin-resolution library
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/origin.sh"
+# shellcheck source=repo_path.sh
+# Source the shared repo-path validation/cd helper
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/repo_path.sh"
 
 get_github_token() {
   _ensure_gh_user
@@ -54,6 +58,8 @@ cmd_fetch() {
   local repo_path="${1:-}"
   local id="${2:-}"
   [[ -n "$repo_path" && -n "$id" ]] || { echo "Usage: $0 fetch <repo_path> <id>" >&2; exit 1; }
+
+  repo_path_enter "$repo_path"
 
   _load_origin "$repo_path"
 
@@ -91,10 +97,10 @@ cmd_fetch() {
   labels_text=$(echo "$result" | jq -r '.labels[].name')
   tags_json=$(extract_tags "$labels_text" | jq -R . | jq -s .)
 
-  "$issue_state_script" set-json "$id" tags "$tags_json"
-  "$issue_state_script" set      "$id" updated_at "$updated_at"
-  "$issue_state_script" set      "$id" title "$title"
-  "$issue_state_script" set      "$id" state "$issue_state"
+  "$issue_state_script" "$repo_path" set-json "$id" tags "$tags_json"
+  "$issue_state_script" "$repo_path" set      "$id" updated_at "$updated_at"
+  "$issue_state_script" "$repo_path" set      "$id" title "$title"
+  "$issue_state_script" "$repo_path" set      "$id" state "$issue_state"
 
   echo "TITLE=$title"
   echo "FILE=$filepath"
@@ -138,6 +144,9 @@ cmd_create() {
   [[ -n "$repo_path" && -n "$title" && -n "$file" ]] || {
     echo "Usage: $0 create <repo_path> <title> <file>" >&2; exit 1
   }
+
+  repo_path_enter "$repo_path"
+
   [[ -f "$file" ]] || { echo "Error: file not found: $file" >&2; exit 1; }
 
   _load_origin "$repo_path"
