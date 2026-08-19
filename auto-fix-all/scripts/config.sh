@@ -8,7 +8,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE=".claude/configuration/auto-fix-all.json"
-STATE_CONFIG_FILE=".claude/state/auto-fix-all-config.json"
 NEW_CONFIG_FILE=".claude/configuration/arcanum-repo-config.json"
 NEW_STATE_FILE=".claude/state/arcanum-config.json"
 NAMESPACE="auto-fix-all"
@@ -28,10 +27,14 @@ _new_file_for_key() {
 }
 
 # Returns the LEGACY file counterpart of _new_file_for_key, used as a
-# fallback by repo_config_read/repo_config_write.
+# fallback by repo_config_read/repo_config_write. clear_context and
+# finish_on_empty_queue have no read-time legacy fallback (returns "",
+# which repo_config_read's [[ -f "$legacy_file" ]] check treats as "no
+# legacy file") — see docs/guides/arcanum-repo-config.md. Every other
+# key still falls back to its legacy file as before.
 _legacy_file_for_key() {
   case "$1" in
-    clear_context|finish_on_empty_queue) echo "$STATE_CONFIG_FILE" ;;
+    clear_context|finish_on_empty_queue) echo "" ;;
     *) echo "$CONFIG_FILE" ;;
   esac
 }
