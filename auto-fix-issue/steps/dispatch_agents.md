@@ -12,6 +12,13 @@ When that happens (handled directly in Step 3 of `SKILL.md` instead of this step
 
 ## Instruction to each specialist agent
 
+Before drafting the instruction, determine whether this agent's plan is split into per-step files: run `scripts/list_plan_steps.sh <plan_dir> <agent_name>` (resolved relative to the `auto-fix-issue` skill folder's `scripts/` folder), where `<plan_dir>` is `PLAN_DIR` and `<agent_name>` is this agent's name.
+
+- **No output** — the plan is inline. Use the "Inline plan" instruction below, unchanged from before.
+- **One or more lines** — the plan is split. Use the "Split plan" instruction below, which walks the agent through its index file and then each step file in the order `list_plan_steps.sh` printed.
+
+### Inline plan
+
 > The target project's root is `<repo_path>` (substitute the literal `REPO_PATH` value here). Read your plan file at `<path>`. Implement everything described in it.
 >
 > Follow the development cycle:
@@ -37,3 +44,40 @@ When that happens (handled directly in Step 3 of `SKILL.md` instead of this step
 >    - You may split your work into multiple atomic commits, each through this script, if the plan has multiple independent steps.
 >
 > Do not ask for confirmation. Report back with: what you implemented, what files you changed, whether all tests and lint checks passed, and the commit hash(es) you produced.
+
+### Split plan
+
+> The target project's root is `<repo_path>` (substitute the literal `REPO_PATH` value here). Your plan is split into an index file and one file per step.
+>
+> 1. Read your index file at `<path>` (the same `<agent-name>.md` path as always). Note its `## Shared contracts` (if present), its `## Steps` list, its `## CI Checks`, and its `## Notes` — these apply to your whole plan, not just one step.
+> 2. Then, for each step file listed below, in the exact order given — **do not read ahead into a later step's file before finishing the current one**:
+>    - Read only that step file.
+>    - Implement it.
+>    - `git add` your changes for this step, then commit them immediately, before moving to the next step, by running the helper script — never write the commit message or run `git commit` by hand:
+>      ```bash
+>      scripts/commit_change.sh <repo_path> <type> <scope> <id> "<subject>" <agent> "<AI model name>" "<AI model email>" "<optional body>" "<optional comment_url>"
+>      ```
+>      (same argument meanings as below; one commit per step, committed inside this loop — this happens before checks are run, not after.)
+>
+>    Step files, in order:
+>    - `<step_file_1>`
+>    - `<step_file_2>`
+>    - ...
+>
+> 3. Once every step above is implemented and committed, run checks once for the whole plan:
+>    ```bash
+>    scripts/run_checks.sh <agent-name>
+>    ```
+>    (resolved relative to the `auto-fix-issue` skill folder, where `<agent-name>` is your own agent name). This runs `.claude/scripts/check_<agent-name>.sh` if the target project defines one, or reports cleanly that no checks are configured. Use the index file's `## CI Checks` section, when present, as context for investigating any failure it reports.
+> 4. If checks fail: fix the issue, then commit the fix(es) as additional commits via `scripts/commit_change.sh` — never amend the per-step commits from step 2. Repeat from step 3 until clean.
+> 5. `scripts/commit_change.sh` argument meanings:
+>    - `<repo_path>`: the target project's root, already substituted with its literal value in this instruction (see the top of this prompt) — use it verbatim, do not treat it as a shell variable.
+>    - `<type>`: `feat`, `fix`, `refactor`, `docs`, `test`, or `chore` — whichever best matches this commit.
+>    - `<scope>`: your layer/area (e.g. `backend`, `frontend`, `infra` — match your own agent name unless the step's `## Files to Change` clearly points to a different scope).
+>    - `<id>`: the issue number.
+>    - `<agent>`: your own agent name (the same one used as `subagent_type`).
+>    - `<AI model name>` and `<AI model email>`: the model you are running on and its canonical noreply email (e.g. `Claude Sonnet 4.6` / `noreply@anthropic.com`).
+>    - `<optional comment_url>`: only pass this when the commit addresses a specific PR comment carried over from `auto-fix-all/steps/handle_comment.md` (its `url`); omit it otherwise, same as the optional `<body>`.
+>    - Resolve `scripts/commit_change.sh` relative to the `auto-fix-issue` skill folder.
+>
+> Do not ask for confirmation. Report back with: what you implemented (per step), what files you changed, whether all tests and lint checks passed, and the commit hash(es) you produced (one per step, plus any fix-up commits).
