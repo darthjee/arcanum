@@ -99,7 +99,7 @@ Repeat until the user confirms the plan is satisfactory.
 When the user asks you to look at the code (e.g., "check the code", "look at the codebase", "research it", or similar), then:
 
 1. Prefer delegating to the target repo's own agents (set up via `init-claude`) over exploring inline yourself:
-   - Run `../scripts/list_agents.sh` (resolved relative to this file's directory; defaults to `.claude/agents` under the current project root) to list the repo's configured agents. Each line has the form `<name>|<description>`.
+   - Run `../scripts/list_agents.sh "$REPO_PATH"` (resolved relative to this file's directory) to list the repo's configured agents; the script takes `repo_path` explicitly as its first argument and resolves `.claude/agents` relative to it. Each line has the form `<name>|<description>`.
    - **No output** — the repo has no `.claude/agents/` set up. Skip to step 2 below and explore inline yourself.
    - **One or more lines** — detect a coordinator agent by description, reusing [`auto-plan-issue/steps/determine_agents.md`](../../auto-plan-issue/steps/determine_agents.md)'s "Exclude the coordinator" heuristic (description mentions things like "coordinator", "coordinates other agents", "spans more than one agent's scope").
      - **Coordinator found** — delegate through it: `Agent(<coordinator-name>, ...)` with the research question; the coordinator decides whether to explore directly or fan out to its own specialists.
