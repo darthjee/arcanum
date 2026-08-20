@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Resolve issue ID, title, and filename from skill arguments and issues folder
-# Usage: resolve_id_and_file.sh <issues_folder> [arg_string]
+# Usage: resolve_id_and_file.sh <repo_path> <issues_folder> [arg_string]
 #
 # Output (key=value lines):
 #   SCENARIO=A|B|C
@@ -12,10 +12,18 @@
 
 set -euo pipefail
 
-ISSUES_FOLDER="${1:-}"
-ARG_STRING="${2:-}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=repo_path.sh
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/repo_path.sh"
 
-[[ -n "$ISSUES_FOLDER" ]] || { echo "Usage: $0 <issues_folder> [arg_string]" >&2; exit 1; }
+REPO_PATH="${1:-}"
+ISSUES_FOLDER="${2:-}"
+ARG_STRING="${3:-}"
+
+[[ -n "$ISSUES_FOLDER" ]] || { echo "Usage: $0 <repo_path> <issues_folder> [arg_string]" >&2; exit 1; }
+
+repo_path_enter "$REPO_PATH"
 
 title_to_snake_case() {
   echo "$1" \
