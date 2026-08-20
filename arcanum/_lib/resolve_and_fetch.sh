@@ -28,5 +28,6 @@ REPO_PATH="${1:-}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # shellcheck source=engine_dispatch.sh
+# shellcheck disable=SC1091
 source "${SCRIPT_DIR}/engine_dispatch.sh"
 engine_dispatch "$REPO_PATH" resolve-and-fetch "${SCRIPT_DIR}/resolve_and_fetch_shell.sh" HOME -- "$@"
