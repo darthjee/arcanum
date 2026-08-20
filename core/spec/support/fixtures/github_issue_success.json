@@ -1,0 +1,13 @@
+{
+  "number": 321,
+  "title": "Bug: Crash on Save!! (café édition) — see #12",
+  "body": "Steps to reproduce:\n1. Open the app\n2. Save\n3. Crash\n",
+  "state": "open",
+  "updated_at": "2026-01-15T10:30:00Z",
+  "labels": [
+    { "name": "Created" },
+    { "name": "Ready for Work" },
+    { "name": "Bug" },
+    { "name": "Created" }
+  ]
+}
