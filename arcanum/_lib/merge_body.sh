@@ -66,6 +66,10 @@ merge_body_mode() {
 #   When <model_email> is given AND "git"."omit_model_coauthor" is
 #   true (model_coauthor_omitted, see agent_email.sh), also drops the
 #   entry whose email exactly matches <model_email>.
+#   Also drops any entry whose email is present in the
+#   "git"."remove_coauthors" config array (remove_coauthors_list, see
+#   agent_email.sh) — an always-applied, purely opt-in exclusion list
+#   independent of the merger/model_email filters above.
 merge_body_coauthors_list() {
   local repo_path="$1" repo_ref="$2" number="$3" model_email="${4:-}"
 
@@ -78,13 +82,18 @@ merge_body_coauthors_list() {
   local omit_model="false"
   [[ -n "$model_email" ]] && omit_model=$(model_coauthor_omitted)
 
+  local remove_list
+  remove_list=$(remove_coauthors_list)
+
   jq -r \
     --arg merger "$merger_login" \
     --arg model_email "$model_email" \
     --arg omit_model "$omit_model" \
+    --argjson remove_list "$remove_list" \
     '
       map(select(.email != null and .email != ""))
       | unique_by(.email)
+      | map(select(.email as $e | $remove_list | index($e) | not))
       | map(select($merger == "" or .login != $merger))
       | map(select($omit_model != "true" or .email != $model_email))
       | map("Co-authored-by: \(.name) <\(.email)>")

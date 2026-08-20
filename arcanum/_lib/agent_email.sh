@@ -57,3 +57,15 @@ model_coauthor_omitted() {
   [[ "$value" == "true" ]] && { echo "true"; return; }
   echo "false"
 }
+
+# remove_coauthors_list
+#   Prints the "git"."remove_coauthors" array (resolved via
+#   config_chain_read: local state -> repo config -> global), as raw
+#   jq-compact JSON, or "[]" when absent/null/empty — default empty
+#   list, purely opt-in.
+remove_coauthors_list() {
+  local value
+  value=$(config_chain_read "." "git" "remove_coauthors")
+  [[ -n "$value" ]] && { echo "$value"; return; }
+  echo "[]"
+}
