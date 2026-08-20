@@ -1,15 +1,25 @@
 #!/usr/bin/env bash
 # List specialist agents configured in the target project
-# Usage: list_agents.sh [agents_dir]
+# Usage: list_agents.sh <repo_path> [agents_dir]
 #
-# Default agents_dir is .claude/agents (relative to current working directory).
+# Default agents_dir is .claude/agents (relative to repo_path).
 # Output: one line per agent, format "<name>|<description>", ordered
 # alphabetically by filename. Prints nothing (exit 0) if agents_dir does
 # not exist or has no *.md files.
 
 set -euo pipefail
 
-AGENTS_DIR="${1:-.claude/agents}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=repo_path.sh
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/repo_path.sh"
+
+REPO_PATH="${1:-}"
+[[ -n "$REPO_PATH" ]] || { echo "Usage: $0 <repo_path> [agents_dir]" >&2; exit 1; }
+
+repo_path_enter "$REPO_PATH"
+
+AGENTS_DIR="${2:-.claude/agents}"
 
 [[ -d "$AGENTS_DIR" ]] || exit 0
 

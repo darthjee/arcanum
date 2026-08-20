@@ -18,7 +18,7 @@ You (the architect) handle the issue evaluation yourself by default. Before draf
 
 When investigation is warranted, prefer delegating to the target repo's own agents (set up via `init-claude`) over a generic one:
 
-1. Run `../scripts/list_agents.sh` (resolved relative to this file's directory; defaults to `.claude/agents` under `$REPO_PATH`, the cwd already resolved at the top of [SKILL.md](../SKILL.md)) to list the repo's configured agents. Each line has the form `<name>|<description>`.
+1. Run `../scripts/list_agents.sh "$REPO_PATH"` (resolved relative to this file's directory; `$REPO_PATH` is already resolved at the top of [SKILL.md](../SKILL.md)) to list the repo's configured agents; the script takes `repo_path` explicitly as its first argument and resolves `.claude/agents` relative to it. Each line has the form `<name>|<description>`.
 2. **No output** — the repo has no `.claude/agents/` set up. Fall back to today's behavior: spawn a generic `Explore` agent to locate relevant code paths.
 3. **One or more lines** — detect a coordinator agent by description, reusing [`auto-plan-issue/steps/determine_agents.md`](../../auto-plan-issue/steps/determine_agents.md)'s "Exclude the coordinator" heuristic (description mentions things like "coordinator", "coordinates other agents", "spans more than one agent's scope").
    - **Coordinator found** — always delegate through it: `Agent(<coordinator-name>, ...)` with the exploration question; the coordinator decides whether to explore directly or fan out to its own specialists.

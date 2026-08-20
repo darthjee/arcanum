@@ -14,7 +14,7 @@ Read whatever is available to understand the high-level folder/module breakdown 
 
 Before reading any code yourself, check whether the target repo has its own agents (set up via `init-claude`) to delegate to:
 
-1. Run `scripts/list_agents.sh` (resolved relative to the `auto-plan-issue` skill folder; defaults to `.claude/agents` under `$REPO_PATH`) to list the repo's configured agents. Each line has the form `<name>|<description>`.
+1. Run `scripts/list_agents.sh "$REPO_PATH"` (resolved relative to the `auto-plan-issue` skill folder) to list the repo's configured agents; the script takes `repo_path` explicitly as its first argument and resolves `.claude/agents` relative to it. Each line has the form `<name>|<description>`.
 2. **No output** — the repo has no `.claude/agents/` set up. Skip to "Explore freely" below.
 3. **One or more lines** — detect a coordinator agent by description, reusing [determine_agents.md](determine_agents.md)'s "Exclude the coordinator" heuristic (description mentions things like "coordinator", "coordinates other agents", "spans more than one agent's scope").
    - **Coordinator found** — delegate through it: `Agent(<coordinator-name>, ...)` with the exploration question; the coordinator decides whether to explore directly or fan out to its own specialists.

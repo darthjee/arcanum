@@ -25,7 +25,7 @@ The script guarantees `FILE` exists on disk once it exits `STATUS=ok` — the sc
 Then check whether this issue already has tracked sub-issues:
 
 ```bash
-../../arcanum/_lib/issue_state.sh get <id> sub-issues
+../../arcanum/_lib/issue_state.sh "$REPO_PATH" get <id> sub-issues
 ```
 
 - **Empty/absent output** — no sub-issues tracked yet. Proceed straight to [explore.md](explore.md).

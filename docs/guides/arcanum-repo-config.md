@@ -38,7 +38,7 @@ Every script that reads this configuration (`auto-fix-all/scripts/config.sh`, `a
 Two ways, either is fine:
 
 1. **Run `/arcanum-migrate`** — the migration this issue shipped (`arcanum/migrations/repos/*/001.sh`) copies both legacy files' contents into the new ones under the `auto-fix-all` key, then leaves the legacy files in place (harmless — they're just no longer read once the new file has the key). This is safe to re-run.
-2. **Re-run `/init-claude`** — `init-claude/setup_ci_monitoring.md` and `init-claude/setup_auto_fix_all_config.md` already write straight to the new files going forward, so re-running those steps has the same effect for the keys they manage.
+2. **Re-run `/init-claude`** — `init-claude/setup_auto_fix_all_settings.md` already writes straight to the new files going forward, so re-running that step has the same effect for the keys it manages.
 
 You can also edit `.claude/configuration/arcanum-repo-config.json` / `.claude/state/arcanum-config.json` by hand — just nest whatever you're adding under the right feature's key.
 

@@ -29,7 +29,7 @@ repo_path_enter "$REPO_PATH"
 
 # Try the local issue state first (avoids an extra GitHub API call)
 SCRIPT_DIR_SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cached_number=$("${SCRIPT_DIR_SELF}/../../arcanum/_lib/issue_state.sh" get "$ID" pr_id 2>/dev/null || true)
+cached_number=$("${SCRIPT_DIR_SELF}/../../arcanum/_lib/issue_state.sh" "$REPO_PATH" get "$ID" pr_id 2>/dev/null || true)
 if [[ -n "$cached_number" ]]; then
   echo "$cached_number"
   exit 0

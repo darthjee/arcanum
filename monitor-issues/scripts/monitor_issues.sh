@@ -20,6 +20,10 @@ source "${SCRIPT_DIR}/../../arcanum/_lib/tags.sh"
 source "${SCRIPT_DIR}/../../arcanum/_lib/tag_actions.sh"
 # shellcheck source=../../arcanum/_lib/lock.sh
 source "${SCRIPT_DIR}/../../arcanum/_lib/lock.sh"
+# shellcheck source=../../arcanum/_lib/repo_path.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/repo_path.sh"
+
+repo_path_enter "$REPO_PATH"
 
 QUEUE_SCRIPT="${SCRIPT_DIR}/../../auto-fix-all/scripts/queue.sh"
 REWRITE_QUEUE_SCRIPT="${SCRIPT_DIR}/rewrite_queue.sh"
@@ -116,7 +120,7 @@ _poll_once() {
       GH_UPDATED_AT=$(echo "$ISSUE" | jq -r '.updatedAt')
 
       # Read stored updated_at for this issue.
-      STORED_UPDATED_AT=$("$ISSUE_STATE_SCRIPT" get "$ISSUE_ID" updated_at)
+      STORED_UPDATED_AT=$("$ISSUE_STATE_SCRIPT" "$REPO_PATH" get "$ISSUE_ID" updated_at)
       STORED_UPDATED_AT="${STORED_UPDATED_AT:-1970-01-01T00:00:00Z}"
 
       # Fine-grained guard: skip if not newer.
@@ -162,8 +166,8 @@ _poll_once() {
         NOW=$(date -u +%FT%TZ)
 
         # Write per-issue state file via issue_state.sh (handles its own locking).
-        "$ISSUE_STATE_SCRIPT" set "$ISSUE_ID" updated_at "$NOW"
-        "$ISSUE_STATE_SCRIPT" set-json "$ISSUE_ID" tags "$TAGS_JSON"
+        "$ISSUE_STATE_SCRIPT" "$REPO_PATH" set "$ISSUE_ID" updated_at "$NOW"
+        "$ISSUE_STATE_SCRIPT" "$REPO_PATH" set-json "$ISSUE_ID" tags "$TAGS_JSON"
 
         _log "Processed #${ISSUE_ID} — updated_at recorded"
       else

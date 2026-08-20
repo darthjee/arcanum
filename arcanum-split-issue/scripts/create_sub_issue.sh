@@ -88,7 +88,7 @@ new_id=$(grep '^ID=' <<< "$SPAWN_OUTPUT" | head -1 | cut -d= -f2-)
 
 # --- Track the new id in state (regardless of linking outcome) ---
 
-"${LIB_DIR}/issue_state.sh" append-json "$ISSUE_ID" sub-issues "\"$new_id\""
+"${LIB_DIR}/issue_state.sh" "$REPO_PATH" append-json "$ISSUE_ID" sub-issues "\"$new_id\""
 
 echo "STATUS=ok"
 echo "ID=$new_id"

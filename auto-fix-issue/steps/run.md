@@ -1,13 +1,13 @@
 You are the **architect**. Your job is to autonomously coordinate the implementation of a planned issue — no questions to the user, no confirmation loop, unlike the interactive `fix-issue` skill. Follow the steps below precisely and in order.
 
-The issues folder is always `docs/agents/issues` and the plans folder is always `docs/agents/plans`. `REPO_PATH` (the target project's root) is carried in from your invocation prompt or from whichever nested caller read this file directly — thread it through to every script call below that resolves the GitHub repo or performs a git operation (Step 2's `create_branch.sh`, Step 3/5's `commit_change.sh` fallback, and [open_pr.md](open_pr.md)'s Step 6).
+The issues folder is always `docs/agents/issues` and the plans folder is always `docs/agents/plans`. `REPO_PATH` (the target project's root) is carried in from your invocation prompt or from whichever nested caller read this file directly — thread it through to every script call below that resolves the GitHub repo or performs a git operation (Step 2's `create_branch.sh`, Step 3/5's `commit_change.sh` fallback, and [open_pr.md](open_pr.md)'s Step 6), as well as to every `scripts/issue_state.sh` call throughout this file.
 
 ## Step 0 — Resume check
 
 Run:
 
 ```bash
-scripts/issue_state.sh get <id> step
+scripts/issue_state.sh "$REPO_PATH" get <id> step
 ```
 
 > Resolve `scripts/issue_state.sh` relative to the `auto-fix-issue` skill folder.
@@ -47,7 +47,7 @@ Read `ISSUE_FILE` and `PLAN_FILE`.
 Once the above completes successfully, record the step:
 
 ```bash
-scripts/issue_state.sh set <id> step plan_located
+scripts/issue_state.sh "$REPO_PATH" set <id> step plan_located
 ```
 
 ## Step 2 — Create the branch
@@ -76,7 +76,7 @@ scripts/merge_main.sh "$REPO_PATH"
 Once the branch is checked out and merged up to date with `main` (conflict resolved, if any), record the step:
 
 ```bash
-scripts/issue_state.sh set <id> step branch_created
+scripts/issue_state.sh "$REPO_PATH" set <id> step branch_created
 ```
 
 ## Step 3 — Determine which specialist agents have work
@@ -94,7 +94,7 @@ Each line printed is the name of a specialist agent that has its own plan file (
 Once the above completes successfully, record the step:
 
 ```bash
-scripts/issue_state.sh set <id> step agents_listed
+scripts/issue_state.sh "$REPO_PATH" set <id> step agents_listed
 ```
 
 - **No output (empty)** — the plan was not split across agents. Treat `PLAN_FILE` itself as the only unit of work and implement it yourself, following the same development cycle described in [dispatch_agents.md](dispatch_agents.md) (implement, run `scripts/run_checks.sh architect`, commit via `scripts/commit_change.sh`). Skip straight to Step 5 once done.
@@ -107,7 +107,7 @@ Read [dispatch_agents.md](dispatch_agents.md) and follow the instructions there 
 Once all dispatched agents have completed, record the step:
 
 ```bash
-scripts/issue_state.sh set <id> step agents_dispatched
+scripts/issue_state.sh "$REPO_PATH" set <id> step agents_dispatched
 ```
 
 ## Step 5 — Review the results
@@ -117,7 +117,7 @@ Read [review_and_redispatch.md](review_and_redispatch.md) and follow the instruc
 Once the review passes and all work is confirmed correct, record the step:
 
 ```bash
-scripts/issue_state.sh set <id> step reviewed
+scripts/issue_state.sh "$REPO_PATH" set <id> step reviewed
 ```
 
 ## Step 6 — Publish the PR
@@ -127,7 +127,7 @@ Once every agent has committed correct, complete work, read [open_pr.md](open_pr
 Once the PR is published (opened or marked ready), record the step:
 
 ```bash
-scripts/issue_state.sh set <id> step pr_published
+scripts/issue_state.sh "$REPO_PATH" set <id> step pr_published
 ```
 
 Do not ask for confirmation at any point in this flow. Report the final PR URL.

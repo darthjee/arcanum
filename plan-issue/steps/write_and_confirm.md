@@ -25,8 +25,6 @@ Model `plan.md` after this structure (adapt sections as needed):
 ### Step 2 — <Name>
 <Description of what to do and why>
 
-...
-
 ## Files to Change
 - `path/to/file.ext` — <what changes and why>
 
@@ -34,7 +32,39 @@ Model `plan.md` after this structure (adapt sections as needed):
 - <Any caveats, risks, open questions, or unknowns>
 ```
 
-If splitting into multiple files, `plan.md` should serve as the index with links to the other files.
+If splitting into multiple files, `plan.md` should serve as the index with links to the other files. This is the same judgment call `auto-plan-issue` makes for a genuinely large plan, and is independent of the step split below.
+
+### Splitting steps into their own files
+
+This mirrors `auto-plan-issue/steps/write_plan.md` exactly, so `plan-issue` and `auto-plan-issue` produce byte-for-byte the same shape for the same input. If the plan involves multiple specialist agents (an `<agent-name>.md` per agent, e.g. via a coordinator's guidance), apply the same rules to each `<agent-name>.md`; otherwise apply them to `plan.md` itself.
+
+**Step file naming**: `<agent-name>/<NN>-<slug>.md` — two-digit zero-padded step number plus a short descriptive slug (e.g. `backend/01-add-users-endpoint.md`). When there is no agent split, use `plan/<NN>-<slug>.md` instead, rooted at `plan.md`.
+
+**Split threshold**: after drafting the steps, count them.
+- **1–2 steps**: keep them inline under `## Implementation Steps` in the single file, as in the template above — no subfolder, no separate step files.
+- **3 or more steps**: move the steps out into per-step files, and turn the file that held them into an index instead:
+
+```markdown
+## Steps
+
+- [01 — Add endpoint](plan/01-add-endpoint.md)
+- [02 — Add validation](plan/02-add-validation.md)
+- [03 — Wire up UI](plan/03-wire-up-ui.md)
+```
+
+(`## Steps` replaces `## Implementation Steps`; `## CI Checks` and `## Notes`, when present, stay in the index, scoped to the whole plan — not duplicated per step.)
+
+Each step file, `plan/<NN>-<slug>.md` (or `<agent-name>/<NN>-<slug>.md` when there is an agent split), is self-contained — no `### Step N` heading, since the filename and index link already convey ordering and name:
+
+```markdown
+# <Name>
+<Description of what to do and why>
+
+## Files to Change
+- `path/to/file.ext` — <what changes and why>
+```
+
+`## Files to Change` here is scoped only to that specific step — pull the subset of the overall file list relevant to this step, not the full list.
 
 ## Present an overview and ask for confirmation
 
@@ -69,7 +99,7 @@ Repeat until the user confirms the plan is satisfactory.
 When the user asks you to look at the code (e.g., "check the code", "look at the codebase", "research it", or similar), then:
 
 1. Prefer delegating to the target repo's own agents (set up via `init-claude`) over exploring inline yourself:
-   - Run `../scripts/list_agents.sh` (resolved relative to this file's directory; defaults to `.claude/agents` under the current project root) to list the repo's configured agents. Each line has the form `<name>|<description>`.
+   - Run `../scripts/list_agents.sh "$REPO_PATH"` (resolved relative to this file's directory) to list the repo's configured agents; the script takes `repo_path` explicitly as its first argument and resolves `.claude/agents` relative to it. Each line has the form `<name>|<description>`.
    - **No output** — the repo has no `.claude/agents/` set up. Skip to step 2 below and explore inline yourself.
    - **One or more lines** — detect a coordinator agent by description, reusing [`auto-plan-issue/steps/determine_agents.md`](../../auto-plan-issue/steps/determine_agents.md)'s "Exclude the coordinator" heuristic (description mentions things like "coordinator", "coordinates other agents", "spans more than one agent's scope").
      - **Coordinator found** — delegate through it: `Agent(<coordinator-name>, ...)` with the research question; the coordinator decides whether to explore directly or fan out to its own specialists.
@@ -88,6 +118,8 @@ When the user asks you to look at the code (e.g., "check the code", "look at the
    Before opening a PR, run the following checks for the folders being modified:
    - `<folder>`: `<local command>` (CircleCI job: `<job name>`)
    ```
+
+   `## CI Checks` always belongs on the index file, never on a per-step file, even when the plan is split into per-step files: `plan.md` when there is no agent split (or when it wasn't split into steps at all), or the relevant `<agent-name>.md` when there is an agent split. Never add `## CI Checks` to a `plan/<NN>-<slug>.md` or `<agent-name>/<NN>-<slug>.md` step file.
 
 4. Present the updated overview and ask again:
    ```
