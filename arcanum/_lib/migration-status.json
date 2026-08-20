@@ -1,4 +1,5 @@
 {
   "dispatch-fixture": true,
-  "dispatch-fixture-crash": true
+  "dispatch-fixture-crash": true,
+  "resolve-and-fetch": true
 }
