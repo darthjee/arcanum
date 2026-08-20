@@ -7,7 +7,7 @@ The issues folder is always `docs/agents/issues`. Your invocation prompt also ca
 Run the resolve script, passing the issues folder and the raw skill arguments:
 
 ```bash
-scripts/resolve_id_and_file.sh docs/agents/issues "<skill_args>"
+scripts/resolve_id_and_file.sh "$REPO_PATH" docs/agents/issues "<skill_args>"
 ```
 
 > Resolve `scripts/resolve_id_and_file.sh` relative to the `auto-new-issue` skill folder.
