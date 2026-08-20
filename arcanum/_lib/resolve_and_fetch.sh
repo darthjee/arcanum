@@ -45,29 +45,39 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # for the full writeup.
 "${SCRIPT_DIR}/checkout_safe_branch.sh" "$REPO_PATH" >/dev/null
 
-SCENARIO="" ID="" TITLE="" FILE="" STATUS="" NEEDS_FETCH=""
-while IFS='=' read -r key value; do
-  case "$key" in
-    SCENARIO) SCENARIO="$value" ;;
-    ID) ID="$value" ;;
-    TITLE) TITLE="$value" ;;
-    FILE) FILE="$value" ;;
-    STATUS) STATUS="$value" ;;
-    NEEDS_FETCH) NEEDS_FETCH="$value" ;;
-  esac
-done < <("$SCRIPT_DIR/resolve_id_and_file.sh" "$ISSUES_FOLDER" "$ARG_STRING")
+title_from_filename() {
+  local base
+  base=$(basename "$1" .md)
+  # Strip leading ID prefix (up to first _ or -)
+  local title_part="${base#*_}"
+  [[ "$title_part" == "$base" ]] && title_part="${base#*-}"
+  echo "$title_part" | tr '_-' ' ' \
+    | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) tolower(substr($i,2)); print}'
+}
 
-if [[ "$STATUS" == "missing_id" ]]; then
-  printf 'STATUS=error\nERROR=No GitHub issue id was given for discuss-issue (it only handles existing GitHub issues).\n'
+# --- Parse the simplified '#<id>' input grammar ---
+
+TRIMMED="$ARG_STRING"
+TRIMMED="${TRIMMED#"${TRIMMED%%[![:space:]]*}"}"
+TRIMMED="${TRIMMED%"${TRIMMED##*[![:space:]]}"}"
+
+if [[ ! "$TRIMMED" =~ ^#([0-9]+)$ ]]; then
+  ERROR_MSG="Error: invalid input '${ARG_STRING}' — expected '#<id>'"
+  printf 'STATUS=error\nERROR=%s\n' "$ERROR_MSG"
   exit 0
 fi
 
-if [[ "$STATUS" == "existing" ]]; then
-  printf 'STATUS=ok\nID=%s\nTITLE=%s\nFILE=%s\n' "$ID" "$TITLE" "$FILE"
+ID="${BASH_REMATCH[1]}"
+
+EXISTING=$(find "$ISSUES_FOLDER" -maxdepth 1 \( -name "${ID}_*" -o -name "${ID}-*" \) 2>/dev/null | head -1)
+
+if [[ -n "$EXISTING" ]]; then
+  TITLE=$(title_from_filename "$EXISTING")
+  printf 'STATUS=ok\nID=%s\nTITLE=%s\nFILE=%s\n' "$ID" "$TITLE" "$EXISTING"
   exit 0
 fi
 
-# STATUS=new + NEEDS_FETCH=true (the only remaining case once an id is known)
+# No local file yet — fetch the issue from GitHub.
 if FETCH_OUTPUT=$("$SCRIPT_DIR/github_issue.sh" fetch "$REPO_PATH" "$ID" 2>/tmp/resolve_and_fetch.err.$$); then
   rm -f /tmp/resolve_and_fetch.err.$$
   echo "STATUS=ok"
