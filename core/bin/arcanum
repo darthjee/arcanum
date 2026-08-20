@@ -8,9 +8,9 @@
 // argument as the command name, looks it up in the COMMANDS registry
 // below, and dispatches to the matching module under `core/lib/`,
 // passing the remaining arguments through. Real migrated entrypoints are
-// wired into COMMANDS incrementally, one command at a time; this issue
-// only wires the `dispatch-fixture`/`dispatch-fixture-crash` proof
-// commands.
+// wired into COMMANDS incrementally, one command at a time — starting
+// with `resolve-and-fetch` (issue #193), alongside the
+// `dispatch-fixture`/`dispatch-fixture-crash` proof commands from #192.
 
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -26,7 +26,8 @@ const libDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'li
  */
 const COMMANDS = {
   'dispatch-fixture': { module: 'DispatchFixture.js', method: 'run' },
-  'dispatch-fixture-crash': { module: 'DispatchFixture.js', method: 'crash' }
+  'dispatch-fixture-crash': { module: 'DispatchFixture.js', method: 'crash' },
+  'resolve-and-fetch': { module: 'ResolveAndFetch.js', method: 'run' }
 };
 
 /**
@@ -44,7 +45,14 @@ async function dispatch(command, args) {
 
   const modulePath = pathToFileURL(path.join(libDir, entry.module)).href;
   const { default: ModuleClass } = await import(modulePath);
-  const output = new ModuleClass()[entry.method](...args);
+  let output = new ModuleClass()[entry.method](...args);
+
+  // Migrated entrypoints (e.g. resolve-and-fetch) are async — await
+  // their result before deciding whether to print it. dispatch-fixture's
+  // synchronous methods pass straight through unaffected.
+  if (output && typeof output.then === 'function') {
+    output = await output;
+  }
 
   if (typeof output === 'string') {
     process.stdout.write(output);
