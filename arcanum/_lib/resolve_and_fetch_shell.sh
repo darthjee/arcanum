@@ -81,11 +81,23 @@ fi
 
 ID="${BASH_REMATCH[1]}"
 
-EXISTING=$(find "$ISSUES_FOLDER" -maxdepth 1 \( -name "${ID}_*" -o -name "${ID}-*" \) 2>/dev/null | head -1)
+# Resolve the search directory against $REPO_PATH — $ISSUES_FOLDER is a
+# caller-supplied path relative to the repo (e.g. "docs/agents/issues"),
+# never relative to the ambient shell cwd this script happens to be
+# invoked from. Trailing slashes on either $REPO_PATH or $ISSUES_FOLDER
+# are trimmed before joining so the join never produces a doubled slash.
+ISSUES_FOLDER_TRIMMED="${ISSUES_FOLDER%/}"
+SEARCH_DIR="${REPO_PATH%/}/${ISSUES_FOLDER_TRIMMED}"
+
+EXISTING=$(find "$SEARCH_DIR" -maxdepth 1 \( -name "${ID}_*" -o -name "${ID}-*" \) 2>/dev/null | head -1)
 
 if [[ -n "$EXISTING" ]]; then
-  TITLE=$(title_from_filename "$EXISTING")
-  printf 'STATUS=ok\nID=%s\nTITLE=%s\nFILE=%s\n' "$ID" "$TITLE" "$EXISTING"
+  EXISTING_BASENAME=$(basename "$EXISTING")
+  # FILE is printed relative to $REPO_PATH (via $ISSUES_FOLDER), not as
+  # the absolute $SEARCH_DIR path used for the filesystem lookup above.
+  FILE="${ISSUES_FOLDER_TRIMMED}/${EXISTING_BASENAME}"
+  TITLE=$(title_from_filename "$EXISTING_BASENAME")
+  printf 'STATUS=ok\nID=%s\nTITLE=%s\nFILE=%s\n' "$ID" "$TITLE" "$FILE"
   exit 0
 fi
 
