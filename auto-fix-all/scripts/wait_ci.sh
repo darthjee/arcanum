@@ -18,11 +18,11 @@
 # to pass). Patterns are read (relative to the current working directory)
 # from the target project's own
 # .claude/configuration/arcanum-repo-config.json, namespace "auto-fix-all",
-# field "ignored_check_patterns" (an array of regex strings) — falling
-# back to the legacy .claude/configuration/auto-fix-all.json (same field,
-# top level) if the new file/key is absent, with a warning. See
-# arcanum/_lib/repo_config.sh and docs/guides/arcanum-repo-config.md.
-# If neither file/field is present, no patterns are ignored. This exists
+# field "ignored_check_patterns" (an array of regex strings). No legacy
+# .claude/configuration/auto-fix-all.json fallback is attempted for this
+# key — see arcanum/_lib/repo_config.sh and
+# docs/guides/arcanum-repo-config.md. If the file/field is not present,
+# no patterns are ignored. This exists
 # because some check-runs (e.g. Codacy) can report a "action_required"
 # conclusion that is neither success nor a failure state, which would
 # otherwise hang this script forever unless ignored.
@@ -42,7 +42,7 @@ repo_path_enter "$REPO_PATH"
 # shellcheck source=../../arcanum/_lib/repo_config.sh
 source "${SCRIPT_DIR}/../../arcanum/_lib/repo_config.sh"
 
-ignored_json=$(repo_config_read ".claude/configuration/arcanum-repo-config.json" ".claude/configuration/auto-fix-all.json" auto-fix-all ignored_check_patterns)
+ignored_json=$(repo_config_read ".claude/configuration/arcanum-repo-config.json" "" auto-fix-all ignored_check_patterns)
 ignored_json="${ignored_json:-[]}"
 
 # shellcheck source=../../arcanum/_lib/origin.sh
