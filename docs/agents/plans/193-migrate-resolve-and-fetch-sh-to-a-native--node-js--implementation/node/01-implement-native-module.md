@@ -1,0 +1,16 @@
+# Implement the native module
+
+Implement the `resolve-and-fetch` command's logic under `core/lib/` (module name/split is your call — e.g. one `ResolveAndFetch.js` orchestrator plus small collaborators for git/GitHub/state concerns, following whatever decomposition keeps each piece independently testable). It must reproduce, exactly:
+
+1. **Safe-branch checkout**: dirty-tree check (fail fast, matching `checkout_safe_branch.sh`'s hard-failure — no `STATUS=` line, non-zero exit — this one case stays outside the `STATUS=`/`ERROR=` contract, see [plan.md](../plan.md)), `git fetch -p`, `git checkout <branch>` (branch resolved the same way `safe_branch_get` does: `git.safe_branch` config key, default `origin/main`) — via `child_process`, plain `git`, no `gh`.
+2. **ID validation**: `^#[0-9]+$` (whitespace-trimmed) before the id is used anywhere; anything else is `STATUS=error` with `ERROR=Error: invalid input '<raw_input>' — expected '#<id>'`.
+3. **Existing-file lookup**: glob `docs/agents/issues/<id>_*`/`<id>-*`, first match wins (see [plan.md](../plan.md) on match-order non-determinism — don't try to out-guess `find`'s order). On a match: `TITLE` via `title_from_filename` (strip the id prefix up to the first `_`/`-`, replace remaining `_`/`-` with spaces, Title-Case each word), `FILE` = the matched path, no GitHub call needed — this is the `STATUS=ok` fast path.
+4. **GitHub fetch** (no existing-file match): `GET https://api.github.com/repos/<owner>/<repo>/issues/<id>` via global `fetch`, `Authorization: Bearer <token>` where `<token>` comes from `gh auth token` (via `execFile`, argument array, never printed to stdout/logs), with a 30-second timeout (`AbortSignal.timeout(30000)`). On auth failure: `STATUS=error`, `ERROR=Error: could not obtain GitHub token via gh auth token`. On fetch failure (network error or non-2xx): `STATUS=error`, `ERROR=Error: could not fetch issue #<id> from <owner>/<repo>`. On success: `TITLE` = the API response's `title`; `FILE` = `docs/agents/issues/<id>-<slug>.md` where `<slug>` is `normalize_title(title)` (lowercase, `[^a-z0-9]`→`-`, collapse repeats, trim leading/trailing `-`) — write the issue body to that path.
+5. **Label → tag mapping and state-file write**: map the fetched issue's GitHub labels to canonical tags via the table in [plan.md](../plan.md), then write `.claude/state/issue-<id>.json` (`tags`, `updated_at`, `title`, `state`) through the same lock/mutate/release protocol as [lock-system.md](../../../architecture/lock-system.md) — this is a strict requirement, not a simplified reimplementation (see the issue's Scope section for why: a longer-horizon plan to eventually move this onto a shared server makes it worth keeping the exact current semantics).
+6. **Origin resolution**: `DOMAIN`/`REPO` come from the git remote, same as `arcanum/_lib/origin.sh`'s `get_domain`/`get_repo_path`.
+
+Every branch above ends by printing the exact `STATUS=`/`KEY=value` lines documented in [plan.md](../plan.md) and exiting 0 (except the dirty-tree precondition failure in step 1, which exits non-zero with no `STATUS=` line).
+
+## Files to Change
+
+- `core/lib/` (new files, naming/decomposition your call) — the module(s) implementing the six behaviors above.
