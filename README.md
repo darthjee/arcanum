@@ -112,3 +112,59 @@ description: Short description shown in the skill list.
 
 Instructions for Claude...
 ```
+
+## Configuration
+
+Arcanum configuration keys are resolved through a 3-tier chain, in order of precedence — the first non-null value found wins, mirroring git's own `--local` > `--global` > `--system` precedence:
+
+1. **Local** — `.claude/state/arcanum-config.json` (per-checkout, gitignored)
+2. **Repo** — `.claude/configuration/arcanum-repo-config.json` (committed, shared across the team)
+3. **Global** — `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/arcanum-config.json` (cross-project, scoped to your Claude Code account)
+
+| Key | Description |
+|-----|-------------|
+| `git.merge_body_mode` | Controls the squash-merge commit body (`empty`, `full`, or `coauthors`). |
+| `git.omit_model_coauthor` | When `true`, removes the model's email from the coauthors list during merge. |
+| `git.remove_coauthors` | List of emails to remove from the coauthors list during merge. |
+| `git.agents.<agent>.email` | Commit author email per agent, supports the `{agent}` placeholder. |
+| `git.email` | Global fallback email for agents without a specific email configured. |
+| `git.safe_branch` | Reference branch for safe fetch/merge operations (default: `origin/main`). |
+| `engine.mode` | Defines which implementation to run for migrated entrypoints (`shell`, `native`, or `docker`). |
+| `auto-fix-all.clear_context` | Clears context between issues processed in the `auto-fix-all` pipeline. |
+| `auto-fix-all.finish_on_empty_queue` | Finishes the pipeline when the issue queue is empty. |
+| `auto-fix-all.ignored_check_patterns` | CI check name patterns to ignore when deciding pass/fail. |
+| `monitor-issues.clear_context` | Clears context between `monitor-issues` cycles. |
+| `plan-issues.max-retry-count` | Max retries for GitHub issue creation in `arcanum/_lib/spawn_issue.sh` (default: 5). |
+| `plan-issues.error-sleep-time` | Seconds to sleep between retries in `arcanum/_lib/spawn_issue.sh` (default: 5). |
+
+**Example, showing every key together:**
+
+```json
+{
+  "git": {
+    "merge_body_mode": "coauthors",
+    "omit_model_coauthor": true,
+    "remove_coauthors": ["noreply@anthropic.com"],
+    "agents": {
+      "architect": { "email": "you+architect@example.com" }
+    },
+    "email": "you+{agent}@example.com",
+    "safe_branch": "origin/main"
+  },
+  "engine": {
+    "mode": "shell"
+  },
+  "auto-fix-all": {
+    "clear_context": false,
+    "finish_on_empty_queue": false,
+    "ignored_check_patterns": []
+  },
+  "monitor-issues": {
+    "clear_context": false
+  },
+  "plan-issues": {
+    "max-retry-count": 5,
+    "error-sleep-time": 5
+  }
+}
+```
