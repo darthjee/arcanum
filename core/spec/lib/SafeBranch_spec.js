@@ -9,6 +9,45 @@ import { createGitFixtureRepo } from '../support/utils/gitFixtureRepo.js';
 const execFileAsync = promisify(execFile);
 
 describe('SafeBranch', () => {
+  describe('#run', () => {
+    it('short-circuits before checkout when repo-path validation fails', async () => {
+      const validationError = new Error('Error: not a directory: /nope');
+      const repoPath = { validate: jasmine.createSpy('validate').and.rejectWith(validationError) };
+      const execFileSpy = jasmine.createSpy('execFileAsync');
+      const safeBranch = new SafeBranch({ execFileAsync: execFileSpy, repoPath });
+
+      await expectAsync(safeBranch.run('/nope')).toBeRejectedWith(validationError);
+      expect(execFileSpy).not.toHaveBeenCalled();
+    });
+
+    it('returns BRANCH=<branch> on success, after validating the repo path', async () => {
+      const repoPath = { validate: jasmine.createSpy('validate').and.resolveTo(undefined) };
+      const execFileSpy = jasmine
+        .createSpy('execFileAsync')
+        .and.callFake(() => Promise.resolve({ stdout: '', stderr: '' }));
+      const repoConfig = { getSafeBranch: async () => 'origin/develop' };
+      const safeBranch = new SafeBranch({ execFileAsync: execFileSpy, repoConfig, repoPath });
+
+      await expectAsync(safeBranch.run('/repo')).toBeResolvedTo('BRANCH=origin/develop\n');
+      expect(repoPath.validate).toHaveBeenCalledWith('/repo');
+    });
+
+    it('propagates the checkout hard failure (dirty tree) without a BRANCH= line', async () => {
+      const repoPath = { validate: jasmine.createSpy('validate').and.resolveTo(undefined) };
+      const dirtyError = Object.assign(new Error('diff found changes'), { code: 1 });
+      const execFileSpy = jasmine.createSpy('execFileAsync').and.callFake((file, args) => {
+        if (args[0] === 'diff') {
+          return Promise.reject(dirtyError);
+        }
+
+        return Promise.resolve({ stdout: '', stderr: '' });
+      });
+      const safeBranch = new SafeBranch({ execFileAsync: execFileSpy, repoPath });
+
+      await expectAsync(safeBranch.run('/repo')).toBeRejectedWithError(/uncommitted changes/);
+    });
+  });
+
   describe('#checkout (stubbed collaborators)', () => {
     it('throws without checking out when the working tree has uncommitted changes', async () => {
       const dirtyError = Object.assign(new Error('diff found changes'), { code: 1 });
