@@ -7,7 +7,7 @@
   "issue-state": false,
   "permission-grant": false,
   "checkout-safe-branch": true,
-  "list-agents": false,
+  "list-agents": true,
   "resolve-plan-paths": false,
   "spawn-issue": false,
   "arcanum-split-issue-create-sub-issue-file": false,
