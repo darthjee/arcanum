@@ -1,57 +1,30 @@
 #!/usr/bin/env bash
-# List specialist agents configured in the target project
+# Thin engine_dispatch shim for the "list-agents" migrated entrypoint —
+# see docs/agents/architecture/script-engine.md and
+# docs/agents/plans/234-migrate-list-agents-entrypoint-to-native-node-js/plan.md
+# for the full design/shared contracts. Lists specialist agents configured
+# in the target project, via either the shell implementation
+# (list_agents_shell.sh) or the native one (core/bin/arcanum), per
+# engine.mode / arcanum/_lib/migration-status.json.
+#
+# Purely filesystem-based — no environment dependency, so no extra
+# env-var allowlist entries (beyond PATH, which engine_dispatch always
+# includes) are needed for the native path.
+#
 # Usage: list_agents.sh <repo_path> [agents_dir]
 #
-# Default agents_dir is .claude/agents (relative to repo_path).
-# Output: one line per agent, format "<name>|<description>", ordered
-# alphabetically by filename. Prints nothing (exit 0) if agents_dir does
-# not exist or has no *.md files.
+# Output and exit code: unchanged from before this migration — see
+# list_agents_shell.sh's own header for the full contract.
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=repo_path.sh
-# shellcheck disable=SC1091
-source "${SCRIPT_DIR}/repo_path.sh"
-
 REPO_PATH="${1:-}"
+
 [[ -n "$REPO_PATH" ]] || { echo "Usage: $0 <repo_path> [agents_dir]" >&2; exit 1; }
 
-repo_path_enter "$REPO_PATH"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-AGENTS_DIR="${2:-.claude/agents}"
-
-[[ -d "$AGENTS_DIR" ]] || exit 0
-
-shopt -s nullglob
-FILES=("$AGENTS_DIR"/*.md)
-shopt -u nullglob
-
-[[ ${#FILES[@]} -gt 0 ]] || exit 0
-
-IFS=$'\n' SORTED_FILES=($(printf '%s\n' "${FILES[@]}" | sort))
-unset IFS
-
-extract_frontmatter_field() {
-  local file="$1" field="$2"
-  awk -v field="$field" '
-    NR==1 && $0=="---" { in_fm=1; next }
-    in_fm && $0=="---" { exit }
-    in_fm {
-      pattern = "^" field ":[ ]*"
-      if ($0 ~ pattern) {
-        sub(pattern, "")
-        gsub(/^["'"'"']|["'"'"']$/, "")
-        print
-        exit
-      }
-    }
-  ' "$file"
-}
-
-for file in "${SORTED_FILES[@]}"; do
-  NAME=$(extract_frontmatter_field "$file" "name")
-  DESCRIPTION=$(extract_frontmatter_field "$file" "description")
-  [[ -n "$NAME" ]] || continue
-  printf '%s|%s\n' "$NAME" "$DESCRIPTION"
-done
+# shellcheck source=engine_dispatch.sh
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/engine_dispatch.sh"
+engine_dispatch "$REPO_PATH" list-agents "${SCRIPT_DIR}/list_agents_shell.sh" -- "$@"
