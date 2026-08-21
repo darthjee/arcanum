@@ -28,6 +28,7 @@ const COMMANDS = {
   'checkout-safe-branch': { module: 'SafeBranch.js', method: 'run' },
   'dispatch-fixture': { module: 'DispatchFixture.js', method: 'run' },
   'dispatch-fixture-crash': { module: 'DispatchFixture.js', method: 'crash' },
+  'list-agents': { module: 'ListAgents.js', method: 'run' },
   'resolve-and-fetch': { module: 'ResolveAndFetch.js', method: 'run' },
   'resolve-id-and-file': { module: 'ResolveIdAndFile.js', method: 'run' }
 };

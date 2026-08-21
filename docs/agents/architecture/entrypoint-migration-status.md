@@ -43,7 +43,7 @@ One row per entry point tracked in [`arcanum/_lib/migration-status.json`](../../
 | `init-claude-sync-labels` | No | #230 |
 | `init-claude-write-label-config` | No | #230 |
 | `issue-state` | No | #230 |
-| `list-agents` | No | #230 |
+| `list-agents` | Yes | #230 |
 | `monitor-issues-config` | No | #230 |
 | `monitor-issues-github` | No | #230 |
 | `monitor-issues-monitor-issues` | No | #230 |
