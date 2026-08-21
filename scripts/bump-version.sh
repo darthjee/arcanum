@@ -11,8 +11,10 @@
 # migration always ships in the same release as the change it belongs
 # to. Also regenerates
 # docs/agents/tag-mutations.md (scripts/generate_tags_table.sh, default
-# non-interactive mode), so it self-heals at every release even if nobody
-# ran it manually mid-cycle.
+# non-interactive mode) and
+# docs/agents/architecture/entrypoint-migration-status.md
+# (scripts/generate_entrypoint_migration_status.sh), so both self-heal at
+# every release even if nobody ran them manually mid-cycle.
 # Does NOT commit or tag anything — that remains a separate, manual (or
 # future) step.
 #
@@ -54,6 +56,7 @@ sed -i.bak -E "s/^DEFAULT_VERSION=\"[^\"]*\"/DEFAULT_VERSION=\"${NEW_VERSION}\"/
 rm -f "${BOOTSTRAP_FILE}.bak"
 
 "${SCRIPT_DIR}/generate_tags_table.sh"
+"${SCRIPT_DIR}/generate_entrypoint_migration_status.sh"
 
 sed -i.bak -E \
   "s#\*\*Current Version:\*\* \[[0-9]+\.[0-9]+\.[0-9]+\]\(https://github.com/${REPO_SLUG}/releases/tag/[0-9]+\.[0-9]+\.[0-9]+\)#**Current Version:** [${NEW_VERSION}](https://github.com/${REPO_SLUG}/releases/tag/${NEW_VERSION})#" \
@@ -83,7 +86,7 @@ fi
 
 echo "New version:  ${NEW_VERSION}"
 echo "Next release: ${NEXT_RELEASE}"
-echo "Updated ${VERSION_FILE}, ${BOOTSTRAP_FILE}, ${README_FILE}, and docs/agents/tag-mutations.md."
+echo "Updated ${VERSION_FILE}, ${BOOTSTRAP_FILE}, ${README_FILE}, docs/agents/tag-mutations.md, and docs/agents/architecture/entrypoint-migration-status.md."
 
 if is_migrations_dir_empty "$NEXT_MIGRATIONS_DIR"; then
   # defensive: keep migrations.json present even if it was missing
