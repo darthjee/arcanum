@@ -1,5 +1,6 @@
 {
   "dispatch-fixture": true,
   "dispatch-fixture-crash": true,
-  "resolve-and-fetch": true
+  "resolve-and-fetch": true,
+  "resolve-id-and-file": true
 }
