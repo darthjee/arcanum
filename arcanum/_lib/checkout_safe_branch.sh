@@ -1,29 +1,30 @@
 #!/usr/bin/env bash
-# Executable CLI wrapper around safe_branch.sh's checkout helper.
+# Thin engine_dispatch shim for the "checkout-safe-branch" migrated
+# entrypoint — see docs/agents/architecture/script-engine.md and
+# docs/agents/plans/233-migrate-checkout-safe-branch-entrypoint-to-native-node-js/plan.md
+# for the full design/shared contracts. Enters <repo_path> and checks out
+# the configured safe branch (default "origin/main", detached HEAD), via
+# either the shell implementation (checkout_safe_branch_shell.sh) or the
+# native one (core/bin/arcanum), per engine.mode / arcanum/_lib/migration-status.json.
+#
+# Purely filesystem/git-based — no environment dependency, so no extra
+# env-var allowlist entries (beyond PATH, which engine_dispatch always
+# includes) are needed for the native path.
+#
 # Usage: checkout_safe_branch.sh <repo_path>
 #
-# Enters <repo_path> (repo_path.sh's repo_path_enter — validates it's a
-# git repo, cd's into it), then runs safe_branch_checkout: hard-errors on
-# a dirty tracked-file working tree, otherwise fetches+prunes and checks
-# out the configured safe branch (default "origin/main", detached HEAD).
-# Prints "BRANCH=<resolved branch>" on success. Mirrors how
-# auto-fix-all/scripts/checkout_from_main.sh wraps git_branch.sh.
+# Output and exit code: unchanged from before this migration — see
+# checkout_safe_branch_shell.sh's own header for the full contract.
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=repo_path.sh
-source "${SCRIPT_DIR}/repo_path.sh"
-# shellcheck source=safe_branch.sh
-source "${SCRIPT_DIR}/safe_branch.sh"
-
 REPO_PATH="${1:-}"
 
-[[ -n "$REPO_PATH" ]] || {
-  echo "Usage: $0 <repo_path>" >&2
-  exit 1
-}
+[[ -n "$REPO_PATH" ]] || { echo "Usage: $0 <repo_path>" >&2; exit 1; }
 
-repo_path_enter "$REPO_PATH"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-safe_branch_checkout
+# shellcheck source=engine_dispatch.sh
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/engine_dispatch.sh"
+engine_dispatch "$REPO_PATH" checkout-safe-branch "${SCRIPT_DIR}/checkout_safe_branch_shell.sh" -- "$@"

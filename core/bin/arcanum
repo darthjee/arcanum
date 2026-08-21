@@ -25,6 +25,7 @@ const libDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'li
  * @type {object}
  */
 const COMMANDS = {
+  'checkout-safe-branch': { module: 'SafeBranch.js', method: 'run' },
   'dispatch-fixture': { module: 'DispatchFixture.js', method: 'run' },
   'dispatch-fixture-crash': { module: 'DispatchFixture.js', method: 'crash' },
   'resolve-and-fetch': { module: 'ResolveAndFetch.js', method: 'run' },

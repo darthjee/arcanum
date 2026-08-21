@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import RepoConfig from './RepoConfig.js';
+import RepoPath from './RepoPath.js';
 
 const defaultExecFileAsync = promisify(execFile);
 
@@ -17,10 +18,35 @@ class SafeBranch {
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Function} [deps.execFileAsync] - promisified `execFile`.
    * @param {RepoConfig} [deps.repoConfig] - safe-branch config reader.
+   * @param {RepoPath} [deps.repoPath] - repo-path validation helper.
    */
-  constructor({ execFileAsync = defaultExecFileAsync, repoConfig = new RepoConfig() } = {}) {
+  constructor({
+    execFileAsync = defaultExecFileAsync,
+    repoConfig = new RepoConfig(),
+    repoPath = new RepoPath({ execFileAsync })
+  } = {}) {
     this._execFileAsync = execFileAsync;
     this._repoConfig = repoConfig;
+    this._repoPath = repoPath;
+  }
+
+  /**
+   * Native implementation of the `checkout-safe-branch` migrated
+   * entrypoint — byte-identical stdout/exit-code counterpart to
+   * `arcanum/_lib/checkout_safe_branch_shell.sh`: validates `repoPath`
+   * (`RepoPath#validate`, matching `repo_path_enter`'s messages/exit-1
+   * semantics), then runs `#checkout`, returning a `BRANCH=<branch>\n`
+   * stdout string on success. Any failure (invalid path, dirty working
+   * tree) propagates uncaught, per the shared hard-failure contract.
+   * @param {string} repoPath - the target repo's local checkout path.
+   * @returns {Promise<string>} the `BRANCH=<branch>\n` output.
+   */
+  async run(repoPath) {
+    await this._repoPath.validate(repoPath);
+
+    const branch = await this.checkout(repoPath);
+
+    return `BRANCH=${branch}\n`;
   }
 
   /**
@@ -30,7 +56,8 @@ class SafeBranch {
    * non-zero) on a dirty tracked-file working tree. Untracked files
    * never block the checkout.
    * @param {string} repoPath - the target repo's local checkout path.
-   * @returns {Promise<void>} resolves once the safe branch is checked out.
+   * @returns {Promise<string>} resolves with the checked-out branch
+   *   once the safe branch is checked out.
    */
   async checkout(repoPath) {
     if (await this._isDirty(repoPath)) {
@@ -42,6 +69,8 @@ class SafeBranch {
     const branch = await this._repoConfig.getSafeBranch(repoPath);
 
     await this._execFileAsync('git', ['checkout', branch], { cwd: repoPath });
+
+    return branch;
   }
 
   /**

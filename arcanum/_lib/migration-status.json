@@ -6,7 +6,7 @@
   "github-issue": false,
   "issue-state": false,
   "permission-grant": false,
-  "checkout-safe-branch": false,
+  "checkout-safe-branch": true,
   "list-agents": false,
   "resolve-plan-paths": false,
   "spawn-issue": false,
