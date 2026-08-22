@@ -99,8 +99,13 @@ class AutoFixAllCleanupArtifacts {
    *   in the commit's `Co-Authored-By` trailer.
    * @param {string} modelEmail - the acting model's email, used in both
    *   `Co-Authored-By` trailers.
-   * @returns {Promise<string>} always resolves to `''` (no stdout on
-   *   success either way, matching the shell contract).
+   * @returns {Promise<string>} `''` for the no-op path (nothing tracked
+   *   to remove, or nothing ended up staged); otherwise `git commit`'s
+   *   own stdout (its `[branch hash] subject` summary block) followed by
+   *   `git push -u`'s own stdout (its `branch '<name>' set up to track
+   *   'origin/<name>'.` confirmation) — the shell counterpart never
+   *   redirects either call's stdout, so the native side relays both
+   *   verbatim, in order, for byte-identical parity.
    */
   async run(repoPath, issueFile, planDir, id, modelName, modelEmail) {
     if (!repoPath || !issueFile || !planDir || !id || !modelName || !modelEmail) {
@@ -121,10 +126,10 @@ class AutoFixAllCleanupArtifacts {
       return '';
     }
 
-    await this._commit(repoPath, id, modelName, modelEmail);
-    await this._pushCurrentBranch(repoPath);
+    const commitStdout = await this._commit(repoPath, id, modelName, modelEmail);
+    const pushStdout = await this._pushCurrentBranch(repoPath);
 
-    return '';
+    return commitStdout + pushStdout;
   }
 
   /**
@@ -179,12 +184,14 @@ class AutoFixAllCleanupArtifacts {
    * Commits whatever is staged with the hardcoded planning-artifacts
    * removal message, mirroring `cleanup_artifacts_shell.sh`'s inline
    * `git commit -F -` heredoc exactly (not `arcanum/_lib/commit_template.sh`/
-   * `agent_email.sh`).
+   * `agent_email.sh`) — including leaving `git commit`'s own stdout
+   * (unlike the `git rm` calls above, the shell script never redirects
+   * this one to `/dev/null`) for the caller to relay.
    * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} id - the issue's numeric id.
    * @param {string} modelName - the acting model's display name.
    * @param {string} modelEmail - the acting model's email.
-   * @returns {Promise<void>} resolves once the commit completes.
+   * @returns {Promise<string>} `git commit`'s own stdout.
    */
   async _commit(repoPath, id, modelName, modelEmail) {
     const message = [
@@ -194,22 +201,34 @@ class AutoFixAllCleanupArtifacts {
       `Co-Authored-By: architect agent <${modelEmail}>`
     ].join('\n');
 
-    await this._execFileAsync('git', ['commit', '-F', '-'], { cwd: repoPath, input: message });
+    const { stdout } = await this._execFileAsync('git', ['commit', '-F', '-'], { cwd: repoPath, input: message });
+
+    return stdout;
   }
 
   /**
    * Native re-derivation of `arcanum/_lib/push.sh`'s `push_current_branch`
    * for this entrypoint's own use only (per `script-engine.md`'s "No
    * standalone, wholesale `_lib` migration" rule): resolves the current
-   * branch, then pushes it to `origin` with upstream tracking.
+   * branch, then pushes it to `origin` with upstream tracking. `git push
+   * -u`'s own stdout (its `branch '<name>' set up to track
+   * 'origin/<name>'.` confirmation — its transfer summary goes to
+   * stderr instead) is left unredirected in the shell script, so it's
+   * relayed here too, same as `#_commit`'s.
    * @param {string} repoPath - the target repo's local checkout path.
-   * @returns {Promise<void>} resolves once the push completes.
+   * @returns {Promise<string>} `git push`'s own stdout.
    */
   async _pushCurrentBranch(repoPath) {
-    const { stdout } = await this._execFileAsync('git', ['branch', '--show-current'], { cwd: repoPath });
-    const branch = stdout.trim();
+    const { stdout: branchStdout } = await this._execFileAsync('git', ['branch', '--show-current'], {
+      cwd: repoPath
+    });
+    const branch = branchStdout.trim();
 
-    await this._execFileAsync('git', ['push', '-u', 'origin', `${branch}:${branch}`], { cwd: repoPath });
+    const { stdout } = await this._execFileAsync('git', ['push', '-u', 'origin', `${branch}:${branch}`], {
+      cwd: repoPath
+    });
+
+    return stdout;
   }
 }
 
