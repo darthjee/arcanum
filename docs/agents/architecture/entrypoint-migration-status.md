@@ -36,13 +36,15 @@ One row per entry point tracked in [`arcanum/_lib/migration-status.json`](../../
 | `dispatch-fixture` | Yes | #192 |
 | `dispatch-fixture-crash` | Yes | #192 |
 | `github-issue` | No | #230 |
+| `github-issue-create` | Yes | #237 |
+| `github-issue-info` | Yes | #237 |
 | `init-claude-set-ci-ignored-patterns` | No | #230 |
 | `init-claude-setup-docs-structure` | No | #230 |
 | `init-claude-setup-templates` | No | #230 |
 | `init-claude-stamp-arcanum-version` | No | #230 |
 | `init-claude-sync-labels` | No | #230 |
 | `init-claude-write-label-config` | No | #230 |
-| `issue-state` | No | #230 |
+| `issue-state` | Yes | #230 |
 | `list-agents` | Yes | #230 |
 | `monitor-issues-config` | No | #230 |
 | `monitor-issues-github` | No | #230 |

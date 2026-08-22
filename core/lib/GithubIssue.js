@@ -1,8 +1,9 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import GithubToken from './GithubToken.js';
 import IssueState from './IssueState.js';
 import Origin from './Origin.js';
+import RepoPath from './RepoPath.js';
 import Tags from './Tags.js';
 
 const DEFAULT_TIMEOUT_MS = 30000;
@@ -23,6 +24,7 @@ class GithubIssue {
    * @param {Origin} [deps.origin] - git-origin resolver.
    * @param {GithubToken} [deps.githubToken] - GitHub token resolver.
    * @param {IssueState} [deps.issueState] - issue state-file writer.
+   * @param {RepoPath} [deps.repoPath] - repo-path validation helper.
    * @param {Function} [deps.fetchFn] - `fetch`-compatible implementation
    *   (global `fetch` by default).
    * @param {number} [deps.timeoutMs] - the REST call's abort timeout,
@@ -32,12 +34,14 @@ class GithubIssue {
     origin = new Origin(),
     githubToken = new GithubToken(),
     issueState = new IssueState(),
+    repoPath = new RepoPath(),
     fetchFn = fetch,
     timeoutMs = DEFAULT_TIMEOUT_MS
   } = {}) {
     this._origin = origin;
     this._githubToken = githubToken;
     this._issueState = issueState;
+    this._repoPath = repoPath;
     this._fetch = fetchFn;
     this._timeoutMs = timeoutMs;
   }
@@ -90,6 +94,90 @@ class GithubIssue {
     });
 
     return { title, file: filePath, domain, repo };
+  }
+
+  /**
+   * Native implementation of the `github-issue-info` migrated
+   * entrypoint's underlying logic — mirrors `github_issue.sh`'s
+   * `cmd_info` exactly: resolves `repoPath`'s git `origin` remote and
+   * returns its `DOMAIN=`/`REPO=` fields. Deliberately skips
+   * `RepoPath#validate` (the shell version only calls `_load_origin`
+   * here, whose own not-a-git-repo/no-origin failure is already
+   * reproduced by `Origin#resolve`'s existing error message).
+   * @param {string} repoPath - the target repo's local checkout path.
+   * @returns {Promise<string>} the `DOMAIN=<domain>\nREPO=<repo>\n` output.
+   */
+  async info(repoPath) {
+    const { domain, repo } = await this._origin.resolve(repoPath);
+
+    return `DOMAIN=${domain}\nREPO=${repo}\n`;
+  }
+
+  /**
+   * Native implementation of the `github-issue-create` migrated
+   * entrypoint's underlying logic — mirrors `github_issue.sh`'s
+   * `cmd_create` exactly: validates `repoPath`, reads `file`'s
+   * contents (trailing newlines stripped, matching `$(cat "$file")`'s
+   * command-substitution trimming), creates the issue over the GitHub
+   * REST API, writes the same body to `docs/agents/issues/`, and
+   * returns the fields `cmd_create`'s stdout needs. Does not persist
+   * any per-issue state file (no `IssueState#write` call), matching the
+   * shell.
+   * @param {string} repoPath - the target repo's local checkout path.
+   * @param {string} title - the new issue's title.
+   * @param {string} file - the local file whose contents become the
+   *   issue's body.
+   * @returns {Promise<string>} the `ID=...\nTITLE=...\nFILE=...\nDOMAIN=...\nREPO=...\n` output.
+   */
+  async create(repoPath, title, file) {
+    await this._repoPath.validate(repoPath);
+
+    let rawBody;
+
+    try {
+      rawBody = await readFile(file, 'utf8');
+    } catch {
+      throw new Error(`Error: file not found: ${file}`);
+    }
+
+    // $(cat "$file") in bash strips ALL trailing newlines via command
+    // substitution; the shell then re-adds exactly one via `printf '%s\n'`.
+    // Match that exactly, in both the POST payload and the written file —
+    // do not just pass the raw file contents through.
+    const body = rawBody.replace(/\n+$/, '');
+
+    const { domain, repo } = await this._origin.resolve(repoPath);
+    const token = await this._githubToken.get(repoPath);
+
+    let response;
+
+    try {
+      response = await this._fetch(`https://api.github.com/repos/${repo}/issues`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ title, body }),
+        signal: AbortSignal.timeout(this._timeoutMs)
+      });
+    } catch {
+      throw new Error(`Error: could not create issue on ${repo}`);
+    }
+
+    if (!response.ok) {
+      throw new Error(`Error: could not create issue on ${repo}`);
+    }
+
+    const issue = await response.json();
+    const id = this._rawString(issue.number);
+    const normalized = this._normalizeTitle(title);
+    const filePath = `${ISSUES_DIR}/${id}-${normalized}.md`;
+
+    await mkdir(path.join(repoPath, ISSUES_DIR), { recursive: true });
+    await writeFile(path.join(repoPath, filePath), `${body}\n`);
+
+    return `ID=${id}\nTITLE=${title}\nFILE=${filePath}\nDOMAIN=${domain}\nREPO=${repo}\n`;
   }
 
   /**
