@@ -37,7 +37,7 @@ import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 const execFileAsync = promisify(execFile);
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const SHELL_SCRIPT = path.join(REPO_ROOT, 'auto-fix-all', 'scripts', 'checkout_from_main.sh');
+const SHELL_SCRIPT = path.join(REPO_ROOT, 'auto-fix-all', 'scripts', 'checkout_from_main_shell.sh');
 const NATIVE_BIN = path.join(REPO_ROOT, 'core', 'bin', 'arcanum');
 
 /**
