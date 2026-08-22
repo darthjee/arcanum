@@ -12,7 +12,7 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CREATE_SUB_ISSUE_FILE="${SCRIPT_DIR}/create_sub_issue_file.sh"
+CREATE_SUB_ISSUE_FILE="${SCRIPT_DIR}/create_sub_issue_file_shell.sh"
 
 TMP_DIR=""
 cleanup() {
