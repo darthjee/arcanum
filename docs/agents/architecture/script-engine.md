@@ -39,6 +39,12 @@ Before invoking `core/bin/arcanum <command> <args...>`, `engine_dispatch.sh` set
 
 A native implementation of a given entrypoint must be byte-identical to its shell counterpart in both stdout and exit code — the same `KEY=value` line protocol (or whatever plain-text contract the shell script already prints) and the same exit code for the same inputs. This is what lets every skill's `.md` steps stay engine-agnostic: they call a script by name and parse its documented output, never knowing or caring whether `engine_dispatch.sh` routed that call to shell or native.
 
+`core/bin/arcanum`'s `dispatch()` supports three outcomes for a module method's result, in increasing order of severity:
+
+- A returned string: printed to `process.stdout`, exit code 0.
+- A thrown `Error` (any subclass not covered below): caught by `dispatch()`'s top-level `.catch`, printed as `arcanum: <message>` to stderr, exit code 1. Nothing is written to stdout.
+- A thrown `core/lib/DispatchFailure.js`: the "print to stdout, still fail" shape — some entrypoints (e.g. `spawn-issue`'s retry-budget-exhausted path) print a `STATUS=failed` line to stdout while still exiting 1, with nothing extra on stderr beyond whatever warnings were already written along the way. A module throws `new DispatchFailure(stdout)` instead of returning a string in that case; `dispatch()`'s catch handler special-cases `error instanceof DispatchFailure`, writing `error.stdout` to `process.stdout` and setting `process.exitCode = 1` **without** the `arcanum: ` stderr line. Any future entrypoint with this same "print to stdout, still fail" shape should reuse `DispatchFailure` rather than reinventing a one-off flag.
+
 ## The `core/` package layout
 
 A single, central Node package at `core/` — not one Node package per skill. `core/package.json` declares Yarn as the package manager and zero runtime npm dependencies (built-in Node APIs only, including the global `fetch` for GitHub REST/GraphQL calls instead of a GitHub SDK — mirroring how today's shell scripts already avoid the `gh issue`/`gh api` subcommands in favor of `curl` plus `gh auth token`). Source lives under `core/lib/`; `core/bin/arcanum` is the one executable entrypoint described above.

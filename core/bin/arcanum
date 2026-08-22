@@ -14,6 +14,7 @@
 
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import DispatchFailure from '../lib/DispatchFailure.js';
 import InvocationLog from '../lib/InvocationLog.js';
 
 const libDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'lib');
@@ -90,6 +91,12 @@ async function dispatch(command, args) {
 const [command, ...args] = process.argv.slice(2);
 
 dispatch(command, args).catch((error) => {
+  if (error instanceof DispatchFailure) {
+    process.stdout.write(error.stdout);
+    process.exitCode = 1;
+    return;
+  }
+
   process.stderr.write(`arcanum: ${error.message}\n`);
   process.exitCode = 1;
 });
