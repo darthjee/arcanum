@@ -46,6 +46,33 @@ describe('Origin', () => {
       });
     });
 
+    it('parses an ssh:// origin url', async () => {
+      const origin = originWithStdout('ssh://git@github.com/darthjee/arcanum.git\n');
+
+      await expectAsync(origin.resolve('/repo')).toBeResolvedTo({
+        domain: 'github.com',
+        repo: 'darthjee/arcanum'
+      });
+    });
+
+    it('parses an ssh:// origin url with a port, stripping it from the domain', async () => {
+      const origin = originWithStdout('ssh://git@github.com:22/darthjee/arcanum.git\n');
+
+      await expectAsync(origin.resolve('/repo')).toBeResolvedTo({
+        domain: 'github.com',
+        repo: 'darthjee/arcanum'
+      });
+    });
+
+    it('parses an ssh:// origin url without a user', async () => {
+      const origin = originWithStdout('ssh://github.com/darthjee/arcanum.git\n');
+
+      await expectAsync(origin.resolve('/repo')).toBeResolvedTo({
+        domain: 'github.com',
+        repo: 'darthjee/arcanum'
+      });
+    });
+
     it('errors when the repo has no origin remote', async () => {
       const origin = new Origin({
         execFileAsync: async () => {
