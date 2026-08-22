@@ -6,7 +6,7 @@
   "github-issue-create": true,
   "github-issue-info": true,
   "github-issue": false,
-  "issue-state": false,
+  "issue-state": true,
   "permission-grant": true,
   "checkout-safe-branch": true,
   "list-agents": true,
