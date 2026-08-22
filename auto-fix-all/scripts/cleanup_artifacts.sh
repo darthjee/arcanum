@@ -1,19 +1,24 @@
 #!/usr/bin/env bash
-# Remove planning artifacts (issue file + plan dir) once a PR is approved
+# Thin engine_dispatch shim for the "auto-fix-all-cleanup-artifacts"
+# migrated entrypoint — see docs/agents/architecture/script-engine.md and
+# docs/agents/plans/254-migrate-auto-fix-all-cleanup-artifacts-entrypoint-to-native-node-js/plan.md
+# for the full design/shared contracts. Removes planning artifacts (issue
+# file + plan dir) once a PR is approved, via either the shell
+# implementation (cleanup_artifacts_shell.sh) or the native one
+# (core/bin/arcanum), per engine.mode / arcanum/_lib/migration-status.json.
+#
+# `HOME` is forwarded to the native path's explicit env-var allowlist —
+# `git` (called throughout the shell implementation) needs it to resolve
+# identity/config once native's `env -i PATH="$PATH"` strips the ambient
+# environment down; without it, native-mode commits would fail in a way
+# shell-mode never does.
+#
 # Usage: cleanup_artifacts.sh <repo_path> <issue_file> <plan_dir> <id> <model_name> <model_email>
 #
-# If <issue_file> is tracked by git, `git rm` it. If <plan_dir> exists and
-# is tracked, `git rm -r` it. If anything ends up staged, commit it using
-# the same commit message template style as commit_change.sh/commit_plan.sh
-# (type=chore, scope=docs, subject "remove planning artifacts", agent
-# fixed to "architect"). If nothing was staged, do nothing and exit 0
-# silently.
+# Output and exit code: unchanged from before this migration — see
+# cleanup_artifacts_shell.sh's own header for the full behavior contract.
 
 set -euo pipefail
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../../arcanum/_lib/push.sh"
-source "${SCRIPT_DIR}/../../arcanum/_lib/repo_path.sh"
 
 REPO_PATH="${1:-}"
 ISSUE_FILE="${2:-}"
@@ -27,25 +32,8 @@ MODEL_EMAIL="${6:-}"
   exit 1
 }
 
-repo_path_enter "$REPO_PATH"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-if [[ -n "$(git ls-files "$ISSUE_FILE" 2>/dev/null)" ]]; then
-  git rm "$ISSUE_FILE" >/dev/null
-fi
-
-if [[ -d "$PLAN_DIR" ]] && [[ -n "$(git ls-files "$PLAN_DIR" 2>/dev/null)" ]]; then
-  git rm -r "$PLAN_DIR" >/dev/null
-fi
-
-if git diff --cached --quiet; then
-  exit 0
-fi
-
-{
-  echo "chore(docs): remove planning artifacts (issue #${ID})"
-  echo
-  echo "Co-Authored-By: ${MODEL_NAME} <${MODEL_EMAIL}>"
-  echo "Co-Authored-By: architect agent <${MODEL_EMAIL}>"
-} | git commit -F -
-
-push_current_branch
+# shellcheck source=../../arcanum/_lib/engine_dispatch.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/engine_dispatch.sh"
+engine_dispatch "$REPO_PATH" auto-fix-all-cleanup-artifacts "${SCRIPT_DIR}/cleanup_artifacts_shell.sh" HOME -- "$@"

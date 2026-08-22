@@ -37,6 +37,7 @@ const configChainPath = path.join(
  * @type {object}
  */
 const COMMANDS = {
+  'auto-fix-all-cleanup-artifacts': { module: 'AutoFixAllCleanupArtifacts.js', method: 'run' },
   'checkout-safe-branch': { module: 'SafeBranch.js', method: 'run' },
   'dispatch-fixture': { module: 'DispatchFixture.js', method: 'run', log: false },
   // dispatch-fixture-crash is deliberately left logged (entry.log
