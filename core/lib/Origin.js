@@ -49,6 +49,19 @@ class Origin {
       return { domain, repo };
     }
 
+    if (origin.startsWith('ssh://')) {
+      const stripped = origin.slice('ssh://'.length);
+      const atIndex = stripped.indexOf('@');
+      const withoutUser = atIndex === -1 ? stripped : stripped.slice(atIndex + 1);
+      const slashIndex = withoutUser.indexOf('/');
+      const hostpart = withoutUser.slice(0, slashIndex);
+      const rest = withoutUser.slice(slashIndex + 1);
+      const domain = hostpart.split(':')[0];
+      const repo = rest.replace(/\.git$/, '');
+
+      return { domain, repo };
+    }
+
     throw new Error(`Error: unrecognized origin format: ${origin}`);
   }
 }

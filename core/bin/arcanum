@@ -44,6 +44,8 @@ const COMMANDS = {
   // (crashing) module is invoked, so logging survives a crash. See
   // docs/agents/plans/244-add-logs-to-native-nodejs-calls/node.md.
   'dispatch-fixture-crash': { module: 'DispatchFixture.js', method: 'crash' },
+  'github-issue-create': { module: 'GithubIssue.js', method: 'create' },
+  'github-issue-info': { module: 'GithubIssue.js', method: 'info' },
   'list-agents': { module: 'ListAgents.js', method: 'run' },
   'permission-grant': { module: 'PermissionGrant.js', method: 'run' },
   'resolve-and-fetch': { module: 'ResolveAndFetch.js', method: 'run' },
