@@ -45,6 +45,7 @@ const COMMANDS = {
   // docs/agents/plans/244-add-logs-to-native-nodejs-calls/node.md.
   'dispatch-fixture-crash': { module: 'DispatchFixture.js', method: 'crash' },
   'list-agents': { module: 'ListAgents.js', method: 'run' },
+  'permission-grant': { module: 'PermissionGrant.js', method: 'run' },
   'resolve-and-fetch': { module: 'ResolveAndFetch.js', method: 'run' },
   'resolve-id-and-file': { module: 'ResolveIdAndFile.js', method: 'run' },
   'resolve-plan-paths': { module: 'ResolvePlanPaths.js', method: 'run' }

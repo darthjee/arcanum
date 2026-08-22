@@ -5,7 +5,7 @@
   "resolve-id-and-file": true,
   "github-issue": false,
   "issue-state": false,
-  "permission-grant": false,
+  "permission-grant": true,
   "checkout-safe-branch": true,
   "list-agents": true,
   "resolve-plan-paths": true,
