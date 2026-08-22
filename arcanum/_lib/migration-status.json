@@ -18,7 +18,7 @@
   "arcanum-split-issue-push-sub-issues": false,
   "arcanum-update-run-update": false,
   "auto-fix-all-checkout-from-main": false,
-  "auto-fix-all-cleanup-artifacts": false,
+  "auto-fix-all-cleanup-artifacts": true,
   "auto-fix-all-config": false,
   "auto-fix-all-github": false,
   "auto-fix-all-queue": false,
