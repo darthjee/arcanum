@@ -70,10 +70,11 @@ _engine_dispatch_native_available() {
 #          on stderr (not a hard error).
 #        - Available: invokes `core/bin/arcanum <command> <args...>`
 #          with the explicit env-var allowlist above (`env -i`, PATH
-#          plus only the named vars — never the full ambient
-#          environment). A non-zero exit here is a real native-side
-#          bug/crash and is propagated as-is, with NO fallback to
-#          <shell_script>.
+#          and ARCANUM_REPO_PATH (infrastructure-level, always set to
+#          <repo_path>) plus only the named vars — never the full
+#          ambient environment). A non-zero exit here is a real
+#          native-side bug/crash and is propagated as-is, with NO
+#          fallback to <shell_script>.
 #
 #   Exit code: whichever branch actually ran (<shell_script> or
 #   core/bin/arcanum)'s own exit code.
@@ -123,7 +124,7 @@ engine_dispatch() {
     done
   fi
 
-  local native_cmd=(env -i PATH="$PATH")
+  local native_cmd=(env -i PATH="$PATH" ARCANUM_REPO_PATH="$repo_path")
   [[ ${#env_args[@]} -gt 0 ]] && native_cmd+=("${env_args[@]}")
   native_cmd+=("$_ENGINE_DISPATCH_NATIVE_BIN" "$command")
   [[ ${#args[@]} -gt 0 ]] && native_cmd+=("${args[@]}")

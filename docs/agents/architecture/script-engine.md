@@ -8,6 +8,10 @@ Which implementation (shell or native) actually runs for a given entrypoint is c
 
 `engine` is its own top-level namespace — not nested under any one skill or feature — since which engine runs is cross-cutting infrastructure, the same way `git` (holding `git.email`, `git.safe_branch`) is its own top-level namespace rather than living under a specific skill. The finalized key path is `engine.mode`, resolved with `config_chain_read <repo_path> engine mode`. Its value is one of `shell` (the current, default behavior — used whenever the key is absent at every tier), `native` (prefer the Node.js implementation when one exists for the entrypoint being called), or `docker` (run the native implementation inside the Docker test image described below, reusing the same `core/bin/arcanum` invocation — the execution environment changes, not the calling convention).
 
+## The `engine.log.location` config key (temporary, debug-only)
+
+Also resolved through the same `config_chain_read` 3-tier chain, `engine.log.location` is a temporary, debug-only instrumentation added for issue #244: when set, `core/bin/arcanum` appends one `command <name> invoked at <ISO timestamp>` line, per invocation, to `<engine.log.location>/arcanum-<repo_name>-log.txt` (`repo_name` derived from `path.basename` of the invoking `ARCANUM_REPO_PATH`). Every failure in that path — the key being unset, an unwritable/non-existent directory, a broken shell-out — silently no-ops; this instrumentation must never affect the invoked command's own stdout or exit code. It's implemented in `core/lib/InvocationLog.js` and is expected to be removed once the native migration described in this document is complete.
+
 ## The dispatch guard
 
 `arcanum/_lib/engine_dispatch.sh` is a shared bash helper, sourced (or otherwise consulted) by every migrated entrypoint's shim script, parameterized by the command/script name being invoked. It is the single place that decides, for that one call, whether to run the existing shell implementation or the native one.
