@@ -14,8 +14,19 @@
 
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import InvocationLog from '../lib/InvocationLog.js';
 
 const libDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'lib');
+// Two levels up from core/bin, mirroring how engine_dispatch.sh itself
+// resolves core/bin/arcanum's path in the other direction.
+const configChainPath = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '..',
+  'arcanum',
+  '_lib',
+  'config_chain.sh'
+);
 
 /**
  * Registry mapping each supported command name to the `core/lib/`
@@ -26,7 +37,12 @@ const libDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'li
  */
 const COMMANDS = {
   'checkout-safe-branch': { module: 'SafeBranch.js', method: 'run' },
-  'dispatch-fixture': { module: 'DispatchFixture.js', method: 'run' },
+  'dispatch-fixture': { module: 'DispatchFixture.js', method: 'run', log: false },
+  // dispatch-fixture-crash is deliberately left logged (entry.log
+  // !== false, the default) — it exists specifically to prove that
+  // InvocationLog#record runs and is awaited before the command's own
+  // (crashing) module is invoked, so logging survives a crash. See
+  // docs/agents/plans/244-add-logs-to-native-nodejs-calls/node.md.
   'dispatch-fixture-crash': { module: 'DispatchFixture.js', method: 'crash' },
   'list-agents': { module: 'ListAgents.js', method: 'run' },
   'resolve-and-fetch': { module: 'ResolveAndFetch.js', method: 'run' },
@@ -44,6 +60,10 @@ async function dispatch(command, args) {
 
   if (!entry) {
     throw new Error(`unknown command '${command}'`);
+  }
+
+  if (entry.log !== false) {
+    await new InvocationLog({ configChainPath }).record(command);
   }
 
   const modulePath = pathToFileURL(path.join(libDir, entry.module)).href;
