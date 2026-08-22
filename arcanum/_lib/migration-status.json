@@ -12,7 +12,7 @@
   "list-agents": true,
   "resolve-plan-paths": true,
   "spawn-issue": true,
-  "arcanum-split-issue-create-sub-issue-file": false,
+  "arcanum-split-issue-create-sub-issue-file": true,
   "arcanum-split-issue-create-sub-issue": false,
   "arcanum-split-issue-finish": true,
   "arcanum-split-issue-push-sub-issues": false,
