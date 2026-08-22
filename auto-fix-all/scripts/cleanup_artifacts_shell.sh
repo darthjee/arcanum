@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Remove planning artifacts (issue file + plan dir) once a PR is approved
+# Usage: cleanup_artifacts.sh <repo_path> <issue_file> <plan_dir> <id> <model_name> <model_email>
+#
+# If <issue_file> is tracked by git, `git rm` it. If <plan_dir> exists and
+# is tracked, `git rm -r` it. If anything ends up staged, commit it using
+# the same commit message template style as commit_change.sh/commit_plan.sh
+# (type=chore, scope=docs, subject "remove planning artifacts", agent
+# fixed to "architect"). If nothing was staged, do nothing and exit 0
+# silently.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../../arcanum/_lib/push.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/push.sh"
+# shellcheck source=../../arcanum/_lib/repo_path.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/repo_path.sh"
+
+REPO_PATH="${1:-}"
+ISSUE_FILE="${2:-}"
+PLAN_DIR="${3:-}"
+ID="${4:-}"
+MODEL_NAME="${5:-}"
+MODEL_EMAIL="${6:-}"
+
+[[ -n "$REPO_PATH" && -n "$ISSUE_FILE" && -n "$PLAN_DIR" && -n "$ID" && -n "$MODEL_NAME" && -n "$MODEL_EMAIL" ]] || {
+  echo "Usage: $0 <repo_path> <issue_file> <plan_dir> <id> <model_name> <model_email>" >&2
+  exit 1
+}
+
+repo_path_enter "$REPO_PATH"
+
+if [[ -n "$(git ls-files "$ISSUE_FILE" 2>/dev/null)" ]]; then
+  git rm "$ISSUE_FILE" >/dev/null
+fi
+
+if [[ -d "$PLAN_DIR" ]] && [[ -n "$(git ls-files "$PLAN_DIR" 2>/dev/null)" ]]; then
+  git rm -r "$PLAN_DIR" >/dev/null
+fi
+
+if git diff --cached --quiet; then
+  exit 0
+fi
+
+{
+  echo "chore(docs): remove planning artifacts (issue #${ID})"
+  echo
+  echo "Co-Authored-By: ${MODEL_NAME} <${MODEL_EMAIL}>"
+  echo "Co-Authored-By: architect agent <${MODEL_EMAIL}>"
+} | git commit -F -
+
+push_current_branch
