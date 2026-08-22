@@ -52,7 +52,8 @@ const COMMANDS = {
   'permission-grant': { module: 'PermissionGrant.js', method: 'run' },
   'resolve-and-fetch': { module: 'ResolveAndFetch.js', method: 'run' },
   'resolve-id-and-file': { module: 'ResolveIdAndFile.js', method: 'run' },
-  'resolve-plan-paths': { module: 'ResolvePlanPaths.js', method: 'run' }
+  'resolve-plan-paths': { module: 'ResolvePlanPaths.js', method: 'run' },
+  'spawn-issue': { module: 'SpawnIssue.js', method: 'run' }
 };
 
 /**
