@@ -3,6 +3,8 @@
   "dispatch-fixture-crash": true,
   "resolve-and-fetch": true,
   "resolve-id-and-file": true,
+  "github-issue-create": true,
+  "github-issue-info": true,
   "github-issue": false,
   "issue-state": false,
   "permission-grant": true,
