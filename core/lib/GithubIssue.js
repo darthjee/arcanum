@@ -93,6 +93,23 @@ class GithubIssue {
   }
 
   /**
+   * Native implementation of the `github-issue-info` migrated
+   * entrypoint's underlying logic — mirrors `github_issue.sh`'s
+   * `cmd_info` exactly: resolves `repoPath`'s git `origin` remote and
+   * returns its `DOMAIN=`/`REPO=` fields. Deliberately skips
+   * `RepoPath#validate` (the shell version only calls `_load_origin`
+   * here, whose own not-a-git-repo/no-origin failure is already
+   * reproduced by `Origin#resolve`'s existing error message).
+   * @param {string} repoPath - the target repo's local checkout path.
+   * @returns {Promise<string>} the `DOMAIN=<domain>\nREPO=<repo>\n` output.
+   */
+  async info(repoPath) {
+    const { domain, repo } = await this._origin.resolve(repoPath);
+
+    return `DOMAIN=${domain}\nREPO=${repo}\n`;
+  }
+
+  /**
    * Mirrors `jq -r`'s rendering of a possibly-null/absent field: the
    * literal string `"null"` for a JSON `null` value, the value itself
    * (stringified) otherwise.
