@@ -9,7 +9,7 @@ Parse the issue ID from the skill argument (accept `99` or `#99` — strip the `
 Run:
 
 ```bash
-scripts/resolve_plan_paths.sh docs/agents/issues docs/agents/plans <id>
+scripts/resolve_plan_paths.sh "$REPO_PATH" docs/agents/issues docs/agents/plans <id>
 ```
 
 > Resolve `scripts/resolve_plan_paths.sh` relative to the `auto-plan-issue` skill folder.

@@ -51,5 +51,5 @@ One row per entry point tracked in [`arcanum/_lib/migration-status.json`](../../
 | `permission-grant` | No | #230 |
 | `resolve-and-fetch` | Yes | #193 |
 | `resolve-id-and-file` | Yes | #227 |
-| `resolve-plan-paths` | No | #230 |
+| `resolve-plan-paths` | Yes | #230 |
 | `spawn-issue` | No | #230 |

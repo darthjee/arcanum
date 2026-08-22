@@ -32,7 +32,7 @@ Parse the issue ID from the skill argument (accept `5` or `#5` — strip the lea
 Run:
 
 ```bash
-scripts/resolve_plan_paths.sh docs/agents/issues docs/agents/plans <id>
+scripts/resolve_plan_paths.sh "$REPO_PATH" docs/agents/issues docs/agents/plans <id>
 ```
 
 > Resolve `scripts/resolve_plan_paths.sh` relative to the `auto-fix-issue` skill folder. This is the same resolver script used by `auto-plan-issue`.

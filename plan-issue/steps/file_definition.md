@@ -3,7 +3,7 @@
 Run:
 
 ```bash
-../auto-plan-issue/scripts/resolve_plan_paths.sh docs/agents/issues docs/agents/plans <id>
+../auto-plan-issue/scripts/resolve_plan_paths.sh "$REPO_PATH" docs/agents/issues docs/agents/plans <id>
 ```
 
 > Resolve `../auto-plan-issue/scripts/resolve_plan_paths.sh` relative to the `plan-issue` skill folder (i.e., `<plan-issue>/scripts/../../../auto-plan-issue/scripts/resolve_plan_paths.sh`).
