@@ -42,6 +42,7 @@ const COMMANDS = {
     method: 'run'
   },
   'arcanum-split-issue-finish': { module: 'ArcanumSplitIssueFinish.js', method: 'run' },
+  'auto-fix-all-checkout-from-main': { module: 'AutoFixAllCheckoutFromMain.js', method: 'run' },
   'auto-fix-all-cleanup-artifacts': { module: 'AutoFixAllCleanupArtifacts.js', method: 'run' },
   'auto-fix-all-reply-comment': { module: 'AutoFixAllReplyComment.js', method: 'run' },
   'checkout-safe-branch': { module: 'SafeBranch.js', method: 'run' },
@@ -101,7 +102,7 @@ const [command, ...args] = process.argv.slice(2);
 dispatch(command, args).catch((error) => {
   if (error instanceof DispatchFailure) {
     process.stdout.write(error.stdout);
-    process.exitCode = 1;
+    process.exitCode = error.exitCode ?? 1;
     return;
   }
 
