@@ -50,9 +50,9 @@ class ArcanumSplitIssueFinish {
    * argument, propagated uncaught so the caller exits 1). Relabels the
    * parent issue by shelling out to `arcanum-split-issue/scripts/github.sh
    * mark-split` (any failure propagates uncaught, mirroring `set -euo
-   * pipefail`), deletes the local `docs/agents/issues/<issueId>-`*/`<issueId>_`*
-   * working files, and finally releases the working tree back to the
-   * configured safe branch.
+   * pipefail`), deletes the local `docs/agents/issues/` working files
+   * whose name starts with `<issueId>-` or `<issueId>_`, and finally
+   * releases the working tree back to the configured safe branch.
    * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} issueId - the parent issue's numeric id.
    * @returns {Promise<string>} the `Deleted:\n  <path>\n...\n` (or
