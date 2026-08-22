@@ -65,7 +65,7 @@ function fakeExecFileAsync({ prNumber = '42', resolveFails = false, pushFails = 
         throw error;
       }
 
-      return { stdout: '' };
+      return { stdout: `branch '${branch}' set up to track 'origin/${branch}'.\n` };
     }
 
     throw new Error(`unexpected execFileAsync call: ${file} ${JSON.stringify(args)}`);
@@ -182,7 +182,7 @@ describe('AutoFixAllReplyComment', () => {
     });
 
     describe('the happy path', () => {
-      it('resolves the PR number, posts the rendered comment, pushes the branch, and resolves with an empty string', async () => {
+      it('resolves the PR number, posts the rendered comment, pushes the branch, and resolves with the push stdout', async () => {
         // The template repeats %%AGENT%% so the first-occurrence-only
         // substitution rule is actually exercised.
         await writeTemplate(
@@ -195,7 +195,7 @@ describe('AutoFixAllReplyComment', () => {
 
         const result = await instance.run(repoPath, `#${ID}`, AGENT, MODEL_NAME, MODEL_EMAIL, REPLY_BODY);
 
-        expect(result).toEqual('');
+        expect(result).toEqual('branch \'my-branch\' set up to track \'origin/my-branch\'.\n');
 
         expect(deps.execFileAsync).toHaveBeenCalledWith(jasmine.stringMatching(/resolve_pr_number\.sh$/), [
           repoPath, ID

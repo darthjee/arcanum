@@ -73,8 +73,16 @@ class AutoFixAllReplyComment {
    * @param {string} modelEmail - the acting model's email, for
    *   attribution.
    * @param {string} replyBody - the full reply text.
-   * @returns {Promise<string>} `''` on success (the shell script prints
-   *   nothing of its own to stdout).
+   * @returns {Promise<string>} `git push -u`'s own stdout (its `branch
+   *   '<name>' set up to track 'origin/<name>'.` confirmation — its
+   *   transfer summary goes to stderr instead) on success: neither
+   *   `push_current_branch` (`arcanum/_lib/push.sh`) nor
+   *   `reply_comment_shell.sh` redirects that call's stdout, so the
+   *   native side relays it too, for byte-identical parity (mirroring
+   *   `AutoFixAllCleanupArtifacts.js`'s own `_pushCurrentBranch`). The
+   *   `gh pr comment` call's own stdout is not relayed — see this
+   *   migration's plan's "Shared contracts": it isn't captured/echoed
+   *   by the shell script either.
    */
   async run(repoPath, id, agent, modelName, modelEmail, replyBody) {
     const cleanId = (id || '').replace(/^#/, '');
@@ -89,9 +97,8 @@ class AutoFixAllReplyComment {
     const content = await this._renderTemplate(repoPath, { body: replyBody, agent, modelName, modelEmail });
 
     await this._postComment(repo, prNumber, token, content);
-    await this._pushCurrentBranch(repoPath);
 
-    return '';
+    return this._pushCurrentBranch(repoPath);
   }
 
   /**
@@ -192,9 +199,13 @@ class AutoFixAllReplyComment {
    * `push_current_branch` for this entrypoint's own use only (per
    * `script-engine.md`'s "No standalone, wholesale `_lib` migration"
    * rule): resolves the current branch, then pushes it to `origin` with
-   * upstream tracking.
+   * upstream tracking. `git push`'s own stdout — its `branch '<name>'
+   * set up to track 'origin/<name>'.` confirmation, printed on every
+   * successful `-u` push regardless of whether the branch was already
+   * tracked (its transfer summary goes to stderr instead) — is left
+   * unredirected by `push.sh`, so it's relayed here too.
    * @param {string} repoPath - the target repo's local checkout path.
-   * @returns {Promise<void>} resolves once pushed.
+   * @returns {Promise<string>} `git push`'s own stdout.
    */
   async _pushCurrentBranch(repoPath) {
     const { stdout: branchStdout } = await this._execFileAsync(
@@ -202,7 +213,11 @@ class AutoFixAllReplyComment {
     );
     const branch = branchStdout.trim();
 
-    await this._execFileAsync('git', ['-C', repoPath, 'push', '-u', 'origin', `${branch}:${branch}`]);
+    const { stdout } = await this._execFileAsync(
+      'git', ['-C', repoPath, 'push', '-u', 'origin', `${branch}:${branch}`]
+    );
+
+    return stdout;
   }
 }
 
