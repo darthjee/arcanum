@@ -73,7 +73,7 @@ describe('github-issue-info parity (shell vs. native)', () => {
 
         expect(native.stdout).toEqual(shell.stdout);
         expect(native.code).toEqual(shell.code);
-        expect(shell.code).toEqual(0);
+        expect(shell.code).withContext(`shell stderr: ${shell.stderr}`).toEqual(0);
         expect(shell.stdout).toEqual('DOMAIN=github.com\nREPO=darthjee/arcanum\n');
       } finally {
         await repo.cleanup();
@@ -92,7 +92,7 @@ describe('github-issue-info parity (shell vs. native)', () => {
 
         expect(native.stdout).toEqual(shell.stdout);
         expect(native.code).toEqual(shell.code);
-        expect(shell.code).toEqual(0);
+        expect(shell.code).withContext(`shell stderr: ${shell.stderr}`).toEqual(0);
         expect(shell.stdout).toEqual('DOMAIN=git.example.com\nREPO=acme/widgets\n');
       } finally {
         await repo.cleanup();
