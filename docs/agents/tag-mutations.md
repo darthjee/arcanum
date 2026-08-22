@@ -8,12 +8,12 @@ One row per call site, across all skills, that mutates a GitHub issue tag/label 
 |-------|------|------------|------------|--------------|
 | arcanum-migrate | (SKILL.md) | `arcanum/migrations/ledger.sh` | - | - |
 | arcanum-migrate | (SKILL.md) | `arcanum-migrate/ledger.sh` | - | - |
-| arcanum-split-issue | 1 (fetch.md) | `arcanum-split-issue/scripts/github.sh` | planning | idea,writting,created |
+| arcanum-split-issue | 1 (fetch.md) | `arcanum-split-issue/scripts/github.sh` | - | - |
 | auto-fix-all | 2 (process_one_issue.md) | `auto-fix-all/scripts/github.sh` | fetched | - |
 | auto-fix-all | 2 (process_one_issue.md) | `auto-fix-all/scripts/github.sh` | - | fetched |
 | auto-fix-all | 2 (process_one_issue.md) | `auto-fix-all/scripts/github.sh` | working | - |
 | auto-rewrite-issue | (run.md) | `monitor-issues/scripts/github.sh` | - | created |
-| discuss-issue | 2 (discuss_and_save.md) | `discuss-issue/scripts/github.sh` | refined | created,idea,writting |
-| discuss-issue | 2 (discuss_and_save.md) | `discuss-issue/scripts/github.sh` | ready | refined |
-| enhance-issue | 1 (fetch.md) | `enhance-issue/scripts/github.sh` | enhancing | idea,writting |
-| enhance-issue | 4 (publish.md) | `enhance-issue/scripts/github.sh` | created | idea,writting,enhancing |
+| discuss-issue | 2 (discuss_and_save.md) | `discuss-issue/scripts/github.sh` | - | - |
+| discuss-issue | 2 (discuss_and_save.md) | `discuss-issue/scripts/github.sh` | - | - |
+| enhance-issue | 1 (fetch.md) | `enhance-issue/scripts/github.sh` | - | - |
+| enhance-issue | 4 (publish.md) | `enhance-issue/scripts/github.sh` | - | - |
