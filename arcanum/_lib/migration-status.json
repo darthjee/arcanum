@@ -22,7 +22,7 @@
   "auto-fix-all-config": false,
   "auto-fix-all-github": false,
   "auto-fix-all-queue": false,
-  "auto-fix-all-reply-comment": false,
+  "auto-fix-all-reply-comment": true,
   "auto-fix-all-wait-ci-and-merge": false,
   "auto-fix-all-wait-ci": false,
   "auto-fix-issue-commit-change": false,
