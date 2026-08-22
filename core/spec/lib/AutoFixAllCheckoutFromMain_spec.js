@@ -202,6 +202,14 @@ describe('AutoFixAllCheckoutFromMain', () => {
 
     it('rejects with a DispatchFailure (exit code 2) on a real merge conflict, leaving conflict markers', async () => {
       repo = await createGitFixtureRepo();
+      // A non-fast-forward `git merge` (conflicting or not) needs a
+      // committer identity available up front, before git even
+      // determines whether it'll conflict — same precondition a real
+      // caller of checkout_from_main.sh must already satisfy (this repo
+      // has no ambient identity otherwise, unlike a real invocation
+      // environment).
+      await git(['config', 'user.name', 'Test'], repo.repoPath);
+      await git(['config', 'user.email', 't@example.com'], repo.repoPath);
       await git(['checkout', '-b', 'issue-99', 'main'], repo.repoPath);
       await writeFile(path.join(repo.repoPath, 'README.md'), '# fixture (branch change)\n');
       await git(['add', 'README.md'], repo.repoPath);

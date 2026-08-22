@@ -148,6 +148,14 @@ async function seedRemoteOnlyBranch(repo, id) {
  * @returns {Promise<void>} resolves once seeding completes.
  */
 async function seedConflictingBranch(repo, id) {
+  // A non-fast-forward `git merge` (conflicting or not) needs a
+  // committer identity available up front, before git even determines
+  // whether it'll conflict — same precondition a real caller of
+  // checkout_from_main.sh must already satisfy (this repo has no
+  // ambient identity otherwise, unlike a real invocation environment).
+  // Repo-level config, so it covers both the shell and native sides.
+  await git(['config', 'user.name', 'Test'], repo.repoPath);
+  await git(['config', 'user.email', 't@example.com'], repo.repoPath);
   await git(['checkout', '-b', `issue-${id}`, 'main'], repo.repoPath);
   await writeFile(path.join(repo.repoPath, 'README.md'), '# fixture (branch change)\n');
   await git(['add', 'README.md'], repo.repoPath);
