@@ -1,51 +1,37 @@
 #!/usr/bin/env bash
-# Resolve the issue file and plan dir/file for a given issue ID
-# Usage: resolve_plan_paths.sh <issues_folder> <plans_folder> <id>
+# Thin engine_dispatch shim for the "resolve-plan-paths" migrated
+# entrypoint — see docs/agents/architecture/script-engine.md and
+# docs/agents/plans/235-migrate-resolve-plan-paths-entrypoint-to-native-node-js/plan.md
+# for the full design/shared contracts. Resolves the issue file and plan
+# dir/file for a given issue ID, via either the shell implementation
+# (resolve_plan_paths_shell.sh) or the native one (core/bin/arcanum), per
+# engine.mode / arcanum/_lib/migration-status.json.
 #
-# Output (key=value lines):
-#   ISSUE_FILE=<path>
-#   PLAN_DIR=<path>
-#   PLAN_FILE=<path>
-#   PLAN_EXISTS=true|false
+# Purely filesystem-based — no gh/GitHub API dependency, so no extra
+# env-var allowlist entries (beyond PATH, which engine_dispatch always
+# includes) are needed for the native path.
+#
+# Usage: resolve_plan_paths.sh <repo_path> <issues_folder> <plans_folder> <id>
+#
+# Output (key=value lines) and exit code: unchanged from before this
+# migration — see resolve_plan_paths_shell.sh's own header for the full
+# ISSUE_FILE=/PLAN_DIR=/PLAN_FILE=/PLAN_EXISTS= contract.
 
 set -euo pipefail
 
-ISSUES_FOLDER="${1:-}"
-PLANS_FOLDER="${2:-}"
-ID="${3:-}"
+REPO_PATH="${1:-}"
+ISSUES_FOLDER="${2:-}"
+PLANS_FOLDER="${3:-}"
+ID="${4:-}"
 
-[[ -n "$ISSUES_FOLDER" && -n "$PLANS_FOLDER" && -n "$ID" ]] || {
-  echo "Usage: $0 <issues_folder> <plans_folder> <id>" >&2
+[[ -n "$REPO_PATH" && -n "$ISSUES_FOLDER" && -n "$PLANS_FOLDER" && -n "$ID" ]] || {
+  echo "Usage: $0 <repo_path> <issues_folder> <plans_folder> <id>" >&2
   exit 1
 }
 
-[[ "$ID" =~ ^[0-9]+$ ]] || {
-  echo "Error: issue id must be numeric and linked to a GitHub issue (got '${ID}'). Local-only ids are no longer supported." >&2
-  exit 1
-}
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-find_existing_file() {
-  find "$ISSUES_FOLDER" -maxdepth 1 \( -name "${1}_*" -o -name "${1}-*" \) 2>/dev/null | head -1
-}
-
-ISSUE_FILE=$(find_existing_file "$ID")
-
-[[ -n "$ISSUE_FILE" ]] || {
-  echo "Error: no issue file found for id ${ID}" >&2
-  exit 1
-}
-
-BASE_NAME=$(basename "$ISSUE_FILE" .md)
-PLAN_DIR="${PLANS_FOLDER}/${BASE_NAME}"
-PLAN_FILE="${PLAN_DIR}/plan.md"
-
-if [[ -f "$PLAN_FILE" ]]; then
-  PLAN_EXISTS=true
-else
-  PLAN_EXISTS=false
-fi
-
-mkdir -p "$PLAN_DIR"
-
-printf 'ISSUE_FILE=%s\nPLAN_DIR=%s\nPLAN_FILE=%s\nPLAN_EXISTS=%s\n' \
-  "$ISSUE_FILE" "$PLAN_DIR" "$PLAN_FILE" "$PLAN_EXISTS"
+# shellcheck source=engine_dispatch.sh
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/engine_dispatch.sh"
+engine_dispatch "$REPO_PATH" resolve-plan-paths "${SCRIPT_DIR}/resolve_plan_paths_shell.sh" -- "$@"

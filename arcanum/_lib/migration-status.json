@@ -8,7 +8,7 @@
   "permission-grant": false,
   "checkout-safe-branch": true,
   "list-agents": true,
-  "resolve-plan-paths": false,
+  "resolve-plan-paths": true,
   "spawn-issue": false,
   "arcanum-split-issue-create-sub-issue-file": false,
   "arcanum-split-issue-create-sub-issue": false,
