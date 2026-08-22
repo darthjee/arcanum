@@ -80,4 +80,44 @@ fi
 echo "OK: get_repo_ref with no repo_path argument hard-fails (no ambient-cwd fallback)"
 
 echo "PASS: arcanum/_lib/origin.sh resolves the explicitly-passed repo_path, ignoring ambient shell cwd"
+
+# --- Assertion 3 (issue #237): an ssh:// origin (as seen on CircleCI, whose
+#     git config rewrites https:// origins to ssh://) resolves to the same
+#     domain/repo as the equivalent https:// and git@ SCP-like forms ---
+
+HTTPS_DIR="$(mktemp -d)"
+git -C "$HTTPS_DIR" init -q
+git -C "$HTTPS_DIR" remote add origin "https://github.com/darthjee/arcanum.git"
+
+SCP_DIR="$(mktemp -d)"
+git -C "$SCP_DIR" init -q
+git -C "$SCP_DIR" remote add origin "git@github.com:darthjee/arcanum.git"
+
+SSH_DIR="$(mktemp -d)"
+git -C "$SSH_DIR" init -q
+git -C "$SSH_DIR" remote add origin "ssh://git@github.com/darthjee/arcanum.git"
+
+https_domain=$(get_domain "$HTTPS_DIR") || fail "get_domain failed for https:// origin"
+https_repo=$(get_repo_path "$HTTPS_DIR") || fail "get_repo_path failed for https:// origin"
+
+scp_domain=$(get_domain "$SCP_DIR") || fail "get_domain failed for git@ (SCP-like) origin"
+scp_repo=$(get_repo_path "$SCP_DIR") || fail "get_repo_path failed for git@ (SCP-like) origin"
+
+ssh_domain=$(get_domain "$SSH_DIR") || fail "get_domain failed for ssh:// origin"
+ssh_repo=$(get_repo_path "$SSH_DIR") || fail "get_repo_path failed for ssh:// origin"
+
+rm -rf "$HTTPS_DIR" "$SCP_DIR" "$SSH_DIR"
+
+[[ "$ssh_domain" == "github.com" ]] || fail "ssh:// origin resolved domain '$ssh_domain', expected 'github.com'"
+[[ "$ssh_repo" == "darthjee/arcanum" ]] || fail "ssh:// origin resolved repo_path '$ssh_repo', expected 'darthjee/arcanum'"
+
+[[ "$ssh_domain" == "$https_domain" && "$ssh_domain" == "$scp_domain" ]] || \
+  fail "ssh:// domain '$ssh_domain' does not match https:// domain '$https_domain' / git@ domain '$scp_domain'"
+
+[[ "$ssh_repo" == "$https_repo" && "$ssh_repo" == "$scp_repo" ]] || \
+  fail "ssh:// repo_path '$ssh_repo' does not match https:// repo_path '$https_repo' / git@ repo_path '$scp_repo'"
+
+echo "OK: ssh://git@github.com/darthjee/arcanum.git resolves to the same domain/repo as the https:// and git@ forms"
+
+echo "PASS: arcanum/_lib/origin.sh parses ssh:// origins (issue #237 — CircleCI's insteadOf URL rewrite)"
 exit 0

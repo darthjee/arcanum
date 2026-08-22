@@ -40,6 +40,13 @@ _load_origin() {
     _ORIGIN_DOMAIN="${stripped%%/*}"
     _ORIGIN_REPO_PATH="${stripped#*/}"
     _ORIGIN_REPO_PATH="${_ORIGIN_REPO_PATH%.git}"
+  elif [[ "$origin" =~ ^ssh:// ]]; then
+    local stripped="${origin#ssh://}"
+    [[ "$stripped" == *"@"* ]] && stripped="${stripped#*@}"
+    _ORIGIN_DOMAIN="${stripped%%/*}"
+    _ORIGIN_DOMAIN="${_ORIGIN_DOMAIN%%:*}"
+    _ORIGIN_REPO_PATH="${stripped#*/}"
+    _ORIGIN_REPO_PATH="${_ORIGIN_REPO_PATH%.git}"
   else
     echo "Error: unrecognized origin format: $origin" >&2
     exit 1
