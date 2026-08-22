@@ -14,7 +14,7 @@
   "spawn-issue": true,
   "arcanum-split-issue-create-sub-issue-file": false,
   "arcanum-split-issue-create-sub-issue": false,
-  "arcanum-split-issue-finish": false,
+  "arcanum-split-issue-finish": true,
   "arcanum-split-issue-push-sub-issues": false,
   "arcanum-update-run-update": false,
   "auto-fix-all-checkout-from-main": false,
