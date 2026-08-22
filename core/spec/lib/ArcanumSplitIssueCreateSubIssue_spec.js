@@ -223,8 +223,14 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
         }
 
         expect(thrown).toBeInstanceOf(DispatchFailure);
-        expect(thrown.stdout).toEqual(`Creating sub-issue ? for issue #${ISSUE_ID}: My Sub Issue\nSTATUS=failed\n`);
-        expect(thrown.stdout).toContain('STATUS=failed\n');
+        // STATUS=failed legitimately appears twice: SpawnIssue#run's own
+        // STATUS=failed\n stdout, followed by this module's own extra
+        // STATUS=failed\n — mirroring create_sub_issue.sh's
+        // `echo "$SPAWN_OUTPUT"; echo "STATUS=failed"` exactly (verified
+        // against the real shell script's output).
+        expect(thrown.stdout).toEqual(
+          `Creating sub-issue ? for issue #${ISSUE_ID}: My Sub Issue\nSTATUS=failed\nSTATUS=failed\n`
+        );
         expect(thrown.exitCode).toEqual(1);
         expect(deps.issueState.appendJson).not.toHaveBeenCalled();
       });

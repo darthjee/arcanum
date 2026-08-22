@@ -67,7 +67,11 @@ class ArcanumSplitIssueCreateSubIssue {
    * @returns {Promise<string>} the progress line followed by
    *   `STATUS=ok\nID=<new_id>\n`.
    * @throws {DispatchFailure} when `SpawnIssue#run`'s retry budget is
-   *   exhausted — carries the progress line plus `STATUS=failed\n`.
+   *   exhausted — carries the progress line, `SpawnIssue#run`'s own
+   *   `STATUS=failed\n`, and this module's own additional
+   *   `STATUS=failed\n` on top (mirroring `create_sub_issue.sh`'s
+   *   `echo "$SPAWN_OUTPUT"; echo "STATUS=failed"` — `STATUS=failed`
+   *   legitimately appears twice).
    */
   async run(repoPath, issueId, subIssueFile) {
     if (!repoPath || !issueId || !subIssueFile) {
@@ -108,11 +112,14 @@ class ArcanumSplitIssueCreateSubIssue {
 
   /**
    * Calls `SpawnIssue#run`, re-throwing any `DispatchFailure` as this
-   * module's own instance (same stdout payload, prefixed with
-   * `progressLine`, same exit code) so the failure surfaces with this
-   * script's own progress line already printed — mirroring the shell
-   * script's `echo "$SPAWN_OUTPUT"; echo "STATUS=failed"; exit 1`
-   * failure path.
+   * module's own instance so the failure surfaces with this script's
+   * own progress line already printed — mirroring the shell script's
+   * `echo "$SPAWN_OUTPUT"; echo "STATUS=failed"; exit 1` failure path
+   * exactly: `SPAWN_OUTPUT` (here, `SpawnIssue#run`'s own
+   * `STATUS=failed\n` stdout) is echoed verbatim, and THEN this
+   * script's own additional `STATUS=failed` line is appended on top —
+   * i.e. `STATUS=failed` legitimately appears twice in the resulting
+   * stdout, not once (verified against the real shell script's output).
    * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} issueId - the parent issue's numeric id.
    * @param {string} title - the sub-issue's title.
@@ -120,14 +127,16 @@ class ArcanumSplitIssueCreateSubIssue {
    * @param {string} progressLine - the already-emitted progress line.
    * @returns {Promise<string>} `SpawnIssue#run`'s `STATUS=ok\nID=...\nURL=...\n`
    *   output.
-   * @throws {DispatchFailure} re-thrown with `progressLine` prefixed.
+   * @throws {DispatchFailure} re-thrown with `progressLine` prefixed and
+   *   `SpawnIssue#run`'s own `STATUS=failed\n` stdout followed by this
+   *   module's own extra `STATUS=failed\n` line.
    */
   async _spawn(repoPath, issueId, title, bodyFile, progressLine) {
     try {
       return await this._spawnIssue.run(repoPath, issueId, title, bodyFile, AS_SUBISSUE_FLAG);
     } catch (error) {
       if (error instanceof DispatchFailure) {
-        throw new DispatchFailure(`${progressLine}${error.stdout}`, error.exitCode);
+        throw new DispatchFailure(`${progressLine}${error.stdout}STATUS=failed\n`, error.exitCode);
       }
 
       throw error;
