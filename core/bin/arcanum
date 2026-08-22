@@ -37,6 +37,10 @@ const configChainPath = path.join(
  * @type {object}
  */
 const COMMANDS = {
+  'arcanum-split-issue-create-sub-issue': {
+    module: 'ArcanumSplitIssueCreateSubIssue.js',
+    method: 'run'
+  },
   'arcanum-split-issue-create-sub-issue-file': {
     module: 'ArcanumSplitIssueCreateSubIssueFile.js',
     method: 'run'
