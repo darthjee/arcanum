@@ -11,7 +11,7 @@
   "checkout-safe-branch": true,
   "list-agents": true,
   "resolve-plan-paths": true,
-  "spawn-issue": false,
+  "spawn-issue": true,
   "arcanum-split-issue-create-sub-issue-file": false,
   "arcanum-split-issue-create-sub-issue": false,
   "arcanum-split-issue-finish": false,
