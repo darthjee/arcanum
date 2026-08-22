@@ -15,7 +15,7 @@
   "arcanum-split-issue-create-sub-issue-file": true,
   "arcanum-split-issue-create-sub-issue": true,
   "arcanum-split-issue-finish": true,
-  "arcanum-split-issue-push-sub-issues": false,
+  "arcanum-split-issue-push-sub-issues": true,
   "arcanum-update-run-update": false,
   "auto-fix-all-checkout-from-main": true,
   "auto-fix-all-cleanup-artifacts": true,
