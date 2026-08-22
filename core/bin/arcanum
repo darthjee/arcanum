@@ -39,6 +39,7 @@ const configChainPath = path.join(
 const COMMANDS = {
   'arcanum-split-issue-finish': { module: 'ArcanumSplitIssueFinish.js', method: 'run' },
   'auto-fix-all-cleanup-artifacts': { module: 'AutoFixAllCleanupArtifacts.js', method: 'run' },
+  'auto-fix-all-reply-comment': { module: 'AutoFixAllReplyComment.js', method: 'run' },
   'checkout-safe-branch': { module: 'SafeBranch.js', method: 'run' },
   'dispatch-fixture': { module: 'DispatchFixture.js', method: 'run', log: false },
   // dispatch-fixture-crash is deliberately left logged (entry.log
