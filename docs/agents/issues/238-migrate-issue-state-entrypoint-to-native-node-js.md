@@ -37,14 +37,15 @@ JSON merge semantics to replicate exactly:
 
 Following the pattern from #227/PR #228:
 
-1. Extend `core/lib/IssueState.js` with `get`/`set`/`setJson`/`appendJson` methods, routed via `core/bin/arcanum issue-state <get|set|set-json|append-json> <repo_path> <id> <field> [value]`.
-2. Reuse `core/lib/Lock.js` for locking — mandatory, not optional. Do not port a second, near-identical inline lock implementation; the shell script's lock protocol shape (instance id, sleep, re-read, retry, warn after 10 attempts) already matches `Lock.js`. If its interface doesn't fit cleanly, adapt `Lock.js` rather than falling back to a standalone port.
-3. Reuse `repo_path.sh`'s `repo_path_enter` equivalent from whatever shared helper landed in an earlier sub-issue (e.g. `RepoPath.js` from #233), or add inline if none fits.
-4. Add a parity test at `core/spec/lib/IssueState_spec.js` (extend the existing spec) that runs shell vs native with identical inputs across all four subcommands, asserting identical stdout, exit code, and resulting state file content.
-5. Add unit tests: missing field on `get`, overwriting an existing field, `set-json` with objects vs arrays, `append-json` on a field that doesn't exist yet vs. already an array, concurrent-write lock contention.
-6. Flip `issue-state` from `false` to `true` in `arcanum/_lib/migration-status.json`.
-7. Regenerate `docs/agents/architecture/entrypoint-migration-status.md` via `scripts/generate_entrypoint_migration_status.sh`.
-8. Zero runtime npm dependencies — only built-in Node APIs.
+1. Extract `arcanum/_lib/issue_state.sh`'s current body to `arcanum/_lib/issue_state_shell.sh` as the fallback, and convert `issue_state.sh` into a thin `engine_dispatch.sh` shim (matching the `checkout_safe_branch.sh`/`checkout_safe_branch_shell.sh` split from #233).
+2. Extend `core/lib/IssueState.js` with a `run`/`get`/`set`/`setJson`/`appendJson` method set, registered in `core/bin/arcanum`'s `COMMANDS` map and routed as `core/bin/arcanum issue-state <repo_path> <get|set|set-json|append-json> <id> <field> [value]` (repo_path before the subcommand, matching the shell script's own argument order — `run` dispatches internally on the subcommand, the same shape as the shell script's `case` statement).
+3. Reuse `core/lib/Lock.js` for locking — mandatory, not optional. Do not port a second, near-identical inline lock implementation; the shell script's lock protocol shape (instance id, sleep, re-read, retry, warn after 10 attempts) already matches `Lock.js`. If its interface doesn't fit cleanly, adapt `Lock.js` rather than falling back to a standalone port.
+4. Reuse `core/lib/RepoPath.js`'s `validate` (the `repo_path_enter` native equivalent, landed in #233) for argument validation.
+5. Add a parity test at `core/spec/bin/issueStateParity_spec.js` (new file, following the `checkoutSafeBranchParity_spec.js`/`resolvePlanPathsParity_spec.js` convention — a dedicated `core/spec/bin/` file, not folded into the `core/spec/lib/` unit spec) that runs `issue_state_shell.sh` vs `core/bin/arcanum issue-state` with identical inputs across all four subcommands, asserting identical stdout, exit code, and resulting state file content. Usage/unknown-command error text may assert with `toContain` rather than exact equality, since the shell side's `$0`-based usage message isn't reproducible byte-for-byte by the native side (precedent: `permissionGrantParity_spec.js`).
+6. Extend the existing `core/spec/lib/IssueState_spec.js` with unit tests for the new methods: missing field on `get`, overwriting an existing field, `set-json` with objects vs arrays, `append-json` on a field that doesn't exist yet vs. already an array, concurrent-write lock contention.
+7. Flip `issue-state` from `false` to `true` in `arcanum/_lib/migration-status.json`.
+8. Regenerate `docs/agents/architecture/entrypoint-migration-status.md` via `scripts/generate_entrypoint_migration_status.sh`.
+9. Zero runtime npm dependencies — only built-in Node APIs.
 
 ### Agent assignments
 
