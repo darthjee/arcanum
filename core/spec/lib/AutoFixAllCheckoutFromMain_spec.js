@@ -149,7 +149,14 @@ describe('AutoFixAllCheckoutFromMain', () => {
 
       const checkoutFromMain = new AutoFixAllCheckoutFromMain();
 
-      await expectAsync(checkoutFromMain.run(repo.repoPath, '42')).toBeResolvedTo('BRANCH=issue-42\nSTATUS=ok\n');
+      // `git checkout -b` from a remote-tracking start point (here,
+      // origin/main) prints its own "branch '<name>' set up to track
+      // '<upstream>'." line to stdout ahead of BRANCH=/STATUS= — see
+      // AutoFixAllCheckoutFromMain#run's doc comment. Assert on the
+      // substantive suffix rather than git's exact (version-dependent)
+      // wording.
+      const output = await checkoutFromMain.run(repo.repoPath, '42');
+      expect(output).toContain('BRANCH=issue-42\nSTATUS=ok\n');
 
       const { stdout: head } = await execFileAsync('git', ['rev-parse', 'HEAD'], { cwd: repo.repoPath });
       const { stdout: originMain } = await execFileAsync('git', ['rev-parse', 'origin/main'], { cwd: repo.repoPath });
@@ -183,7 +190,11 @@ describe('AutoFixAllCheckoutFromMain', () => {
 
       const checkoutFromMain = new AutoFixAllCheckoutFromMain();
 
-      await expectAsync(checkoutFromMain.run(repo.repoPath, '77')).toBeResolvedTo('BRANCH=issue-77\nSTATUS=ok\n');
+      // See the comment in the previous test — `git checkout -b` from a
+      // remote-tracking start point (here, origin/issue-77) also prints
+      // its own tracking-setup line ahead of BRANCH=/STATUS=.
+      const output = await checkoutFromMain.run(repo.repoPath, '77');
+      expect(output).toContain('BRANCH=issue-77\nSTATUS=ok\n');
 
       const { stdout } = await execFileAsync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: repo.repoPath });
       expect(stdout.trim()).toEqual('issue-77');
@@ -214,7 +225,13 @@ describe('AutoFixAllCheckoutFromMain', () => {
 
       expect(thrown).toBeInstanceOf(DispatchFailure);
       expect(thrown.exitCode).toEqual(2);
-      expect(thrown.stdout).toEqual('BRANCH=issue-99\nSTATUS=conflict\nREADME.md\n');
+      // `git merge --no-edit`'s own conflict messages (Auto-merging/
+      // CONFLICT/Automatic merge failed) print to stdout too, ahead of
+      // the conflicted-file list — assert on the substantive
+      // prefix/suffix rather than git's exact (version-dependent)
+      // wording for the messages in between.
+      expect(thrown.stdout).toContain('BRANCH=issue-99\nSTATUS=conflict\n');
+      expect(thrown.stdout.endsWith('README.md\n')).toBeTrue();
 
       const { stdout } = await execFileAsync('git', ['diff', '--name-only', '--diff-filter=U'], {
         cwd: repo.repoPath

@@ -36,10 +36,14 @@ class AutoFixAllCheckoutFromMain {
    * `origin/main` (falling back to local `main`) otherwise.
    * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} id - the issue's numeric id.
-   * @returns {Promise<string>} the `BRANCH=<branch>\nSTATUS=ok\n` output.
+   * @returns {Promise<string>} the `BRANCH=<branch>\nSTATUS=ok\n` output,
+   *   prefixed with any incidental `git checkout` stdout (e.g. a branch
+   *   "set up to track" line), matching the unredirected shell script.
    * @throws {DispatchFailure} with exit code 2 when the merge against
    *   `origin/main` conflicts — carries the `BRANCH=...\nSTATUS=conflict\n`
-   *   plus conflicted-file-list stdout payload.
+   *   payload, followed by the merge's own conflict messages and the
+   *   conflicted-file list, exactly like the shell script's captured
+   *   `git_branch_merge_main` output.
    */
   async run(repoPath, id) {
     if (!repoPath || !id) {
@@ -58,12 +62,15 @@ class AutoFixAllCheckoutFromMain {
 
     let status = 'ok';
     let conflicts = '';
+    let checkoutOutput;
 
     if (localExists || remoteExists) {
       if (localExists) {
-        await this._execFileAsync('git', ['checkout', branch], { cwd: repoPath });
+        checkoutOutput = (await this._execFileAsync('git', ['checkout', branch], { cwd: repoPath })).stdout;
       } else {
-        await this._execFileAsync('git', ['checkout', '-b', branch, `origin/${branch}`], { cwd: repoPath });
+        checkoutOutput = (
+          await this._execFileAsync('git', ['checkout', '-b', branch, `origin/${branch}`], { cwd: repoPath })
+        ).stdout;
       }
 
       await this._fetchTolerant(repoPath, 'main');
@@ -71,23 +78,31 @@ class AutoFixAllCheckoutFromMain {
       if (await this._refExists(repoPath, 'refs/remotes/origin/main')) {
         try {
           await this._execFileAsync('git', ['merge', '--no-edit', 'origin/main'], { cwd: repoPath });
-        } catch {
+        } catch (error) {
           status = 'conflict';
           const { stdout } = await this._execFileAsync(
             'git',
             ['diff', '--name-only', '--diff-filter=U'],
             { cwd: repoPath }
           );
-          conflicts = stdout;
+          conflicts = (error.stdout || '') + stdout;
         }
       }
     } else if (await this._refExists(repoPath, 'refs/remotes/origin/main')) {
-      await this._execFileAsync('git', ['checkout', '-b', branch, 'origin/main'], { cwd: repoPath });
+      checkoutOutput = (
+        await this._execFileAsync('git', ['checkout', '-b', branch, 'origin/main'], { cwd: repoPath })
+      ).stdout;
     } else {
-      await this._execFileAsync('git', ['checkout', '-b', branch, 'main'], { cwd: repoPath });
+      checkoutOutput = (await this._execFileAsync('git', ['checkout', '-b', branch, 'main'], { cwd: repoPath })).stdout;
     }
 
-    let output = `BRANCH=${branch}\nSTATUS=${status}\n`;
+    // `git checkout`'s own stdout (e.g. the "branch '<name>' set up to
+    // track '<upstream>'." line git prints — to stdout, not stderr —
+    // when creating a branch from a remote-tracking start point) isn't
+    // captured/redirected by the shell script, so it streams straight
+    // to the real stdout before the BRANCH=/STATUS= lines below. Mirror
+    // that by prepending it here instead of discarding it.
+    let output = `${checkoutOutput}BRANCH=${branch}\nSTATUS=${status}\n`;
 
     if (status === 'conflict') {
       output += `${conflicts.replace(/\n*$/, '')}\n`;
