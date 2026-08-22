@@ -117,7 +117,7 @@ Reached only from "Monitor the PR" → `approved` — a human approved the PR vi
    ```bash
    scripts/cleanup_artifacts.sh "$REPO_PATH" <issue_file> <plan_dir> <id> "<your AI model name>" "<your AI model noreply email>"
    ```
-   `<issue_file>` and `<plan_dir>` are the same paths resolved by `../auto-plan-issue/scripts/resolve_plan_paths.sh docs/agents/issues docs/agents/plans <id>` (re-run it here, resolved relative to the `auto-plan-issue` skill folder, if you no longer have them at hand).
+   `<issue_file>` and `<plan_dir>` are the same paths resolved by `../auto-plan-issue/scripts/resolve_plan_paths.sh "$REPO_PATH" docs/agents/issues docs/agents/plans <id>` (re-run it here, resolved relative to the `auto-plan-issue` skill folder, if you no longer have them at hand).
 2. Wait for CI:
    ```bash
    scripts/wait_ci.sh "$REPO_PATH"
@@ -160,7 +160,7 @@ Reached only from "Check for pre-approval" above, when `has-shipit-label` exits 
    ```bash
    scripts/cleanup_artifacts.sh "$REPO_PATH" <issue_file> <plan_dir> <id> "<your AI model name>" "<your AI model noreply email>"
    ```
-   `<issue_file>` and `<plan_dir>` are the same paths resolved by `../auto-plan-issue/scripts/resolve_plan_paths.sh docs/agents/issues docs/agents/plans <id>` (re-run it here, resolved relative to the `auto-plan-issue` skill folder, if you no longer have them at hand).
+   `<issue_file>` and `<plan_dir>` are the same paths resolved by `../auto-plan-issue/scripts/resolve_plan_paths.sh "$REPO_PATH" docs/agents/issues docs/agents/plans <id>` (re-run it here, resolved relative to the `auto-plan-issue` skill folder, if you no longer have them at hand).
 2. Wait for CI, then merge if it passes — one combined call:
    ```bash
    scripts/wait_ci_and_merge.sh "$REPO_PATH" "<your AI model noreply email>"
