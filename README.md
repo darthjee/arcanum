@@ -4,9 +4,9 @@ A collection of Claude Code skills — reusable slash commands that extend Claud
 
 ![arcanum](https://raw.githubusercontent.com/darthjee/arcanum/master/arcanum.png)
 
-**Current Version:** [0.19.3](https://github.com/darthjee/arcanum/releases/tag/0.19.3)
+**Current Version:** [0.20.0](https://github.com/darthjee/arcanum/releases/tag/0.20.0)
 
-**Next Release:** [0.19.4](https://github.com/darthjee/arcanum/compare/0.19.3...main)
+**Next Release:** [0.20.1](https://github.com/darthjee/arcanum/compare/0.20.0...main)
 
 ## What are skills?
 
