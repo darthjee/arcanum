@@ -36,6 +36,16 @@ import { createTempDir, removeTempDir } from './tempDir.js';
 //   - `gh api repos/<owner>/<repo>/commits/<sha>/check-runs?per_page=100`
 //     -> prints `{"check_runs": $FAKE_GH_CHECK_RUNS_JSON}` (default
 //     `[]`) — used by wait_ci_shell.sh.
+//   - `gh issue view <id> -R <ref> --json labels -q '.labels[].name'`
+//     -> prints `$FAKE_GH_ISSUE_LABELS` (one label name per line —
+//     embedded newlines in the env var itself, e.g. `'Ready for
+//     Work\nCreated'`), or nothing when unset; fails when
+//     `$FAKE_GH_ISSUE_VIEW_FAIL` is `1` — used by
+//     tag_mutate.sh's `tag_mutate_add_label`/`tag_mutate_remove_label`
+//     (queue_save_shell.sh's/queue_push_shell.sh's `_mark_enqueued`).
+//   - `gh issue edit <id> -R <ref> --add-label <label>` /
+//     `gh issue edit <id> -R <ref> --remove-label <label>` -> succeeds
+//     (prints nothing) unless `$FAKE_GH_ISSUE_EDIT_FAIL` is `1`.
 /**
  * @param {boolean} authTokenAlwaysFails - whether `gh auth token` should
  *   unconditionally fail, baked in as a literal (not read from the
@@ -112,6 +122,27 @@ case "\${1:-}" in
     case "\${2:-}" in
       repos/*/commits/*/check-runs*)
         echo "{\\"check_runs\\": \${FAKE_GH_CHECK_RUNS_JSON:-[]}}"
+        exit 0
+        ;;
+    esac
+    ;;
+  issue)
+    case "\${2:-}" in
+      view)
+        if [[ "\${FAKE_GH_ISSUE_VIEW_FAIL:-}" == "1" ]]; then
+          echo "fake gh: issue view failed" >&2
+          exit 1
+        fi
+        if [[ -n "\${FAKE_GH_ISSUE_LABELS:-}" ]]; then
+          printf '%s\\n' "$FAKE_GH_ISSUE_LABELS"
+        fi
+        exit 0
+        ;;
+      edit)
+        if [[ "\${FAKE_GH_ISSUE_EDIT_FAIL:-}" == "1" ]]; then
+          echo "fake gh: issue edit failed" >&2
+          exit 1
+        fi
         exit 0
         ;;
     esac
