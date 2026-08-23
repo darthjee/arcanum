@@ -131,4 +131,78 @@ describe('RepoConfig', () => {
       });
     });
   });
+
+  describe('#getIgnoredCheckPatterns', () => {
+    it('defaults to [] when the config file is absent', async () => {
+      const repoConfig = new RepoConfig();
+
+      await expectAsync(repoConfig.getIgnoredCheckPatterns(repoPath)).toBeResolvedTo([]);
+    });
+
+    it('reads auto-fix-all.ignored_check_patterns from .claude/configuration/arcanum-repo-config.json when present', async () => {
+      await mkdir(path.join(repoPath, '.claude', 'configuration'), { recursive: true });
+      await writeFile(
+        path.join(repoPath, '.claude', 'configuration', 'arcanum-repo-config.json'),
+        JSON.stringify({ 'auto-fix-all': { ignored_check_patterns: ['codacy', 'dependabot'] } })
+      );
+
+      const repoConfig = new RepoConfig();
+
+      await expectAsync(repoConfig.getIgnoredCheckPatterns(repoPath)).toBeResolvedTo(['codacy', 'dependabot']);
+    });
+
+    it('defaults to [] when the auto-fix-all namespace is absent', async () => {
+      await mkdir(path.join(repoPath, '.claude', 'configuration'), { recursive: true });
+      await writeFile(path.join(repoPath, '.claude', 'configuration', 'arcanum-repo-config.json'), JSON.stringify({}));
+
+      const repoConfig = new RepoConfig();
+
+      await expectAsync(repoConfig.getIgnoredCheckPatterns(repoPath)).toBeResolvedTo([]);
+    });
+
+    it('defaults to [] when ignored_check_patterns is absent from the auto-fix-all namespace', async () => {
+      await mkdir(path.join(repoPath, '.claude', 'configuration'), { recursive: true });
+      await writeFile(
+        path.join(repoPath, '.claude', 'configuration', 'arcanum-repo-config.json'),
+        JSON.stringify({ 'auto-fix-all': {} })
+      );
+
+      const repoConfig = new RepoConfig();
+
+      await expectAsync(repoConfig.getIgnoredCheckPatterns(repoPath)).toBeResolvedTo([]);
+    });
+
+    it('defaults to [] when ignored_check_patterns is not itself an array', async () => {
+      await mkdir(path.join(repoPath, '.claude', 'configuration'), { recursive: true });
+      await writeFile(
+        path.join(repoPath, '.claude', 'configuration', 'arcanum-repo-config.json'),
+        JSON.stringify({ 'auto-fix-all': { ignored_check_patterns: 'not-an-array' } })
+      );
+
+      const repoConfig = new RepoConfig();
+
+      await expectAsync(repoConfig.getIgnoredCheckPatterns(repoPath)).toBeResolvedTo([]);
+    });
+
+    it('defaults to [] when the config file is malformed JSON', async () => {
+      await mkdir(path.join(repoPath, '.claude', 'configuration'), { recursive: true });
+      await writeFile(path.join(repoPath, '.claude', 'configuration', 'arcanum-repo-config.json'), '{not valid json');
+
+      const repoConfig = new RepoConfig();
+
+      await expectAsync(repoConfig.getIgnoredCheckPatterns(repoPath)).toBeResolvedTo([]);
+    });
+
+    it('does not fall back to the legacy .claude/configuration/auto-fix-all.json file', async () => {
+      await mkdir(path.join(repoPath, '.claude', 'configuration'), { recursive: true });
+      await writeFile(
+        path.join(repoPath, '.claude', 'configuration', 'auto-fix-all.json'),
+        JSON.stringify({ ignored_check_patterns: ['codacy'] })
+      );
+
+      const repoConfig = new RepoConfig();
+
+      await expectAsync(repoConfig.getIgnoredCheckPatterns(repoPath)).toBeResolvedTo([]);
+    });
+  });
 });
