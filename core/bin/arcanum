@@ -50,6 +50,8 @@ const COMMANDS = {
     module: 'ArcanumSplitIssuePushSubIssues.js',
     method: 'run'
   },
+  'arcanum-update-run-update-check': { module: 'ArcanumUpdateRunUpdate.js', method: 'check' },
+  'arcanum-update-run-update-apply': { module: 'ArcanumUpdateRunUpdate.js', method: 'apply' },
   'auto-fix-all-checkout-from-main': { module: 'AutoFixAllCheckoutFromMain.js', method: 'run' },
   'auto-fix-all-cleanup-artifacts': { module: 'AutoFixAllCleanupArtifacts.js', method: 'run' },
   'auto-fix-all-config-get': { module: 'AutoFixAllConfig.js', method: 'get' },
