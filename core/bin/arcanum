@@ -74,6 +74,7 @@ const COMMANDS = {
   'auto-fix-all-queue-wait-next': { module: 'AutoFixAllQueue.js', method: 'waitNext' },
   'auto-fix-all-reply-comment': { module: 'AutoFixAllReplyComment.js', method: 'run' },
   'auto-fix-all-wait-ci': { module: 'AutoFixAllWaitCi.js', method: 'run' },
+  'auto-fix-all-wait-ci-and-merge': { module: 'AutoFixAllWaitCiAndMerge.js', method: 'run' },
   'checkout-safe-branch': { module: 'SafeBranch.js', method: 'run' },
   'dispatch-fixture': { module: 'DispatchFixture.js', method: 'run', log: false },
   // dispatch-fixture-crash is deliberately left logged (entry.log
