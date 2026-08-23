@@ -57,6 +57,7 @@ const COMMANDS = {
   'auto-fix-all-config-set': { module: 'AutoFixAllConfig.js', method: 'set' },
   'auto-fix-all-config-toggle': { module: 'AutoFixAllConfig.js', method: 'toggle' },
   'auto-fix-all-reply-comment': { module: 'AutoFixAllReplyComment.js', method: 'run' },
+  'auto-fix-all-wait-ci': { module: 'AutoFixAllWaitCi.js', method: 'run' },
   'checkout-safe-branch': { module: 'SafeBranch.js', method: 'run' },
   'dispatch-fixture': { module: 'DispatchFixture.js', method: 'run', log: false },
   // dispatch-fixture-crash is deliberately left logged (entry.log

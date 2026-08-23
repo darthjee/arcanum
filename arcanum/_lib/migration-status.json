@@ -27,7 +27,7 @@
   "auto-fix-all-queue": false,
   "auto-fix-all-reply-comment": true,
   "auto-fix-all-wait-ci-and-merge": false,
-  "auto-fix-all-wait-ci": false,
+  "auto-fix-all-wait-ci": true,
   "auto-fix-issue-commit-change": false,
   "auto-fix-issue-create-branch": false,
   "auto-fix-issue-github": false,
