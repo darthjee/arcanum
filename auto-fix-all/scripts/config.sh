@@ -1,98 +1,46 @@
 #!/usr/bin/env bash
-# Config management for auto-fix-all.
-# Usage: config.sh get <key>
-#        config.sh is-enabled <key>
-#        config.sh set <key> true|false
-#        config.sh toggle <key>
+# Thin per-subcommand engine_dispatch shim for the "auto-fix-all-config-*"
+# migrated entrypoints — see docs/agents/architecture/script-engine.md and
+# docs/agents/plans/261-migrate-auto-fix-all-config-entrypoint-get-is-enabled-set-toggle-to-native-node-js/plan.md
+# for the full design/shared contracts. Config management for
+# auto-fix-all, via either the shell implementation
+# (config_<subcommand>_shell.sh) or the native one (core/bin/arcanum), per
+# engine.mode / arcanum/_lib/migration-status.json.
+#
+# Usage: config.sh get <repo_path> <key>
+#        config.sh is-enabled <repo_path> <key>
+#        config.sh set <repo_path> <key> true|false
+#        config.sh toggle <repo_path> <key>
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE=".claude/configuration/auto-fix-all.json"
-NEW_CONFIG_FILE=".claude/configuration/arcanum-repo-config.json"
-NEW_STATE_FILE=".claude/state/arcanum-config.json"
-NAMESPACE="auto-fix-all"
+# shellcheck source=../../arcanum/_lib/engine_dispatch.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/engine_dispatch.sh"
 
-# shellcheck source=../../arcanum/_lib/repo_config.sh
-source "${SCRIPT_DIR}/../../arcanum/_lib/repo_config.sh"
+COMMAND="${1:-}"
+[[ -n "$COMMAND" ]] || { echo "Usage: $0 {get <key>|is-enabled <key>|set <key> true|false|toggle <key>}" >&2; exit 1; }
+shift
 
-# Returns the NEW (namespaced) file that a given key should be read
-# from/written to: clear_context and finish_on_empty_queue are personal,
-# frequently-toggled state and live in the gitignored state file; every
-# other key lives in the committed configuration file.
-_new_file_for_key() {
-  case "$1" in
-    clear_context|finish_on_empty_queue) echo "$NEW_STATE_FILE" ;;
-    *) echo "$NEW_CONFIG_FILE" ;;
-  esac
-}
+REPO_PATH="${1:-}"
+[[ -n "$REPO_PATH" ]] || { echo "Usage: $0 $COMMAND <repo_path> [...]" >&2; exit 1; }
+shift
 
-# Returns the LEGACY file counterpart of _new_file_for_key, used as a
-# fallback by repo_config_read/repo_config_write. clear_context and
-# finish_on_empty_queue have no read-time legacy fallback (returns "",
-# which repo_config_read's [[ -f "$legacy_file" ]] check treats as "no
-# legacy file") — see docs/guides/arcanum-repo-config.md. Every other
-# key still falls back to its legacy file as before.
-_legacy_file_for_key() {
-  case "$1" in
-    clear_context|finish_on_empty_queue) echo "" ;;
-    *) echo "$CONFIG_FILE" ;;
-  esac
-}
-
-case ${1:-} in
+# From here, "$@" is just <key> or <key> <value> — engine_dispatch's args
+# below re-prepends "$REPO_PATH" so both the shell script and the native
+# call receive an identical, correctly-shaped <repo_path> <key> [<value>].
+case "$COMMAND" in
   get)
-    if [[ $# -lt 2 ]]; then
-      echo "Error: get requires a key" >&2
-      exit 1
-    fi
-    KEY="$2"
-    VALUE=$(repo_config_read "$(_new_file_for_key "$KEY")" "$(_legacy_file_for_key "$KEY")" "$NAMESPACE" "$KEY")
-    VALUE="${VALUE:-false}"
-    echo "$VALUE"
+    engine_dispatch "$REPO_PATH" auto-fix-all-config-get "${SCRIPT_DIR}/config_get_shell.sh" -- "$REPO_PATH" "$@"
     ;;
-
   is-enabled)
-    if [[ $# -lt 2 ]]; then
-      echo "Error: is-enabled requires a key" >&2
-      exit 1
-    fi
-    KEY="$2"
-    VALUE=$(repo_config_read "$(_new_file_for_key "$KEY")" "$(_legacy_file_for_key "$KEY")" "$NAMESPACE" "$KEY")
-    VALUE="${VALUE:-false}"
-    [[ "$VALUE" == "true" ]]
+    engine_dispatch "$REPO_PATH" auto-fix-all-config-is-enabled "${SCRIPT_DIR}/config_is_enabled_shell.sh" -- "$REPO_PATH" "$@"
     ;;
-
   set)
-    if [[ $# -lt 3 ]]; then
-      echo "Error: set requires a key and a value (true|false)" >&2
-      exit 1
-    fi
-    KEY="$2"
-    VALUE="$3"
-    if [[ "$VALUE" != "true" && "$VALUE" != "false" ]]; then
-      echo "Error: value must be 'true' or 'false'" >&2
-      exit 1
-    fi
-    repo_config_write "$(_new_file_for_key "$KEY")" "$(_legacy_file_for_key "$KEY")" "$NAMESPACE" "$KEY" "$VALUE"
+    engine_dispatch "$REPO_PATH" auto-fix-all-config-set "${SCRIPT_DIR}/config_set_shell.sh" -- "$REPO_PATH" "$@"
     ;;
-
   toggle)
-    if [[ $# -lt 2 ]]; then
-      echo "Error: toggle requires a key" >&2
-      exit 1
-    fi
-    KEY="$2"
-    CURRENT=$(repo_config_read "$(_new_file_for_key "$KEY")" "$(_legacy_file_for_key "$KEY")" "$NAMESPACE" "$KEY")
-    CURRENT="${CURRENT:-false}"
-    if [[ "$CURRENT" == "true" ]]; then
-      NEW_VALUE="false"
-    else
-      NEW_VALUE="true"
-    fi
-    repo_config_write "$(_new_file_for_key "$KEY")" "$(_legacy_file_for_key "$KEY")" "$NAMESPACE" "$KEY" "$NEW_VALUE"
-    echo "$NEW_VALUE"
+    engine_dispatch "$REPO_PATH" auto-fix-all-config-toggle "${SCRIPT_DIR}/config_toggle_shell.sh" -- "$REPO_PATH" "$@"
     ;;
-
   *)
     echo "Usage: $0 {get <key>|is-enabled <key>|set <key> true|false|toggle <key>}" >&2
     exit 1
