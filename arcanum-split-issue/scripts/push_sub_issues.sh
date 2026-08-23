@@ -1,19 +1,24 @@
 #!/usr/bin/env bash
-# Batch driver: push every generated sub-issue draft file for <issue_id>
-# to GitHub, in ascending count order, stopping at the first failure.
+# Thin engine_dispatch shim for the "arcanum-split-issue-push-sub-issues"
+# migrated entrypoint — see docs/agents/architecture/script-engine.md and
+# docs/agents/plans/260-migrate-arcanum-split-issue-push-sub-issues-entrypoint-to-native-node-js/plan.md
+# for the full design/shared contracts. Pushes every generated sub-issue
+# draft file for an issue to GitHub, in ascending count order, via either
+# the shell implementation (push_sub_issues_shell.sh) or the native one
+# (core/bin/arcanum), per engine.mode / arcanum/_lib/migration-status.json.
+#
+# HOME is forwarded to the native path's explicit env-var allowlist — the
+# native implementation calls ArcanumSplitIssueCreateSubIssue in-process
+# for each file (whose own call chain reaches SpawnIssue -> `gh auth
+# token`) and needs it to resolve credentials once native's
+# `env -i PATH="$PATH"` strips the ambient environment; mirrors
+# create_sub_issue.sh's own shim.
+#
 # Usage: push_sub_issues.sh <repo_path> <issue_id>
 #
-# On success (or zero files to process) prints:
-#   STATUS=ok
-#   CREATED=<file>:<id>[,<file>:<id>...]   (possibly empty)
-# and exits 0.
-#
-# On the first failure, stops immediately (does not process remaining
-# files) and prints:
-#   STATUS=failed
-#   CREATED=<csv of file:id pairs that succeeded so far, possibly empty>
-#   FAILED=<the file that failed>
-# and exits 1.
+# Output and exit code: unchanged from before this migration — see
+# push_sub_issues_shell.sh's own header for the full STATUS=ok/
+# CREATED=.../STATUS=failed/FAILED=... contract.
 
 set -euo pipefail
 
@@ -27,46 +32,7 @@ ISSUE_ID="${2:-}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# shellcheck source=../../arcanum/_lib/repo_path.sh
+# shellcheck source=../../arcanum/_lib/engine_dispatch.sh
 # shellcheck disable=SC1091
-source "${SCRIPT_DIR}/../../arcanum/_lib/repo_path.sh"
-
-repo_path_enter "$REPO_PATH"
-
-ISSUES_DIR="docs/agents/issues"
-
-shopt -s nullglob
-FILES=("${ISSUES_DIR}/${ISSUE_ID}_"[0-9][0-9]*_*)
-shopt -u nullglob
-
-IFS=$'\n' FILES=($(printf '%s\n' "${FILES[@]+"${FILES[@]}"}" | sort))
-unset IFS
-
-CREATED=""
-
-for file in "${FILES[@]+"${FILES[@]}"}"; do
-  OUTPUT=""
-  EXIT_CODE=0
-  OUTPUT=$("${SCRIPT_DIR}/create_sub_issue.sh" "$REPO_PATH" "$ISSUE_ID" "$file") || EXIT_CODE=$?
-
-  STATUS_LINE=$(printf '%s\n' "$OUTPUT" | grep -m1 '^STATUS=' || true)
-  ID_LINE=$(printf '%s\n' "$OUTPUT" | grep -m1 '^ID=' || true)
-
-  if [[ "$EXIT_CODE" -eq 0 && "$STATUS_LINE" == "STATUS=ok" ]]; then
-    new_id="${ID_LINE#ID=}"
-    if [[ -n "$CREATED" ]]; then
-      CREATED="${CREATED},${file}:${new_id}"
-    else
-      CREATED="${file}:${new_id}"
-    fi
-    continue
-  fi
-
-  echo "STATUS=failed"
-  echo "CREATED=${CREATED}"
-  echo "FAILED=${file}"
-  exit 1
-done
-
-echo "STATUS=ok"
-echo "CREATED=${CREATED}"
+source "${SCRIPT_DIR}/../../arcanum/_lib/engine_dispatch.sh"
+engine_dispatch "$REPO_PATH" arcanum-split-issue-push-sub-issues "${SCRIPT_DIR}/push_sub_issues_shell.sh" HOME -- "$@"

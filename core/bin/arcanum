@@ -46,6 +46,10 @@ const COMMANDS = {
     method: 'run'
   },
   'arcanum-split-issue-finish': { module: 'ArcanumSplitIssueFinish.js', method: 'run' },
+  'arcanum-split-issue-push-sub-issues': {
+    module: 'ArcanumSplitIssuePushSubIssues.js',
+    method: 'run'
+  },
   'auto-fix-all-checkout-from-main': { module: 'AutoFixAllCheckoutFromMain.js', method: 'run' },
   'auto-fix-all-cleanup-artifacts': { module: 'AutoFixAllCleanupArtifacts.js', method: 'run' },
   'auto-fix-all-reply-comment': { module: 'AutoFixAllReplyComment.js', method: 'run' },
