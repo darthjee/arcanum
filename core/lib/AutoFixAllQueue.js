@@ -85,11 +85,23 @@ class AutoFixAllQueue {
    * Native implementation of `queue_save_shell.sh`: overwrites the
    * queue with the given ids, then best-effort tags the affected
    * issues as enqueued. Not lock-guarded (matches today's `save`).
+   * Writes directly to `process.stdout` (rather than returning a
+   * string) because `_mark_enqueued`'s own per-tag stdout lines
+   * (`tag_mutate_add_label`/`tag_mutate_remove_label`'s "already
+   * present"/"Added tag"/etc. output) are interleaved with — and always
+   * come after — the `Queue saved: ...` confirmation line; the whole
+   * sequence must land on stdout in that exact order, including when a
+   * later step throws (`dispatch()` only prints a returned string on
+   * success, never partial output from a rejected promise).
    * @param {string} repoPath - the target repo's local checkout path.
    * @param {...string} ids - the ids to save, in order.
-   * @returns {Promise<string>} `Queue saved: <ids>\n`.
+   * @returns {Promise<void>} resolves once the queue is written and the
+   *   best-effort label mutation has finished.
    * @throws {Error} `Error: save requires at least one ID` when no ids
    *   are given.
+   * @throws {DispatchFailure} with an empty stdout payload and exit
+   *   code 1 when the repo's origin/GitHub token can't be resolved —
+   *   see `#_markEnqueued`'s doc comment.
    */
   async save(repoPath, ...ids) {
     if (ids.length === 0) {
@@ -98,11 +110,9 @@ class AutoFixAllQueue {
 
     await this._writeQueue(repoPath, ids.map((id) => ({ id })));
 
-    const output = `Queue saved: ${ids.join(' ')}\n`;
+    process.stdout.write(`Queue saved: ${ids.join(' ')}\n`);
 
     await this._markEnqueued(repoPath, ids);
-
-    return output;
   }
 
   /**
@@ -140,12 +150,17 @@ class AutoFixAllQueue {
   /**
    * Native implementation of `queue_push_shell.sh`: lock-guarded append
    * of the given ids to the end of the queue, then best-effort tags the
-   * affected issues as enqueued.
+   * affected issues as enqueued. Writes directly to `process.stdout` —
+   * see `#save`'s doc comment for why.
    * @param {string} repoPath - the target repo's local checkout path.
    * @param {...string} ids - the ids to push, in order.
-   * @returns {Promise<string>} `Pushed: <ids>\n`.
+   * @returns {Promise<void>} resolves once the queue is written and the
+   *   best-effort label mutation has finished.
    * @throws {Error} `Error: push requires at least one ID` when no ids
    *   are given.
+   * @throws {DispatchFailure} with an empty stdout payload and exit
+   *   code 1 when the repo's origin/GitHub token can't be resolved —
+   *   see `#_markEnqueued`'s doc comment.
    */
   async push(repoPath, ...ids) {
     if (ids.length === 0) {
@@ -164,11 +179,9 @@ class AutoFixAllQueue {
       await this._lock.release(lockFile);
     }
 
-    const output = `Pushed: ${ids.join(' ')}\n`;
+    process.stdout.write(`Pushed: ${ids.join(' ')}\n`);
 
     await this._markEnqueued(repoPath, ids);
-
-    return output;
   }
 
   /**
@@ -285,13 +298,24 @@ class AutoFixAllQueue {
   /**
    * Best-effort: adds the `enqueued` tag and removes the
    * `ready_for_work`/`created` tags from each given issue id, mirroring
-   * `_mark_enqueued`. A failure anywhere in this step — including
-   * resolving the repo's origin/GitHub token — warns to stderr and
-   * never blocks the caller; the queue write has already happened by
-   * the time this runs.
+   * `_mark_enqueued` — each per-tag mutation writes its own stdout/
+   * stderr lines directly (see `#_mutateTag`'s doc comment). Per-tag
+   * mutation failures are fully best-effort (warn and continue — see
+   * `#_mutateTag`), but a failure resolving the repo's origin itself is
+   * NOT swallowed: `_mark_enqueued`'s own `repo_ref=$(get_repo_ref
+   * "$repo_path")` command substitution, under `set -euo pipefail`,
+   * aborts the whole shell script at that point (after `save`/`push`'s
+   * own confirmation line has already printed) whenever `repo_path`
+   * isn't a git repo with an `origin` remote — so this rethrows as a
+   * `DispatchFailure('', 1)` to match that exit code, deliberately with
+   * an empty `.stdout` payload since `save`/`push` already wrote their
+   * own confirmation line directly (see `#save`'s doc comment).
    * @param {string} repoPath - the target repo's local checkout path.
    * @param {string[]} ids - the affected issue ids.
-   * @returns {Promise<void>} resolves regardless of outcome.
+   * @returns {Promise<void>} resolves once every mutation attempt has
+   *   finished.
+   * @throws {DispatchFailure} with an empty stdout payload and exit
+   *   code 1 when the repo's origin/GitHub token can't be resolved.
    */
   async _markEnqueued(repoPath, ids) {
     let repo;
@@ -305,7 +329,7 @@ class AutoFixAllQueue {
       repoRef = resolved.domain === 'github.com' ? resolved.repo : `${resolved.domain}/${resolved.repo}`;
       token = await this._githubToken.get(repoPath);
     } catch {
-      return;
+      throw new DispatchFailure('', 1);
     }
 
     for (const id of ids) {
@@ -317,35 +341,81 @@ class AutoFixAllQueue {
 
   /**
    * Add or remove a single canonical tag's mapped GitHub label on issue
-   * `id`, mirroring `tag_mutate_add_label`/`tag_mutate_remove_label`:
-   * fetches the issue's current labels, no-ops if the label is
-   * already in the desired state, otherwise mutates it. Any failure
-   * (fetch or mutate) warns to stderr and never throws.
+   * `id`, mirroring `tag_mutate_add_label`/`tag_mutate_remove_label`
+   * exactly, including their own stdout lines (not just the caller's
+   * stderr warning on failure): fetches the issue's current labels
+   * (a fetch failure prints `Error: could not fetch issue #<id> from
+   * <repo>` to stderr); if the label is already in the desired state,
+   * prints a "nothing to do" line to stdout and stops; otherwise
+   * mutates it (a mutate failure prints `Error: could not update issue
+   * #<id> on <repo>` to stderr) and prints a success line to stdout. In
+   * either failure case, this method's own caller-facing warning
+   * (`Warning: could not add/remove '<tag>' tag ...`) is also printed
+   * to stderr, exactly as `_mark_enqueued`'s `|| echo ...` does.
    * @param {string} id - the issue id.
    * @param {string} repo - the `owner/repo` path, for the REST calls.
    * @param {string} repoRef - the (possibly domain-qualified) repo
-   *   reference, for the warning message only.
+   *   reference, used in both the success/failure messages.
    * @param {string} token - the GitHub token.
    * @param {'add'|'remove'} action - whether to add or remove the tag.
    * @param {string} tag - the canonical tag name.
    * @returns {Promise<void>} resolves regardless of outcome.
    */
   async _mutateTag(id, repo, repoRef, token, action, tag) {
-    try {
-      const label = TAG_TO_LABEL[tag];
-      const labels = await this._fetchLabels(id, repo, token);
-      const present = labels.includes(label);
+    const label = TAG_TO_LABEL[tag];
+    let labels;
 
-      if (action === 'add' && !present) {
+    try {
+      labels = await this._fetchLabels(id, repo, token);
+    } catch {
+      this._warnMutationFailure(action, tag, id, repoRef);
+
+      return;
+    }
+
+    const present = labels.includes(label);
+
+    if (action === 'add' ? present : !present) {
+      const state = action === 'add' ? 'already present on' : 'not present on';
+
+      process.stdout.write(`Tag '${tag}' ${state} issue #${id} — nothing to do.\n`);
+
+      return;
+    }
+
+    try {
+      if (action === 'add') {
         await this._addLabel(id, repo, token, label);
-      } else if (action === 'remove' && present) {
+      } else {
         await this._removeLabel(id, repo, token, label);
       }
     } catch {
-      const preposition = action === 'add' ? 'to' : 'from';
+      this._warnMutationFailure(action, tag, id, repoRef);
 
-      process.stderr.write(`Warning: could not ${action} '${tag}' tag ${preposition} issue #${id} on ${repoRef}\n`);
+      return;
     }
+
+    const verb = action === 'add' ? 'Added' : 'Removed';
+    const preposition = action === 'add' ? 'to' : 'from';
+
+    process.stdout.write(`${verb} tag '${tag}' ${preposition} issue #${id} on ${repoRef}\n`);
+  }
+
+  /**
+   * Prints `_mark_enqueued`'s own `|| echo "Warning: ..."` fallback
+   * message to stderr for a failed tag mutation.
+   * @param {'add'|'remove'} action - whether the mutation was an add
+   *   or a remove.
+   * @param {string} tag - the canonical tag name.
+   * @param {string} id - the issue id.
+   * @param {string} repoRef - the (possibly domain-qualified) repo
+   *   reference.
+   * @returns {void}
+   */
+  _warnMutationFailure(action, tag, id, repoRef) {
+    const preposition = action === 'add' ? 'to' : 'from';
+
+    process.stderr.write(`Warning: could not ${action} '${tag}' tag ${preposition} issue #${id} on ${repoRef}\n`);
   }
 
   /**

@@ -74,14 +74,41 @@ describe('AutoFixAllQueue', () => {
     });
   }
 
+  /**
+   * `save`/`push` write directly to `process.stdout` (see
+   * AutoFixAllQueue.js#save's doc comment) rather than returning a
+   * string — capture everything written to `process.stdout` for the
+   * duration of `fn`, so specs can assert on it the same way parity
+   * specs assert on a subprocess's captured stdout.
+   * @param {Function} fn - a zero-argument function (sync or async)
+   *   to run while `process.stdout.write` is captured.
+   * @returns {Promise<{result: *, stdout: string}>} `fn`'s own resolved
+   *   value, plus everything written to `process.stdout` meanwhile.
+   */
+  async function captureStdout(fn) {
+    const chunks = [];
+    const spy = spyOn(process.stdout, 'write').and.callFake((chunk) => {
+      chunks.push(chunk);
+
+      return true;
+    });
+
+    const result = await fn();
+
+    spy.and.callThrough();
+
+    return { result, stdout: chunks.join('') };
+  }
+
   describe('#save', () => {
     it('overwrites the queue with the exact given ids and prints the confirmation line', async () => {
       await writeQueueFile([{ id: 'old' }]);
 
       const queue = newQueue();
 
-      await expectAsync(queue.save(dir, '1', '2', '3')).toBeResolvedTo('Queue saved: 1 2 3\n');
+      const { stdout } = await captureStdout(() => queue.save(dir, '1', '2', '3'));
 
+      expect(stdout.split('\n')[0]).toEqual('Queue saved: 1 2 3');
       expect(await readQueueFile()).toEqual([{ id: '1' }, { id: '2' }, { id: '3' }]);
     });
 
@@ -95,7 +122,7 @@ describe('AutoFixAllQueue', () => {
       const fetchFn = fakeFetch();
       const queue = newQueue({ fetchFn });
 
-      await queue.save(dir, '10', '20');
+      await captureStdout(() => queue.save(dir, '10', '20'));
 
       // 3 GET calls per id (enqueued/ready_for_work/created), 1 POST
       // (add enqueued, not yet present) and 2 DELETE (remove
@@ -111,13 +138,14 @@ describe('AutoFixAllQueue', () => {
       expect(methods.filter((method) => method === 'DELETE').length).toEqual(4);
     });
 
-    it('warns to stderr (and does not throw) when a label mutation fails', async () => {
+    it('warns to stderr, and prints only the confirmation line to stdout, when a label mutation fails', async () => {
       spyOn(process.stderr, 'write');
 
       const queue = newQueue({ fetchFn: fakeFetch({ getFails: true }) });
 
-      await expectAsync(queue.save(dir, '10')).toBeResolvedTo('Queue saved: 10\n');
+      const { stdout } = await captureStdout(() => queue.save(dir, '10'));
 
+      expect(stdout).toEqual('Queue saved: 10\n');
       expect(process.stderr.write).toHaveBeenCalledWith(
         'Warning: could not add \'enqueued\' tag to issue #10 on darthjee/arcanum\n'
       );
@@ -129,10 +157,22 @@ describe('AutoFixAllQueue', () => {
       );
     });
 
-    it('does not throw when resolving the origin/token itself fails', async () => {
+    it('rejects with a DispatchFailure (stdout "", exit code 1), after printing the confirmation line, when resolving the origin/token itself fails', async () => {
       const queue = newQueue({ origin: { resolve: async () => { throw new Error('no origin'); } } });
+      let thrown;
 
-      await expectAsync(queue.save(dir, '10')).toBeResolvedTo('Queue saved: 10\n');
+      const { stdout } = await captureStdout(async () => {
+        try {
+          await queue.save(dir, '10');
+        } catch (error) {
+          thrown = error;
+        }
+      });
+
+      expect(stdout).toEqual('Queue saved: 10\n');
+      expect(thrown).toBeInstanceOf(DispatchFailure);
+      expect(thrown.stdout).toEqual('');
+      expect(thrown.exitCode).toEqual(1);
     });
   });
 
@@ -197,8 +237,9 @@ describe('AutoFixAllQueue', () => {
 
       const queue = newQueue();
 
-      await expectAsync(queue.push(dir, '1', '2')).toBeResolvedTo('Pushed: 1 2\n');
+      const { stdout } = await captureStdout(() => queue.push(dir, '1', '2'));
 
+      expect(stdout.split('\n')[0]).toEqual('Pushed: 1 2');
       expect(await readQueueFile()).toEqual([{ id: 'existing' }, { id: '1' }, { id: '2' }]);
     });
 
@@ -216,7 +257,7 @@ describe('AutoFixAllQueue', () => {
 
       const queue = newQueue({ lock });
 
-      await queue.push(dir, '1');
+      await captureStdout(() => queue.push(dir, '1'));
 
       expect(lock.acquire).toHaveBeenCalledWith(lockFile);
       expect(lock.release).toHaveBeenCalledWith(lockFile);
@@ -226,21 +267,40 @@ describe('AutoFixAllQueue', () => {
       const fetchFn = fakeFetch();
       const queue = newQueue({ fetchFn });
 
-      await queue.push(dir, '30');
+      await captureStdout(() => queue.push(dir, '30'));
 
       expect(fetchFn).toHaveBeenCalled();
     });
 
-    it('warns to stderr (and does not throw) when a label mutation fails', async () => {
+    it('warns to stderr, and prints only the confirmation line to stdout, when a label mutation fails', async () => {
       spyOn(process.stderr, 'write');
 
       const queue = newQueue({ fetchFn: fakeFetch({ mutateFails: true }) });
 
-      await expectAsync(queue.push(dir, '10')).toBeResolvedTo('Pushed: 10\n');
+      const { stdout } = await captureStdout(() => queue.push(dir, '10'));
 
+      expect(stdout).toEqual('Pushed: 10\n');
       expect(process.stderr.write).toHaveBeenCalledWith(
         'Warning: could not add \'enqueued\' tag to issue #10 on darthjee/arcanum\n'
       );
+    });
+
+    it('rejects with a DispatchFailure (stdout "", exit code 1), after printing the confirmation line, when resolving the origin/token itself fails', async () => {
+      const queue = newQueue({ origin: { resolve: async () => { throw new Error('no origin'); } } });
+      let thrown;
+
+      const { stdout } = await captureStdout(async () => {
+        try {
+          await queue.push(dir, '10');
+        } catch (error) {
+          thrown = error;
+        }
+      });
+
+      expect(stdout).toEqual('Pushed: 10\n');
+      expect(thrown).toBeInstanceOf(DispatchFailure);
+      expect(thrown.stdout).toEqual('');
+      expect(thrown.exitCode).toEqual(1);
     });
   });
 
@@ -344,7 +404,7 @@ describe('AutoFixAllQueue', () => {
       const first = newQueue({ lock });
       const second = newQueue({ lock });
 
-      await Promise.all([first.push(dir, 'a', 'b'), second.push(dir, 'c', 'd')]);
+      await captureStdout(() => Promise.all([first.push(dir, 'a', 'b'), second.push(dir, 'c', 'd')]));
 
       const ids = (await readQueueFile()).map((entry) => entry.id).sort();
 
@@ -358,7 +418,7 @@ describe('AutoFixAllQueue', () => {
       const pusher = newQueue({ lock });
       const popper = newQueue({ lock });
 
-      await Promise.all([pusher.push(dir, 'next'), popper.pop(dir)]);
+      await captureStdout(() => Promise.all([pusher.push(dir, 'next'), popper.pop(dir)]));
 
       const ids = (await readQueueFile()).map((entry) => entry.id);
 

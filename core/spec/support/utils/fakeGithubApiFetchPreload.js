@@ -53,4 +53,31 @@ if (mode === 'success') {
 
     return new Response(JSON.stringify({ message: 'not found' }), { status: 404 });
   };
+} else if (mode === 'queue') {
+  // Drives `AutoFixAllQueue.js`'s best-effort label mutation (`GET
+  // .../issues/<id>`, `POST .../issues/<id>/labels`, `DELETE
+  // .../issues/<id>/labels/<label>`), mirroring fakeGhBin.js's own
+  // `FAKE_GH_ISSUE_LABELS`/`FAKE_GH_ISSUE_VIEW_FAIL`/
+  // `FAKE_GH_ISSUE_EDIT_FAIL` so the same scenario seeds both sides of
+  // a parity comparison identically. `FAKE_FETCH_ISSUE_LABELS` is a
+  // newline-separated list of the issue's current label names.
+  const labels = (process.env.FAKE_FETCH_ISSUE_LABELS || '').split('\n').filter(Boolean);
+  const viewFail = process.env.FAKE_FETCH_ISSUE_VIEW_FAIL === '1';
+  const editFail = process.env.FAKE_FETCH_ISSUE_EDIT_FAIL === '1';
+
+  globalThis.fetch = async (url, options = {}) => {
+    if (options.method === undefined) {
+      if (viewFail) {
+        return new Response(JSON.stringify({ message: 'not found' }), { status: 404 });
+      }
+
+      return new Response(JSON.stringify({ labels: labels.map((name) => ({ name })) }), { status: 200 });
+    }
+
+    if (options.method === 'POST' || options.method === 'DELETE') {
+      return new Response('{}', { status: editFail ? 422 : 200 });
+    }
+
+    return new Response(JSON.stringify({ message: 'not found' }), { status: 404 });
+  };
 }
