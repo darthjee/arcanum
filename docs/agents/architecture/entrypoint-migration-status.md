@@ -18,7 +18,7 @@ One row per entry point tracked in [`arcanum/_lib/migration-status.json`](../../
 | `auto-fix-all-config-is-enabled` | Yes | #261 |
 | `auto-fix-all-config-set` | Yes | #261 |
 | `auto-fix-all-config-toggle` | Yes | #261 |
-| `auto-fix-all-github` | No | #230 |
+| `auto-fix-all-github` | Yes | #230 |
 | `auto-fix-all-queue-empty` | Yes | #264 |
 | `auto-fix-all-queue-list` | Yes | #264 |
 | `auto-fix-all-queue-next` | Yes | #264 |
@@ -28,7 +28,7 @@ One row per entry point tracked in [`arcanum/_lib/migration-status.json`](../../
 | `auto-fix-all-queue-wait-next` | Yes | #264 |
 | `auto-fix-all-reply-comment` | Yes | #230 |
 | `auto-fix-all-wait-ci` | Yes | #230 |
-| `auto-fix-all-wait-ci-and-merge` | No | #230 |
+| `auto-fix-all-wait-ci-and-merge` | Yes | #230 |
 | `auto-fix-issue-commit-change` | No | #230 |
 | `auto-fix-issue-create-branch` | No | #230 |
 | `auto-fix-issue-github` | No | #230 |
