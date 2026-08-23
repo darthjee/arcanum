@@ -33,7 +33,7 @@
   "auto-fix-all-queue-empty": true,
   "auto-fix-all-queue-list": true,
   "auto-fix-all-reply-comment": true,
-  "auto-fix-all-wait-ci-and-merge": false,
+  "auto-fix-all-wait-ci-and-merge": true,
   "auto-fix-all-wait-ci": true,
   "auto-fix-issue-commit-change": false,
   "auto-fix-issue-create-branch": false,
