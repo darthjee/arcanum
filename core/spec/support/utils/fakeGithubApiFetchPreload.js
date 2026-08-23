@@ -80,4 +80,83 @@ if (mode === 'success') {
 
     return new Response(JSON.stringify({ message: 'not found' }), { status: 404 });
   };
+} else if (mode === 'github') {
+  // Drives every REST call `AutoFixAllGithub.js` makes (issue #265):
+  // `GET .../pulls?head=...&state=all` (pr-number/pr-state/pr-merge's PR
+  // lookup), `GET .../pulls/<number>/commits` (coauthors mode), `GET
+  // https://api.github.com/user` (coauthors mode's merger-login lookup),
+  // `PUT .../pulls/<number>/merge`, `DELETE .../git/refs/heads/<branch>`
+  // (pr-merge's post-merge branch delete), and the same issue-labels GET/
+  // POST/DELETE trio `queue` mode above already drives (has-shipit-label/
+  // add-tag/remove-tag). Env vars mirror fakeGhBin.js's own `FAKE_GH_*`
+  // names (as `FAKE_FETCH_*`) so the same scenario seeds both sides of a
+  // parity comparison identically.
+  const prNumber = process.env.FAKE_FETCH_PR_NUMBER || '';
+  const prTitle = process.env.FAKE_FETCH_PR_TITLE || 'Fake PR title';
+  const prUrl = process.env.FAKE_FETCH_PR_URL || `https://github.com/example/repo/pull/${prNumber}`;
+  const prState = process.env.FAKE_FETCH_PR_STATE || 'open';
+  const prMerged = process.env.FAKE_FETCH_PR_MERGED === '1';
+  const prCommitsJson = process.env.FAKE_FETCH_PR_COMMITS_JSON || '[]';
+  const userLogin = process.env.FAKE_FETCH_USER_LOGIN || 'fake-merger';
+  const userFail = process.env.FAKE_FETCH_USER_FAIL === '1';
+  const mergeFail = process.env.FAKE_FETCH_MERGE_FAIL === '1';
+  const labels = (process.env.FAKE_FETCH_ISSUE_LABELS || '').split('\n').filter(Boolean);
+  const issueViewFail = process.env.FAKE_FETCH_ISSUE_VIEW_FAIL === '1';
+  const issueEditFail = process.env.FAKE_FETCH_ISSUE_EDIT_FAIL === '1';
+
+  globalThis.fetch = async (rawUrl, options = {}) => {
+    const url = typeof rawUrl === 'string' ? rawUrl : rawUrl.toString();
+
+    if (url.includes('/pulls?head=')) {
+      if (!prNumber) {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+
+      return new Response(
+        JSON.stringify([{
+          number: Number(prNumber),
+          title: prTitle,
+          html_url: prUrl,
+          state: prState,
+          merged: prMerged,
+          merged_at: prMerged ? '2024-01-01T00:00:00Z' : null
+        }]),
+        { status: 200 }
+      );
+    }
+
+    if (/\/pulls\/\d+\/commits/.test(url)) {
+      return new Response(prCommitsJson, { status: 200 });
+    }
+
+    if (options.method === 'PUT' && /\/pulls\/\d+\/merge$/.test(url)) {
+      return new Response('{}', { status: mergeFail ? 405 : 200 });
+    }
+
+    if (url === 'https://api.github.com/user') {
+      if (userFail) {
+        return new Response(JSON.stringify({ message: 'not found' }), { status: 404 });
+      }
+
+      return new Response(JSON.stringify({ login: userLogin }), { status: 200 });
+    }
+
+    if (options.method === 'DELETE' && url.includes('/git/refs/heads/')) {
+      return new Response('', { status: 204 });
+    }
+
+    if (options.method === undefined && /\/issues\/[^/]+$/.test(url)) {
+      if (issueViewFail) {
+        return new Response(JSON.stringify({ message: 'not found' }), { status: 404 });
+      }
+
+      return new Response(JSON.stringify({ labels: labels.map((name) => ({ name })) }), { status: 200 });
+    }
+
+    if ((options.method === 'POST' || options.method === 'DELETE') && url.includes('/labels')) {
+      return new Response('{}', { status: issueEditFail ? 422 : 200 });
+    }
+
+    return new Response(JSON.stringify({ message: 'not found' }), { status: 404 });
+  };
 }

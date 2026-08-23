@@ -24,7 +24,7 @@
   "auto-fix-all-config-is-enabled": true,
   "auto-fix-all-config-set": true,
   "auto-fix-all-config-toggle": true,
-  "auto-fix-all-github": false,
+  "auto-fix-all-github": true,
   "auto-fix-all-queue-save": true,
   "auto-fix-all-queue-next": true,
   "auto-fix-all-queue-wait-next": true,
