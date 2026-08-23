@@ -71,7 +71,7 @@ class AutoFixAllConfig {
     }
 
     if (value !== 'true' && value !== 'false') {
-      throw new Error("Error: value must be 'true' or 'false'");
+      throw new Error('Error: value must be \'true\' or \'false\'');
     }
 
     const newFile = this._newFileForKey(repoPath, key);
@@ -145,15 +145,17 @@ class AutoFixAllConfig {
    * @param {string|null} legacyFile - the legacy config file's path,
    *   or `null` when there's no legacy fallback.
    * @param {string} key - the config key to read.
-   * @returns {Promise<string|undefined>} the resolved value, or
-   *   `undefined` if absent everywhere.
+   * @returns {Promise<string|undefined>} the resolved value, compact
+   *   JSON-stringified exactly as `repo_config_read`'s `jq -c` output
+   *   would be (e.g. the stored JSON boolean `true` reads back as the
+   *   string `"true"`), or `undefined` if absent everywhere.
    */
   async _read(newFile, legacyFile, key) {
     const newConfig = await this._readJson(newFile);
     const namespaceSection = newConfig && newConfig[NAMESPACE];
 
     if (namespaceSection && Object.prototype.hasOwnProperty.call(namespaceSection, key)) {
-      return namespaceSection[key];
+      return JSON.stringify(namespaceSection[key]);
     }
 
     if (legacyFile === null) {
@@ -163,7 +165,7 @@ class AutoFixAllConfig {
     const legacyConfig = await this._readJson(legacyFile);
 
     if (legacyConfig && Object.prototype.hasOwnProperty.call(legacyConfig, key)) {
-      return legacyConfig[key];
+      return JSON.stringify(legacyConfig[key]);
     }
 
     return undefined;
@@ -175,7 +177,9 @@ class AutoFixAllConfig {
    * @param {string|null} legacyFile - the legacy config file's path,
    *   or `null` when there's no legacy fallback.
    * @param {string} key - the config key to write.
-   * @param {string} value - the value to write.
+   * @param {string} value - the value to write, always exactly `"true"`
+   *   or `"false"` (validated by `#set`) — stored as a real JSON
+   *   boolean, mirroring `repo_config_write`'s `jq --argjson` behavior.
    * @returns {Promise<void>} resolves once the value has been written
    *   atomically.
    */
@@ -200,7 +204,7 @@ class AutoFixAllConfig {
         ...base,
         [NAMESPACE]: {
           ...namespaceSection,
-          [key]: value
+          [key]: value === 'true' || value === 'false' ? value === 'true' : value
         }
       };
 
