@@ -4,10 +4,13 @@
  * docs/agents/plans/193-migrate-resolve-and-fetch-sh-to-a-native--node-js--implementation/plan.md's
  * "Shared contracts" section) — not shared with the shell side, per
  * docs/agents/architecture/script-engine.md's "no standalone `_lib`
- * migration" scope boundary.
+ * migration" scope boundary. Exported (not module-private) so callers
+ * that need the reverse (canonical tag name -> GitHub label name)
+ * lookup — e.g. `AutoFixAllQueue.js`'s best-effort label mutation — can
+ * invert this same table rather than hardcoding a second copy of it.
  * @type {Record<string, string>}
  */
-const LABEL_TO_TAG = {
+export const LABEL_TO_TAG = {
   Created: 'created',
   'Ready for Work': 'ready_for_work',
   shipit: 'shipit',
