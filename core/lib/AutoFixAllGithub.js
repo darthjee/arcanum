@@ -1,12 +1,21 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import ConfigChain from './ConfigChain.js';
+import DispatchFailure from './DispatchFailure.js';
 import GithubToken from './GithubToken.js';
 import IssueState from './IssueState.js';
 import Origin from './Origin.js';
+import { LABEL_TO_TAG } from './Tags.js';
 
 const defaultExecFileAsync = promisify(execFile);
 const DEFAULT_TIMEOUT_MS = 30000;
+
+// Reverse of Tags.js's LABEL_TO_TAG — same construction as
+// AutoFixAllQueue.js's own TAG_TO_LABEL, resolving a canonical tag name
+// to its exact GitHub label name for add-tag/remove-tag/has-shipit-label.
+const TAG_TO_LABEL = Object.fromEntries(
+  Object.entries(LABEL_TO_TAG).map(([label, tag]) => [tag, label])
+);
 
 /**
  * Native equivalent of `auto-fix-all/scripts/github.sh`: the 7
@@ -193,6 +202,145 @@ class AutoFixAllGithub {
     await this._execFileAsync('git', ['branch', '-D', branch], { cwd: repoPath });
 
     return '';
+  }
+
+  /**
+   * Native implementation of `github.sh has-shipit-label`: no stdout
+   * either way, matching the shell's `grep -qiE` contract — only the
+   * exit code communicates the result.
+   * @param {string} repoPath - the target repo's local checkout path.
+   * @param {string} id - the numeric issue id.
+   * @returns {Promise<string>} `''` when the issue has a `shipit`
+   *   label (case-insensitive, exact match).
+   * @throws {DispatchFailure} with an empty stdout payload and exit
+   *   code 1 when the issue's labels can't be fetched, or the issue
+   *   doesn't have a `shipit` label.
+   */
+  async hasShipitLabel(repoPath, id) {
+    if (!repoPath || !id) {
+      throw new Error('Usage: github.sh has-shipit-label <repo_path> <id>');
+    }
+
+    let labels;
+
+    try {
+      const { repo } = await this._resolveRepo(repoPath);
+      const token = await this._githubToken.get(repoPath);
+
+      labels = await this._fetchLabels(id, repo, token);
+    } catch {
+      throw new DispatchFailure('', 1);
+    }
+
+    const hasShipit = labels.some((label) => label.toLowerCase() === 'shipit');
+
+    if (!hasShipit) {
+      throw new DispatchFailure('', 1);
+    }
+
+    return '';
+  }
+
+  /**
+   * Native implementation of `github.sh add-tag`: adds a single
+   * canonical tag to GitHub issue `id`, mapped to its real GitHub
+   * label via `Tags.js`'s `LABEL_TO_TAG` (inverted).
+   * @param {string} repoPath - the target repo's local checkout path.
+   * @param {string} id - the numeric issue id.
+   * @param {string} tag - the canonical tag name to add.
+   * @returns {Promise<string>} the resulting confirmation line — see
+   *   `#_mutateTag`.
+   * @throws {Error} `Error: shipit is human-only; scripts must not add
+   *   or remove it` when `tag` is `shipit`.
+   */
+  async addTag(repoPath, id, tag) {
+    if (!repoPath || !id || !tag) {
+      throw new Error('Usage: github.sh add-tag <repo_path> <id> <tag>');
+    }
+
+    return this._mutateTag(repoPath, id, tag, 'add');
+  }
+
+  /**
+   * Native implementation of `github.sh remove-tag`: removes a single
+   * canonical tag from GitHub issue `id`, mapped to its real GitHub
+   * label via `Tags.js`'s `LABEL_TO_TAG` (inverted).
+   * @param {string} repoPath - the target repo's local checkout path.
+   * @param {string} id - the numeric issue id.
+   * @param {string} tag - the canonical tag name to remove.
+   * @returns {Promise<string>} the resulting confirmation line — see
+   *   `#_mutateTag`.
+   * @throws {Error} `Error: shipit is human-only; scripts must not add
+   *   or remove it` when `tag` is `shipit`.
+   */
+  async removeTag(repoPath, id, tag) {
+    if (!repoPath || !id || !tag) {
+      throw new Error('Usage: github.sh remove-tag <repo_path> <id> <tag>');
+    }
+
+    return this._mutateTag(repoPath, id, tag, 'remove');
+  }
+
+  /**
+   * Shared `addTag`/`removeTag` implementation, mirroring
+   * `tag_mutate_add_label`/`tag_mutate_remove_label` exactly (same
+   * shape `AutoFixAllQueue.js`'s own `_mutateTag` already established
+   * for its best-effort, internal-only mutation — this version is
+   * caller-facing, so failures throw instead of warning-and-continuing).
+   * @param {string} repoPath - the target repo's local checkout path.
+   * @param {string} id - the numeric issue id.
+   * @param {string} tag - the canonical tag name.
+   * @param {'add'|'remove'} action - whether to add or remove the tag.
+   * @returns {Promise<string>} a `Tag '<tag>' already/not present on
+   *   issue #<id> — nothing to do.\n` line when no mutation was
+   *   needed, or an `Added`/`Removed tag '<tag>' .../... issue #<id>
+   *   on <repo_ref>\n` line once mutated.
+   * @throws {Error} `Error: shipit is human-only; scripts must not add
+   *   or remove it` when `tag` is `shipit`.
+   * @throws {Error} `Error: could not fetch issue #<id> from <repo_ref>`
+   *   when the issue's current labels can't be fetched.
+   * @throws {Error} `Error: could not update issue #<id> on <repo_ref>`
+   *   when the add/remove-label REST call fails.
+   */
+  async _mutateTag(repoPath, id, tag, action) {
+    if (tag === 'shipit') {
+      throw new Error('Error: shipit is human-only; scripts must not add or remove it');
+    }
+
+    const label = TAG_TO_LABEL[tag];
+    const { repo, repoRef } = await this._resolveRepo(repoPath);
+    const token = await this._githubToken.get(repoPath);
+
+    let labels;
+
+    try {
+      labels = await this._fetchLabels(id, repo, token);
+    } catch {
+      throw new Error(`Error: could not fetch issue #${id} from ${repoRef}`);
+    }
+
+    const present = labels.includes(label);
+
+    if (action === 'add' ? present : !present) {
+      const state = action === 'add' ? 'already present on' : 'not present on';
+
+      return `Tag '${tag}' ${state} issue #${id} — nothing to do.\n`;
+    }
+
+    try {
+      if (action === 'add') {
+        await this._addLabel(id, repo, token, label);
+      } else {
+        await this._removeLabel(id, repo, token, label);
+      }
+    } catch {
+      throw new Error(`Error: could not update issue #${id} on ${repoRef}`);
+    }
+
+    const verb = action === 'add' ? 'Added' : 'Removed';
+    const preposition = action === 'add' ? 'to' : 'from';
+
+    return `${verb} tag '${tag}' ${preposition} issue #${id} on ${repoRef}\n`;
   }
 
   /**
@@ -554,6 +702,72 @@ class AutoFixAllGithub {
       });
     } catch {
       // best-effort — tolerate any failure.
+    }
+  }
+
+  /**
+   * @param {string} id - the issue id.
+   * @param {string} repo - the `owner/repo` path.
+   * @param {string} token - the GitHub token.
+   * @returns {Promise<string[]>} the issue's current GitHub label names.
+   */
+  async _fetchLabels(id, repo, token) {
+    const response = await this._fetch(`https://api.github.com/repos/${repo}/issues/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(this._timeoutMs)
+    });
+
+    if (!response.ok) {
+      throw new Error(`could not fetch issue #${id} from ${repo}`);
+    }
+
+    const issue = await response.json();
+
+    return (issue.labels || []).map((issueLabel) => issueLabel.name);
+  }
+
+  /**
+   * @param {string} id - the issue id.
+   * @param {string} repo - the `owner/repo` path.
+   * @param {string} token - the GitHub token.
+   * @param {string} label - the GitHub label name to add.
+   * @returns {Promise<void>} resolves once added.
+   */
+  async _addLabel(id, repo, token, label) {
+    const response = await this._fetch(`https://api.github.com/repos/${repo}/issues/${id}/labels`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ labels: [label] }),
+      signal: AbortSignal.timeout(this._timeoutMs)
+    });
+
+    if (!response.ok) {
+      throw new Error(`could not add label '${label}' to issue #${id} on ${repo}`);
+    }
+  }
+
+  /**
+   * @param {string} id - the issue id.
+   * @param {string} repo - the `owner/repo` path.
+   * @param {string} token - the GitHub token.
+   * @param {string} label - the GitHub label name to remove.
+   * @returns {Promise<void>} resolves once removed.
+   */
+  async _removeLabel(id, repo, token, label) {
+    const response = await this._fetch(
+      `https://api.github.com/repos/${repo}/issues/${id}/labels/${encodeURIComponent(label)}`,
+      {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(this._timeoutMs)
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`could not remove label '${label}' from issue #${id} on ${repo}`);
     }
   }
 }
