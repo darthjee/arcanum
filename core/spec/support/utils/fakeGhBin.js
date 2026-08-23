@@ -29,6 +29,27 @@ import { createTempDir, removeTempDir } from './tempDir.js';
 //     -> prints `$FAKE_GH_HEAD_SHA` (default `fake-head-sha`) when
 //     `$FAKE_GH_PR_NUMBER` is set; otherwise fails, matching the
 //     `number` case above.
+//   - `gh pr view -R <ref> <branch|number> --json state -q .state` ->
+//     prints `$FAKE_GH_PR_STATE` (default `OPEN`) — used by
+//     `github.sh`'s `cmd_pr_state`.
+//   - `gh pr view -R <ref> <branch|number> --json title -q .title` ->
+//     prints `$FAKE_GH_PR_TITLE` (default `Fake PR title`) — used by
+//     `github.sh`'s `cmd_pr_merge` cached-number/url branch.
+//   - `gh pr view -R <ref> <branch> --json title,number,url` (no `-q`,
+//     raw JSON on stdout) -> prints `{"title":..,"number":..,"url":..}`
+//     built from `$FAKE_GH_PR_TITLE`/`$FAKE_GH_PR_NUMBER`/
+//     `$FAKE_GH_PR_URL` (default derived from `$FAKE_GH_PR_NUMBER`) —
+//     used by `github.sh`'s `cmd_pr_merge` uncached branch.
+//   - `gh pr view -R <ref> <number> --json commits` (no `-q`) -> prints
+//     `{"commits": $FAKE_GH_PR_COMMITS_JSON}` (default `[]`) — used by
+//     `merge_body.sh`'s `merge_body_coauthors_list`.
+//   - Every `gh pr view ...` invocation above fails (simulating "no pull
+//     request found for the current branch") whenever `$FAKE_GH_PR_NUMBER`
+//     is unset/empty.
+//   - `gh pr merge <number> -R <ref> --squash --delete-branch --subject
+//     <subject> [--body <body>]` -> succeeds (prints nothing) unless
+//     `$FAKE_GH_PR_MERGE_FAIL` is `1` — used by `github.sh`'s
+//     `cmd_pr_merge`.
 //   - `gh pr comment <number> -R <ref> --body-file -` -> drains stdin;
 //     fails when `$FAKE_GH_COMMENT_FAIL` is `1`, otherwise succeeds
 //     printing nothing (matching this migration's "gh pr comment isn't
@@ -36,13 +57,17 @@ import { createTempDir, removeTempDir } from './tempDir.js';
 //   - `gh api repos/<owner>/<repo>/commits/<sha>/check-runs?per_page=100`
 //     -> prints `{"check_runs": $FAKE_GH_CHECK_RUNS_JSON}` (default
 //     `[]`) — used by wait_ci_shell.sh.
+//   - `gh api user -q '.login'` -> prints `$FAKE_GH_USER_LOGIN` (default
+//     `fake-merger`); fails when `$FAKE_GH_USER_FAIL` is `1` — used by
+//     `merge_body.sh`'s `merge_body_coauthors_list`.
 //   - `gh issue view <id> -R <ref> --json labels -q '.labels[].name'`
 //     -> prints `$FAKE_GH_ISSUE_LABELS` (one label name per line —
 //     embedded newlines in the env var itself, e.g. `'Ready for
 //     Work\nCreated'`), or nothing when unset; fails when
 //     `$FAKE_GH_ISSUE_VIEW_FAIL` is `1` — used by
 //     tag_mutate.sh's `tag_mutate_add_label`/`tag_mutate_remove_label`
-//     (queue_save_shell.sh's/queue_push_shell.sh's `_mark_enqueued`).
+//     (queue_save_shell.sh's/queue_push_shell.sh's `_mark_enqueued`, and
+//     `github.sh`'s `cmd_has_shipit_label`/`cmd_add_tag`/`cmd_remove_tag`).
 //   - `gh issue edit <id> -R <ref> --add-label <label>` /
 //     `gh issue edit <id> -R <ref> --remove-label <label>` -> succeeds
 //     (prints nothing) unless `$FAKE_GH_ISSUE_EDIT_FAIL` is `1`.
@@ -88,25 +113,46 @@ case "\${1:-}" in
   pr)
     case "\${2:-}" in
       view)
+        if [[ -z "\${FAKE_GH_PR_NUMBER:-}" ]]; then
+          echo "no pull requests found for branch" >&2
+          exit 1
+        fi
         json_field="$(_json_flag_value "$@")"
         case "$json_field" in
           headRefOid)
-            if [[ -n "\${FAKE_GH_PR_NUMBER:-}" ]]; then
-              echo "\${FAKE_GH_HEAD_SHA:-fake-head-sha}"
-              exit 0
-            fi
-            echo "no pull requests found for branch" >&2
-            exit 1
+            echo "\${FAKE_GH_HEAD_SHA:-fake-head-sha}"
+            ;;
+          number)
+            echo "$FAKE_GH_PR_NUMBER"
+            ;;
+          state)
+            echo "\${FAKE_GH_PR_STATE:-OPEN}"
+            ;;
+          title)
+            echo "\${FAKE_GH_PR_TITLE:-Fake PR title}"
+            ;;
+          title,number,url)
+            printf '{"title":"%s","number":%s,"url":"%s"}\\n' \\
+              "\${FAKE_GH_PR_TITLE:-Fake PR title}" \\
+              "$FAKE_GH_PR_NUMBER" \\
+              "\${FAKE_GH_PR_URL:-https://github.com/example/repo/pull/$FAKE_GH_PR_NUMBER}"
+            ;;
+          commits)
+            echo "{\\"commits\\": \${FAKE_GH_PR_COMMITS_JSON:-[]}}"
             ;;
           *)
-            if [[ -n "\${FAKE_GH_PR_NUMBER:-}" ]]; then
-              echo "$FAKE_GH_PR_NUMBER"
-              exit 0
-            fi
-            echo "no pull requests found for branch" >&2
+            echo "fake gh: unrecognized --json field: $json_field" >&2
             exit 1
             ;;
         esac
+        exit 0
+        ;;
+      merge)
+        if [[ "\${FAKE_GH_PR_MERGE_FAIL:-}" == "1" ]]; then
+          echo "fake gh: merge failed" >&2
+          exit 1
+        fi
+        exit 0
         ;;
       comment)
         cat >/dev/null
@@ -122,6 +168,14 @@ case "\${1:-}" in
     case "\${2:-}" in
       repos/*/commits/*/check-runs*)
         echo "{\\"check_runs\\": \${FAKE_GH_CHECK_RUNS_JSON:-[]}}"
+        exit 0
+        ;;
+      user)
+        if [[ "\${FAKE_GH_USER_FAIL:-}" == "1" ]]; then
+          echo "fake gh: api user failed" >&2
+          exit 1
+        fi
+        echo "\${FAKE_GH_USER_LOGIN:-fake-merger}"
         exit 0
         ;;
     esac
