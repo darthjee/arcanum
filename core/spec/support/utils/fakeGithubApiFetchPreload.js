@@ -80,6 +80,58 @@ if (mode === 'success') {
 
     return new Response(JSON.stringify({ message: 'not found' }), { status: 404 });
   };
+} else if (mode === 'wait-ci-and-merge') {
+  // Drives AutoFixAllWaitCiAndMerge.js (issue #266): the union of
+  // `wait-ci` mode's three GET calls (`AutoFixAllWaitCi#run`'s PR
+  // lookup, head-sha fetch, and check-runs fetch) plus `github` mode's
+  // merge calls (`AutoFixAllGithub#prMerge`'s PR lookup — reusing the
+  // same `/pulls?head=` handler, richer than wait-ci's own but a
+  // superset of the fields either caller reads — `PUT .../merge`, and
+  // `DELETE .../git/refs/heads/<branch>`). `git.merge_body_mode`
+  // defaults to `'empty'` (see AutoFixAllGithub.js#mergeBodyMode), so
+  // no `/pulls/<number>/commits` or `https://api.github.com/user` call
+  // is ever made in this mode — those two `github`-mode-only endpoints
+  // are intentionally left unhandled here. Env vars mirror `wait-ci`/
+  // `github` modes' own `FAKE_FETCH_*` names.
+  const prNumber = process.env.FAKE_FETCH_PR_NUMBER || '';
+  const prTitle = process.env.FAKE_FETCH_PR_TITLE || 'Fake PR title';
+  const prUrl = process.env.FAKE_FETCH_PR_URL || `https://github.com/example/repo/pull/${prNumber}`;
+  const headSha = process.env.FAKE_FETCH_HEAD_SHA || 'fake-head-sha';
+  const checkRuns = process.env.FAKE_FETCH_CHECK_RUNS_JSON || '[]';
+  const mergeFail = process.env.FAKE_FETCH_MERGE_FAIL === '1';
+
+  globalThis.fetch = async (rawUrl, options = {}) => {
+    const url = typeof rawUrl === 'string' ? rawUrl : rawUrl.toString();
+
+    if (url.includes('/pulls?head=')) {
+      if (!prNumber) {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+
+      return new Response(
+        JSON.stringify([{ number: Number(prNumber), title: prTitle, html_url: prUrl }]),
+        { status: 200 }
+      );
+    }
+
+    if (/\/pulls\/\d+$/.test(url)) {
+      return new Response(JSON.stringify({ head: { sha: headSha } }), { status: 200 });
+    }
+
+    if (url.includes('/check-runs')) {
+      return new Response(JSON.stringify({ check_runs: JSON.parse(checkRuns) }), { status: 200 });
+    }
+
+    if (options.method === 'PUT' && /\/pulls\/\d+\/merge$/.test(url)) {
+      return new Response('{}', { status: mergeFail ? 405 : 200 });
+    }
+
+    if (options.method === 'DELETE' && url.includes('/git/refs/heads/')) {
+      return new Response('', { status: 204 });
+    }
+
+    return new Response(JSON.stringify({ message: 'not found' }), { status: 404 });
+  };
 } else if (mode === 'github') {
   // Drives every REST call `AutoFixAllGithub.js` makes (issue #265):
   // `GET .../pulls?head=...&state=all` (pr-number/pr-state/pr-merge's PR
