@@ -52,8 +52,8 @@ Once the user confirms the final table, write only the rows that were actually e
 
 - **`clear_context` / `finish_on_empty_queue` rows**, for each one edited this pass:
   ```bash
-  ../auto-fix-all/scripts/config.sh set clear_context true|false
-  ../auto-fix-all/scripts/config.sh set finish_on_empty_queue true|false
+  ../auto-fix-all/scripts/config.sh set "$REPO_PATH" clear_context true|false
+  ../auto-fix-all/scripts/config.sh set "$REPO_PATH" finish_on_empty_queue true|false
   ```
   > Resolve `../auto-fix-all/scripts/config.sh` relative to the `init-claude` skill folder. Both keys are routed to `.claude/state/arcanum-config.json`'s `auto-fix-all` namespace (gitignored, not committed). Not edited this pass: don't run the script for that key.
 

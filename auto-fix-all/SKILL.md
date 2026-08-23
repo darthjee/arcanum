@@ -46,7 +46,7 @@ scripts/queue.sh pop "$REPO_PATH"
 Check whether the run should finish now that the queue may be empty:
 
 ```bash
-scripts/queue.sh empty "$REPO_PATH" && scripts/config.sh is-enabled finish_on_empty_queue
+scripts/queue.sh empty "$REPO_PATH" && scripts/config.sh is-enabled "$REPO_PATH" finish_on_empty_queue
 ```
 
 - **Exit 0 (both true)**: the queue is empty and the user has opted into finishing instead of waiting. Skip the `clear_context` check below entirely — no `ScheduleWakeup`, no looping back to Step 2. Go straight to Step 4 and report the summary.
@@ -55,7 +55,7 @@ scripts/queue.sh empty "$REPO_PATH" && scripts/config.sh is-enabled finish_on_em
 Check whether to clear context:
 
 ```bash
-scripts/config.sh is-enabled clear_context
+scripts/config.sh is-enabled "$REPO_PATH" clear_context
 ```
 
 - **Exit 0 (`true`)**: call `ScheduleWakeup(delaySeconds=60, prompt="/auto-fix-all", reason="clearing context before next issue")` and stop. Do not loop back to Step 2. (Requires that `auto-fix-all` was invoked via `/loop /auto-fix-all <ids>`; the 60-second wakeup fires a fresh iteration that reads the queue and continues.)
