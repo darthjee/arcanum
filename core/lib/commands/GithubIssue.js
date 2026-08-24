@@ -1,10 +1,10 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import GithubToken from './utils/github/GithubToken.js';
+import GithubToken from '../utils/github/GithubToken.js';
 import IssueState from './IssueState.js';
-import Origin from './utils/git/Origin.js';
-import RepoPath from './utils/file/RepoPath.js';
-import Tags from './utils/issue/Tags.js';
+import Origin from '../utils/git/Origin.js';
+import RepoPath from '../utils/file/RepoPath.js';
+import Tags from '../utils/issue/Tags.js';
 
 const DEFAULT_TIMEOUT_MS = 30000;
 const ISSUES_DIR = 'docs/agents/issues';

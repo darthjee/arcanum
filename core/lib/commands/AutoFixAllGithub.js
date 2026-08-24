@@ -1,11 +1,11 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import ConfigChain from './utils/config/ConfigChain.js';
-import DispatchFailure from './utils/errors/DispatchFailure.js';
-import GithubToken from './utils/github/GithubToken.js';
+import ConfigChain from '../utils/config/ConfigChain.js';
+import DispatchFailure from '../utils/errors/DispatchFailure.js';
+import GithubToken from '../utils/github/GithubToken.js';
 import IssueState from './IssueState.js';
-import Origin from './utils/git/Origin.js';
-import { LABEL_TO_TAG } from './utils/issue/Tags.js';
+import Origin from '../utils/git/Origin.js';
+import { LABEL_TO_TAG } from '../utils/issue/Tags.js';
 
 const defaultExecFileAsync = promisify(execFile);
 const DEFAULT_TIMEOUT_MS = 30000;

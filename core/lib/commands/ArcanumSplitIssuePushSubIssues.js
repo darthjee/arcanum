@@ -1,8 +1,8 @@
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import ArcanumSplitIssueCreateSubIssue from './ArcanumSplitIssueCreateSubIssue.js';
-import DispatchFailure from './utils/errors/DispatchFailure.js';
-import RepoPath from './utils/file/RepoPath.js';
+import DispatchFailure from '../utils/errors/DispatchFailure.js';
+import RepoPath from '../utils/file/RepoPath.js';
 
 const USAGE = 'Usage: push_sub_issues.sh <repo_path> <issue_id>';
 const ISSUES_DIR = 'docs/agents/issues';

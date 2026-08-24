@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { readdir, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import RepoPath from './utils/file/RepoPath.js';
+import RepoPath from '../utils/file/RepoPath.js';
 import SafeBranch from './SafeBranch.js';
 
 const defaultExecFileAsync = promisify(execFile);

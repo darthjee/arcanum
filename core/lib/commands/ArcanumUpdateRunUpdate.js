@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import DispatchFailure from './utils/errors/DispatchFailure.js';
+import DispatchFailure from '../utils/errors/DispatchFailure.js';
 
 const defaultExecFileAsync = promisify(execFile);
 const GIT_SSH_PREFIX = 'git@github.com:';

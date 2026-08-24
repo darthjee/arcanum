@@ -3,8 +3,8 @@ import { readFile as defaultReadFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import GithubToken from './utils/github/GithubToken.js';
-import Origin from './utils/git/Origin.js';
+import GithubToken from '../utils/github/GithubToken.js';
+import Origin from '../utils/git/Origin.js';
 
 const defaultExecFileAsync = promisify(execFile);
 const DEFAULT_TIMEOUT_MS = 30000;

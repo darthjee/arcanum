@@ -1,9 +1,9 @@
-import DispatchFailure from './utils/errors/DispatchFailure.js';
-import GithubToken from './utils/github/GithubToken.js';
-import IssueTagger from './utils/issue/IssueTagger.js';
-import Lock from './utils/file/Lock.js';
-import Origin from './utils/git/Origin.js';
-import QueueStore from './utils/queue/QueueStore.js';
+import DispatchFailure from '../utils/errors/DispatchFailure.js';
+import GithubToken from '../utils/github/GithubToken.js';
+import IssueTagger from '../utils/issue/IssueTagger.js';
+import Lock from '../utils/file/Lock.js';
+import Origin from '../utils/git/Origin.js';
+import QueueStore from '../utils/queue/QueueStore.js';
 
 const DEFAULT_POLL_INTERVAL_MS = 5000;
 

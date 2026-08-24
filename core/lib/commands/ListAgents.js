@@ -1,6 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import RepoPath from './utils/file/RepoPath.js';
+import RepoPath from '../utils/file/RepoPath.js';
 
 const FRONTMATTER_DELIMITER = '---';
 

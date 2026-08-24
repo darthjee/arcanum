@@ -2,12 +2,12 @@ import { execFile } from 'node:child_process';
 import { access, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import DispatchFailure from './utils/errors/DispatchFailure.js';
+import DispatchFailure from '../utils/errors/DispatchFailure.js';
 import GithubIssue from './GithubIssue.js';
-import Origin from './utils/git/Origin.js';
-import RepoConfig from './utils/config/RepoConfig.js';
-import RepoPath from './utils/file/RepoPath.js';
-import Tags from './utils/issue/Tags.js';
+import Origin from '../utils/git/Origin.js';
+import RepoConfig from '../utils/config/RepoConfig.js';
+import RepoPath from '../utils/file/RepoPath.js';
+import Tags from '../utils/issue/Tags.js';
 
 const defaultExecFileAsync = promisify(execFile);
 const USAGE = 'Usage: spawn-issue <repo_path> <parent_id> <title> <body_file> [--as-subissue]';
