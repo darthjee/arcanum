@@ -3,40 +3,12 @@ import path from 'node:path';
 import AutoFixAllQueue from '../../lib/AutoFixAllQueue.js';
 import DispatchFailure from '../../lib/DispatchFailure.js';
 import Lock from '../../lib/Lock.js';
+import { captureStdout } from '../support/utils/captureStdout.js';
+import { fakeFetch } from '../support/utils/fakeFetch.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
 const REPO = 'darthjee/arcanum';
 const TOKEN = 'fake-token';
-
-/**
- * Build a fake `fetch` implementation answering the 3 REST calls
- * `AutoFixAllQueue`'s best-effort label mutation makes per tag: `GET
- * .../issues/<id>` (current labels), `POST .../issues/<id>/labels`
- * (add), `DELETE .../issues/<id>/labels/<label>` (remove).
- * @param {object} [opts] - behavior overrides.
- * @param {string[]} [opts.existingLabels] - the labels every issue
- *   fetch reports as already present.
- * @param {boolean} [opts.getFails] - whether the labels GET fails.
- * @param {boolean} [opts.mutateFails] - whether every POST/DELETE fails.
- * @returns {Function} a jasmine spy usable as `fetchFn`.
- */
-function fakeFetch({ existingLabels = ['Ready for Work', 'Created'], getFails = false, mutateFails = false } = {}) {
-  return jasmine.createSpy('fetch').and.callFake(async (url, options = {}) => {
-    if (options.method === undefined) {
-      if (getFails) {
-        return { ok: false };
-      }
-
-      return { ok: true, json: async () => ({ labels: existingLabels.map((name) => ({ name })) }) };
-    }
-
-    if (options.method === 'POST' || options.method === 'DELETE') {
-      return { ok: !mutateFails };
-    }
-
-    throw new Error(`unexpected fetch call: ${url} ${JSON.stringify(options)}`);
-  });
-}
 
 describe('AutoFixAllQueue', () => {
   let dir;
@@ -72,32 +44,6 @@ describe('AutoFixAllQueue', () => {
       sleepFn: async () => {},
       ...overrides
     });
-  }
-
-  /**
-   * `save`/`push` write directly to `process.stdout` (see
-   * AutoFixAllQueue.js#save's doc comment) rather than returning a
-   * string — capture everything written to `process.stdout` for the
-   * duration of `fn`, so specs can assert on it the same way parity
-   * specs assert on a subprocess's captured stdout.
-   * @param {Function} fn - a zero-argument function (sync or async)
-   *   to run while `process.stdout.write` is captured.
-   * @returns {Promise<{result: *, stdout: string}>} `fn`'s own resolved
-   *   value, plus everything written to `process.stdout` meanwhile.
-   */
-  async function captureStdout(fn) {
-    const chunks = [];
-    const spy = spyOn(process.stdout, 'write').and.callFake((chunk) => {
-      chunks.push(chunk);
-
-      return true;
-    });
-
-    const result = await fn();
-
-    spy.and.callThrough();
-
-    return { result, stdout: chunks.join('') };
   }
 
   describe('#save', () => {
