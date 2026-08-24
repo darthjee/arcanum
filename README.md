@@ -2,10 +2,15 @@
 
 A collection of Claude Code skills — reusable slash commands that extend Claude Code with project workflows.
 
+
+[![Build Status](https://circleci.com/gh/darthjee/arcanum.svg?style=shield)](https://circleci.com/gh/darthjee/arcanum)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/9749726787d24c7cadc8bf82f0dd1d53)](https://app.codacy.com/gh/darthjee/arcanum/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+[![Codacy Badge](https://app.codacy.com/project/badge/Coverage/9749726787d24c7cadc8bf82f0dd1d53)](https://app.codacy.com/gh/darthjee/arcanum/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_coverage)
+
+
 ![arcanum](https://raw.githubusercontent.com/darthjee/arcanum/master/arcanum.png)
 
 **Current Version:** [0.20.1](https://github.com/darthjee/arcanum/releases/tag/0.20.1)
-
 **Next Release:** [0.20.2](https://github.com/darthjee/arcanum/compare/0.20.1...main)
 
 ## What are skills?
