@@ -1,9 +1,9 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import DispatchFailure from './DispatchFailure.js';
+import DispatchFailure from './utils/errors/DispatchFailure.js';
 import IssueState from './IssueState.js';
-import RepoPath from './RepoPath.js';
+import RepoPath from './utils/file/RepoPath.js';
 import SpawnIssue from './SpawnIssue.js';
 
 const USAGE = 'Usage: create_sub_issue.sh <repo_path> <issue_id> <sub_issue_file>';

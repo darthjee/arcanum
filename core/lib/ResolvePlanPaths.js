@@ -1,6 +1,6 @@
 import { access, mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import IssueFile from './IssueFile.js';
+import IssueFile from './utils/file/IssueFile.js';
 
 const NUMERIC_ID_PATTERN = /^[0-9]+$/;
 

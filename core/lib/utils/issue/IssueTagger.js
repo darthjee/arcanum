@@ -1,6 +1,6 @@
-import DispatchFailure from './DispatchFailure.js';
-import GithubToken from './GithubToken.js';
-import Origin from './Origin.js';
+import DispatchFailure from '../errors/DispatchFailure.js';
+import GithubToken from '../github/GithubToken.js';
+import Origin from '../git/Origin.js';
 import { LABEL_TO_TAG } from './Tags.js';
 
 const DEFAULT_TIMEOUT_MS = 30000;

@@ -1,5 +1,5 @@
 import GithubIssue from './GithubIssue.js';
-import IssueFile from './IssueFile.js';
+import IssueFile from './utils/file/IssueFile.js';
 import SafeBranch from './SafeBranch.js';
 
 const ID_PATTERN = /^#([0-9]+)$/;

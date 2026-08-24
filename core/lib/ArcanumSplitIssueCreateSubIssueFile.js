@@ -1,6 +1,6 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import RepoPath from './RepoPath.js';
+import RepoPath from './utils/file/RepoPath.js';
 
 const USAGE = 'Usage: create_sub_issue_file.sh <repo_path> <issue_id> <title> <body_file>';
 const ISSUES_DIR = 'docs/agents/issues';

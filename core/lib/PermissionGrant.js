@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import Lock from './Lock.js';
+import Lock from './utils/file/Lock.js';
 
 const USAGE_MESSAGE = 'Usage: permission_grant.sh add <file> <pattern>';
 

@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import Lock from './Lock.js';
-import RepoPath from './RepoPath.js';
+import Lock from './utils/file/Lock.js';
+import RepoPath from './utils/file/RepoPath.js';
 
 const USAGE_MESSAGE = [
   'Usage: issue_state.sh <repo_path> get <id> <field>',

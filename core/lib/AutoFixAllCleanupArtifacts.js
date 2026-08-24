@@ -1,7 +1,7 @@
 import { execFile, spawn } from 'node:child_process';
 import { stat } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import RepoPath from './RepoPath.js';
+import RepoPath from './utils/file/RepoPath.js';
 
 const promisifiedExecFile = promisify(execFile);
 const USAGE = 'Usage: cleanup_artifacts.sh <repo_path> <issue_file> <plan_dir> <id> <model_name> <model_email>';
