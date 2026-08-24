@@ -49,7 +49,7 @@ class PermissionGrant {
    * needed, deduping against whatever is already there, without
    * disturbing any other content already in `file` (e.g.
    * `.permissions.deny`, hooks, or any other top-level key).
-   * Lock-protected (`core/lib/Lock.js`), atomic write (`.tmp` file +
+   * Lock-protected (`core/lib/utils/file/Lock.js`), atomic write (`.tmp` file +
    * rename).
    *
    * Degrades silently (stderr warning, no-op, still resolves/exits 0)

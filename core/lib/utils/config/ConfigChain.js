@@ -9,7 +9,8 @@ import path from 'node:path';
  * (`.claude/configuration/arcanum-repo-config.json`), then global
  * config (`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/arcanum-config.json`).
  * Extracted as a standalone, reusable module (see
- * `core/lib/Tags.js`/`core/lib/GithubToken.js` for the same
+ * `core/lib/utils/issue/Tags.js`/`core/lib/utils/github/GithubToken.js`
+ * for the same
  * one-entrypoint-then-exported-for-reuse precedent) rather than
  * embedded in whichever entrypoint needed it first.
  */

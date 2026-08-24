@@ -25,8 +25,8 @@ const TAG_TO_LABEL = Object.fromEntries(
  * `fetch` + a `gh auth token`-resolved bearer token) instead of
  * shelling out to `gh pr view`/`gh pr merge`/`gh issue view`/`gh issue
  * edit`, mirroring every other migrated GitHub-facing entrypoint (see
- * `core/lib/GithubIssue.js`, `core/lib/AutoFixAllQueue.js`,
- * `core/lib/AutoFixAllWaitCi.js`).
+ * `core/lib/commands/GithubIssue.js`, `core/lib/commands/AutoFixAllQueue.js`,
+ * `core/lib/commands/AutoFixAllWaitCi.js`).
  */
 class AutoFixAllGithub {
   /**
@@ -65,7 +65,7 @@ class AutoFixAllGithub {
    * Native implementation of `github.sh pr-number`: prints the current
    * branch's pull request number. When the current branch matches
    * `issue-<id>`, tries `IssueState`'s cached `pr_id` field first
-   * (reusing `core/lib/IssueState.js` directly rather than re-deriving
+   * (reusing `core/lib/commands/IssueState.js` directly rather than re-deriving
    * the cache read) before falling back to a GitHub REST lookup.
    * @param {string} repoPath - the target repo's local checkout path.
    * @returns {Promise<string>} `<number>\n`.

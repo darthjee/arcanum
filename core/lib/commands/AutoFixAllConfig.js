@@ -11,7 +11,8 @@ const DEFAULT_VALUE = 'false';
  * Native equivalent of `auto-fix-all/scripts/config.sh`, re-deriving
  * `arcanum/_lib/repo_config.sh`'s new/legacy file split and
  * `repo_config_read`/`repo_config_write` logic natively — no shared
- * native helper exists for this yet (`core/lib/RepoConfig.js` covers an
+ * native helper exists for this yet (`core/lib/utils/config/RepoConfig.js`
+ * covers an
  * unrelated, single-tier read of a different namespace). Implements the
  * 4 subcommands (`get`, `is-enabled`, `set`, `toggle`) of the
  * `auto-fix-all` config namespace.

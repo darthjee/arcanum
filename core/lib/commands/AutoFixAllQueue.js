@@ -27,7 +27,7 @@ function defaultSleep(ms) {
  * `waitNext`, `push`, `pop`, `empty`, `list`). State is a JSON array in
  * `.claude/state/auto-fix-all-queue.json`; `push`/`pop` are
  * lock-guarded (`.claude/state/auto-fix-all-queue.lock`, via
- * `core/lib/Lock.js`) against concurrent mutation. `save`/`push` also
+ * `core/lib/utils/file/Lock.js`) against concurrent mutation. `save`/`push` also
  * best-effort tag-mutate the affected GitHub issues (`enqueued` added,
  * `ready_for_work`/`created` removed) — see
  * docs/agents/plans/264-migrate-auto-fix-all-queue-entrypoint-save-next-wait-next-push-pop-empty-list-to-native-node-js/node.md.
