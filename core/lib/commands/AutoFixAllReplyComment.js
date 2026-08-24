@@ -15,10 +15,10 @@ const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 // `auto-monitor-issue-pr/scripts/resolve_pr_number.sh` is explicitly
 // out-of-batch for this migration (see the issue) — shelled out to
 // exactly like `reply_comment_shell.sh` does, resolved relative to this
-// skill repo's own root (two levels up from `core/lib/`), not the
-// target `repoPath` being operated on.
+// skill repo's own root (three levels up from `core/lib/commands/`),
+// not the target `repoPath` being operated on.
 const RESOLVE_PR_NUMBER_SCRIPT = path.join(
-  MODULE_DIR, '..', '..', 'auto-monitor-issue-pr', 'scripts', 'resolve_pr_number.sh'
+  MODULE_DIR, '..', '..', '..', 'auto-monitor-issue-pr', 'scripts', 'resolve_pr_number.sh'
 );
 
 /**
