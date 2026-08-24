@@ -107,7 +107,7 @@ describe('bin/arcanum', () => {
   });
 
   // Invocation logging (issue #244) — temporary, debug-only
-  // instrumentation. See core/lib/InvocationLog.js and
+  // instrumentation. See core/lib/utils/logging/InvocationLog.js and
   // docs/agents/plans/244-add-logs-to-native-nodejs-calls/node.md.
   describe('invocation logging', () => {
     let repo;
