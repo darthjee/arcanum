@@ -1,6 +1,6 @@
-import { expectParity, seedGithubLikeRepo, setupParityTest } from '../../support/factories/githubParitySetup.js';
+import { seedGithubLikeRepo, setupParityTest } from '../../support/factories/githubParitySetup.js';
 import { createGitFixtureRepo } from '../../support/utils/gitFixtureRepo.js';
-import { NATIVE_BIN, runBoth, runCommand, SHELL_SCRIPT } from '../../support/utils/runCommand.js';
+import { expectParity, NATIVE_BIN, runBoth, runCommand, SHELL_SCRIPT } from '../../support/utils/runCommand.js';
 
 // Parity test for the "auto-fix-all-github add-tag" migrated
 // entrypoint (issue #265) — see docs/agents/architecture/script-engine.md's

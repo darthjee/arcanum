@@ -50,15 +50,3 @@ export async function setupParityTest({ ghVars, fetchVars } = {}) {
     cleanup: () => Promise.all([shellRepo.cleanup(), nativeRepo.cleanup(), fakeGh.cleanup()])
   };
 }
-
-/**
- * Asserts the shell and native sides of a comparison produced
- * byte-identical stdout and matching exit codes.
- * @param {{stdout: string, code: number}} shell - the shell side's result.
- * @param {{stdout: string, code: number}} native - the native side's result.
- * @returns {void}
- */
-export function expectParity(shell, native) {
-  expect(native.stdout).toEqual(shell.stdout);
-  expect(native.code).toEqual(shell.code);
-}

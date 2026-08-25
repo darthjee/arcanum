@@ -1,5 +1,5 @@
-import { expectParity, setupParityTest } from '../../support/factories/githubParitySetup.js';
-import { runBoth } from '../../support/utils/runCommand.js';
+import { setupParityTest } from '../../support/factories/githubParitySetup.js';
+import { expectParity, runBoth } from '../../support/utils/runCommand.js';
 
 // Parity test for the "auto-fix-all-github pr-merge" migrated
 // entrypoint (issue #265) — see docs/agents/architecture/script-engine.md's
