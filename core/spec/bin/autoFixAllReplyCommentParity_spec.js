@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { createFakeGhBin } from '../support/utils/fakeGhBin.js';
 import { createGitFixtureRepo } from '../support/utils/gitFixtureRepo.js';
+import { seedOriginUrl } from '../support/utils/runCommand.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
 // Parity test for the "auto-fix-all-reply-comment" migrated entrypoint
@@ -101,7 +102,7 @@ async function git(args, cwd) {
 async function seedGithubLikeRepo(repo) {
   const fakeUrl = 'https://github.com/darthjee/arcanum-reply-comment-fixture.git';
 
-  await git(['remote', 'set-url', 'origin', fakeUrl], repo.repoPath);
+  await seedOriginUrl(repo.repoPath, fakeUrl);
   await git(['config', `url.${repo.remotePath}.pushInsteadOf`, fakeUrl], repo.repoPath);
 
   const templateContent = await readFile(REAL_TEMPLATE_PATH, 'utf8');
