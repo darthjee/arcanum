@@ -2,22 +2,28 @@ import PrOperations from '../../../../lib/utils/github/PrOperations.js';
 import { createRepoContextMock } from '../../../support/factories/repoContextFactory.js';
 
 const REPO = 'darthjee/arcanum';
-const REPO_REF = 'darthjee/arcanum';
-const TOKEN = 'fake-token';
 
 /**
- * Build a fake `GitClient`, answering `currentBranch` with `branch`.
+ * Build a fake `Git` facade, answering `currentBranch`/
+ * `issueFromCurrentBranch` from `branch`.
  * @param {object} [opts] - behavior overrides.
  * @param {string} [opts.branch] - the current branch's name.
- * @returns {object} a fake `GitClient`.
+ * @returns {object} a fake `Git` facade.
  */
-function fakeGitClient({ branch = 'issue-5' } = {}) {
-  return { currentBranch: jasmine.createSpy().and.resolveTo(branch) };
+function fakeGit({ branch = 'issue-5' } = {}) {
+  const idMatch = branch.match(/^issue-(\d+)$/);
+  const issue = idMatch ? { id: idMatch[1], branch } : null;
+
+  return {
+    currentBranch: jasmine.createSpy().and.resolveTo(branch),
+    issueFromCurrentBranch: jasmine.createSpy().and.resolveTo(issue)
+  };
 }
 
 /**
  * Build a fake `GitHubClient`, routing every call to a configurable
- * canned response.
+ * canned response. Every method drops `repo`/`token`/`repoRef`, per the
+ * context-bound `GitHubClient` from step 03.
  * @param {object} [config] - behavior overrides.
  * @param {object} [config.pull] - the `getPr` resolved pull request, or
  *   `null` to reject with the not-found error.
@@ -33,9 +39,9 @@ function fakeGithubClient({
   mergeOk = true
 } = {}) {
   return {
-    getPr: jasmine.createSpy().and.callFake(async (repo, branch, token, repoRef) => {
+    getPr: jasmine.createSpy().and.callFake(async () => {
       if (!pull) {
-        throw new Error(`Error: no pull request found for the current branch on ${repoRef}`);
+        throw new Error(`Error: no pull request found for the current branch on ${REPO}`);
       }
 
       return pull;
@@ -54,15 +60,15 @@ function fakeGithubClient({
 describe('PrOperations', () => {
   function newPrOperations({ branch, pull, commits, user, mergeOk, configValues = {}, issueStateValues = {} } = {}) {
     const context = createRepoContextMock({
-      origin: { resolveWithRef: jasmine.createSpy().and.resolveTo({ domain: 'github.com', repo: REPO, repoRef: REPO_REF }) },
-      githubToken: { get: jasmine.createSpy().and.resolveTo(TOKEN) },
+      origin: { resolveWithRef: jasmine.createSpy() },
+      githubToken: { get: jasmine.createSpy() },
       issueState: { get: jasmine.createSpy().and.callFake(async (repoPath, id, field) => issueStateValues[field] ?? '') },
       configChain: { read: jasmine.createSpy().and.callFake(async (repoPath, scope, key) => configValues[key]) }
     });
     const githubClient = fakeGithubClient({ pull, commits, user, mergeOk });
-    const prOperations = new PrOperations({ context, gitClient: fakeGitClient({ branch }), githubClient });
+    const prOperations = new PrOperations({ context, git: fakeGit({ branch }), githubClient });
 
-    return { prOperations, githubClient };
+    return { prOperations, githubClient, context };
   }
 
   describe('#prNumber', () => {
@@ -90,6 +96,15 @@ describe('PrOperations', () => {
       await expectAsync(prOperations.prNumber()).toBeRejectedWithError(
         'Error: no pull request found for the current branch on darthjee/arcanum'
       );
+    });
+
+    it('never calls context.getToken() or context.resolveWithRef() directly', async () => {
+      const { prOperations, context } = newPrOperations({ branch: 'some-other-branch' });
+
+      await prOperations.prNumber();
+
+      expect(context._githubToken.get).not.toHaveBeenCalled();
+      expect(context._origin.resolveWithRef).not.toHaveBeenCalled();
     });
   });
 
@@ -121,6 +136,15 @@ describe('PrOperations', () => {
         'Error: no pull request found for the current branch on darthjee/arcanum'
       );
     });
+
+    it('never calls context.getToken() or context.resolveWithRef() directly', async () => {
+      const { prOperations, context } = newPrOperations({});
+
+      await prOperations.prState();
+
+      expect(context._githubToken.get).not.toHaveBeenCalled();
+      expect(context._origin.resolveWithRef).not.toHaveBeenCalled();
+    });
   });
 
   describe('#prMerge', () => {
@@ -132,7 +156,7 @@ describe('PrOperations', () => {
       await expectAsync(prOperations.prMerge()).toBeResolvedTo(`${PULL.html_url}\n`);
 
       expect(githubClient.mergePr).toHaveBeenCalledWith(
-        REPO, 7, TOKEN, { merge_method: 'squash', commit_title: 'My PR (#7)', commit_message: '' }
+        7, { merge_method: 'squash', commit_title: 'My PR (#7)', commit_message: '' }
       );
     });
 
@@ -147,9 +171,8 @@ describe('PrOperations', () => {
 
       const mergeCall = githubClient.mergePr.calls.mostRecent();
 
-      expect(mergeCall.args[0]).toEqual(REPO);
-      expect(mergeCall.args[1]).toEqual('123');
-      expect(mergeCall.args[3].commit_title).toEqual('My PR (#123)');
+      expect(mergeCall.args[0]).toEqual('123');
+      expect(mergeCall.args[1].commit_title).toEqual('My PR (#123)');
     });
 
     it('omits commit_message entirely in "full" mode', async () => {
@@ -159,7 +182,7 @@ describe('PrOperations', () => {
 
       const mergeCall = githubClient.mergePr.calls.mostRecent();
 
-      expect(mergeCall.args[3]).toEqual({ merge_method: 'squash', commit_title: 'My PR (#7)' });
+      expect(mergeCall.args[1]).toEqual({ merge_method: 'squash', commit_title: 'My PR (#7)' });
     });
 
     it('sends an empty commit_message in "empty" mode', async () => {
@@ -169,7 +192,7 @@ describe('PrOperations', () => {
 
       const mergeCall = githubClient.mergePr.calls.mostRecent();
 
-      expect(mergeCall.args[3].commit_message).toEqual('');
+      expect(mergeCall.args[1].commit_message).toEqual('');
     });
 
     describe('"coauthors" mode', () => {
@@ -189,7 +212,7 @@ describe('PrOperations', () => {
 
         const mergeCall = githubClient.mergePr.calls.mostRecent();
 
-        expect(mergeCall.args[3].commit_message).toEqual(
+        expect(mergeCall.args[1].commit_message).toEqual(
           'Co-authored-by: Alice <alice@x.com>\nCo-authored-by: Bob <bob@x.com>\n'
         );
       });
@@ -209,7 +232,7 @@ describe('PrOperations', () => {
 
         const mergeCall = githubClient.mergePr.calls.mostRecent();
 
-        expect(mergeCall.args[3]).toEqual({ merge_method: 'squash', commit_title: 'My PR (#7)' });
+        expect(mergeCall.args[1]).toEqual({ merge_method: 'squash', commit_title: 'My PR (#7)' });
       });
     });
 
@@ -217,7 +240,7 @@ describe('PrOperations', () => {
       const { prOperations } = newPrOperations({ pull: PULL, mergeOk: false });
 
       await expectAsync(prOperations.prMerge()).toBeRejectedWithError(
-        'Error: could not merge PR #7 on darthjee/arcanum'
+        'could not merge PR #7 on darthjee/arcanum'
       );
     });
 
@@ -226,7 +249,16 @@ describe('PrOperations', () => {
 
       await prOperations.prMerge();
 
-      expect(githubClient.deleteBranch).toHaveBeenCalledWith(REPO, 'issue-9', TOKEN);
+      expect(githubClient.deleteBranch).toHaveBeenCalledWith('issue-9');
+    });
+
+    it('never calls context.getToken() or context.resolveWithRef() directly', async () => {
+      const { prOperations, context } = newPrOperations({ pull: PULL });
+
+      await prOperations.prMerge();
+
+      expect(context._githubToken.get).not.toHaveBeenCalled();
+      expect(context._origin.resolveWithRef).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,11 +1,17 @@
 import GitHubClient from '../../../../lib/utils/github/GitHubClient.js';
+import { createRepoContextMock } from '../../../support/factories/repoContextFactory.js';
 
 const REPO = 'darthjee/arcanum';
 const TOKEN = 'fake-token';
 
 describe('GitHubClient', () => {
   function newClient(fetchFn) {
-    return new GitHubClient({ fetchFn, timeoutMs: 5 });
+    const context = createRepoContextMock({
+      origin: { resolveWithRef: jasmine.createSpy().and.resolveTo({ domain: 'github.com', repo: REPO, repoRef: REPO }) },
+      githubToken: { get: jasmine.createSpy().and.resolveTo(TOKEN) }
+    });
+
+    return new GitHubClient({ context, fetchFn, timeoutMs: 5 });
   }
 
   describe('#getPr', () => {
@@ -14,7 +20,7 @@ describe('GitHubClient', () => {
       const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true, json: async () => [pull] });
       const client = newClient(fetchFn);
 
-      const result = await client.getPr(REPO, 'issue-5', TOKEN, REPO);
+      const result = await client.getPr('issue-5');
 
       expect(fetchFn).toHaveBeenCalledWith(
         `https://api.github.com/repos/${REPO}/pulls?head=darthjee:issue-5&state=all`,
@@ -27,7 +33,7 @@ describe('GitHubClient', () => {
       const fetchFn = jasmine.createSpy().and.resolveTo({ ok: false });
       const client = newClient(fetchFn);
 
-      await expectAsync(client.getPr(REPO, 'issue-5', TOKEN, REPO)).toBeRejectedWithError(
+      await expectAsync(client.getPr('issue-5')).toBeRejectedWithError(
         'Error: no pull request found for the current branch on darthjee/arcanum'
       );
     });
@@ -36,7 +42,7 @@ describe('GitHubClient', () => {
       const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true, json: async () => [] });
       const client = newClient(fetchFn);
 
-      await expectAsync(client.getPr(REPO, 'issue-5', TOKEN, REPO)).toBeRejectedWithError(
+      await expectAsync(client.getPr('issue-5')).toBeRejectedWithError(
         'Error: no pull request found for the current branch on darthjee/arcanum'
       );
     });
@@ -45,7 +51,7 @@ describe('GitHubClient', () => {
       const fetchFn = jasmine.createSpy().and.rejectWith(new Error('timeout'));
       const client = newClient(fetchFn);
 
-      await expectAsync(client.getPr(REPO, 'issue-5', TOKEN, REPO)).toBeRejectedWithError(
+      await expectAsync(client.getPr('issue-5')).toBeRejectedWithError(
         'Error: no pull request found for the current branch on darthjee/arcanum'
       );
     });
@@ -57,7 +63,7 @@ describe('GitHubClient', () => {
       const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true, json: async () => commits });
       const client = newClient(fetchFn);
 
-      const result = await client.getPrCommits(REPO, 7, TOKEN);
+      const result = await client.getPrCommits(7);
 
       expect(fetchFn).toHaveBeenCalledWith(
         `https://api.github.com/repos/${REPO}/pulls/7/commits?per_page=100`,
@@ -70,14 +76,14 @@ describe('GitHubClient', () => {
       const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true, json: async () => ({}) });
       const client = newClient(fetchFn);
 
-      await expectAsync(client.getPrCommits(REPO, 7, TOKEN)).toBeResolvedTo([]);
+      await expectAsync(client.getPrCommits(7)).toBeResolvedTo([]);
     });
 
     it('throws when the response is not ok', async () => {
       const fetchFn = jasmine.createSpy().and.resolveTo({ ok: false });
       const client = newClient(fetchFn);
 
-      await expectAsync(client.getPrCommits(REPO, 7, TOKEN)).toBeRejectedWithError(
+      await expectAsync(client.getPrCommits(7)).toBeRejectedWithError(
         'could not fetch commits for pull request #7 in darthjee/arcanum'
       );
     });
@@ -89,7 +95,7 @@ describe('GitHubClient', () => {
       const client = newClient(fetchFn);
       const payload = { merge_method: 'squash', commit_title: 'My PR (#7)' };
 
-      await client.mergePr(REPO, 7, TOKEN, payload);
+      await client.mergePr(7, payload);
 
       expect(fetchFn).toHaveBeenCalledWith(`https://api.github.com/repos/${REPO}/pulls/7/merge`, {
         method: 'PUT',
@@ -103,7 +109,7 @@ describe('GitHubClient', () => {
       const fetchFn = jasmine.createSpy().and.resolveTo({ ok: false });
       const client = newClient(fetchFn);
 
-      await expectAsync(client.mergePr(REPO, 7, TOKEN, {})).toBeRejectedWithError(
+      await expectAsync(client.mergePr(7, {})).toBeRejectedWithError(
         'could not merge PR #7 on darthjee/arcanum'
       );
     });
@@ -114,7 +120,7 @@ describe('GitHubClient', () => {
       const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true });
       const client = newClient(fetchFn);
 
-      await client.deleteBranch(REPO, 'issue-5', TOKEN);
+      await client.deleteBranch('issue-5');
 
       expect(fetchFn).toHaveBeenCalledWith(`https://api.github.com/repos/${REPO}/git/refs/heads/issue-5`, {
         method: 'DELETE',
@@ -127,14 +133,14 @@ describe('GitHubClient', () => {
       const fetchFn = jasmine.createSpy().and.resolveTo({ ok: false });
       const client = newClient(fetchFn);
 
-      await expectAsync(client.deleteBranch(REPO, 'issue-5', TOKEN)).toBeResolved();
+      await expectAsync(client.deleteBranch('issue-5')).toBeResolved();
     });
 
     it('tolerates a rejected fetch call', async () => {
       const fetchFn = jasmine.createSpy().and.rejectWith(new Error('network error'));
       const client = newClient(fetchFn);
 
-      await expectAsync(client.deleteBranch(REPO, 'issue-5', TOKEN)).toBeResolved();
+      await expectAsync(client.deleteBranch('issue-5')).toBeResolved();
     });
   });
 
@@ -144,7 +150,7 @@ describe('GitHubClient', () => {
       const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true, json: async () => user });
       const client = newClient(fetchFn);
 
-      const result = await client.getCurrentUser(TOKEN);
+      const result = await client.getCurrentUser();
 
       expect(fetchFn).toHaveBeenCalledWith(
         'https://api.github.com/user',
@@ -157,7 +163,7 @@ describe('GitHubClient', () => {
       const fetchFn = jasmine.createSpy().and.resolveTo({ ok: false });
       const client = newClient(fetchFn);
 
-      await expectAsync(client.getCurrentUser(TOKEN)).toBeRejectedWithError('could not fetch current user');
+      await expectAsync(client.getCurrentUser()).toBeRejectedWithError('could not fetch current user');
     });
   });
 });
