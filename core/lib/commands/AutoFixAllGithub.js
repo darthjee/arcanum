@@ -1,5 +1,7 @@
 import BranchCleanup from '../utils/git/BranchCleanup.js';
 import DispatchFailure from '../utils/errors/DispatchFailure.js';
+import Git from '../utils/git/Git.js';
+import GitBranch from '../utils/git/GitBranch.js';
 import GitClient from '../utils/git/GitClient.js';
 import GitHubClient from '../utils/github/GitHubClient.js';
 import GithubToken from '../utils/github/GithubToken.js';
@@ -12,40 +14,42 @@ import { TAG_TO_LABEL } from '../utils/issue/Tags.js';
 /**
  * Native equivalent of `auto-fix-all/scripts/github.sh`'s 7 GitHub-facing
  * subcommands. A thin facade delegating PR lifecycle to a per-call
- * `PrOperations` (built from a per-call `RepoContext` plus the shared
- * `gitClient`/`githubClient` singletons — `repoPath` differs call to
- * call, so `RepoContext` can't be built once per instance), local-git
- * branch teardown to `BranchCleanup`, and tag/label mutation to
- * `IssueTagger` — see `docs/agents/plans/284-refactor-core-lib-autofixallgithub-js/`
- * and `docs/agents/plans/292-reduce-size-of-properations/`. Kept (not
- * removed) since `AutoFixAllWaitCiAndMerge.js` instantiates it directly
- * to call `#prMerge`.
+ * `PrOperations` (built from a per-call `RepoContext`, plus a fresh
+ * context-bound `gitClient`/`githubClient` pair — `repoPath` differs
+ * call to call, so none of `RepoContext`/`GitClient`/`GitHubClient` can
+ * be shared across calls once `GitClient`/`GitHubClient` become
+ * context-bound), local-git branch teardown to `BranchCleanup`, and
+ * tag/label mutation to `IssueTagger` — see
+ * `docs/agents/plans/284-refactor-core-lib-autofixallgithub-js/`,
+ * `docs/agents/plans/292-reduce-size-of-properations/`, and
+ * `docs/agents/plans/294-refactor-properations/`. Kept (not removed)
+ * since `AutoFixAllWaitCiAndMerge.js` instantiates it directly to call
+ * `#prMerge`.
  */
 class AutoFixAllGithub {
   /**
    * Builds and shares one `origin`/`githubToken` pair across the
-   * default `issueTagger`, and one `gitClient`/`githubClient` pair
-   * across every per-call `PrOperations`, rather than letting each
-   * default its own.
+   * default `issueTagger`, keeping `execFileAsync`/`fetchFn`/`timeoutMs`
+   * around only to forward into each call's fresh, context-bound
+   * `gitClient`/`githubClient` pair (built by `#_prOperations`) — those
+   * two are no longer constructor-level shared singletons, since a
+   * `GitClient`/`GitHubClient` built without a `context` can't resolve
+   * `repoPath`/`token`/`repo`/`repoRef` at all.
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Origin} [deps.origin] - shared git-origin resolver.
    * @param {GithubToken} [deps.githubToken] - shared GitHub token resolver.
    * @param {Function} [deps.fetchFn] - forwarded to the default
-   *   `issueTagger`/`githubClient`.
+   *   `issueTagger`, and to each per-call `githubClient`.
    * @param {number} [deps.timeoutMs] - forwarded to the default
-   *   `issueTagger`/`githubClient`.
+   *   `issueTagger`, and to each per-call `githubClient`.
    * @param {object} [deps.issueState] - forwarded to each per-call
    *   `RepoContext`.
    * @param {object} [deps.configChain] - forwarded to each per-call
    *   `RepoContext`.
    * @param {Function} [deps.execFileAsync] - forwarded to the default
-   *   `gitClient`/`branchCleanup`.
+   *   `branchCleanup`, and to each per-call `gitClient`.
    * @param {IssueTagger} [deps.issueTagger] - delegate for `addTag`/
    *   `removeTag`/`hasShipitLabel`.
-   * @param {GitClient} [deps.gitClient] - shared git CLI client, forwarded
-   *   to each per-call `PrOperations`.
-   * @param {GitHubClient} [deps.githubClient] - shared GitHub REST
-   *   client, forwarded to each per-call `PrOperations`.
    * @param {BranchCleanup} [deps.branchCleanup] - delegate for
    *   `cleanupBranch`.
    */
@@ -58,8 +62,6 @@ class AutoFixAllGithub {
     configChain,
     execFileAsync,
     issueTagger = new IssueTagger({ origin, githubToken, fetchFn, timeoutMs }),
-    gitClient = new GitClient({ execFileAsync }),
-    githubClient = new GitHubClient({ fetchFn, timeoutMs }),
     branchCleanup = new BranchCleanup({ execFileAsync })
   } = {}) {
     this._origin = origin;
@@ -67,8 +69,9 @@ class AutoFixAllGithub {
     this._issueState = issueState;
     this._configChain = configChain;
     this._issueTagger = issueTagger;
-    this._gitClient = gitClient;
-    this._githubClient = githubClient;
+    this._fetchFn = fetchFn;
+    this._timeoutMs = timeoutMs;
+    this._execFileAsync = execFileAsync;
     this._branchCleanup = branchCleanup;
   }
 
@@ -115,8 +118,10 @@ class AutoFixAllGithub {
   /**
    * Build a per-call `PrOperations`, wrapping `repoPath` (plus the
    * shared `origin`/`githubToken`/`issueState`/`configChain`) into a
-   * fresh `RepoContext` and forwarding the shared `gitClient`/
-   * `githubClient` singletons.
+   * fresh `RepoContext`, and building a fresh, context-bound
+   * `gitClient`/`githubClient` pair right alongside it — both are cheap,
+   * stateless-construction objects (no I/O in their constructors), so
+   * building them per call has no meaningful cost.
    * @param {string} repoPath - the target repo's local checkout path.
    * @returns {PrOperations} the per-call `PrOperations` facade.
    */
@@ -128,8 +133,12 @@ class AutoFixAllGithub {
       issueState: this._issueState,
       configChain: this._configChain
     });
+    const gitClient = new GitClient({ context, execFileAsync: this._execFileAsync });
+    const gitBranch = new GitBranch({ context, gitClient });
+    const git = new Git({ context, gitBranch });
+    const githubClient = new GitHubClient({ context, fetchFn: this._fetchFn, timeoutMs: this._timeoutMs });
 
-    return new PrOperations({ context, gitClient: this._gitClient, githubClient: this._githubClient });
+    return new PrOperations({ context, gitClient, gitBranch, git, githubClient });
   }
 
   /**

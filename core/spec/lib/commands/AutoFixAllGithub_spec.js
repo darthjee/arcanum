@@ -129,24 +129,36 @@ describe('AutoFixAllGithub', () => {
       expect(tokenGet).toHaveBeenCalledTimes(2);
     });
 
-    it('shares the same gitClient/githubClient instances across every per-call PrOperations', async () => {
-      const currentBranch = jasmine.createSpy('gitClient.currentBranch').and.resolveTo('main');
-      const getPr = jasmine.createSpy('githubClient.getPr').and.resolveTo({
-        number: 7, state: 'open', merged: false, merged_at: null
+    it('builds a fresh, context-bound gitClient/githubClient pair per call, forwarding the shared execFileAsync/fetchFn', async () => {
+      const execFileAsync = jasmine.createSpy('execFileAsync').and.callFake(async (cmd, args, options) => {
+        if (args[0] === 'branch' && args[1] === '--show-current') {
+          return { stdout: `branch-for-${options.cwd}\n`, stderr: '' };
+        }
+
+        return { stdout: '', stderr: '' };
+      });
+      const fetchFn = jasmine.createSpy('fetch').and.callFake(async (url) => {
+        if (url.includes('/pulls?head=')) {
+          return { ok: true, json: async () => [{ number: 7, state: 'open', merged: false, merged_at: null }] };
+        }
+
+        throw new Error(`unexpected fetch call: ${url}`);
       });
 
-      const github = newGithub({
-        gitClient: { currentBranch },
-        githubClient: { getPr }
-      });
+      const github = newGithub({ execFileAsync, fetchFn });
 
-      // #prState and #prNumber each build their own RepoContext/PrOperations per call, but must route
-      // through the same injected gitClient/githubClient instances rather than defaulting their own.
-      await github.prState(REPO_PATH);
-      await github.prNumber(REPO_PATH);
+      // #prState builds its own RepoContext/gitClient/githubClient per call, bound to that call's own
+      // repoPath, but must route through the same injected execFileAsync/fetchFn rather than defaulting
+      // its own — a stale/shared gitClient would resolve every call against the same (wrong) cwd.
+      await github.prState('/fake/repo/one');
+      await github.prState('/fake/repo/two');
 
-      expect(currentBranch).toHaveBeenCalledTimes(2);
-      expect(getPr).toHaveBeenCalledTimes(2);
+      const cwds = execFileAsync.calls.allArgs()
+        .filter(([, args]) => args[0] === 'branch')
+        .map(([, , options]) => options.cwd);
+
+      expect(cwds).toEqual(['/fake/repo/one', '/fake/repo/two']);
+      expect(fetchFn.calls.allArgs().filter(([url]) => url.includes('/pulls?head=')).length).toEqual(2);
     });
   });
 
@@ -214,7 +226,7 @@ describe('AutoFixAllGithub', () => {
       const github = newGithub({ fetchFn: fakeFetch({ pulls: [PULL], mergeOk: false }) });
 
       await expectAsync(github.prMerge(REPO_PATH)).toBeRejectedWithError(
-        'Error: could not merge PR #7 on darthjee/arcanum'
+        'could not merge PR #7 on darthjee/arcanum'
       );
     });
   });
