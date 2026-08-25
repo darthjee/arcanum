@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { createGitFixtureRepo } from '../support/utils/gitFixtureRepo.js';
+import { seedOriginUrl } from '../support/utils/runCommand.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
 // Parity test for the "arcanum-split-issue-create-sub-issue" migrated
@@ -117,9 +118,7 @@ async function writeSubIssueFile(repoPath, issueId, count, slug, content) {
  * @returns {Promise<void>} resolves once seeded.
  */
 async function seedZeroRetryRepo(repoPath) {
-  await execFileAsync('git', ['remote', 'set-url', 'origin', 'https://github.com/darthjee/arcanum-cs-fixture.git'], {
-    cwd: repoPath
-  });
+  await seedOriginUrl(repoPath, 'https://github.com/darthjee/arcanum-cs-fixture.git');
 
   const stateDir = path.join(repoPath, '.claude', 'state');
 

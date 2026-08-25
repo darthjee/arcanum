@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { createGitFixtureRepo } from '../support/utils/gitFixtureRepo.js';
+import { seedOriginUrl } from '../support/utils/runCommand.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
 // Parity test for the "github-issue-info" migrated entrypoint (issue
@@ -52,22 +53,13 @@ async function runBoth(repoPath, cwd) {
   return { shell, native };
 }
 
-/**
- * @param {string} repoPath - the fixture repo's local checkout path.
- * @param {string} url - the `origin` remote URL to set.
- * @returns {Promise<void>} resolves once the remote has been set.
- */
-async function setOrigin(repoPath, url) {
-  await execFileAsync('git', ['-C', repoPath, 'remote', 'set-url', 'origin', url]);
-}
-
 describe('github-issue-info parity (shell vs. native)', () => {
   describe('a GitHub-shaped origin remote', () => {
     it('matches shell output byte-for-byte', async () => {
       const repo = await createGitFixtureRepo();
 
       try {
-        await setOrigin(repo.repoPath, 'https://github.com/darthjee/arcanum.git');
+        await seedOriginUrl(repo.repoPath, 'https://github.com/darthjee/arcanum.git');
 
         const { shell, native } = await runBoth(repo.repoPath, repo.repoPath);
 
@@ -86,7 +78,7 @@ describe('github-issue-info parity (shell vs. native)', () => {
       const repo = await createGitFixtureRepo();
 
       try {
-        await setOrigin(repo.repoPath, 'git@git.example.com:acme/widgets.git');
+        await seedOriginUrl(repo.repoPath, 'git@git.example.com:acme/widgets.git');
 
         const { shell, native } = await runBoth(repo.repoPath, repo.repoPath);
 

@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { createFakeGhBin } from '../support/utils/fakeGhBin.js';
 import { createGitFixtureRepo } from '../support/utils/gitFixtureRepo.js';
+import { seedOriginUrl } from '../support/utils/runCommand.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
 // Parity test for the "auto-fix-all-wait-ci" migrated entrypoint (issue
@@ -74,15 +75,6 @@ async function runCommand([file, ...args], cwd, env = process.env) {
 }
 
 /**
- * @param {string[]} args - the `git` arguments to run.
- * @param {string} cwd - the directory to run them in.
- * @returns {Promise<void>} resolves once the command succeeds.
- */
-async function git(args, cwd) {
-  await execFileAsync('git', args, { cwd });
-}
-
-/**
  * Rewrites `repo.repoPath`'s `origin` remote to a github.com-shaped URL
  * — `Origin.js`/`origin.sh` both need a recognizable origin URL to
  * derive `{ domain, repo }` from, and `AutoFixAllWaitCi` never actually
@@ -92,7 +84,7 @@ async function git(args, cwd) {
  * @returns {Promise<void>} resolves once seeded.
  */
 async function seedGithubLikeRepo(repo) {
-  await git(['remote', 'set-url', 'origin', FAKE_GITHUB_URL], repo.repoPath);
+  await seedOriginUrl(repo.repoPath, FAKE_GITHUB_URL);
 }
 
 /**

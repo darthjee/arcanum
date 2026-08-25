@@ -1,4 +1,4 @@
-import { git } from '../utils/runCommand.js';
+import { seedOriginUrl } from '../utils/runCommand.js';
 import { createFakeGhBin } from '../utils/fakeGhBin.js';
 import { createGitFixtureRepo } from '../utils/gitFixtureRepo.js';
 import { seedEnv } from '../utils/parityEnv.js';
@@ -16,7 +16,7 @@ const FAKE_GITHUB_URL = 'https://github.com/darthjee/arcanum-github-fixture.git'
  * @returns {Promise<void>} resolves once seeded.
  */
 export async function seedGithubLikeRepo(repo) {
-  await git(['remote', 'set-url', 'origin', FAKE_GITHUB_URL], repo.repoPath);
+  await seedOriginUrl(repo.repoPath, FAKE_GITHUB_URL);
 }
 
 /**
@@ -49,16 +49,4 @@ export async function setupParityTest({ ghVars, fetchVars } = {}) {
     fakeGh,
     cleanup: () => Promise.all([shellRepo.cleanup(), nativeRepo.cleanup(), fakeGh.cleanup()])
   };
-}
-
-/**
- * Asserts the shell and native sides of a comparison produced
- * byte-identical stdout and matching exit codes.
- * @param {{stdout: string, code: number}} shell - the shell side's result.
- * @param {{stdout: string, code: number}} native - the native side's result.
- * @returns {void}
- */
-export function expectParity(shell, native) {
-  expect(native.stdout).toEqual(shell.stdout);
-  expect(native.code).toEqual(shell.code);
 }
