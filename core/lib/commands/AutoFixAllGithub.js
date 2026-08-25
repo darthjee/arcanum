@@ -136,7 +136,7 @@ class AutoFixAllGithub {
    * @param {string} tag - the canonical tag name to add.
    * @returns {Promise<string>} the resulting confirmation line.
    */
-  addTag(repoPath, id, tag) {
+  async addTag(repoPath, id, tag) {
     if (!repoPath || !id || !tag) {
       throw new Error('Usage: github.sh add-tag <repo_path> <id> <tag>');
     }
@@ -151,7 +151,7 @@ class AutoFixAllGithub {
    * @param {string} tag - the canonical tag name to remove.
    * @returns {Promise<string>} the resulting confirmation line.
    */
-  removeTag(repoPath, id, tag) {
+  async removeTag(repoPath, id, tag) {
     if (!repoPath || !id || !tag) {
       throw new Error('Usage: github.sh remove-tag <repo_path> <id> <tag>');
     }
