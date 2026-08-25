@@ -128,6 +128,26 @@ describe('AutoFixAllGithub', () => {
       expect(originWithRef).toHaveBeenCalledTimes(2);
       expect(tokenGet).toHaveBeenCalledTimes(2);
     });
+
+    it('shares the same gitClient/githubClient instances across every per-call PrOperations', async () => {
+      const currentBranch = jasmine.createSpy('gitClient.currentBranch').and.resolveTo('main');
+      const getPr = jasmine.createSpy('githubClient.getPr').and.resolveTo({
+        number: 7, state: 'open', merged: false, merged_at: null
+      });
+
+      const github = newGithub({
+        gitClient: { currentBranch },
+        githubClient: { getPr }
+      });
+
+      // #prState and #prNumber each build their own RepoContext/PrOperations per call, but must route
+      // through the same injected gitClient/githubClient instances rather than defaulting their own.
+      await github.prState(REPO_PATH);
+      await github.prNumber(REPO_PATH);
+
+      expect(currentBranch).toHaveBeenCalledTimes(2);
+      expect(getPr).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('#prNumber', () => {
