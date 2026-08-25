@@ -62,10 +62,10 @@ class IssueTagger {
     let token;
 
     try {
-      const resolved = await this._origin.resolve(repoPath);
+      const resolved = await this._origin.resolveWithRef(repoPath);
 
       repo = resolved.repo;
-      repoRef = resolved.domain === 'github.com' ? resolved.repo : `${resolved.domain}/${resolved.repo}`;
+      repoRef = resolved.repoRef;
       token = await this._githubToken.get(repoPath);
     } catch {
       throw new DispatchFailure('', 1);
@@ -221,6 +221,25 @@ class IssueTagger {
     if (!response.ok) {
       throw new Error(`could not remove label '${label}' from issue #${id} on ${repo}`);
     }
+  }
+
+  /**
+   * Case-insensitive, exact-match check for whether issue `id` carries
+   * `label`, reusing `#fetchLabels` — symmetric with `#addLabel`/
+   * `#removeLabel`. Throws a plain `Error` (not `DispatchFailure`) on a
+   * failed fetch, matching its siblings; callers needing a
+   * `DispatchFailure('', 1)` wrap this themselves.
+   * @param {string} id - the issue id.
+   * @param {string} repo - the `owner/repo` path.
+   * @param {string} token - the GitHub token.
+   * @param {string} label - the GitHub label name to check for.
+   * @returns {Promise<boolean>} `true` when the issue has `label`
+   *   (case-insensitive, exact match).
+   */
+  async hasLabel(id, repo, token, label) {
+    const labels = await this.fetchLabels(id, repo, token);
+
+    return labels.some((current) => current.toLowerCase() === label.toLowerCase());
   }
 }
 
