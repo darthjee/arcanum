@@ -37,7 +37,7 @@ describe('AutoFixAllQueue', () => {
   function newQueue(overrides = {}) {
     return new AutoFixAllQueue({
       lock: new Lock({ sleepMs: 5 }),
-      origin: { resolve: async () => ({ domain: 'github.com', repo: REPO }) },
+      origin: { resolveWithRef: async () => ({ domain: 'github.com', repo: REPO, repoRef: REPO }) },
       githubToken: { get: async () => TOKEN },
       fetchFn: fakeFetch(),
       pollIntervalMs: 5,
@@ -104,7 +104,7 @@ describe('AutoFixAllQueue', () => {
     });
 
     it('rejects with a DispatchFailure (stdout "", exit code 1), after printing the confirmation line, when resolving the origin/token itself fails', async () => {
-      const queue = newQueue({ origin: { resolve: async () => { throw new Error('no origin'); } } });
+      const queue = newQueue({ origin: { resolveWithRef: async () => { throw new Error('no origin'); } } });
       let thrown;
 
       const { stdout } = await captureStdout(async () => {
@@ -232,7 +232,7 @@ describe('AutoFixAllQueue', () => {
     });
 
     it('rejects with a DispatchFailure (stdout "", exit code 1), after printing the confirmation line, when resolving the origin/token itself fails', async () => {
-      const queue = newQueue({ origin: { resolve: async () => { throw new Error('no origin'); } } });
+      const queue = newQueue({ origin: { resolveWithRef: async () => { throw new Error('no origin'); } } });
       let thrown;
 
       const { stdout } = await captureStdout(async () => {

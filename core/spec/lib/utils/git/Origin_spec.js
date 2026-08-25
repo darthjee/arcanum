@@ -93,4 +93,38 @@ describe('Origin', () => {
       );
     });
   });
+
+  describe('#resolveWithRef', () => {
+    it('leaves the repoRef unqualified for a github.com origin', async () => {
+      const origin = originWithStdout('git@github.com:darthjee/arcanum.git\n');
+
+      await expectAsync(origin.resolveWithRef('/repo')).toBeResolvedTo({
+        domain: 'github.com',
+        repo: 'darthjee/arcanum',
+        repoRef: 'darthjee/arcanum'
+      });
+    });
+
+    it('domain-qualifies the repoRef for a non-github.com origin', async () => {
+      const origin = originWithStdout('git@github.enterprise.example.com:owner/repo.git\n');
+
+      await expectAsync(origin.resolveWithRef('/repo')).toBeResolvedTo({
+        domain: 'github.enterprise.example.com',
+        repo: 'owner/repo',
+        repoRef: 'github.enterprise.example.com/owner/repo'
+      });
+    });
+
+    it('propagates a resolve failure', async () => {
+      const origin = new Origin({
+        execFileAsync: async () => {
+          throw new Error('not a git repo');
+        }
+      });
+
+      await expectAsync(origin.resolveWithRef('/repo')).toBeRejectedWithError(
+        'Error: \'/repo\' is not a git repository or has no \'origin\' remote'
+      );
+    });
+  });
 });

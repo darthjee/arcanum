@@ -9,7 +9,7 @@ const TOKEN = 'fake-token';
 describe('IssueTagger', () => {
   function newTagger(overrides = {}) {
     return new IssueTagger({
-      origin: { resolve: async () => ({ domain: 'github.com', repo: REPO }) },
+      origin: { resolveWithRef: async () => ({ domain: 'github.com', repo: REPO, repoRef: REPO }) },
       githubToken: { get: async () => TOKEN },
       fetchFn: fakeFetch(),
       ...overrides
@@ -56,7 +56,7 @@ describe('IssueTagger', () => {
     });
 
     it('rejects with a DispatchFailure (stdout "", exit code 1) when resolving the origin fails', async () => {
-      const tagger = newTagger({ origin: { resolve: async () => { throw new Error('no origin'); } } });
+      const tagger = newTagger({ origin: { resolveWithRef: async () => { throw new Error('no origin'); } } });
       let thrown;
 
       try {
@@ -89,7 +89,9 @@ describe('IssueTagger', () => {
       spyOn(process.stderr, 'write');
 
       const tagger = newTagger({
-        origin: { resolve: async () => ({ domain: 'example.com', repo: REPO }) },
+        origin: {
+          resolveWithRef: async () => ({ domain: 'example.com', repo: REPO, repoRef: `example.com/${REPO}` })
+        },
         fetchFn: fakeFetch({ getFails: true })
       });
 
@@ -212,6 +214,34 @@ describe('IssueTagger', () => {
       const tagger = newTagger({ fetchFn: fakeFetch({ mutateFails: true }) });
 
       await expectAsync(tagger.removeLabel('10', REPO, TOKEN, 'Ready for Work')).toBeRejected();
+    });
+  });
+
+  describe('#hasLabel', () => {
+    it('resolves true when the label is present (case-insensitive, exact match)', async () => {
+      const tagger = newTagger({ fetchFn: fakeFetch({ existingLabels: ['shipit'] }) });
+
+      await expectAsync(tagger.hasLabel('10', REPO, TOKEN, 'ShipIt')).toBeResolvedTo(true);
+    });
+
+    it('resolves false when the label is absent', async () => {
+      const tagger = newTagger({ fetchFn: fakeFetch({ existingLabels: ['Created'] }) });
+
+      await expectAsync(tagger.hasLabel('10', REPO, TOKEN, 'shipit')).toBeResolvedTo(false);
+    });
+
+    it('rejects with a plain Error (not DispatchFailure) when the labels fetch fails', async () => {
+      const tagger = newTagger({ fetchFn: fakeFetch({ getFails: true }) });
+      let thrown;
+
+      try {
+        await tagger.hasLabel('10', REPO, TOKEN, 'shipit');
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(thrown).toBeInstanceOf(Error);
+      expect(thrown).not.toBeInstanceOf(DispatchFailure);
     });
   });
 

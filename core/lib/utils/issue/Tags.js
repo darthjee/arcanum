@@ -30,6 +30,17 @@ export const LABEL_TO_TAG = {
 };
 
 /**
+ * Reverse of `LABEL_TO_TAG` — resolves a canonical tag name to its
+ * exact GitHub label name, computed once here so callers (e.g.
+ * `IssueTagger.js`, `AutoFixAllQueue.js`) share a single inversion
+ * instead of each re-deriving their own copy.
+ * @type {Record<string, string>}
+ */
+export const TAG_TO_LABEL = Object.fromEntries(
+  Object.entries(LABEL_TO_TAG).map(([label, tag]) => [tag, label])
+);
+
+/**
  * Maps GitHub issue label names to their canonical tag names.
  */
 class Tags {

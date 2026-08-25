@@ -64,6 +64,22 @@ class Origin {
 
     throw new Error(`Error: unrecognized origin format: ${origin}`);
   }
+
+  /**
+   * Resolve `<repoPath>`'s `origin` remote into `{ domain, repo,
+   * repoRef }`, where `repoRef` is the (possibly domain-qualified) repo
+   * reference used in error/success messages, mirroring `origin.sh`'s
+   * `get_repo_ref`.
+   * @param {string} repoPath - the target repo's local checkout path.
+   * @returns {Promise<{domain: string, repo: string, repoRef: string}>}
+   *   the parsed origin, plus its derived `repoRef`.
+   */
+  async resolveWithRef(repoPath) {
+    const { domain, repo } = await this.resolve(repoPath);
+    const repoRef = domain === 'github.com' ? repo : `${domain}/${repo}`;
+
+    return { domain, repo, repoRef };
+  }
 }
 
 export default Origin;
