@@ -1,9 +1,6 @@
 import MergeBodyResolver from '../../../../lib/utils/github/MergeBodyResolver.js';
 import { createRepoContextMock } from '../../../support/factories/repoContextFactory.js';
 
-const REPO = 'darthjee/arcanum';
-const TOKEN = 'fake-token';
-
 describe('MergeBodyResolver', () => {
   function newResolver({ configValues = {}, githubClient = {} } = {}) {
     const context = createRepoContextMock({
@@ -50,13 +47,13 @@ describe('MergeBodyResolver', () => {
     it('returns an included empty body in "empty" mode', async () => {
       const resolver = newResolver({ configValues: { merge_body_mode: 'empty' } });
 
-      await expectAsync(resolver.buildBody(REPO, 7, TOKEN)).toBeResolvedTo({ included: true, body: '' });
+      await expectAsync(resolver.buildBody(7)).toBeResolvedTo({ included: true, body: '' });
     });
 
     it('returns an excluded body in "full" mode', async () => {
       const resolver = newResolver({ configValues: { merge_body_mode: 'full' } });
 
-      await expectAsync(resolver.buildBody(REPO, 7, TOKEN)).toBeResolvedTo({ included: false, body: '' });
+      await expectAsync(resolver.buildBody(7)).toBeResolvedTo({ included: false, body: '' });
     });
 
     describe('"coauthors" mode', () => {
@@ -79,7 +76,7 @@ describe('MergeBodyResolver', () => {
           }
         });
 
-        const body = await resolver.buildBody(REPO, 7, TOKEN);
+        const body = await resolver.buildBody(7);
 
         expect(body).toEqual({
           included: true,
@@ -96,7 +93,7 @@ describe('MergeBodyResolver', () => {
           githubClient: { getPrCommits: jasmine.createSpy().and.resolveTo(commits) }
         });
 
-        const body = await resolver.buildBody(REPO, 7, TOKEN);
+        const body = await resolver.buildBody(7);
 
         expect(body.body).toEqual('Co-authored-by: Bob <bob@x.com>\n');
       });
@@ -113,7 +110,7 @@ describe('MergeBodyResolver', () => {
           }
         });
 
-        const body = await resolver.buildBody(REPO, 7, TOKEN);
+        const body = await resolver.buildBody(7);
 
         expect(body.body).toEqual('Co-authored-by: Alice <alice@x.com>\n');
       });
@@ -129,7 +126,7 @@ describe('MergeBodyResolver', () => {
           }
         });
 
-        const body = await resolver.buildBody(REPO, 7, TOKEN);
+        const body = await resolver.buildBody(7);
 
         expect(body.body).toEqual('Co-authored-by: Alice <alice@x.com>\n');
       });
@@ -144,7 +141,7 @@ describe('MergeBodyResolver', () => {
           githubClient: { getPrCommits: jasmine.createSpy().and.resolveTo(commits) }
         });
 
-        const body = await resolver.buildBody(REPO, 7, TOKEN, 'model@x.com');
+        const body = await resolver.buildBody(7, 'model@x.com');
 
         expect(body.body).toEqual('Co-authored-by: Alice <alice@x.com>\n');
       });
@@ -157,7 +154,7 @@ describe('MergeBodyResolver', () => {
           githubClient: { getPrCommits: jasmine.createSpy().and.resolveTo(commits) }
         });
 
-        const body = await resolver.buildBody(REPO, 7, TOKEN, 'model@x.com');
+        const body = await resolver.buildBody(7, 'model@x.com');
 
         expect(body.body).toEqual('Co-authored-by: Model <model@x.com>\n');
       });
@@ -172,7 +169,7 @@ describe('MergeBodyResolver', () => {
           githubClient: { getPrCommits: jasmine.createSpy().and.resolveTo(commits) }
         });
 
-        const body = await resolver.buildBody(REPO, 7, TOKEN);
+        const body = await resolver.buildBody(7);
 
         expect(body.body).toEqual('Co-authored-by: Alice <alice@x.com>\n');
       });
@@ -188,7 +185,7 @@ describe('MergeBodyResolver', () => {
           }
         });
 
-        const body = await resolver.buildBody(REPO, 7, TOKEN);
+        const body = await resolver.buildBody(7);
 
         expect(body).toEqual({ included: false, body: '' });
       });

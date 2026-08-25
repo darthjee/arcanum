@@ -47,9 +47,7 @@ class MergeBodyResolver {
   /**
    * Resolve the `commit_message` payload for the REST merge call, per
    * `#resolveMode`'s resolved mode.
-   * @param {string} repo - the `owner/repo` path.
    * @param {number|string} number - the pull request number.
-   * @param {string} token - the GitHub token.
    * @param {string} [modelEmail] - the acting model's commit-author
    *   email, used by `coauthors` body mode to optionally exclude its
    *   own co-author entry.
@@ -59,7 +57,7 @@ class MergeBodyResolver {
    *   `body` string to send (possibly an empty string, for `empty`
    *   mode).
    */
-  async buildBody(repo, number, token, modelEmail) {
+  async buildBody(number, modelEmail) {
     const mode = await this.resolveMode();
 
     if (mode === 'empty') {
@@ -70,7 +68,7 @@ class MergeBodyResolver {
       return { included: false, body: '' };
     }
 
-    const coauthors = await this._coauthorsBody(repo, number, token, modelEmail);
+    const coauthors = await this._coauthorsBody(number, modelEmail);
 
     return coauthors ? { included: true, body: coauthors } : { included: false, body: '' };
   }
@@ -80,18 +78,16 @@ class MergeBodyResolver {
    * `merge_body_coauthors_list`, built on `RepoContext#readConfig` for
    * the `omit_model_coauthor`/`remove_coauthors` config keys (see
    * `agent_email.sh`'s `model_coauthor_omitted`/`remove_coauthors_list`).
-   * @param {string} repo - the `owner/repo` path.
    * @param {number|string} number - the pull request number.
-   * @param {string} token - the GitHub token.
    * @param {string} [modelEmail] - the acting model's commit-author
    *   email.
    * @returns {Promise<string>} the deduped `Co-authored-by: ...` block
    *   (one line per author, trailing newline), or `''` when the
    *   resulting list is empty.
    */
-  async _coauthorsBody(repo, number, token, modelEmail) {
-    const commits = await this._github.getPrCommits(repo, number, token);
-    const merger = await this._resolveMergerLogin(token);
+  async _coauthorsBody(number, modelEmail) {
+    const commits = await this._github.getPrCommits(number);
+    const merger = await this._resolveMergerLogin();
     const omitModel = modelEmail ? await this._modelCoauthorOmitted() : false;
     const removeList = await this._removeCoauthorsList();
 
@@ -185,12 +181,11 @@ class MergeBodyResolver {
    * Resolve the acting GitHub user's own login, replacing `gh api user
    * -q '.login'`. Fails open (returns `''`) on any error, mirroring
    * `merge_body_coauthors_list`'s own `|| merger_login=""` fallback.
-   * @param {string} token - the GitHub token.
    * @returns {Promise<string>} the merger's GitHub login, or `''`.
    */
-  async _resolveMergerLogin(token) {
+  async _resolveMergerLogin() {
     try {
-      const user = await this._github.getCurrentUser(token);
+      const user = await this._github.getCurrentUser();
 
       return user && user.login ? user.login : '';
     } catch {
