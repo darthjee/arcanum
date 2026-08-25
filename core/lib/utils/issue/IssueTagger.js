@@ -1,17 +1,9 @@
 import DispatchFailure from '../errors/DispatchFailure.js';
 import GithubToken from '../github/GithubToken.js';
 import Origin from '../git/Origin.js';
-import { LABEL_TO_TAG } from './Tags.js';
+import { TAG_TO_LABEL } from './Tags.js';
 
 const DEFAULT_TIMEOUT_MS = 30000;
-
-// Reverse of Tags.js's LABEL_TO_TAG — resolves the 3 canonical tag
-// names this module's best-effort label mutation touches
-// (enqueued/ready_for_work/created) to their exact GitHub label names,
-// rather than hardcoding a second copy of that mapping.
-const TAG_TO_LABEL = Object.fromEntries(
-  Object.entries(LABEL_TO_TAG).map(([label, tag]) => [tag, label])
-);
 
 /**
  * Generic (not `AutoFixAll`-prefixed) GitHub issue tag/label mutation

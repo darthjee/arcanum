@@ -1,6 +1,23 @@
-import Tags from '../../../../lib/utils/issue/Tags.js';
+import Tags, { LABEL_TO_TAG, TAG_TO_LABEL } from '../../../../lib/utils/issue/Tags.js';
 
 describe('Tags', () => {
+  describe('TAG_TO_LABEL', () => {
+    it('is the exact inversion of LABEL_TO_TAG', () => {
+      const expected = Object.fromEntries(
+        Object.entries(LABEL_TO_TAG).map(([label, tag]) => [tag, label])
+      );
+
+      expect(TAG_TO_LABEL).toEqual(expected);
+    });
+
+    it('maps every canonical tag back to its GitHub label', () => {
+      expect(TAG_TO_LABEL.created).toEqual('Created');
+      expect(TAG_TO_LABEL.ready_for_work).toEqual('Ready for Work');
+      expect(TAG_TO_LABEL.shipit).toEqual('shipit');
+    });
+  });
+
+
   describe('.extractTags', () => {
     it('maps recognized GitHub labels to their canonical tag names', () => {
       expect(Tags.extractTags(['Created', 'Ready for Work'])).toEqual(['created', 'ready_for_work']);
