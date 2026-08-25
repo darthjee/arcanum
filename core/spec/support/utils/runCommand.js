@@ -5,7 +5,8 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
-const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
+/** The repository's root directory. */
+export const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
 
 /** The `auto-fix-all-github` shell entrypoint's script path. */
 export const SHELL_SCRIPT = path.join(REPO_ROOT, 'auto-fix-all', 'scripts', 'github.sh');
@@ -58,6 +59,18 @@ export async function git(args, cwd) {
 }
 
 /**
+ * Rewrites `repoPath`'s `origin` remote to `url` — the one line every
+ * parity spec's own origin-seeding helper needs, shared here so none
+ * of them has to duplicate it.
+ * @param {string} repoPath - the fixture repo's path.
+ * @param {string} url - the URL to set `origin` to.
+ * @returns {Promise<void>} resolves once set.
+ */
+export async function seedOriginUrl(repoPath, url) {
+  await git(['remote', 'set-url', 'origin', url], repoPath);
+}
+
+/**
  * Run one subcommand on both sides — shell against `shellRepo`, native
  * against `nativeRepo` — asserting nothing itself; just returns both
  * results for the caller to assert on.
@@ -86,4 +99,16 @@ export async function runBoth(subcommand, nativeCommand, extraArgs, shellRepo, n
   );
 
   return { shell, native };
+}
+
+/**
+ * Asserts the shell and native sides of a comparison produced
+ * byte-identical stdout and matching exit codes.
+ * @param {{stdout: string, code: number}} shell - the shell side's result.
+ * @param {{stdout: string, code: number}} native - the native side's result.
+ * @returns {void}
+ */
+export function expectParity(shell, native) {
+  expect(native.stdout).toEqual(shell.stdout);
+  expect(native.code).toEqual(shell.code);
 }
