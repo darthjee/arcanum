@@ -42,8 +42,8 @@ class AutoFixAllGithub {
    *   `issueTagger`, and to each per-call `githubClient`.
    * @param {number} [deps.timeoutMs] - forwarded to the default
    *   `issueTagger`, and to each per-call `githubClient`.
-   * @param {object} [deps.issueState] - forwarded to each per-call
-   *   `RepoContext`.
+   * @param {object} [deps.issueStateService] - forwarded to each
+   *   per-call `RepoContext`.
    * @param {object} [deps.configChain] - forwarded to each per-call
    *   `RepoContext`.
    * @param {Function} [deps.execFileAsync] - forwarded to the default
@@ -58,7 +58,7 @@ class AutoFixAllGithub {
     githubToken = new GithubToken(),
     fetchFn = fetch,
     timeoutMs,
-    issueState,
+    issueStateService,
     configChain,
     execFileAsync,
     issueTagger = new IssueTagger({ origin, githubToken, fetchFn, timeoutMs }),
@@ -66,7 +66,7 @@ class AutoFixAllGithub {
   } = {}) {
     this._origin = origin;
     this._githubToken = githubToken;
-    this._issueState = issueState;
+    this._issueStateService = issueStateService;
     this._configChain = configChain;
     this._issueTagger = issueTagger;
     this._fetchFn = fetchFn;
@@ -117,8 +117,8 @@ class AutoFixAllGithub {
 
   /**
    * Build a per-call `PrOperations`, wrapping `repoPath` (plus the
-   * shared `origin`/`githubToken`/`issueState`/`configChain`) into a
-   * fresh `RepoContext`, and building a fresh, context-bound
+   * shared `origin`/`githubToken`/`issueStateService`/`configChain`)
+   * into a fresh `RepoContext`, and building a fresh, context-bound
    * `gitClient`/`githubClient` pair right alongside it — both are cheap,
    * stateless-construction objects (no I/O in their constructors), so
    * building them per call has no meaningful cost.
@@ -130,7 +130,7 @@ class AutoFixAllGithub {
       repoPath,
       origin: this._origin,
       githubToken: this._githubToken,
-      issueState: this._issueState,
+      issueStateService: this._issueStateService,
       configChain: this._configChain
     });
     const gitClient = new GitClient({ context, execFileAsync: this._execFileAsync });

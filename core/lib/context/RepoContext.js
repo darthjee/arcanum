@@ -1,15 +1,16 @@
 import ConfigChain from '../utils/config/ConfigChain.js';
 import GithubToken from '../utils/github/GithubToken.js';
-import IssueState from '../commands/IssueState.js';
+import IssueStateService from '../services/IssueStateService.js';
 import Origin from '../utils/git/Origin.js';
 
 /**
  * Bundles a single repo's `repoPath` with the 4 collaborators
  * `PrOperations` (and friends) resolve it against — `origin`,
- * `githubToken`, `issueState`, `configChain` — so callers stop threading
- * `repoPath` through every method call individually. One `RepoContext`
- * is built per call site (`repoPath` differs call to call), wrapping
- * whichever shared collaborator instances the caller already holds.
+ * `githubToken`, `issueStateService`, `configChain` — so callers stop
+ * threading `repoPath` through every method call individually. One
+ * `RepoContext` is built per call site (`repoPath` differs call to
+ * call), wrapping whichever shared collaborator instances the caller
+ * already holds.
  */
 class RepoContext {
   /**
@@ -19,20 +20,21 @@ class RepoContext {
    *   path.
    * @param {Origin} [deps.origin] - git-origin resolver.
    * @param {GithubToken} [deps.githubToken] - GitHub token resolver.
-   * @param {IssueState} [deps.issueState] - issue state-file reader.
+   * @param {IssueStateService} [deps.issueStateService] - issue
+   *   state-file reader/writer, bound to this context.
    * @param {ConfigChain} [deps.configChain] - 3-tier config reader.
    */
   constructor({
     repoPath,
     origin = new Origin(),
     githubToken = new GithubToken(),
-    issueState = new IssueState(),
+    issueStateService,
     configChain = new ConfigChain()
   } = {}) {
     this.repoPath = repoPath;
     this._origin = origin;
     this._githubToken = githubToken;
-    this._issueState = issueState;
+    this._issueStateService = issueStateService ?? new IssueStateService({ context: this });
     this._configChain = configChain;
   }
 
@@ -65,10 +67,10 @@ class RepoContext {
    * @param {string} id - the numeric issue id.
    * @param {string} key - the state field's name.
    * @returns {Promise<string>} `this.repoPath`'s cached issue-state
-   *   field value — see `IssueState#get`.
+   *   field value — see `IssueStateService#get`.
    */
   async getIssueState(id, key) {
-    return this._issueState.get(this.repoPath, id, key);
+    return this._issueStateService.get(id, key);
   }
 
   /**

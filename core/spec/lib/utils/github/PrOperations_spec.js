@@ -62,7 +62,7 @@ describe('PrOperations', () => {
     const context = createRepoContextMock({
       origin: { resolveWithRef: jasmine.createSpy() },
       githubToken: { get: jasmine.createSpy() },
-      issueState: { get: jasmine.createSpy().and.callFake(async (repoPath, id, field) => issueStateValues[field] ?? '') },
+      issueStateService: { get: jasmine.createSpy().and.callFake(async (id, field) => issueStateValues[field] ?? '') },
       configChain: { read: jasmine.createSpy().and.callFake(async (repoPath, scope, key) => configValues[key]) }
     });
     const githubClient = fakeGithubClient({ pull, commits, user, mergeOk });

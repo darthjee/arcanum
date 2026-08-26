@@ -1,9 +1,15 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import RepoContext from '../context/RepoContext.js';
+import IssueStateService from '../services/IssueStateService.js';
 import DispatchFailure from '../utils/errors/DispatchFailure.js';
-import IssueState from './IssueState.js';
+import IssueStatePaths from '../utils/file/IssueStatePaths.js';
+import Lock from '../utils/file/Lock.js';
 import RepoPath from '../utils/file/RepoPath.js';
+import JsonParser from '../utils/json/JsonParser.js';
+import JsonReader from '../utils/json/JsonReader.js';
+import JsonValueFormatter from '../utils/json/JsonValueFormatter.js';
 import SpawnIssue from './SpawnIssue.js';
 
 const USAGE = 'Usage: create_sub_issue.sh <repo_path> <issue_id> <sub_issue_file>';
@@ -24,28 +30,45 @@ class ArcanumSplitIssueCreateSubIssue {
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {RepoPath} [deps.repoPath] - repo-path validation helper.
    * @param {SpawnIssue} [deps.spawnIssue] - issue-creation/linking helper.
-   * @param {IssueState} [deps.issueState] - per-issue state tracker.
    * @param {Function} [deps.readFile] - `node:fs/promises`'s `readFile`.
    * @param {Function} [deps.writeFile] - `node:fs/promises`'s `writeFile`.
    * @param {Function} [deps.mkdtemp] - `node:fs/promises`'s `mkdtemp`.
    * @param {Function} [deps.rm] - `node:fs/promises`'s `rm`.
+   * @param {Lock} [deps.lock] - forwarded to each per-call
+   *   `IssueStateService`.
+   * @param {JsonParser} [deps.jsonParser] - forwarded to each per-call
+   *   `IssueStateService`.
+   * @param {JsonValueFormatter} [deps.jsonValueFormatter] - forwarded
+   *   to each per-call `IssueStateService`.
+   * @param {JsonReader} [deps.jsonReader] - forwarded to each per-call
+   *   `IssueStateService`.
+   * @param {IssueStatePaths} [deps.issueStatePaths] - forwarded to each
+   *   per-call `IssueStateService`.
    */
   constructor({
     repoPath = new RepoPath(),
     spawnIssue = new SpawnIssue(),
-    issueState = new IssueState(),
     readFile: readFileFn = readFile,
     writeFile: writeFileFn = writeFile,
     mkdtemp: mkdtempFn = mkdtemp,
-    rm: rmFn = rm
+    rm: rmFn = rm,
+    lock = new Lock(),
+    jsonParser = new JsonParser(),
+    jsonValueFormatter = new JsonValueFormatter(),
+    jsonReader = new JsonReader(),
+    issueStatePaths = new IssueStatePaths()
   } = {}) {
     this._repoPath = repoPath;
     this._spawnIssue = spawnIssue;
-    this._issueState = issueState;
     this._readFile = readFileFn;
     this._writeFile = writeFileFn;
     this._mkdtemp = mkdtempFn;
     this._rm = rmFn;
+    this._lock = lock;
+    this._jsonParser = jsonParser;
+    this._jsonValueFormatter = jsonValueFormatter;
+    this._jsonReader = jsonReader;
+    this._issueStatePaths = issueStatePaths;
   }
 
   /**
@@ -102,7 +125,7 @@ class ArcanumSplitIssueCreateSubIssue {
       const spawnOutput = await this._spawn(repoPath, issueId, title, tmpBodyFile, progressLine);
       const newId = this._extractField(spawnOutput, 'ID');
 
-      await this._issueState.appendJson(repoPath, issueId, SUB_ISSUES_FIELD, JSON.stringify(newId));
+      await this._issueStateService(repoPath).appendJson(issueId, SUB_ISSUES_FIELD, JSON.stringify(newId));
 
       return `${progressLine}STATUS=ok\nID=${newId}\n`;
     } finally {
@@ -203,6 +226,26 @@ class ArcanumSplitIssueCreateSubIssue {
     }
 
     return countSegment || '?';
+  }
+
+  /**
+   * Build a per-call `IssueStateService`, wrapping `repoPath` into a
+   * fresh `RepoContext` — mirroring `IssueState.js`'s
+   * `_issueStateService(repoPath)` helper.
+   * @param {string} repoPath - the target repo's local checkout path.
+   * @returns {IssueStateService} the per-call `IssueStateService`.
+   */
+  _issueStateService(repoPath) {
+    const context = new RepoContext({ repoPath });
+
+    return new IssueStateService({
+      context,
+      lock: this._lock,
+      jsonParser: this._jsonParser,
+      jsonValueFormatter: this._jsonValueFormatter,
+      jsonReader: this._jsonReader,
+      issueStatePaths: this._issueStatePaths
+    });
   }
 
   /**

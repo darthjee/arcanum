@@ -49,6 +49,17 @@ A native implementation of a given entrypoint must be byte-identical to its shel
 
 A single, central Node package at `core/` — not one Node package per skill. `core/package.json` declares Yarn as the package manager and zero runtime npm dependencies (built-in Node APIs only, including the global `fetch` for GitHub REST/GraphQL calls instead of a GitHub SDK — mirroring how today's shell scripts already avoid the `gh issue`/`gh api` subcommands in favor of `curl` plus `gh auth token`). Source lives under `core/lib/`; `core/bin/arcanum` is the one executable entrypoint described above.
 
+`core/lib/` is split into 4 folders, with a one-way dependency direction — `commands` → `context`/`services` → `utils` — enforced by convention (no lint rule):
+
+- `commands/` — CLI entrypoints, one per `core/bin/arcanum` dispatch-table module. May depend on `context/`, `services/`, and `utils/`.
+- `context/` — per-call-site bundles of a `repoPath` plus its resolved collaborators (e.g. `RepoContext`, built fresh per call since `repoPath` differs call to call). May depend on `services/` and `utils/`.
+- `services/` — stateful or I/O-owning logic shared by multiple commands/contexts, but not itself a CLI entrypoint (e.g. `IssueStateService`). May depend on `utils/`.
+- `utils/` — stateless or narrowly-scoped helpers with no knowledge of the CLI dispatch surface.
+
+Nothing under `context/`, `services/`, or `utils/` may import from `commands/` — a command is an entrypoint, not a library other layers should reach back into.
+
+Because `core/bin/arcanum`'s dispatcher instantiates every command with zero constructor arguments and passes `repoPath` only as a per-call method argument, a command that needs a context-bound `services/` collaborator (fixed to that call's `repoPath`) builds it fresh per call via a small private helper, rather than receiving it ready-made at construction — see `AutoFixAllGithub#_prOperations` for the reference shape.
+
 An ESLint flat config enforces: 2-space indentation, single quotes, semicolons, `const`/`let` only (no `var`), strict `===`, no `console.log` (use whatever structured stdout-writing convention the entrypoint's output contract requires instead), and JSDoc on public functions.
 
 `core/spec/` mirrors `core/lib/` 1:1; spec files are named `<Name>_spec.js`. Shared test helpers live under `core/spec/support/{factories,dummies,utils,fixtures}`.
