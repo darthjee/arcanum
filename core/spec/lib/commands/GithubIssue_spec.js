@@ -22,7 +22,6 @@ function stubDeps(overrides = {}) {
   return {
     origin: { resolve: async () => ({ domain: 'github.com', repo: 'darthjee/arcanum' }) },
     githubToken: { get: async () => 'fake-token' },
-    issueState: { write: jasmine.createSpy('write').and.resolveTo(undefined) },
     repoPath: { validate: jasmine.createSpy('validate').and.resolveTo(undefined) },
     ...overrides
   };
@@ -76,12 +75,14 @@ describe('GithubIssue', () => {
     it('maps GitHub labels to canonical tags, deduplicated, and writes the state file', async () => {
       const payload = await loadFixture('github_issue_success.json');
       const fetchFn = jasmine.createSpy('fetch').and.resolveTo({ ok: true, json: async () => payload });
-      const issueState = { write: jasmine.createSpy('write').and.resolveTo(undefined) };
-      const githubIssue = new GithubIssue({ ...stubDeps({ issueState }), fetchFn });
+      const githubIssue = new GithubIssue({ ...stubDeps(), fetchFn });
 
       await githubIssue.fetch(repoPath, '321');
 
-      expect(issueState.write).toHaveBeenCalledWith(repoPath, '321', {
+      const stateFile = path.join(repoPath, '.claude', 'state', 'issue-321.json');
+      const written = JSON.parse(await readFile(stateFile, 'utf8'));
+
+      expect(written).toEqual({
         tags: ['created', 'ready_for_work'],
         updated_at: payload.updated_at,
         title: payload.title,
@@ -259,16 +260,17 @@ describe('GithubIssue', () => {
       });
     });
 
-    it('does not call issueState.write', async () => {
+    it('does not write a per-issue state file', async () => {
       const payload = await loadFixture('github_issue_create_success.json');
       const fetchFn = jasmine.createSpy('fetch').and.resolveTo({ ok: true, json: async () => payload });
       const file = await writeBodyFile('the body');
-      const issueState = { write: jasmine.createSpy('write').and.resolveTo(undefined) };
-      const githubIssue = new GithubIssue({ ...stubDeps({ issueState }), fetchFn });
+      const githubIssue = new GithubIssue({ ...stubDeps(), fetchFn });
 
       await githubIssue.create(repoPath, 'New feature: dark mode', file);
 
-      expect(issueState.write).not.toHaveBeenCalled();
+      const stateFile = path.join(repoPath, '.claude', 'state', 'issue-42.json');
+
+      await expectAsync(readFile(stateFile, 'utf8')).toBeRejected();
     });
 
     it('propagates repoPath.validate rejection and makes no network call', async () => {

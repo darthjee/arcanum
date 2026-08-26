@@ -1,9 +1,15 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import RepoContext from '../context/RepoContext.js';
+import IssueStateService from '../services/IssueStateService.js';
 import GithubToken from '../utils/github/GithubToken.js';
-import IssueState from './IssueState.js';
+import IssueStatePaths from '../utils/file/IssueStatePaths.js';
+import Lock from '../utils/file/Lock.js';
 import Origin from '../utils/git/Origin.js';
 import RepoPath from '../utils/file/RepoPath.js';
+import JsonParser from '../utils/json/JsonParser.js';
+import JsonReader from '../utils/json/JsonReader.js';
+import JsonValueFormatter from '../utils/json/JsonValueFormatter.js';
 import Tags from '../utils/issue/Tags.js';
 
 const DEFAULT_TIMEOUT_MS = 30000;
@@ -23,27 +29,44 @@ class GithubIssue {
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Origin} [deps.origin] - git-origin resolver.
    * @param {GithubToken} [deps.githubToken] - GitHub token resolver.
-   * @param {IssueState} [deps.issueState] - issue state-file writer.
    * @param {RepoPath} [deps.repoPath] - repo-path validation helper.
    * @param {Function} [deps.fetchFn] - `fetch`-compatible implementation
    *   (global `fetch` by default).
    * @param {number} [deps.timeoutMs] - the REST call's abort timeout,
    *   overridable for tests (defaults to the real 30s protocol value).
+   * @param {Lock} [deps.lock] - forwarded to each per-call
+   *   `IssueStateService`.
+   * @param {JsonParser} [deps.jsonParser] - forwarded to each per-call
+   *   `IssueStateService`.
+   * @param {JsonValueFormatter} [deps.jsonValueFormatter] - forwarded
+   *   to each per-call `IssueStateService`.
+   * @param {JsonReader} [deps.jsonReader] - forwarded to each per-call
+   *   `IssueStateService`.
+   * @param {IssueStatePaths} [deps.issueStatePaths] - forwarded to each
+   *   per-call `IssueStateService`.
    */
   constructor({
     origin = new Origin(),
     githubToken = new GithubToken(),
-    issueState = new IssueState(),
     repoPath = new RepoPath(),
     fetchFn = fetch,
-    timeoutMs = DEFAULT_TIMEOUT_MS
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    lock = new Lock(),
+    jsonParser = new JsonParser(),
+    jsonValueFormatter = new JsonValueFormatter(),
+    jsonReader = new JsonReader(),
+    issueStatePaths = new IssueStatePaths()
   } = {}) {
     this._origin = origin;
     this._githubToken = githubToken;
-    this._issueState = issueState;
     this._repoPath = repoPath;
     this._fetch = fetchFn;
     this._timeoutMs = timeoutMs;
+    this._lock = lock;
+    this._jsonParser = jsonParser;
+    this._jsonValueFormatter = jsonValueFormatter;
+    this._jsonReader = jsonReader;
+    this._issueStatePaths = issueStatePaths;
   }
 
   /**
@@ -86,7 +109,7 @@ class GithubIssue {
     await mkdir(path.join(repoPath, ISSUES_DIR), { recursive: true });
     await writeFile(path.join(repoPath, filePath), `${body}\n`);
 
-    await this._issueState.write(repoPath, id, {
+    await this._issueStateService(repoPath).write(id, {
       tags: Tags.extractTags(labels),
       updated_at: updatedAt,
       title,
@@ -178,6 +201,26 @@ class GithubIssue {
     await writeFile(path.join(repoPath, filePath), `${body}\n`);
 
     return `ID=${id}\nTITLE=${title}\nFILE=${filePath}\nDOMAIN=${domain}\nREPO=${repo}\n`;
+  }
+
+  /**
+   * Build a per-call `IssueStateService`, wrapping `repoPath` into a
+   * fresh `RepoContext` — mirroring `IssueState.js`'s
+   * `_issueStateService(repoPath)` helper.
+   * @param {string} repoPath - the target repo's local checkout path.
+   * @returns {IssueStateService} the per-call `IssueStateService`.
+   */
+  _issueStateService(repoPath) {
+    const context = new RepoContext({ repoPath });
+
+    return new IssueStateService({
+      context,
+      lock: this._lock,
+      jsonParser: this._jsonParser,
+      jsonValueFormatter: this._jsonValueFormatter,
+      jsonReader: this._jsonReader,
+      issueStatePaths: this._issueStatePaths
+    });
   }
 
   /**

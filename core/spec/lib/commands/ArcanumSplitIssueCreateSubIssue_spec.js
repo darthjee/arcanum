@@ -18,7 +18,6 @@ function stubDeps(overrides = {}) {
     spawnIssue: {
       run: jasmine.createSpy('run').and.resolveTo('STATUS=ok\nID=42\nURL=https://github.com/darthjee/arcanum/issues/42\n')
     },
-    issueState: { appendJson: jasmine.createSpy('appendJson').and.resolveTo(undefined) },
     ...overrides
   };
 }
@@ -186,12 +185,10 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
           jasmine.any(String),
           '--as-subissue'
         );
-        expect(deps.issueState.appendJson).toHaveBeenCalledWith(
-          repoPath,
-          ISSUE_ID,
-          'sub-issues',
-          JSON.stringify('42')
-        );
+        const stateFile = path.join(repoPath, '.claude', 'state', `issue-${ISSUE_ID}.json`);
+        const written = JSON.parse(await readFile(stateFile, 'utf8'));
+
+        expect(written).toEqual({ 'sub-issues': ['42'] });
         expect(result).toEqual(`Creating sub-issue ? for issue #${ISSUE_ID}: My Sub Issue\nSTATUS=ok\nID=42\n`);
       });
 
@@ -232,7 +229,10 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
           `Creating sub-issue ? for issue #${ISSUE_ID}: My Sub Issue\nSTATUS=failed\nSTATUS=failed\n`
         );
         expect(thrown.exitCode).toEqual(1);
-        expect(deps.issueState.appendJson).not.toHaveBeenCalled();
+
+        const stateFile = path.join(repoPath, '.claude', 'state', `issue-${ISSUE_ID}.json`);
+
+        await expectAsync(readFile(stateFile, 'utf8')).toBeRejected();
       });
 
       it('propagates a non-DispatchFailure rejection uncaught', async () => {
@@ -242,7 +242,10 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
         const instance = new ArcanumSplitIssueCreateSubIssue(deps);
 
         await expectAsync(instance.run(repoPath, ISSUE_ID, subIssueFile)).toBeRejectedWithError('boom');
-        expect(deps.issueState.appendJson).not.toHaveBeenCalled();
+
+        const stateFile = path.join(repoPath, '.claude', 'state', `issue-${ISSUE_ID}.json`);
+
+        await expectAsync(readFile(stateFile, 'utf8')).toBeRejected();
       });
 
       it('still cleans up the temp body file on failure', async () => {
