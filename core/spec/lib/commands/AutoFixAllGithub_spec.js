@@ -92,7 +92,7 @@ describe('AutoFixAllGithub', () => {
         resolveWithRef: async () => ({ domain: 'github.com', repo: REPO, repoRef: REPO })
       },
       githubToken: { get: async () => TOKEN },
-      issueState: { get: async () => '' },
+      issueStateService: { get: async () => '' },
       configChain: { read: async () => undefined },
       execFileAsync: fakeExecFileAsync(),
       fetchFn: fakeFetch(),
@@ -173,7 +173,7 @@ describe('AutoFixAllGithub', () => {
       const fetchFn = fakeFetch();
       const github = newGithub({
         execFileAsync: fakeExecFileAsync({ branch: 'issue-5' }),
-        issueState: { get: async (repoPath, id, field) => (field === 'pr_id' ? '99' : '') },
+        issueStateService: { get: async (id, field) => (field === 'pr_id' ? '99' : '') },
         fetchFn
       });
 

@@ -8,7 +8,7 @@ describe('RepoContext', () => {
       repoPath: REPO_PATH,
       origin: { resolveWithRef: jasmine.createSpy(), resolve: jasmine.createSpy() },
       githubToken: { get: jasmine.createSpy() },
-      issueState: { get: jasmine.createSpy() },
+      issueStateService: { get: jasmine.createSpy() },
       configChain: { read: jasmine.createSpy() },
       ...overrides
     });
@@ -51,13 +51,13 @@ describe('RepoContext', () => {
   });
 
   describe('#getIssueState', () => {
-    it('delegates to issueState.get with repoPath, id, and key', async () => {
+    it('delegates to issueStateService.get with id and key', async () => {
       const get = jasmine.createSpy().and.resolveTo('99');
-      const context = newContext({ issueState: { get } });
+      const context = newContext({ issueStateService: { get } });
 
       const result = await context.getIssueState('5', 'pr_id');
 
-      expect(get).toHaveBeenCalledWith(REPO_PATH, '5', 'pr_id');
+      expect(get).toHaveBeenCalledWith('5', 'pr_id');
       expect(result).toEqual('99');
     });
   });
