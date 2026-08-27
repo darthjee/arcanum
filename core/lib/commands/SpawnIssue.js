@@ -4,17 +4,17 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import DispatchFailure from '../utils/errors/DispatchFailure.js';
 import GithubIssue from './GithubIssue.js';
+import IssueLinker from '../utils/issue/IssueLinker.js';
+import LabelApplicator from '../utils/issue/LabelApplicator.js';
 import Origin from '../utils/git/Origin.js';
-import RepoConfig from '../utils/config/RepoConfig.js';
+import RepoContext from '../context/RepoContext.js';
 import RepoPath from '../utils/file/RepoPath.js';
-import Tags from '../utils/issue/Tags.js';
 
 const defaultExecFileAsync = promisify(execFile);
 const USAGE = 'Usage: spawn-issue <repo_path> <parent_id> <title> <body_file> [--as-subissue]';
-const SPAWNED_LABEL = 'Spawned';
 const AS_SUBISSUE_FLAG = '--as-subissue';
-const ADD_SUB_ISSUE_MUTATION =
-  'mutation($issueId:ID!,$subIssueId:ID!){addSubIssue(input:{issueId:$issueId,subIssueId:$subIssueId}){subIssue{id}}}';
+const DEFAULT_MAX_RETRY_COUNT = 5;
+const DEFAULT_ERROR_SLEEP_TIME = 5;
 
 /**
  * Sleep for `seconds` seconds, mirroring the shell's `sleep
@@ -43,28 +43,57 @@ class SpawnIssue {
   /**
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {RepoPath} [deps.repoPath] - repo-path validation helper.
-   * @param {Origin} [deps.origin] - git-origin resolver.
-   * @param {GithubIssue} [deps.githubIssue] - GitHub issue create helper.
-   * @param {RepoConfig} [deps.repoConfig] - per-repo config reader.
-   * @param {Function} [deps.execFileAsync] - promisified `execFile`.
+   * @param {Origin} [deps.origin] - git-origin resolver, forwarded into
+   *   each per-call `RepoContext`.
+   * @param {GithubIssue} [deps.githubIssue] - GitHub issue create
+   *   helper, forwarded into each per-call `RepoContext`.
+   * @param {object} [deps.configChain] - 3-tier config reader,
+   *   forwarded into each per-call `RepoContext`.
+   * @param {Function} [deps.execFileAsync] - promisified `execFile`,
+   *   forwarded to the default `labelApplicator`/`issueLinker`.
    * @param {Function} [deps.sleepFn] - retry-loop sleep implementation,
    *   overridable for tests (defaults to a real `setTimeout`-based
    *   sleep).
+   * @param {LabelApplicator} [deps.labelApplicator] - best-effort
+   *   parent-label carryover delegate.
+   * @param {IssueLinker} [deps.issueLinker] - best-effort
+   *   parent/new-issue cross-linking delegate.
    */
   constructor({
     repoPath = new RepoPath(),
     origin = new Origin(),
     githubIssue = new GithubIssue(),
-    repoConfig = new RepoConfig(),
+    configChain,
     execFileAsync = defaultExecFileAsync,
-    sleepFn = defaultSleep
+    sleepFn = defaultSleep,
+    labelApplicator = new LabelApplicator({ execFileAsync }),
+    issueLinker = new IssueLinker({ execFileAsync })
   } = {}) {
     this._repoPath = repoPath;
     this._origin = origin;
     this._githubIssue = githubIssue;
-    this._repoConfig = repoConfig;
+    this._configChain = configChain;
     this._execFileAsync = execFileAsync;
     this._sleep = sleepFn;
+    this._labelApplicator = labelApplicator;
+    this._issueLinker = issueLinker;
+  }
+
+  /**
+   * Build a fresh, per-call `RepoContext` wrapping `repoPath` — mirrors
+   * `AutoFixAllGithub#_prOperations`'s per-call context construction,
+   * since `core/bin/arcanum` always builds a zero-arg `new SpawnIssue()`
+   * before `repoPath` is known.
+   * @param {string} repoPath - the target repo's local checkout path.
+   * @returns {RepoContext} the per-call context.
+   */
+  _repoContext(repoPath) {
+    return new RepoContext({
+      repoPath,
+      origin: this._origin,
+      githubIssue: this._githubIssue,
+      configChain: this._configChain
+    });
   }
 
   /**
@@ -98,13 +127,19 @@ class SpawnIssue {
       throw new Error(`Error: file not found: ${bodyFile}`);
     }
 
-    const { domain, repo } = await this._origin.resolve(repoPath);
-    const { maxRetryCount, errorSleepTime } = await this._repoConfig.getPlanIssuesRetryConfig(repoPath);
+    const context = this._repoContext(repoPath);
+    const { domain, repo } = await context.resolve();
+    const maxRetryCount = this._numberOrDefault(
+      await context.readConfig('plan-issues', 'max-retry-count'), DEFAULT_MAX_RETRY_COUNT
+    );
+    const errorSleepTime = this._numberOrDefault(
+      await context.readConfig('plan-issues', 'error-sleep-time'), DEFAULT_ERROR_SLEEP_TIME
+    );
 
-    const { newId, newFile } = await this._createWithRetry(repoPath, title, bodyFile, maxRetryCount, errorSleepTime);
+    const { newId, newFile } = await this._createWithRetry(context, title, bodyFile, maxRetryCount, errorSleepTime);
 
-    await this._applyLabels(parentId, newId, repo);
-    await this._linkBack(parentId, newId, title, repo, asSubissue);
+    await this._labelApplicator.apply(parentId, newId, repo);
+    await this._issueLinker.link(parentId, newId, title, repo, asSubissue);
     await this._cleanup(repoPath, newFile);
 
     const url = `https://${domain}/${repo}/issues/${newId}`;
@@ -113,11 +148,37 @@ class SpawnIssue {
   }
 
   /**
-   * Call `GithubIssue#create` in-process, retrying up to
+   * Coerce a raw config value (a number, a numeric string, or anything
+   * else) into a number, falling back to `fallback` when it can't be
+   * parsed as a finite number — mirrors `RepoConfig#_numberOrDefault`'s
+   * coercion logic (`ConfigChain#read` itself applies no per-key
+   * defaults).
+   * @param {*} value - the raw config value.
+   * @param {number} fallback - the default to use when unparseable.
+   * @returns {number} the parsed number, or `fallback`.
+   */
+  _numberOrDefault(value, fallback) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+
+    if (typeof value === 'string' && value.trim().length > 0) {
+      const parsed = Number(value);
+
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+
+    return fallback;
+  }
+
+  /**
+   * Call `RepoContext#createIssue` in-process, retrying up to
    * `maxRetryCount` times with `errorSleepTime`-second sleeps between
    * attempts, mirroring `spawn_issue_shell.sh`'s retry loop around
    * `github_issue.sh create`.
-   * @param {string} repoPath - the target repo's local checkout path.
+   * @param {RepoContext} context - the per-call repo context.
    * @param {string} title - the new issue's title.
    * @param {string} bodyFile - the local file whose contents become the
    *   new issue's body.
@@ -127,10 +188,10 @@ class SpawnIssue {
    *   issue's id and the scratch file `create` wrote.
    * @throws {DispatchFailure} once `maxRetryCount` attempts have all failed.
    */
-  async _createWithRetry(repoPath, title, bodyFile, maxRetryCount, errorSleepTime) {
+  async _createWithRetry(context, title, bodyFile, maxRetryCount, errorSleepTime) {
     for (let attempt = 1; attempt <= maxRetryCount; attempt += 1) {
       try {
-        const output = await this._githubIssue.create(repoPath, title, bodyFile);
+        const output = await context.createIssue(title, bodyFile);
 
         return { newId: this._extractField(output, 'ID'), newFile: this._extractField(output, 'FILE') };
       } catch (error) {
@@ -145,137 +206,6 @@ class SpawnIssue {
     }
 
     throw new DispatchFailure('STATUS=failed\n');
-  }
-
-  /**
-   * Best-effort: fetch `parentId`'s current labels, strip any label
-   * that maps to a canonical pipeline tag, keep everything else, then
-   * always add `Spawned` on top. Falls back to applying just `Spawned`
-   * when the parent-labels lookup itself fails. Never throws.
-   * @param {string} parentId - the parent issue's numeric id.
-   * @param {string} newId - the newly-created issue's numeric id.
-   * @param {string} repoRef - the `owner/repo` GitHub reference.
-   * @returns {Promise<void>} resolves regardless of outcome.
-   */
-  async _applyLabels(parentId, newId, repoRef) {
-    let labelsToApply = [];
-
-    try {
-      const { stdout } = await this._execFileAsync('gh', [
-        'issue', 'view', String(parentId), '-R', repoRef, '--json', 'labels', '-q', '.labels[].name'
-      ]);
-
-      labelsToApply = stdout
-        .split('\n')
-        .map((label) => label.trim())
-        .filter((label) => label.length > 0)
-        .filter((label) => Tags.extractTags([label]).length === 0);
-    } catch (error) {
-      process.stderr.write(
-        `Warning: could not fetch labels from parent issue #${parentId} on ${repoRef}: ${error.message} — applying only 'Spawned'\n`
-      );
-    }
-
-    labelsToApply.push(SPAWNED_LABEL);
-
-    const labelArgs = labelsToApply.flatMap((label) => ['--add-label', label]);
-
-    try {
-      await this._execFileAsync('gh', ['issue', 'edit', String(newId), '-R', repoRef, ...labelArgs]);
-    } catch {
-      process.stderr.write(`Warning: could not apply labels to issue #${newId} on ${repoRef}\n`);
-    }
-  }
-
-  /**
-   * Best-effort: comment on both the parent and the new issue,
-   * cross-linking them, and — when `asSubissue` is set — additionally
-   * link the new issue as a native GitHub sub-issue of the parent via
-   * the `addSubIssue` GraphQL mutation. Never throws.
-   * @param {string} parentId - the parent issue's numeric id.
-   * @param {string} newId - the newly-created issue's numeric id.
-   * @param {string} title - the new issue's title.
-   * @param {string} repoRef - the `owner/repo` GitHub reference.
-   * @param {boolean} asSubissue - whether to also link as a native
-   *   GitHub sub-issue.
-   * @returns {Promise<void>} resolves regardless of outcome.
-   */
-  async _linkBack(parentId, newId, title, repoRef, asSubissue) {
-    try {
-      await this._execFileAsync('gh', [
-        'issue', 'comment', String(parentId), '-R', repoRef, '--body', `Spawned issue #${newId}: ${title}`
-      ]);
-    } catch {
-      process.stderr.write(`Warning: could not comment on parent issue #${parentId} on ${repoRef}\n`);
-    }
-
-    try {
-      await this._execFileAsync('gh', [
-        'issue', 'comment', String(newId), '-R', repoRef, '--body', `Spawned from #${parentId}`
-      ]);
-    } catch {
-      process.stderr.write(`Warning: could not comment on issue #${newId} on ${repoRef}\n`);
-    }
-
-    if (!asSubissue) {
-      return;
-    }
-
-    await this._linkSubIssue(parentId, newId, repoRef);
-  }
-
-  /**
-   * Best-effort: resolve both issues' GraphQL node ids and run the
-   * `addSubIssue` mutation, warning to stderr on any failure along the
-   * way. Never throws.
-   * @param {string} parentId - the parent issue's numeric id.
-   * @param {string} newId - the newly-created issue's numeric id.
-   * @param {string} repoRef - the `owner/repo` GitHub reference.
-   * @returns {Promise<void>} resolves regardless of outcome.
-   */
-  async _linkSubIssue(parentId, newId, repoRef) {
-    const parentNodeId = await this._nodeId(parentId, repoRef);
-    const subNodeId = await this._nodeId(newId, repoRef);
-
-    let linked = false;
-
-    if (parentNodeId && subNodeId) {
-      try {
-        await this._execFileAsync('gh', [
-          'api', 'graphql',
-          '-f', `query=${ADD_SUB_ISSUE_MUTATION}`,
-          '-F', `issueId=${parentNodeId}`,
-          '-F', `subIssueId=${subNodeId}`
-        ]);
-        linked = true;
-      } catch {
-        linked = false;
-      }
-    }
-
-    if (!linked) {
-      process.stderr.write(
-        `Warning: could not link issue #${newId} as a native sub-issue of #${parentId} — created but not linked; link it manually on GitHub\n`
-      );
-    }
-  }
-
-  /**
-   * @param {string} id - the issue's numeric id.
-   * @param {string} repoRef - the `owner/repo` GitHub reference.
-   * @returns {Promise<string>} the issue's GraphQL node id, or an empty
-   *   string on any lookup failure.
-   */
-  async _nodeId(id, repoRef) {
-    try {
-      const { stdout } = await this._execFileAsync('gh', [
-        'issue', 'view', String(id), '-R', repoRef, '--json', 'id', '-q', '.id'
-      ]);
-
-      return stdout.trim();
-    } catch {
-      return '';
-    }
   }
 
   /**
