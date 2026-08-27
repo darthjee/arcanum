@@ -144,6 +144,74 @@ describe('GitHubClient', () => {
     });
   });
 
+  describe('#getPrHeadSha', () => {
+    it('requests the pull request and returns its head sha', async () => {
+      const pull = { number: 7, head: { sha: 'abc123' } };
+      const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true, json: async () => pull });
+      const client = newClient(fetchFn);
+
+      const result = await client.getPrHeadSha(7);
+
+      expect(fetchFn).toHaveBeenCalledWith(
+        `https://api.github.com/repos/${REPO}/pulls/7`,
+        jasmine.objectContaining({ headers: { Authorization: `Bearer ${TOKEN}` } })
+      );
+      expect(result).toEqual('abc123');
+    });
+
+    it('throws when the response is not ok', async () => {
+      const fetchFn = jasmine.createSpy().and.resolveTo({ ok: false });
+      const client = newClient(fetchFn);
+
+      await expectAsync(client.getPrHeadSha(7)).toBeRejectedWithError(
+        `Error: could not fetch pull request #7 from ${REPO}`
+      );
+    });
+
+    it('throws when the response has no head.sha', async () => {
+      const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true, json: async () => ({ number: 7 }) });
+      const client = newClient(fetchFn);
+
+      await expectAsync(client.getPrHeadSha(7)).toBeRejectedWithError(
+        `Error: could not resolve head commit for pull request #7 in ${REPO}`
+      );
+    });
+  });
+
+  describe('#getCheckRuns', () => {
+    it('requests the commit\'s check-runs and returns the check_runs array', async () => {
+      const checkRuns = [{ name: 'build', status: 'completed', conclusion: 'success' }];
+      const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true, json: async () => ({ check_runs: checkRuns }) });
+      const client = newClient(fetchFn);
+
+      const result = await client.getCheckRuns('abc123');
+
+      expect(fetchFn).toHaveBeenCalledWith(
+        `https://api.github.com/repos/${REPO}/commits/abc123/check-runs?per_page=100`,
+        jasmine.objectContaining({ headers: { Authorization: `Bearer ${TOKEN}` } })
+      );
+      expect(result).toEqual(checkRuns);
+    });
+
+    it('throws when the response is not ok', async () => {
+      const fetchFn = jasmine.createSpy().and.resolveTo({ ok: false });
+      const client = newClient(fetchFn);
+
+      await expectAsync(client.getCheckRuns('abc123')).toBeRejectedWithError(
+        `Error: could not fetch check-runs for abc123 in ${REPO}`
+      );
+    });
+
+    it('throws when check_runs is not an array', async () => {
+      const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true, json: async () => ({}) });
+      const client = newClient(fetchFn);
+
+      await expectAsync(client.getCheckRuns('abc123')).toBeRejectedWithError(
+        `Error: malformed check-runs response for abc123 in ${REPO}`
+      );
+    });
+  });
+
   describe('#getCurrentUser', () => {
     it('requests the current user with the auth header', async () => {
       const user = { login: 'fake-merger' };

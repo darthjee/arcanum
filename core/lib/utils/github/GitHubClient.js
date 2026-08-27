@@ -151,6 +151,73 @@ class GitHubClient {
   }
 
   /**
+   * Resolve pull request `prNumber`'s current head commit sha, replacing
+   * `AutoFixAllWaitCi`'s own `_fetchHeadSha`.
+   * @param {number|string} prNumber - the pull request number.
+   * @returns {Promise<string>} the pull request's current head commit
+   *   sha.
+   * @throws {Error} `Error: could not fetch pull request #<prNumber> from
+   *   <repo>` on a non-ok response.
+   * @throws {Error} `Error: could not resolve head commit for pull
+   *   request #<prNumber> in <repo>` when the response has no
+   *   `head.sha`.
+   */
+  async getPrHeadSha(prNumber) {
+    const { repo } = await this._context.resolveWithRef();
+    const token = await this._context.getToken();
+    const response = await this._fetch(`https://api.github.com/repos/${repo}/pulls/${prNumber}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(this._timeoutMs)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error: could not fetch pull request #${prNumber} from ${repo}`);
+    }
+
+    const pull = await response.json();
+    const sha = pull && pull.head && pull.head.sha;
+
+    if (!sha) {
+      throw new Error(`Error: could not resolve head commit for pull request #${prNumber} in ${repo}`);
+    }
+
+    return sha;
+  }
+
+  /**
+   * Resolve commit `sha`'s check-runs, replacing `AutoFixAllWaitCi`'s own
+   * `_fetchCheckRuns`.
+   * @param {string} sha - the commit sha to look up check-runs for.
+   * @returns {Promise<Array>} the commit's `check_runs` array (first page
+   *   only, `per_page=100` — no pagination, matching the shell script's
+   *   own single-page fetch).
+   * @throws {Error} `Error: could not fetch check-runs for <sha> in
+   *   <repo>` on a non-ok response.
+   * @throws {Error} `Error: malformed check-runs response for <sha> in
+   *   <repo>` when `check_runs` isn't an array.
+   */
+  async getCheckRuns(sha) {
+    const { repo } = await this._context.resolveWithRef();
+    const token = await this._context.getToken();
+    const response = await this._fetch(`https://api.github.com/repos/${repo}/commits/${sha}/check-runs?per_page=100`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(this._timeoutMs)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error: could not fetch check-runs for ${sha} in ${repo}`);
+    }
+
+    const body = await response.json();
+
+    if (!Array.isArray(body.check_runs)) {
+      throw new Error(`Error: malformed check-runs response for ${sha} in ${repo}`);
+    }
+
+    return body.check_runs;
+  }
+
+  /**
    * Resolve the acting GitHub user, replacing `gh api user`.
    * @returns {Promise<object>} the parsed `/user` response body.
    * @throws {Error} `could not fetch current user` on any non-ok
