@@ -118,15 +118,20 @@ describe('AutoFixAllGithub', () => {
         })
       });
 
-      // #addTag routes through the shared issueTagger flow (origin.resolveWithRef + githubToken.get).
+      // #addTag routes through the shared issueTagger flow (origin.resolveWithRef + githubToken.get) —
+      // both `_mutateTag`'s own repoRef resolution and the per-call IssueClient's internal resolution
+      // route through the same shared instances, so both are called more than once per #addTag call.
       await github.addTag(REPO_PATH, '5', 'ready_for_work');
       expect(originWithRef).toHaveBeenCalledWith(REPO_PATH);
       expect(tokenGet).toHaveBeenCalledWith(REPO_PATH);
 
+      const originWithRefAfterAddTag = originWithRef.calls.count();
+      const tokenGetAfterAddTag = tokenGet.calls.count();
+
       // #prState routes through the shared prOperations flow (also origin.resolveWithRef + githubToken.get).
       await github.prState(REPO_PATH);
-      expect(originWithRef).toHaveBeenCalledTimes(2);
-      expect(tokenGet).toHaveBeenCalledTimes(2);
+      expect(originWithRef.calls.count()).toEqual(originWithRefAfterAddTag + 1);
+      expect(tokenGet.calls.count()).toEqual(tokenGetAfterAddTag + 1);
     });
 
     it('builds a fresh, context-bound gitClient/githubClient pair per call, forwarding the shared execFileAsync/fetchFn', async () => {
