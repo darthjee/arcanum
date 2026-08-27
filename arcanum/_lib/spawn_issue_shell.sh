@@ -22,11 +22,12 @@
 #
 #   1. Create: calls github_issue.sh create <repo_path> <title>
 #      <body_file>, wrapped in a retry loop (max-retry-count/
-#      error-sleep-time read from .claude/state/arcanum-config.json's
-#      "plan-issues" section, default 5 retries / 5s sleep). On
-#      exhausted retries: prints STATUS=failed, exits 1 (nothing to
-#      clean up — the create command only writes its scratch file on a
-#      successful call).
+#      error-sleep-time read via config_chain.sh's config_chain_read from
+#      the "plan-issues" namespace — local state, then repo config, then
+#      global config — default 5 retries / 5s sleep). On exhausted
+#      retries: prints STATUS=failed, exits 1 (nothing to clean up — the
+#      create command only writes its scratch file on a successful
+#      call).
 #   2. Labels: fetches <parent_id>'s current labels, strips any label
 #      that maps to a canonical pipeline tag (tags.sh's _tag_for_label),
 #      keeps everything else, then always adds Spawned. Applied via
@@ -80,9 +81,9 @@ source "${SCRIPT_DIR}/repo_path.sh"
 # shellcheck source=origin.sh
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/origin.sh"
-# shellcheck source=repo_config.sh
+# shellcheck source=config_chain.sh
 # shellcheck disable=SC1091
-source "${SCRIPT_DIR}/repo_config.sh"
+source "${SCRIPT_DIR}/config_chain.sh"
 # shellcheck source=tags.sh
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/tags.sh"
@@ -97,11 +98,11 @@ domain="$_ORIGIN_DOMAIN"
 
 # --- Retry config ---
 
-max_retry=$(repo_config_read ".claude/state/arcanum-config.json" "" "plan-issues" "max-retry-count")
+max_retry=$(config_chain_read "$REPO_PATH" "plan-issues" "max-retry-count")
 max_retry="${max_retry//\"/}"
 [[ -n "$max_retry" ]] || max_retry=5
 
-error_sleep=$(repo_config_read ".claude/state/arcanum-config.json" "" "plan-issues" "error-sleep-time")
+error_sleep=$(config_chain_read "$REPO_PATH" "plan-issues" "error-sleep-time")
 error_sleep="${error_sleep//\"/}"
 [[ -n "$error_sleep" ]] || error_sleep=5
 

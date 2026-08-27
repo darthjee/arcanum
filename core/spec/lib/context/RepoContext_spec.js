@@ -10,6 +10,7 @@ describe('RepoContext', () => {
       githubToken: { get: jasmine.createSpy() },
       issueStateService: { get: jasmine.createSpy() },
       configChain: { read: jasmine.createSpy() },
+      githubIssue: { create: jasmine.createSpy() },
       ...overrides
     });
   }
@@ -71,6 +72,18 @@ describe('RepoContext', () => {
 
       expect(read).toHaveBeenCalledWith(REPO_PATH, 'git', 'merge_body_mode');
       expect(result).toEqual('full');
+    });
+  });
+
+  describe('#createIssue', () => {
+    it('delegates to githubIssue.create with repoPath, title, and bodyFile', async () => {
+      const create = jasmine.createSpy().and.resolveTo('ID=5\nTITLE=t\nFILE=f\nDOMAIN=github.com\nREPO=a/b\n');
+      const context = newContext({ githubIssue: { create } });
+
+      const result = await context.createIssue('t', 'f');
+
+      expect(create).toHaveBeenCalledWith(REPO_PATH, 't', 'f');
+      expect(result).toEqual('ID=5\nTITLE=t\nFILE=f\nDOMAIN=github.com\nREPO=a/b\n');
     });
   });
 

@@ -1,10 +1,10 @@
 import RepoContext from '../../../lib/context/RepoContext.js';
 
 /**
- * Build a `RepoContext` wired to jasmine spies for its 4 collaborators,
+ * Build a `RepoContext` wired to jasmine spies for its 5 collaborators,
  * for reuse across specs that only care about the `RepoContext`
  * boundary (not `Origin`/`GithubToken`/`IssueStateService`/
- * `ConfigChain`'s own internals).
+ * `ConfigChain`/`GithubIssue`'s own internals).
  * @param {object} [opts] - behavior overrides.
  * @param {string} [opts.repoPath] - the target repo's local checkout
  *   path.
@@ -13,6 +13,7 @@ import RepoContext from '../../../lib/context/RepoContext.js';
  * @param {object} [opts.issueStateService] - `issueStateService` spy
  *   overrides.
  * @param {object} [opts.configChain] - `configChain` spy overrides.
+ * @param {object} [opts.githubIssue] - `githubIssue` spy overrides.
  * @returns {RepoContext} a `RepoContext` instance ready for spec use.
  */
 export function createRepoContextMock({ repoPath = '/fake/repo', ...overrides } = {}) {
@@ -20,6 +21,7 @@ export function createRepoContextMock({ repoPath = '/fake/repo', ...overrides } 
   const githubToken = { get: jasmine.createSpy(), ...overrides.githubToken };
   const issueStateService = { get: jasmine.createSpy(), ...overrides.issueStateService };
   const configChain = { read: jasmine.createSpy(), ...overrides.configChain };
+  const githubIssue = { create: jasmine.createSpy(), ...overrides.githubIssue };
 
-  return new RepoContext({ repoPath, origin, githubToken, issueStateService, configChain });
+  return new RepoContext({ repoPath, origin, githubToken, issueStateService, configChain, githubIssue });
 }
