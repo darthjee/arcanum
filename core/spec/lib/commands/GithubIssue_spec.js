@@ -20,7 +20,10 @@ async function loadFixture(name) {
  */
 function stubDeps(overrides = {}) {
   return {
-    origin: { resolve: async () => ({ domain: 'github.com', repo: 'darthjee/arcanum' }) },
+    origin: {
+      resolve: async () => ({ domain: 'github.com', repo: 'darthjee/arcanum' }),
+      resolveWithRef: async () => ({ domain: 'github.com', repo: 'darthjee/arcanum', repoRef: 'darthjee/arcanum' })
+    },
     githubToken: { get: async () => 'fake-token' },
     repoPath: { validate: jasmine.createSpy('validate').and.resolveTo(undefined) },
     ...overrides

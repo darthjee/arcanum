@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import RepoContext from '../context/RepoContext.js';
+import IssueClient from '../utils/github/IssueClient.js';
 import IssueStateService from '../services/IssueStateService.js';
 import GithubToken from '../utils/github/GithubToken.js';
 import IssueStatePaths from '../utils/file/IssueStatePaths.js';
@@ -79,24 +80,7 @@ class GithubIssue {
    */
   async fetch(repoPath, id) {
     const { domain, repo } = await this._origin.resolve(repoPath);
-    const token = await this._githubToken.get(repoPath);
-
-    let response;
-
-    try {
-      response = await this._fetch(`https://api.github.com/repos/${repo}/issues/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(this._timeoutMs)
-      });
-    } catch {
-      throw new Error(`Error: could not fetch issue #${id} from ${repo}`);
-    }
-
-    if (!response.ok) {
-      throw new Error(`Error: could not fetch issue #${id} from ${repo}`);
-    }
-
-    const issue = await response.json();
+    const issue = await this._issueClient(repoPath).getIssue(id);
     const title = this._rawString(issue.title);
     const body = this._rawString(issue.body);
     const state = this._rawString(issue.state);
@@ -170,29 +154,7 @@ class GithubIssue {
     const body = rawBody.replace(/\n+$/, '');
 
     const { domain, repo } = await this._origin.resolve(repoPath);
-    const token = await this._githubToken.get(repoPath);
-
-    let response;
-
-    try {
-      response = await this._fetch(`https://api.github.com/repos/${repo}/issues`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ title, body }),
-        signal: AbortSignal.timeout(this._timeoutMs)
-      });
-    } catch {
-      throw new Error(`Error: could not create issue on ${repo}`);
-    }
-
-    if (!response.ok) {
-      throw new Error(`Error: could not create issue on ${repo}`);
-    }
-
-    const issue = await response.json();
+    const issue = await this._issueClient(repoPath).createIssue(title, body);
     const id = this._rawString(issue.number);
     const normalized = this._normalizeTitle(title);
     const filePath = `${ISSUES_DIR}/${id}-${normalized}.md`;
@@ -221,6 +183,26 @@ class GithubIssue {
       jsonReader: this._jsonReader,
       issueStatePaths: this._issueStatePaths
     });
+  }
+
+  /**
+   * Build a per-call `IssueClient`, wrapping `repoPath` into a fresh
+   * `RepoContext` bound to the shared `origin`/`githubToken` — same
+   * per-call shape as `#_issueStateService`, since `fetch`/`create` are
+   * dispatched with `repoPath` known only once the method is called
+   * (see this migration's plan's Notes on why `GithubIssue` itself
+   * keeps a zero-argument constructor).
+   * @param {string} repoPath - the target repo's local checkout path.
+   * @returns {IssueClient} the per-call `IssueClient`.
+   */
+  _issueClient(repoPath) {
+    const context = new RepoContext({
+      repoPath,
+      origin: this._origin,
+      githubToken: this._githubToken
+    });
+
+    return new IssueClient({ context, fetchFn: this._fetch, timeoutMs: this._timeoutMs });
   }
 
   /**
