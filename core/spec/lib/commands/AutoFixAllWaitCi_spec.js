@@ -7,7 +7,9 @@ const TOKEN = 'fake-token';
 
 /**
  * Build a fake `execFileAsync` implementation answering the single
- * `git branch --show-current` call `AutoFixAllWaitCi` makes.
+ * `git branch --show-current` call `AutoFixAllWaitCi` makes (via its
+ * per-call `GitClient`, which invokes it as `execFileAsync('git',
+ * ['branch', '--show-current'], { cwd: repoPath })`).
  * @param {object} [opts] - behavior overrides.
  * @param {string} [opts.branch] - the branch `git branch --show-current`
  *   reports.
@@ -15,7 +17,7 @@ const TOKEN = 'fake-token';
  */
 function fakeExecFileAsync({ branch = BRANCH } = {}) {
   return jasmine.createSpy('execFileAsync').and.callFake(async (file, args = []) => {
-    if (file === 'git' && args[2] === 'branch') {
+    if (file === 'git' && args[0] === 'branch' && args[1] === '--show-current') {
       return { stdout: `${branch}\n` };
     }
 
@@ -87,7 +89,10 @@ function fakeFetch({ pulls = [{ number: 7 }], headSequence = ['sha-1'], checkRun
  */
 function stubDeps(overrides = {}) {
   return {
-    origin: { resolve: async () => ({ domain: 'github.com', repo: REPO }) },
+    origin: {
+      resolve: async () => ({ domain: 'github.com', repo: REPO }),
+      resolveWithRef: async () => ({ domain: 'github.com', repo: REPO, repoRef: REPO })
+    },
     githubToken: { get: async () => TOKEN },
     repoConfig: { getIgnoredCheckPatterns: jasmine.createSpy('getIgnoredCheckPatterns').and.resolveTo([]) },
     execFileAsync: fakeExecFileAsync(),
@@ -291,16 +296,15 @@ describe('AutoFixAllWaitCi', () => {
         expect(deps.sleepFn).toHaveBeenCalledTimes(1);
       });
 
-      it('does not raise when an ignored-pattern regex is malformed — keeps polling instead (#_pollOnce directly, matching the shell\'s own "hang forever unless ignored" behavior for this case)', async () => {
-        const deps = stubDeps({
-          fetchFn: fakeFetch({
-            checkRunsSequence: [[{ name: 'build', status: 'completed', conclusion: 'success' }]]
-          })
-        });
-        const instance = new AutoFixAllWaitCi(deps);
-
-        await expectAsync(instance._pollOnce(REPO, 7, TOKEN, ['('])).toBeResolvedTo(null);
-      });
+      // A malformed ignored-pattern regex's "keep polling instead of
+      // raising" behavior (matching the shell's own "hang forever unless
+      // ignored" behavior for this case) is now covered at the
+      // `PrChecker` layer — see
+      // `core/spec/lib/services/PrChecker_spec.js`'s "returns null when
+      // an ignored pattern is malformed regex" — since `#_pollOnce` no
+      // longer exists on `AutoFixAllWaitCi` to call directly, and
+      // exercising it through `run()` would loop forever (the malformed
+      // pattern never resolves).
     });
 
     it('sends the resolved GitHub token as a bearer header on every REST call', async () => {

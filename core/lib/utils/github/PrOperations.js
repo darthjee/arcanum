@@ -140,6 +140,26 @@ class PrOperations {
   }
 
   /**
+   * Orchestrates `GitHubClient#getPrHeadSha` — thin delegation, same as
+   * `prNumber()` delegates to `GitHubClient#getPr`.
+   * @param {number|string} prNumber - the pull request number.
+   * @returns {Promise<string>} the pull request's current head commit
+   *   sha.
+   */
+  async headSha(prNumber) {
+    return this._github.getPrHeadSha(prNumber);
+  }
+
+  /**
+   * Orchestrates `GitHubClient#getCheckRuns` — thin delegation.
+   * @param {string} sha - the commit sha to look up check-runs for.
+   * @returns {Promise<Array>} the commit's `check_runs` array.
+   */
+  async checkRuns(sha) {
+    return this._github.getCheckRuns(sha);
+  }
+
+  /**
    * Mirrors `gh pr view --json state`'s derivation of `OPEN`/`MERGED`/
    * `CLOSED` from the REST API's `state`/`merged`/`merged_at` fields —
    * a merged PR always reports `MERGED`, even though the REST `state`

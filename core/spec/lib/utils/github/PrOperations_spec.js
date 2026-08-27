@@ -48,6 +48,8 @@ function fakeGithubClient({
     }),
     getPrCommits: jasmine.createSpy().and.resolveTo(commits),
     getCurrentUser: jasmine.createSpy().and.resolveTo(user),
+    getPrHeadSha: jasmine.createSpy().and.resolveTo('abc123'),
+    getCheckRuns: jasmine.createSpy().and.resolveTo([]),
     mergePr: jasmine.createSpy().and.callFake(async () => {
       if (!mergeOk) {
         throw new Error(`could not merge PR #${pull.number} on ${REPO}`);
@@ -144,6 +146,29 @@ describe('PrOperations', () => {
 
       expect(context._githubToken.get).not.toHaveBeenCalled();
       expect(context._origin.resolveWithRef).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('#headSha', () => {
+    it('delegates to githubClient.getPrHeadSha() and returns its result', async () => {
+      const { prOperations, githubClient } = newPrOperations({});
+
+      await expectAsync(prOperations.headSha(7)).toBeResolvedTo('abc123');
+
+      expect(githubClient.getPrHeadSha).toHaveBeenCalledWith(7);
+    });
+  });
+
+  describe('#checkRuns', () => {
+    it('delegates to githubClient.getCheckRuns() and returns its result', async () => {
+      const checkRuns = [{ name: 'build', status: 'completed', conclusion: 'success' }];
+      const { prOperations, githubClient } = newPrOperations({});
+
+      githubClient.getCheckRuns.and.resolveTo(checkRuns);
+
+      await expectAsync(prOperations.checkRuns('abc123')).toBeResolvedTo(checkRuns);
+
+      expect(githubClient.getCheckRuns).toHaveBeenCalledWith('abc123');
     });
   });
 
