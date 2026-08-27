@@ -5,6 +5,7 @@ import GitBranch from '../utils/git/GitBranch.js';
 import GitClient from '../utils/git/GitClient.js';
 import GitHubClient from '../utils/github/GitHubClient.js';
 import GithubToken from '../utils/github/GithubToken.js';
+import IssueClient from '../utils/github/IssueClient.js';
 import IssueTagger from '../utils/issue/IssueTagger.js';
 import Origin from '../utils/git/Origin.js';
 import PrOperations from '../utils/github/PrOperations.js';
@@ -28,28 +29,32 @@ import { TAG_TO_LABEL } from '../utils/issue/Tags.js';
  */
 class AutoFixAllGithub {
   /**
-   * Builds and shares one `origin`/`githubToken` pair across the
-   * default `issueTagger`, keeping `execFileAsync`/`fetchFn`/`timeoutMs`
+   * Builds and shares one `origin`/`githubToken` pair across every
+   * per-call collaborator, keeping `execFileAsync`/`fetchFn`/`timeoutMs`
    * around only to forward into each call's fresh, context-bound
-   * `gitClient`/`githubClient` pair (built by `#_prOperations`) — those
-   * two are no longer constructor-level shared singletons, since a
-   * `GitClient`/`GitHubClient` built without a `context` can't resolve
-   * `repoPath`/`token`/`repo`/`repoRef` at all.
+   * `gitClient`/`githubClient` pair (built by `#_prOperations`) and
+   * `issueTagger` (built by `#_issueTagger`) — none of those are
+   * constructor-level shared singletons, since a context-bound
+   * collaborator built without a `context` can't resolve `repoPath`/
+   * `token`/`repo`/`repoRef` at all.
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Origin} [deps.origin] - shared git-origin resolver.
    * @param {GithubToken} [deps.githubToken] - shared GitHub token resolver.
    * @param {Function} [deps.fetchFn] - forwarded to the default
-   *   `issueTagger`, and to each per-call `githubClient`.
+   *   `issueTaggerFactory`, and to each per-call `githubClient`.
    * @param {number} [deps.timeoutMs] - forwarded to the default
-   *   `issueTagger`, and to each per-call `githubClient`.
+   *   `issueTaggerFactory`, and to each per-call `githubClient`.
    * @param {object} [deps.issueStateService] - forwarded to each
    *   per-call `RepoContext`.
    * @param {object} [deps.configChain] - forwarded to each per-call
    *   `RepoContext`.
    * @param {Function} [deps.execFileAsync] - forwarded to the default
    *   `branchCleanup`, and to each per-call `gitClient`.
-   * @param {IssueTagger} [deps.issueTagger] - delegate for `addTag`/
-   *   `removeTag`/`hasShipitLabel`.
+   * @param {Function} [deps.issueTaggerFactory] - builds an
+   *   `IssueTagger` (used by `addTag`/`removeTag`/`hasShipitLabel`) from
+   *   a per-call `RepoContext` — see `#_issueTagger`. A factory, not a
+   *   pre-built instance, since a context-bound `IssueTagger` can't be
+   *   shared across calls once `repoPath` varies call to call.
    * @param {BranchCleanup} [deps.branchCleanup] - delegate for
    *   `cleanupBranch`.
    */
@@ -61,14 +66,17 @@ class AutoFixAllGithub {
     issueStateService,
     configChain,
     execFileAsync,
-    issueTagger = new IssueTagger({ origin, githubToken, fetchFn, timeoutMs }),
+    issueTaggerFactory = (context) => new IssueTagger({
+      context,
+      issueClient: new IssueClient({ context, fetchFn, timeoutMs })
+    }),
     branchCleanup = new BranchCleanup({ execFileAsync })
   } = {}) {
     this._origin = origin;
     this._githubToken = githubToken;
     this._issueStateService = issueStateService;
     this._configChain = configChain;
-    this._issueTagger = issueTagger;
+    this._issueTaggerFactory = issueTaggerFactory;
     this._fetchFn = fetchFn;
     this._timeoutMs = timeoutMs;
     this._execFileAsync = execFileAsync;
@@ -142,6 +150,28 @@ class AutoFixAllGithub {
   }
 
   /**
+   * Build a per-call `IssueTagger`, wrapping `repoPath` (plus the shared
+   * `origin`/`githubToken`/`issueStateService`/`configChain`) into a
+   * fresh `RepoContext` — mirroring `#_prOperations`'s own per-call
+   * context construction, since a context-bound `IssueTagger` can't be a
+   * constructor-level shared singleton once `repoPath` varies call to
+   * call.
+   * @param {string} repoPath - the target repo's local checkout path.
+   * @returns {IssueTagger} the per-call `IssueTagger` delegate.
+   */
+  _issueTagger(repoPath) {
+    const context = new RepoContext({
+      repoPath,
+      origin: this._origin,
+      githubToken: this._githubToken,
+      issueStateService: this._issueStateService,
+      configChain: this._configChain
+    });
+
+    return this._issueTaggerFactory(context);
+  }
+
+  /**
    * `github.sh cleanup-branch` — see `BranchCleanup#cleanupBranch`.
    * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} id - the numeric issue id.
@@ -169,10 +199,7 @@ class AutoFixAllGithub {
     let hasShipit;
 
     try {
-      const { repo } = await this._origin.resolve(repoPath);
-      const token = await this._githubToken.get(repoPath);
-
-      hasShipit = await this._issueTagger.hasLabel(id, repo, token, 'shipit');
+      hasShipit = await this._issueTagger(repoPath).hasLabel(id, 'shipit');
     } catch {
       throw new DispatchFailure('', 1);
     }
@@ -232,13 +259,13 @@ class AutoFixAllGithub {
     }
 
     const label = TAG_TO_LABEL[tag];
-    const { repo, repoRef } = await this._origin.resolveWithRef(repoPath);
-    const token = await this._githubToken.get(repoPath);
+    const { repoRef } = await this._origin.resolveWithRef(repoPath);
+    const issueTagger = this._issueTagger(repoPath);
 
     let labels;
 
     try {
-      labels = await this._issueTagger.fetchLabels(id, repo, token);
+      labels = await issueTagger.fetchLabels(id);
     } catch {
       throw new Error(`Error: could not fetch issue #${id} from ${repoRef}`);
     }
@@ -253,9 +280,9 @@ class AutoFixAllGithub {
 
     try {
       if (action === 'add') {
-        await this._issueTagger.addLabel(id, repo, token, label);
+        await issueTagger.addLabel(id, label);
       } else {
-        await this._issueTagger.removeLabel(id, repo, token, label);
+        await issueTagger.removeLabel(id, label);
       }
     } catch {
       throw new Error(`Error: could not update issue #${id} on ${repoRef}`);

@@ -1,9 +1,11 @@
 import DispatchFailure from '../utils/errors/DispatchFailure.js';
 import GithubToken from '../utils/github/GithubToken.js';
+import IssueClient from '../utils/github/IssueClient.js';
 import IssueTagger from '../utils/issue/IssueTagger.js';
 import Lock from '../utils/file/Lock.js';
 import Origin from '../utils/git/Origin.js';
 import QueueStore from '../utils/queue/QueueStore.js';
+import RepoContext from '../context/RepoContext.js';
 
 const DEFAULT_POLL_INTERVAL_MS = 5000;
 
@@ -44,24 +46,26 @@ class AutoFixAllQueue {
    *   guard `push`/`pop`.
    * @param {QueueStore} [deps.queueStore] - the queue file's I/O
    *   delegate.
-   * @param {Origin} [deps.origin] - git-origin resolver, used to build
-   *   the default `issueTagger` (ignored if `issueTagger` is also
-   *   given).
+   * @param {Origin} [deps.origin] - git-origin resolver, shared across
+   *   each per-call `RepoContext` built by `#_issueTagger`.
    * @param {GithubToken} [deps.githubToken] - GitHub token resolver,
-   *   used to build the default `issueTagger` (ignored if `issueTagger`
-   *   is also given).
+   *   shared across each per-call `RepoContext` built by `#_issueTagger`.
    * @param {Function} [deps.fetchFn] - `fetch`-compatible implementation
-   *   (global `fetch` by default), used to build the default
-   *   `issueTagger` (ignored if `issueTagger` is also given).
+   *   (global `fetch` by default), forwarded to the default
+   *   `issueTaggerFactory`.
    * @param {number} [deps.timeoutMs] - each REST call's abort timeout,
-   *   used to build the default `issueTagger` (ignored if `issueTagger`
-   *   is also given; defaults to `IssueTagger`'s own real 30s protocol
-   *   value).
-   * @param {IssueTagger} [deps.issueTagger] - the best-effort GitHub
-   *   label-mutation delegate used by `save`/`push`. Defaults to an
-   *   `IssueTagger` built from `origin`/`githubToken`/`fetchFn`/
-   *   `timeoutMs`, so callers can override just the label-mutation
-   *   transport without also passing a whole custom `issueTagger`.
+   *   forwarded to the default `issueTaggerFactory` (ignored if
+   *   `issueTaggerFactory` is also given; defaults to `IssueClient`'s
+   *   own real 30s protocol value).
+   * @param {Function} [deps.issueTaggerFactory] - builds an
+   *   `IssueTagger` (the best-effort GitHub label-mutation delegate used
+   *   by `save`/`push`) from a per-call `RepoContext` — see
+   *   `#_issueTagger`. A factory, not a pre-built instance, since a
+   *   context-bound `IssueTagger` can't be shared across calls once
+   *   `repoPath` varies call to call. Defaults to an `IssueTagger` built
+   *   from `context` plus an `IssueClient` using `fetchFn`/`timeoutMs`,
+   *   so callers can override just the label-mutation transport without
+   *   also passing a whole custom factory.
    * @param {number} [deps.pollIntervalMs] - `waitNext`'s poll interval,
    *   overridable for tests (defaults to the shell script's real 5s
    *   `sleep 5`).
@@ -76,13 +80,18 @@ class AutoFixAllQueue {
     githubToken = new GithubToken(),
     fetchFn = fetch,
     timeoutMs,
-    issueTagger = new IssueTagger({ origin, githubToken, fetchFn, timeoutMs }),
+    issueTaggerFactory = (context) => new IssueTagger({
+      context,
+      issueClient: new IssueClient({ context, fetchFn, timeoutMs })
+    }),
     pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
     sleepFn = defaultSleep
   } = {}) {
     this._lock = lock;
     this._queueStore = queueStore;
-    this._issueTagger = issueTagger;
+    this._origin = origin;
+    this._githubToken = githubToken;
+    this._issueTaggerFactory = issueTaggerFactory;
     this._pollIntervalMs = pollIntervalMs;
     this._sleep = sleepFn;
   }
@@ -118,7 +127,31 @@ class AutoFixAllQueue {
 
     process.stdout.write(`Queue saved: ${ids.join(' ')}\n`);
 
-    await this._issueTagger.markEnqueued(repoPath, ids);
+    await this._issueTagger(repoPath).markEnqueued(ids);
+  }
+
+  /**
+   * Build a per-call `IssueTagger`, wrapping `repoPath` (plus the shared
+   * `origin`/`githubToken`) into a fresh `RepoContext` — mirroring
+   * `AutoFixAllGithub#_issueTagger`'s own per-call context construction,
+   * since a context-bound `IssueTagger` can't be a constructor-level
+   * shared singleton once `repoPath` varies call to call. Building the
+   * `RepoContext` itself is synchronous and doesn't resolve `origin`/
+   * `token` — the actual resolution only happens once `#markEnqueued` is
+   * called, so moving the context-building call earlier (before
+   * `save`/`push`'s own stdout confirmation line) doesn't change when a
+   * resolution failure can occur.
+   * @param {string} repoPath - the target repo's local checkout path.
+   * @returns {IssueTagger} the per-call `IssueTagger` delegate.
+   */
+  _issueTagger(repoPath) {
+    const context = new RepoContext({
+      repoPath,
+      origin: this._origin,
+      githubToken: this._githubToken
+    });
+
+    return this._issueTaggerFactory(context);
   }
 
   /**
@@ -187,7 +220,7 @@ class AutoFixAllQueue {
 
     process.stdout.write(`Pushed: ${ids.join(' ')}\n`);
 
-    await this._issueTagger.markEnqueued(repoPath, ids);
+    await this._issueTagger(repoPath).markEnqueued(ids);
   }
 
   /**

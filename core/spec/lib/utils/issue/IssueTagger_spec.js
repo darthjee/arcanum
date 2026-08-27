@@ -1,48 +1,79 @@
 import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
 import IssueTagger from '../../../../lib/utils/issue/IssueTagger.js';
-import { fakeFetch } from '../../../support/utils/fakeFetch.js';
+import { createRepoContextMock } from '../../../support/factories/repoContextFactory.js';
 import { captureStdout } from '../../../support/utils/captureStdout.js';
 
 const REPO = 'darthjee/arcanum';
-const TOKEN = 'fake-token';
+
+/**
+ * Build a fake `IssueClient`, answering the 3 REST calls `IssueTagger`'s
+ * label mutation makes per tag: `getIssue` (current labels), `addLabel`,
+ * `removeLabel`.
+ * @param {object} [opts] - behavior overrides.
+ * @param {string[]} [opts.existingLabels] - the labels every `getIssue`
+ *   call reports as already present.
+ * @param {boolean} [opts.getFails] - whether `getIssue` fails.
+ * @param {boolean} [opts.mutateFails] - whether every `addLabel`/
+ *   `removeLabel` call fails.
+ * @returns {object} a fake `IssueClient`.
+ */
+function fakeIssueClient({ existingLabels = ['Ready for Work', 'Created'], getFails = false, mutateFails = false } = {}) {
+  return {
+    getIssue: jasmine.createSpy().and.callFake(async () => {
+      if (getFails) {
+        throw new Error(`Error: could not fetch issue from ${REPO}`);
+      }
+
+      return { labels: existingLabels.map((name) => ({ name })) };
+    }),
+    addLabel: jasmine.createSpy().and.callFake(async () => {
+      if (mutateFails) {
+        throw new Error(`could not add label on ${REPO}`);
+      }
+    }),
+    removeLabel: jasmine.createSpy().and.callFake(async () => {
+      if (mutateFails) {
+        throw new Error(`could not remove label on ${REPO}`);
+      }
+    })
+  };
+}
 
 describe('IssueTagger', () => {
-  function newTagger(overrides = {}) {
-    return new IssueTagger({
+  function newTagger({ issueClient = fakeIssueClient(), ...contextOverrides } = {}) {
+    const context = createRepoContextMock({
       origin: { resolveWithRef: async () => ({ domain: 'github.com', repo: REPO, repoRef: REPO }) },
-      githubToken: { get: async () => TOKEN },
-      fetchFn: fakeFetch(),
-      ...overrides
+      githubToken: { get: async () => 'fake-token' },
+      ...contextOverrides
     });
+
+    return new IssueTagger({ context, issueClient });
   }
 
   describe('#markEnqueued', () => {
     it('best-effort attempts the label mutation for every given id', async () => {
-      const fetchFn = fakeFetch();
-      const tagger = newTagger({ fetchFn });
+      const issueClient = fakeIssueClient();
+      const tagger = newTagger({ issueClient });
 
-      await captureStdout(() => tagger.markEnqueued('/repo', ['10', '20']));
+      await captureStdout(() => tagger.markEnqueued(['10', '20']));
 
-      // 3 GET calls per id (enqueued/ready_for_work/created), 1 POST
-      // (add enqueued, not yet present) and 2 DELETE (remove
-      // ready_for_work/created, both present) per id.
-      const urls = fetchFn.calls.allArgs().map(([url]) => url);
+      // 3 getIssue calls per id (enqueued/ready_for_work/created), 1
+      // addLabel (add enqueued, not yet present) and 2 removeLabel
+      // (remove ready_for_work/created, both present) per id.
+      const getIds = issueClient.getIssue.calls.allArgs().map(([id]) => id);
 
-      expect(urls.filter((url) => url === 'https://api.github.com/repos/darthjee/arcanum/issues/10').length).toEqual(3);
-      expect(urls.filter((url) => url === 'https://api.github.com/repos/darthjee/arcanum/issues/20').length).toEqual(3);
-
-      const methods = fetchFn.calls.allArgs().map(([, options]) => options.method);
-
-      expect(methods.filter((method) => method === 'POST').length).toEqual(2);
-      expect(methods.filter((method) => method === 'DELETE').length).toEqual(4);
+      expect(getIds.filter((id) => id === '10').length).toEqual(3);
+      expect(getIds.filter((id) => id === '20').length).toEqual(3);
+      expect(issueClient.addLabel.calls.count()).toEqual(2);
+      expect(issueClient.removeLabel.calls.count()).toEqual(4);
     });
 
     it('warns to stderr, without stopping, when a label mutation fails', async () => {
       spyOn(process.stderr, 'write');
 
-      const tagger = newTagger({ fetchFn: fakeFetch({ getFails: true }) });
+      const tagger = newTagger({ issueClient: fakeIssueClient({ getFails: true }) });
 
-      await captureStdout(() => tagger.markEnqueued('/repo', ['10']));
+      await captureStdout(() => tagger.markEnqueued(['10']));
 
       expect(process.stderr.write).toHaveBeenCalledWith(
         'Warning: could not add \'enqueued\' tag to issue #10 on darthjee/arcanum\n'
@@ -60,7 +91,7 @@ describe('IssueTagger', () => {
       let thrown;
 
       try {
-        await tagger.markEnqueued('/repo', ['10']);
+        await tagger.markEnqueued(['10']);
       } catch (error) {
         thrown = error;
       }
@@ -75,7 +106,7 @@ describe('IssueTagger', () => {
       let thrown;
 
       try {
-        await tagger.markEnqueued('/repo', ['10']);
+        await tagger.markEnqueued(['10']);
       } catch (error) {
         thrown = error;
       }
@@ -92,10 +123,10 @@ describe('IssueTagger', () => {
         origin: {
           resolveWithRef: async () => ({ domain: 'example.com', repo: REPO, repoRef: `example.com/${REPO}` })
         },
-        fetchFn: fakeFetch({ getFails: true })
+        issueClient: fakeIssueClient({ getFails: true })
       });
 
-      await captureStdout(() => tagger.markEnqueued('/repo', ['10']));
+      await captureStdout(() => tagger.markEnqueued(['10']));
 
       expect(process.stderr.write).toHaveBeenCalledWith(
         'Warning: could not add \'enqueued\' tag to issue #10 on example.com/darthjee/arcanum\n'
@@ -105,40 +136,40 @@ describe('IssueTagger', () => {
 
   describe('#mutateTag', () => {
     it('prints a "nothing to do" line to stdout and stops when adding an already-present label', async () => {
-      const tagger = newTagger({ fetchFn: fakeFetch({ existingLabels: ['Enqueued'] }) });
+      const tagger = newTagger({ issueClient: fakeIssueClient({ existingLabels: ['Enqueued'] }) });
 
       const { stdout } = await captureStdout(() =>
-        tagger.mutateTag('10', REPO, REPO, TOKEN, 'add', 'enqueued')
+        tagger.mutateTag('10', REPO, 'add', 'enqueued')
       );
 
       expect(stdout).toEqual('Tag \'enqueued\' already present on issue #10 — nothing to do.\n');
     });
 
     it('prints a "nothing to do" line to stdout and stops when removing an absent label', async () => {
-      const tagger = newTagger({ fetchFn: fakeFetch({ existingLabels: [] }) });
+      const tagger = newTagger({ issueClient: fakeIssueClient({ existingLabels: [] }) });
 
       const { stdout } = await captureStdout(() =>
-        tagger.mutateTag('10', REPO, REPO, TOKEN, 'remove', 'ready_for_work')
+        tagger.mutateTag('10', REPO, 'remove', 'ready_for_work')
       );
 
       expect(stdout).toEqual('Tag \'ready_for_work\' not present on issue #10 — nothing to do.\n');
     });
 
     it('prints a success line to stdout when adding a not-yet-present label', async () => {
-      const tagger = newTagger({ fetchFn: fakeFetch({ existingLabels: [] }) });
+      const tagger = newTagger({ issueClient: fakeIssueClient({ existingLabels: [] }) });
 
       const { stdout } = await captureStdout(() =>
-        tagger.mutateTag('10', REPO, REPO, TOKEN, 'add', 'enqueued')
+        tagger.mutateTag('10', REPO, 'add', 'enqueued')
       );
 
       expect(stdout).toEqual('Added tag \'enqueued\' to issue #10 on darthjee/arcanum\n');
     });
 
     it('prints a success line to stdout when removing a present label', async () => {
-      const tagger = newTagger({ fetchFn: fakeFetch({ existingLabels: ['Ready for Work'] }) });
+      const tagger = newTagger({ issueClient: fakeIssueClient({ existingLabels: ['Ready for Work'] }) });
 
       const { stdout } = await captureStdout(() =>
-        tagger.mutateTag('10', REPO, REPO, TOKEN, 'remove', 'ready_for_work')
+        tagger.mutateTag('10', REPO, 'remove', 'ready_for_work')
       );
 
       expect(stdout).toEqual('Removed tag \'ready_for_work\' from issue #10 on darthjee/arcanum\n');
@@ -147,10 +178,10 @@ describe('IssueTagger', () => {
     it('warns to stderr and prints nothing else when the labels fetch fails', async () => {
       spyOn(process.stderr, 'write');
 
-      const tagger = newTagger({ fetchFn: fakeFetch({ getFails: true }) });
+      const tagger = newTagger({ issueClient: fakeIssueClient({ getFails: true }) });
 
       const { stdout } = await captureStdout(() =>
-        tagger.mutateTag('10', REPO, REPO, TOKEN, 'add', 'enqueued')
+        tagger.mutateTag('10', REPO, 'add', 'enqueued')
       );
 
       expect(stdout).toEqual('');
@@ -162,10 +193,10 @@ describe('IssueTagger', () => {
     it('warns to stderr and prints nothing else when the mutation itself fails', async () => {
       spyOn(process.stderr, 'write');
 
-      const tagger = newTagger({ fetchFn: fakeFetch({ existingLabels: [], mutateFails: true }) });
+      const tagger = newTagger({ issueClient: fakeIssueClient({ existingLabels: [], mutateFails: true }) });
 
       const { stdout } = await captureStdout(() =>
-        tagger.mutateTag('10', REPO, REPO, TOKEN, 'add', 'enqueued')
+        tagger.mutateTag('10', REPO, 'add', 'enqueued')
       );
 
       expect(stdout).toEqual('');
@@ -177,15 +208,15 @@ describe('IssueTagger', () => {
 
   describe('#fetchLabels', () => {
     it('returns the issue\'s current label names', async () => {
-      const tagger = newTagger({ fetchFn: fakeFetch({ existingLabels: ['Ready for Work', 'Created'] }) });
+      const tagger = newTagger({ issueClient: fakeIssueClient({ existingLabels: ['Ready for Work', 'Created'] }) });
 
-      await expectAsync(tagger.fetchLabels('10', REPO, TOKEN)).toBeResolvedTo(['Ready for Work', 'Created']);
+      await expectAsync(tagger.fetchLabels('10')).toBeResolvedTo(['Ready for Work', 'Created']);
     });
 
-    it('rejects when the fetch response is not ok', async () => {
-      const tagger = newTagger({ fetchFn: fakeFetch({ getFails: true }) });
+    it('rejects when the labels fetch fails', async () => {
+      const tagger = newTagger({ issueClient: fakeIssueClient({ getFails: true }) });
 
-      await expectAsync(tagger.fetchLabels('10', REPO, TOKEN)).toBeRejected();
+      await expectAsync(tagger.fetchLabels('10')).toBeRejected();
     });
   });
 
@@ -193,13 +224,13 @@ describe('IssueTagger', () => {
     it('resolves when the add succeeds', async () => {
       const tagger = newTagger();
 
-      await expectAsync(tagger.addLabel('10', REPO, TOKEN, 'Enqueued')).toBeResolved();
+      await expectAsync(tagger.addLabel('10', 'Enqueued')).toBeResolved();
     });
 
     it('rejects when the add fails', async () => {
-      const tagger = newTagger({ fetchFn: fakeFetch({ mutateFails: true }) });
+      const tagger = newTagger({ issueClient: fakeIssueClient({ mutateFails: true }) });
 
-      await expectAsync(tagger.addLabel('10', REPO, TOKEN, 'Enqueued')).toBeRejected();
+      await expectAsync(tagger.addLabel('10', 'Enqueued')).toBeRejected();
     });
   });
 
@@ -207,35 +238,35 @@ describe('IssueTagger', () => {
     it('resolves when the remove succeeds', async () => {
       const tagger = newTagger();
 
-      await expectAsync(tagger.removeLabel('10', REPO, TOKEN, 'Ready for Work')).toBeResolved();
+      await expectAsync(tagger.removeLabel('10', 'Ready for Work')).toBeResolved();
     });
 
     it('rejects when the remove fails', async () => {
-      const tagger = newTagger({ fetchFn: fakeFetch({ mutateFails: true }) });
+      const tagger = newTagger({ issueClient: fakeIssueClient({ mutateFails: true }) });
 
-      await expectAsync(tagger.removeLabel('10', REPO, TOKEN, 'Ready for Work')).toBeRejected();
+      await expectAsync(tagger.removeLabel('10', 'Ready for Work')).toBeRejected();
     });
   });
 
   describe('#hasLabel', () => {
     it('resolves true when the label is present (case-insensitive, exact match)', async () => {
-      const tagger = newTagger({ fetchFn: fakeFetch({ existingLabels: ['shipit'] }) });
+      const tagger = newTagger({ issueClient: fakeIssueClient({ existingLabels: ['shipit'] }) });
 
-      await expectAsync(tagger.hasLabel('10', REPO, TOKEN, 'ShipIt')).toBeResolvedTo(true);
+      await expectAsync(tagger.hasLabel('10', 'ShipIt')).toBeResolvedTo(true);
     });
 
     it('resolves false when the label is absent', async () => {
-      const tagger = newTagger({ fetchFn: fakeFetch({ existingLabels: ['Created'] }) });
+      const tagger = newTagger({ issueClient: fakeIssueClient({ existingLabels: ['Created'] }) });
 
-      await expectAsync(tagger.hasLabel('10', REPO, TOKEN, 'shipit')).toBeResolvedTo(false);
+      await expectAsync(tagger.hasLabel('10', 'shipit')).toBeResolvedTo(false);
     });
 
     it('rejects with a plain Error (not DispatchFailure) when the labels fetch fails', async () => {
-      const tagger = newTagger({ fetchFn: fakeFetch({ getFails: true }) });
+      const tagger = newTagger({ issueClient: fakeIssueClient({ getFails: true }) });
       let thrown;
 
       try {
-        await tagger.hasLabel('10', REPO, TOKEN, 'shipit');
+        await tagger.hasLabel('10', 'shipit');
       } catch (error) {
         thrown = error;
       }

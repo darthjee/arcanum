@@ -1,37 +1,27 @@
 import DispatchFailure from '../errors/DispatchFailure.js';
-import GithubToken from '../github/GithubToken.js';
-import Origin from '../git/Origin.js';
+import IssueClient from '../github/IssueClient.js';
 import { TAG_TO_LABEL } from './Tags.js';
-
-const DEFAULT_TIMEOUT_MS = 30000;
 
 /**
  * Generic (not `AutoFixAll`-prefixed) GitHub issue tag/label mutation
  * helper, so it can be reused by future skills outside the queue
  * context. Mirrors `tag_mutate_add_label`/`tag_mutate_remove_label`
- * exactly, including their own stdout/stderr output.
+ * exactly, including their own stdout/stderr output. `RepoContext`-bound
+ * (`repo`/`token` resolved internally via `this._context`/
+ * `this._issueClient`, not taken as method parameters), mirroring
+ * `PrOperations`'s conversion to `GitHubClient`.
  */
 class IssueTagger {
   /**
-   * @param {object} [deps] - injectable collaborators, for testing.
-   * @param {Origin} [deps.origin] - git-origin resolver.
-   * @param {GithubToken} [deps.githubToken] - GitHub token resolver.
-   * @param {Function} [deps.fetchFn] - `fetch`-compatible implementation
-   *   (global `fetch` by default), used for the label mutation's GitHub
-   *   REST calls.
-   * @param {number} [deps.timeoutMs] - each REST call's abort timeout,
-   *   overridable for tests (defaults to the real 30s protocol value).
+   * @param {object} deps - the tagger's collaborators.
+   * @param {import('../../context/RepoContext.js').default} deps.context -
+   *   the target repo's context, for `repo`/`repoRef`/`token` resolution.
+   * @param {IssueClient} [deps.issueClient] - the label mutation's
+   *   GitHub REST delegate.
    */
-  constructor({
-    origin = new Origin(),
-    githubToken = new GithubToken(),
-    fetchFn = fetch,
-    timeoutMs = DEFAULT_TIMEOUT_MS
-  } = {}) {
-    this._origin = origin;
-    this._githubToken = githubToken;
-    this._fetch = fetchFn;
-    this._timeoutMs = timeoutMs;
+  constructor({ context, issueClient = new IssueClient({ context }) } = {}) {
+    this._context = context;
+    this._issueClient = issueClient;
   }
 
   /**
@@ -49,32 +39,28 @@ class IssueTagger {
    * `DispatchFailure('', 1)` to match that exit code, deliberately with
    * an empty `.stdout` payload since the caller already wrote its own
    * confirmation line directly.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string[]} ids - the affected issue ids.
    * @returns {Promise<void>} resolves once every mutation attempt has
    *   finished.
    * @throws {DispatchFailure} with an empty stdout payload and exit
    *   code 1 when the repo's origin/GitHub token can't be resolved.
    */
-  async markEnqueued(repoPath, ids) {
-    let repo;
+  async markEnqueued(ids) {
     let repoRef;
-    let token;
 
     try {
-      const resolved = await this._origin.resolveWithRef(repoPath);
+      const resolved = await this._context.resolveWithRef();
 
-      repo = resolved.repo;
       repoRef = resolved.repoRef;
-      token = await this._githubToken.get(repoPath);
+      await this._context.getToken();
     } catch {
       throw new DispatchFailure('', 1);
     }
 
     for (const id of ids) {
-      await this.mutateTag(id, repo, repoRef, token, 'add', 'enqueued');
-      await this.mutateTag(id, repo, repoRef, token, 'remove', 'ready_for_work');
-      await this.mutateTag(id, repo, repoRef, token, 'remove', 'created');
+      await this.mutateTag(id, repoRef, 'add', 'enqueued');
+      await this.mutateTag(id, repoRef, 'remove', 'ready_for_work');
+      await this.mutateTag(id, repoRef, 'remove', 'created');
     }
   }
 
@@ -92,20 +78,18 @@ class IssueTagger {
    * (`Warning: could not add/remove '<tag>' tag ...`) is also printed
    * to stderr, exactly as `_mark_enqueued`'s `|| echo ...` does.
    * @param {string} id - the issue id.
-   * @param {string} repo - the `owner/repo` path, for the REST calls.
    * @param {string} repoRef - the (possibly domain-qualified) repo
    *   reference, used in both the success/failure messages.
-   * @param {string} token - the GitHub token.
    * @param {'add'|'remove'} action - whether to add or remove the tag.
    * @param {string} tag - the canonical tag name.
    * @returns {Promise<void>} resolves regardless of outcome.
    */
-  async mutateTag(id, repo, repoRef, token, action, tag) {
+  async mutateTag(id, repoRef, action, tag) {
     const label = TAG_TO_LABEL[tag];
     let labels;
 
     try {
-      labels = await this.fetchLabels(id, repo, token);
+      labels = await this.fetchLabels(id);
     } catch {
       this.warnMutationFailure(action, tag, id, repoRef);
 
@@ -124,9 +108,9 @@ class IssueTagger {
 
     try {
       if (action === 'add') {
-        await this.addLabel(id, repo, token, label);
+        await this.addLabel(id, label);
       } else {
-        await this.removeLabel(id, repo, token, label);
+        await this.removeLabel(id, label);
       }
     } catch {
       this.warnMutationFailure(action, tag, id, repoRef);
@@ -159,68 +143,30 @@ class IssueTagger {
 
   /**
    * @param {string} id - the issue id.
-   * @param {string} repo - the `owner/repo` path.
-   * @param {string} token - the GitHub token.
    * @returns {Promise<string[]>} the issue's current GitHub label names.
    */
-  async fetchLabels(id, repo, token) {
-    const response = await this._fetch(`https://api.github.com/repos/${repo}/issues/${id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(this._timeoutMs)
-    });
-
-    if (!response.ok) {
-      throw new Error(`could not fetch issue #${id} from ${repo}`);
-    }
-
-    const issue = await response.json();
+  async fetchLabels(id) {
+    const issue = await this._issueClient.getIssue(id);
 
     return (issue.labels || []).map((issueLabel) => issueLabel.name);
   }
 
   /**
    * @param {string} id - the issue id.
-   * @param {string} repo - the `owner/repo` path.
-   * @param {string} token - the GitHub token.
    * @param {string} label - the GitHub label name to add.
    * @returns {Promise<void>} resolves once added.
    */
-  async addLabel(id, repo, token, label) {
-    const response = await this._fetch(`https://api.github.com/repos/${repo}/issues/${id}/labels`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ labels: [label] }),
-      signal: AbortSignal.timeout(this._timeoutMs)
-    });
-
-    if (!response.ok) {
-      throw new Error(`could not add label '${label}' to issue #${id} on ${repo}`);
-    }
+  async addLabel(id, label) {
+    await this._issueClient.addLabel(id, label);
   }
 
   /**
    * @param {string} id - the issue id.
-   * @param {string} repo - the `owner/repo` path.
-   * @param {string} token - the GitHub token.
    * @param {string} label - the GitHub label name to remove.
    * @returns {Promise<void>} resolves once removed.
    */
-  async removeLabel(id, repo, token, label) {
-    const response = await this._fetch(
-      `https://api.github.com/repos/${repo}/issues/${id}/labels/${encodeURIComponent(label)}`,
-      {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(this._timeoutMs)
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`could not remove label '${label}' from issue #${id} on ${repo}`);
-    }
+  async removeLabel(id, label) {
+    await this._issueClient.removeLabel(id, label);
   }
 
   /**
@@ -230,14 +176,12 @@ class IssueTagger {
    * failed fetch, matching its siblings; callers needing a
    * `DispatchFailure('', 1)` wrap this themselves.
    * @param {string} id - the issue id.
-   * @param {string} repo - the `owner/repo` path.
-   * @param {string} token - the GitHub token.
    * @param {string} label - the GitHub label name to check for.
    * @returns {Promise<boolean>} `true` when the issue has `label`
    *   (case-insensitive, exact match).
    */
-  async hasLabel(id, repo, token, label) {
-    const labels = await this.fetchLabels(id, repo, token);
+  async hasLabel(id, label) {
+    const labels = await this.fetchLabels(id);
 
     return labels.some((current) => current.toLowerCase() === label.toLowerCase());
   }

@@ -78,7 +78,10 @@ function fakeExecFileAsync({ prNumber = '42', resolveFails = false, pushFails = 
  */
 function stubDeps(overrides = {}) {
   return {
-    origin: { resolve: async () => ({ domain: 'github.com', repo: 'darthjee/arcanum' }) },
+    origin: {
+      resolve: async () => ({ domain: 'github.com', repo: 'darthjee/arcanum' }),
+      resolveWithRef: async () => ({ domain: 'github.com', repo: 'darthjee/arcanum', repoRef: 'darthjee/arcanum' })
+    },
     githubToken: { get: async () => 'fake-token' },
     execFileAsync: fakeExecFileAsync(),
     fetchFn: jasmine.createSpy('fetch').and.resolveTo({ ok: true, json: async () => ({}) }),
