@@ -1,16 +1,17 @@
 import ConfigChain from '../utils/config/ConfigChain.js';
+import GithubIssue from '../commands/GithubIssue.js';
 import GithubToken from '../utils/github/GithubToken.js';
 import IssueStateService from '../services/IssueStateService.js';
 import Origin from '../utils/git/Origin.js';
 
 /**
- * Bundles a single repo's `repoPath` with the 4 collaborators
+ * Bundles a single repo's `repoPath` with the 5 collaborators
  * `PrOperations` (and friends) resolve it against — `origin`,
- * `githubToken`, `issueStateService`, `configChain` — so callers stop
- * threading `repoPath` through every method call individually. One
- * `RepoContext` is built per call site (`repoPath` differs call to
- * call), wrapping whichever shared collaborator instances the caller
- * already holds.
+ * `githubToken`, `issueStateService`, `configChain`, `githubIssue` — so
+ * callers stop threading `repoPath` through every method call
+ * individually. One `RepoContext` is built per call site (`repoPath`
+ * differs call to call), wrapping whichever shared collaborator
+ * instances the caller already holds.
  */
 class RepoContext {
   /**
@@ -23,19 +24,22 @@ class RepoContext {
    * @param {IssueStateService} [deps.issueStateService] - issue
    *   state-file reader/writer, bound to this context.
    * @param {ConfigChain} [deps.configChain] - 3-tier config reader.
+   * @param {GithubIssue} [deps.githubIssue] - GitHub issue creator.
    */
   constructor({
     repoPath,
     origin = new Origin(),
     githubToken = new GithubToken(),
     issueStateService,
-    configChain = new ConfigChain()
+    configChain = new ConfigChain(),
+    githubIssue = new GithubIssue()
   } = {}) {
     this.repoPath = repoPath;
     this._origin = origin;
     this._githubToken = githubToken;
     this._issueStateService = issueStateService ?? new IssueStateService({ context: this });
     this._configChain = configChain;
+    this._githubIssue = githubIssue;
   }
 
   /**
@@ -81,6 +85,18 @@ class RepoContext {
    */
   async readConfig(scope, key) {
     return this._configChain.read(this.repoPath, scope, key);
+  }
+
+  /**
+   * @param {string} title - the new issue's title.
+   * @param {string} bodyFile - the local file whose contents become the
+   *   issue's body.
+   * @returns {Promise<string>} `this.repoPath`'s newly created issue's
+   *   `ID=...\nTITLE=...\nFILE=...\nDOMAIN=...\nREPO=...\n` output —
+   *   see `GithubIssue#create`.
+   */
+  async createIssue(title, bodyFile) {
+    return this._githubIssue.create(this.repoPath, title, bodyFile);
   }
 }
 
