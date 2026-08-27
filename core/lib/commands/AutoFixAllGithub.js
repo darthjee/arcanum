@@ -1,49 +1,36 @@
 import BranchCleanup from '../utils/git/BranchCleanup.js';
 import DispatchFailure from '../utils/errors/DispatchFailure.js';
-import GithubToken from '../utils/github/GithubToken.js';
 import IssueTagger from '../utils/issue/IssueTagger.js';
-import Origin from '../utils/git/Origin.js';
 import PrOperations from '../utils/github/PrOperations.js';
 import RepoContextFactory from '../context/RepoContextFactory.js';
 import TagMutationService from '../services/TagMutationService.js';
 
 /**
  * Native equivalent of `auto-fix-all/scripts/github.sh`'s 7 GitHub-facing
- * subcommands. A thin facade delegating PR lifecycle to a per-call
- * `PrOperations` (built from a per-call `RepoContextFactory` bundle —
- * `repoPath` differs call to call, so none of the context-bound
- * collaborators can be shared across calls), local-git branch teardown
- * to `BranchCleanup`, and tag/label mutation to `IssueTagger` — see
+ * subcommands. A thin facade over just three collaborators: a
+ * `RepoContextFactory` that builds each per-call `RepoContext` bundle
+ * (PR lifecycle goes through a per-call `PrOperations`, tag/label
+ * mutation through a per-call `TagMutationService`, both built off that
+ * bundle — `repoPath` differs call to call, so none of the context-bound
+ * pieces can be shared), an `issueTaggerFactory` for the per-call
+ * `IssueTagger` (`hasShipitLabel` plus the tag-mutation service), and a
+ * `BranchCleanup` for local-git branch teardown — see
  * `docs/agents/plans/284-refactor-core-lib-autofixallgithub-js/`,
- * `docs/agents/plans/292-reduce-size-of-properations/`, and
- * `docs/agents/plans/294-refactor-properations/`. Kept (not removed)
- * since `AutoFixAllWaitCiAndMerge.js` instantiates it directly to call
- * `#prMerge`.
+ * `docs/agents/plans/292-reduce-size-of-properations/`,
+ * `docs/agents/plans/294-refactor-properations/`, and
+ * `docs/agents/plans/304-refactor-autofixallgithub-to-extract-responsibilities/`.
+ * Kept (not removed) since `AutoFixAllWaitCiAndMerge.js` instantiates it
+ * directly to call `#prMerge`.
  */
 class AutoFixAllGithub {
   /**
-   * Builds one shared `RepoContextFactory` (from `origin`/`githubToken`/
-   * `issueStateService`/`configChain`/`execFileAsync`/`fetchFn`/
-   * `timeoutMs`) that `#_prOperations`/`#_issueTagger` call per request —
-   * none of the context-bound collaborators are constructor-level shared
-   * singletons, since a context-bound collaborator built without a
-   * `context` can't resolve `repoPath`/`token`/`repo`/`repoRef` at all.
    * @param {object} [deps] - injectable collaborators, for testing.
-   * @param {Origin} [deps.origin] - shared git-origin resolver.
-   * @param {GithubToken} [deps.githubToken] - shared GitHub token resolver.
-   * @param {Function} [deps.fetchFn] - forwarded to the default
-   *   `repoContextFactory` (its per-call `githubClient`/`issueClient`).
-   * @param {number} [deps.timeoutMs] - forwarded to the default
-   *   `repoContextFactory` (its per-call `githubClient`/`issueClient`).
-   * @param {object} [deps.issueStateService] - forwarded to the default
-   *   `repoContextFactory`, then to each per-call `RepoContext`.
-   * @param {object} [deps.configChain] - forwarded to the default
-   *   `repoContextFactory`, then to each per-call `RepoContext`.
-   * @param {Function} [deps.execFileAsync] - forwarded to the default
-   *   `branchCleanup`, and to the default `repoContextFactory`.
    * @param {RepoContextFactory} [deps.repoContextFactory] - builds each
    *   per-call `RepoContext` bundle (context plus context-bound
-   *   clients) — see `#_prOperations`/`#_issueTagger`.
+   *   clients) — see `#_prOperations`/`#_issueTagger`/
+   *   `#_tagMutationService`. Owns the low-level `origin`/`githubToken`/
+   *   `issueStateService`/`configChain`/`execFileAsync`/`fetchFn`/
+   *   `timeoutMs` wiring.
    * @param {Function} [deps.issueTaggerFactory] - builds an
    *   `IssueTagger` (used by `addTag`/`removeTag`/`hasShipitLabel`) from
    *   a per-call `RepoContext` bundle — see `#_issueTagger`. A factory,
@@ -53,27 +40,12 @@ class AutoFixAllGithub {
    *   `cleanupBranch`.
    */
   constructor({
-    origin = new Origin(),
-    githubToken = new GithubToken(),
-    fetchFn = fetch,
-    timeoutMs,
-    issueStateService,
-    configChain,
-    execFileAsync,
-    repoContextFactory = new RepoContextFactory({
-      origin,
-      githubToken,
-      issueStateService,
-      configChain,
-      execFileAsync,
-      fetchFn,
-      timeoutMs
-    }),
+    repoContextFactory = new RepoContextFactory(),
     issueTaggerFactory = (bundle) => new IssueTagger({
       context: bundle.context,
       issueClient: bundle.issueClient
     }),
-    branchCleanup = new BranchCleanup({ execFileAsync })
+    branchCleanup = new BranchCleanup()
   } = {}) {
     this._repoContextFactory = repoContextFactory;
     this._issueTaggerFactory = issueTaggerFactory;

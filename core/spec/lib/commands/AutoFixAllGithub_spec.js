@@ -1,5 +1,7 @@
 import AutoFixAllGithub from '../../../lib/commands/AutoFixAllGithub.js';
+import BranchCleanup from '../../../lib/utils/git/BranchCleanup.js';
 import DispatchFailure from '../../../lib/utils/errors/DispatchFailure.js';
+import RepoContextFactory from '../../../lib/context/RepoContextFactory.js';
 
 const REPO = 'darthjee/arcanum';
 const TOKEN = 'fake-token';
@@ -85,24 +87,48 @@ function fakeFetch({
 }
 
 describe('AutoFixAllGithub', () => {
+  /**
+   * Build an `AutoFixAllGithub` wired through a fake-backed
+   * `RepoContextFactory` + `BranchCleanup`. The flat override keys
+   * (`origin`/`githubToken`/`issueStateService`/`configChain`/
+   * `execFileAsync`/`fetchFn`/`timeoutMs`) feed the factory; any other
+   * key (e.g. `issueTaggerFactory`) is forwarded straight to the
+   * constructor.
+   * @param {object} [overrides] - per-test wiring overrides.
+   * @returns {AutoFixAllGithub} the assembled command instance.
+   */
   function newGithub(overrides = {}) {
-    return new AutoFixAllGithub({
-      origin: {
+    const {
+      origin = {
         resolve: async () => ({ domain: 'github.com', repo: REPO }),
         resolveWithRef: async () => ({ domain: 'github.com', repo: REPO, repoRef: REPO })
       },
-      githubToken: { get: async () => TOKEN },
-      issueStateService: { get: async () => '' },
-      configChain: { read: async () => undefined },
-      execFileAsync: fakeExecFileAsync(),
-      fetchFn: fakeFetch(),
-      timeoutMs: 5,
-      ...overrides
+      githubToken = { get: async () => TOKEN },
+      issueStateService = { get: async () => '' },
+      configChain = { read: async () => undefined },
+      execFileAsync = fakeExecFileAsync(),
+      fetchFn = fakeFetch(),
+      timeoutMs = 5,
+      ...rest
+    } = overrides;
+
+    return new AutoFixAllGithub({
+      repoContextFactory: new RepoContextFactory({
+        origin,
+        githubToken,
+        issueStateService,
+        configChain,
+        execFileAsync,
+        fetchFn,
+        timeoutMs
+      }),
+      branchCleanup: new BranchCleanup({ execFileAsync }),
+      ...rest
     });
   }
 
   describe('constructor wiring', () => {
-    it('shares the same origin/githubToken instances across the default issueTagger/prOperations/branchCleanup', async () => {
+    it('shares the same origin/githubToken instances (through the injected RepoContextFactory) across issueTagger/prOperations', async () => {
       const origin = jasmine.createSpy('origin.resolve').and.callFake(async () => ({ domain: 'github.com', repo: REPO }));
       const originWithRef = jasmine.createSpy('origin.resolveWithRef').and.callFake(async () => ({
         domain: 'github.com', repo: REPO, repoRef: REPO
@@ -134,7 +160,7 @@ describe('AutoFixAllGithub', () => {
       expect(tokenGet.calls.count()).toEqual(tokenGetAfterAddTag + 1);
     });
 
-    it('builds a fresh, context-bound gitClient/githubClient pair per call, forwarding the shared execFileAsync/fetchFn', async () => {
+    it('builds a fresh, context-bound bundle per call via RepoContextFactory, forwarding the shared execFileAsync/fetchFn', async () => {
       const execFileAsync = jasmine.createSpy('execFileAsync').and.callFake(async (cmd, args, options) => {
         if (args[0] === 'branch' && args[1] === '--show-current') {
           return { stdout: `branch-for-${options.cwd}\n`, stderr: '' };
