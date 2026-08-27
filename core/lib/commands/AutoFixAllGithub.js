@@ -1,26 +1,19 @@
 import BranchCleanup from '../utils/git/BranchCleanup.js';
 import DispatchFailure from '../utils/errors/DispatchFailure.js';
-import Git from '../utils/git/Git.js';
-import GitBranch from '../utils/git/GitBranch.js';
-import GitClient from '../utils/git/GitClient.js';
-import GitHubClient from '../utils/github/GitHubClient.js';
 import GithubToken from '../utils/github/GithubToken.js';
-import IssueClient from '../utils/github/IssueClient.js';
 import IssueTagger from '../utils/issue/IssueTagger.js';
 import Origin from '../utils/git/Origin.js';
 import PrOperations from '../utils/github/PrOperations.js';
-import RepoContext from '../context/RepoContext.js';
+import RepoContextFactory from '../context/RepoContextFactory.js';
 import { TAG_TO_LABEL } from '../utils/issue/Tags.js';
 
 /**
  * Native equivalent of `auto-fix-all/scripts/github.sh`'s 7 GitHub-facing
  * subcommands. A thin facade delegating PR lifecycle to a per-call
- * `PrOperations` (built from a per-call `RepoContext`, plus a fresh
- * context-bound `gitClient`/`githubClient` pair — `repoPath` differs
- * call to call, so none of `RepoContext`/`GitClient`/`GitHubClient` can
- * be shared across calls once `GitClient`/`GitHubClient` become
- * context-bound), local-git branch teardown to `BranchCleanup`, and
- * tag/label mutation to `IssueTagger` — see
+ * `PrOperations` (built from a per-call `RepoContextFactory` bundle —
+ * `repoPath` differs call to call, so none of the context-bound
+ * collaborators can be shared across calls), local-git branch teardown
+ * to `BranchCleanup`, and tag/label mutation to `IssueTagger` — see
  * `docs/agents/plans/284-refactor-core-lib-autofixallgithub-js/`,
  * `docs/agents/plans/292-reduce-size-of-properations/`, and
  * `docs/agents/plans/294-refactor-properations/`. Kept (not removed)
@@ -29,32 +22,35 @@ import { TAG_TO_LABEL } from '../utils/issue/Tags.js';
  */
 class AutoFixAllGithub {
   /**
-   * Builds and shares one `origin`/`githubToken` pair across every
-   * per-call collaborator, keeping `execFileAsync`/`fetchFn`/`timeoutMs`
-   * around only to forward into each call's fresh, context-bound
-   * `gitClient`/`githubClient` pair (built by `#_prOperations`) and
-   * `issueTagger` (built by `#_issueTagger`) — none of those are
-   * constructor-level shared singletons, since a context-bound
-   * collaborator built without a `context` can't resolve `repoPath`/
-   * `token`/`repo`/`repoRef` at all.
+   * Builds one shared `RepoContextFactory` (from `origin`/`githubToken`/
+   * `issueStateService`/`configChain`/`execFileAsync`/`fetchFn`/
+   * `timeoutMs`) that `#_prOperations`/`#_issueTagger` call per request —
+   * none of the context-bound collaborators are constructor-level shared
+   * singletons, since a context-bound collaborator built without a
+   * `context` can't resolve `repoPath`/`token`/`repo`/`repoRef` at all.
+   * `origin` is also kept directly for `#_mutateTag`'s own `repoRef`
+   * resolution.
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Origin} [deps.origin] - shared git-origin resolver.
    * @param {GithubToken} [deps.githubToken] - shared GitHub token resolver.
    * @param {Function} [deps.fetchFn] - forwarded to the default
-   *   `issueTaggerFactory`, and to each per-call `githubClient`.
+   *   `repoContextFactory` (its per-call `githubClient`/`issueClient`).
    * @param {number} [deps.timeoutMs] - forwarded to the default
-   *   `issueTaggerFactory`, and to each per-call `githubClient`.
-   * @param {object} [deps.issueStateService] - forwarded to each
-   *   per-call `RepoContext`.
-   * @param {object} [deps.configChain] - forwarded to each per-call
-   *   `RepoContext`.
+   *   `repoContextFactory` (its per-call `githubClient`/`issueClient`).
+   * @param {object} [deps.issueStateService] - forwarded to the default
+   *   `repoContextFactory`, then to each per-call `RepoContext`.
+   * @param {object} [deps.configChain] - forwarded to the default
+   *   `repoContextFactory`, then to each per-call `RepoContext`.
    * @param {Function} [deps.execFileAsync] - forwarded to the default
-   *   `branchCleanup`, and to each per-call `gitClient`.
+   *   `branchCleanup`, and to the default `repoContextFactory`.
+   * @param {RepoContextFactory} [deps.repoContextFactory] - builds each
+   *   per-call `RepoContext` bundle (context plus context-bound
+   *   clients) — see `#_prOperations`/`#_issueTagger`.
    * @param {Function} [deps.issueTaggerFactory] - builds an
    *   `IssueTagger` (used by `addTag`/`removeTag`/`hasShipitLabel`) from
-   *   a per-call `RepoContext` — see `#_issueTagger`. A factory, not a
-   *   pre-built instance, since a context-bound `IssueTagger` can't be
-   *   shared across calls once `repoPath` varies call to call.
+   *   a per-call `RepoContext` bundle — see `#_issueTagger`. A factory,
+   *   not a pre-built instance, since a context-bound `IssueTagger`
+   *   can't be shared across calls once `repoPath` varies call to call.
    * @param {BranchCleanup} [deps.branchCleanup] - delegate for
    *   `cleanupBranch`.
    */
@@ -66,20 +62,24 @@ class AutoFixAllGithub {
     issueStateService,
     configChain,
     execFileAsync,
-    issueTaggerFactory = (context) => new IssueTagger({
-      context,
-      issueClient: new IssueClient({ context, fetchFn, timeoutMs })
+    repoContextFactory = new RepoContextFactory({
+      origin,
+      githubToken,
+      issueStateService,
+      configChain,
+      execFileAsync,
+      fetchFn,
+      timeoutMs
+    }),
+    issueTaggerFactory = (bundle) => new IssueTagger({
+      context: bundle.context,
+      issueClient: bundle.issueClient
     }),
     branchCleanup = new BranchCleanup({ execFileAsync })
   } = {}) {
     this._origin = origin;
-    this._githubToken = githubToken;
-    this._issueStateService = issueStateService;
-    this._configChain = configChain;
+    this._repoContextFactory = repoContextFactory;
     this._issueTaggerFactory = issueTaggerFactory;
-    this._fetchFn = fetchFn;
-    this._timeoutMs = timeoutMs;
-    this._execFileAsync = execFileAsync;
     this._branchCleanup = branchCleanup;
   }
 
@@ -124,51 +124,29 @@ class AutoFixAllGithub {
   }
 
   /**
-   * Build a per-call `PrOperations`, wrapping `repoPath` (plus the
-   * shared `origin`/`githubToken`/`issueStateService`/`configChain`)
-   * into a fresh `RepoContext`, and building a fresh, context-bound
-   * `gitClient`/`githubClient` pair right alongside it — both are cheap,
-   * stateless-construction objects (no I/O in their constructors), so
-   * building them per call has no meaningful cost.
+   * Build a per-call `PrOperations` from a fresh `RepoContextFactory`
+   * bundle (its `context` plus a context-bound `gitClient`/`gitBranch`/
+   * `git`/`githubClient` — the extra `issueClient` key is ignored by
+   * `PrOperations`). The whole bundle is cheap, zero-I/O construction,
+   * so building it per call has no meaningful cost.
    * @param {string} repoPath - the target repo's local checkout path.
    * @returns {PrOperations} the per-call `PrOperations` facade.
    */
   _prOperations(repoPath) {
-    const context = new RepoContext({
-      repoPath,
-      origin: this._origin,
-      githubToken: this._githubToken,
-      issueStateService: this._issueStateService,
-      configChain: this._configChain
-    });
-    const gitClient = new GitClient({ context, execFileAsync: this._execFileAsync });
-    const gitBranch = new GitBranch({ context, gitClient });
-    const git = new Git({ context, gitBranch });
-    const githubClient = new GitHubClient({ context, fetchFn: this._fetchFn, timeoutMs: this._timeoutMs });
-
-    return new PrOperations({ context, gitClient, gitBranch, git, githubClient });
+    return new PrOperations(this._repoContextFactory.build(repoPath));
   }
 
   /**
-   * Build a per-call `IssueTagger`, wrapping `repoPath` (plus the shared
-   * `origin`/`githubToken`/`issueStateService`/`configChain`) into a
-   * fresh `RepoContext` — mirroring `#_prOperations`'s own per-call
-   * context construction, since a context-bound `IssueTagger` can't be a
-   * constructor-level shared singleton once `repoPath` varies call to
+   * Build a per-call `IssueTagger` by handing the `issueTaggerFactory` a
+   * fresh `RepoContextFactory` bundle (it reads `.context`/
+   * `.issueClient` off it), since a context-bound `IssueTagger` can't be
+   * a constructor-level shared singleton once `repoPath` varies call to
    * call.
    * @param {string} repoPath - the target repo's local checkout path.
    * @returns {IssueTagger} the per-call `IssueTagger` delegate.
    */
   _issueTagger(repoPath) {
-    const context = new RepoContext({
-      repoPath,
-      origin: this._origin,
-      githubToken: this._githubToken,
-      issueStateService: this._issueStateService,
-      configChain: this._configChain
-    });
-
-    return this._issueTaggerFactory(context);
+    return this._issueTaggerFactory(this._repoContextFactory.build(repoPath));
   }
 
   /**
