@@ -5,7 +5,7 @@ import IssueTagger from '../utils/issue/IssueTagger.js';
 import Origin from '../utils/git/Origin.js';
 import PrOperations from '../utils/github/PrOperations.js';
 import RepoContextFactory from '../context/RepoContextFactory.js';
-import { TAG_TO_LABEL } from '../utils/issue/Tags.js';
+import TagMutationService from '../services/TagMutationService.js';
 
 /**
  * Native equivalent of `auto-fix-all/scripts/github.sh`'s 7 GitHub-facing
@@ -28,8 +28,6 @@ class AutoFixAllGithub {
    * none of the context-bound collaborators are constructor-level shared
    * singletons, since a context-bound collaborator built without a
    * `context` can't resolve `repoPath`/`token`/`repo`/`repoRef` at all.
-   * `origin` is also kept directly for `#_mutateTag`'s own `repoRef`
-   * resolution.
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Origin} [deps.origin] - shared git-origin resolver.
    * @param {GithubToken} [deps.githubToken] - shared GitHub token resolver.
@@ -77,7 +75,6 @@ class AutoFixAllGithub {
     }),
     branchCleanup = new BranchCleanup({ execFileAsync })
   } = {}) {
-    this._origin = origin;
     this._repoContextFactory = repoContextFactory;
     this._issueTaggerFactory = issueTaggerFactory;
     this._branchCleanup = branchCleanup;
@@ -150,6 +147,23 @@ class AutoFixAllGithub {
   }
 
   /**
+   * Build a per-call `TagMutationService` from a fresh
+   * `RepoContextFactory` bundle — its context-bound `IssueTagger`
+   * (via `issueTaggerFactory`) and `RepoContext` can't be shared once
+   * `repoPath` varies call to call.
+   * @param {string} repoPath - the target repo's local checkout path.
+   * @returns {TagMutationService} the per-call tag-mutation service.
+   */
+  _tagMutationService(repoPath) {
+    const bundle = this._repoContextFactory.build(repoPath);
+
+    return new TagMutationService({
+      issueTagger: this._issueTaggerFactory(bundle),
+      context: bundle.context
+    });
+  }
+
+  /**
    * `github.sh cleanup-branch` — see `BranchCleanup#cleanupBranch`.
    * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} id - the numeric issue id.
@@ -190,7 +204,7 @@ class AutoFixAllGithub {
   }
 
   /**
-   * `github.sh add-tag` — see `#_mutateTag`.
+   * `github.sh add-tag` — see `TagMutationService#addTag`.
    * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} id - the numeric issue id.
    * @param {string} tag - the canonical tag name to add.
@@ -201,11 +215,11 @@ class AutoFixAllGithub {
       throw new Error('Usage: github.sh add-tag <repo_path> <id> <tag>');
     }
 
-    return this._mutateTag(repoPath, id, tag, 'add');
+    return this._tagMutationService(repoPath).addTag(id, tag);
   }
 
   /**
-   * `github.sh remove-tag` — see `#_mutateTag`.
+   * `github.sh remove-tag` — see `TagMutationService#removeTag`.
    * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} id - the numeric issue id.
    * @param {string} tag - the canonical tag name to remove.
@@ -216,60 +230,7 @@ class AutoFixAllGithub {
       throw new Error('Usage: github.sh remove-tag <repo_path> <id> <tag>');
     }
 
-    return this._mutateTag(repoPath, id, tag, 'remove');
-  }
-
-  /**
-   * Shared `addTag`/`removeTag` implementation: throws instead of the
-   * best-effort warn-and-continue `IssueTagger#mutateTag` uses, so it
-   * reuses `IssueTagger`'s `fetchLabels`/`addLabel`/`removeLabel`
-   * primitives directly rather than `#mutateTag` itself.
-   * @param {string} repoPath - the target repo's local checkout path.
-   * @param {string} id - the numeric issue id.
-   * @param {string} tag - the canonical tag name.
-   * @param {'add'|'remove'} action - whether to add or remove the tag.
-   * @returns {Promise<string>} a "nothing to do" line, or an
-   *   `Added`/`Removed` confirmation line once mutated.
-   */
-  async _mutateTag(repoPath, id, tag, action) {
-    if (tag === 'shipit') {
-      throw new Error('Error: shipit is human-only; scripts must not add or remove it');
-    }
-
-    const label = TAG_TO_LABEL[tag];
-    const { repoRef } = await this._origin.resolveWithRef(repoPath);
-    const issueTagger = this._issueTagger(repoPath);
-
-    let labels;
-
-    try {
-      labels = await issueTagger.fetchLabels(id);
-    } catch {
-      throw new Error(`Error: could not fetch issue #${id} from ${repoRef}`);
-    }
-
-    const present = labels.includes(label);
-
-    if (action === 'add' ? present : !present) {
-      const state = action === 'add' ? 'already present on' : 'not present on';
-
-      return `Tag '${tag}' ${state} issue #${id} — nothing to do.\n`;
-    }
-
-    try {
-      if (action === 'add') {
-        await issueTagger.addLabel(id, label);
-      } else {
-        await issueTagger.removeLabel(id, label);
-      }
-    } catch {
-      throw new Error(`Error: could not update issue #${id} on ${repoRef}`);
-    }
-
-    const verb = action === 'add' ? 'Added' : 'Removed';
-    const preposition = action === 'add' ? 'to' : 'from';
-
-    return `${verb} tag '${tag}' ${preposition} issue #${id} on ${repoRef}\n`;
+    return this._tagMutationService(repoPath).removeTag(id, tag);
   }
 }
 
