@@ -4,7 +4,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import GithubToken from '../utils/github/GithubToken.js';
+import IssueClient from '../utils/github/IssueClient.js';
 import Origin from '../utils/git/Origin.js';
+import RepoContext from '../context/RepoContext.js';
 
 const defaultExecFileAsync = promisify(execFile);
 const DEFAULT_TIMEOUT_MS = 30000;
@@ -92,13 +94,41 @@ class AutoFixAllReplyComment {
     }
 
     const prNumber = await this._resolvePrNumber(repoPath, cleanId);
-    const { repo } = await this._origin.resolve(repoPath);
-    const token = await this._githubToken.get(repoPath);
     const content = await this._renderTemplate(repoPath, { body: replyBody, agent, modelName, modelEmail });
 
-    await this._postComment(repo, prNumber, token, content);
+    await this._postComment(repoPath, prNumber, content);
 
     return this._pushCurrentBranch(repoPath);
+  }
+
+  /**
+   * Build a fresh, per-call `RepoContext` wrapping `repoPath` — mirrors
+   * `AutoFixAllGithub#_prOperations`/`SpawnIssue#_repoContext`, since
+   * `core/bin/arcanum` always builds a zero-arg
+   * `new AutoFixAllReplyComment()` before `repoPath` is known.
+   * @param {string} repoPath - the target repo's local checkout path.
+   * @returns {RepoContext} the per-call context.
+   */
+  _repoContext(repoPath) {
+    return new RepoContext({
+      repoPath,
+      origin: this._origin,
+      githubToken: this._githubToken
+    });
+  }
+
+  /**
+   * Build a fresh, per-call `IssueClient` wrapping `repoPath`'s
+   * `RepoContext` — see `#_repoContext`.
+   * @param {string} repoPath - the target repo's local checkout path.
+   * @returns {IssueClient} the per-call issue REST client.
+   */
+  _issueClient(repoPath) {
+    return new IssueClient({
+      context: this._repoContext(repoPath),
+      fetchFn: this._fetch,
+      timeoutMs: this._timeoutMs
+    });
   }
 
   /**
@@ -162,36 +192,19 @@ class AutoFixAllReplyComment {
   }
 
   /**
-   * Posts `content` as a comment on pull request `prNumber`, mirroring
-   * `GithubIssue.js`'s fetch-call shape (error handling,
-   * `AbortSignal.timeout`, `response.ok` check). PR comments live under
-   * the `issues` REST endpoint.
-   * @param {string} repo - the `owner/repo` path.
+   * Posts `content` as a comment on pull request `prNumber`, delegating
+   * to a per-call `IssueClient` — see `#_issueClient`. PR comments live
+   * under the `issues` REST endpoint. `IssueClient#postComment` already
+   * throws the exact `Error: could not post comment on pull request
+   * #<prNumber> in <repo>` message this method used to raise itself, so
+   * its rejection is left to propagate unwrapped.
+   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} prNumber - the target pull request's number.
-   * @param {string} token - the GitHub token.
    * @param {string} content - the rendered comment body.
    * @returns {Promise<void>} resolves once the comment is posted.
    */
-  async _postComment(repo, prNumber, token, content) {
-    let response;
-
-    try {
-      response = await this._fetch(`https://api.github.com/repos/${repo}/issues/${prNumber}/comments`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ body: content }),
-        signal: AbortSignal.timeout(this._timeoutMs)
-      });
-    } catch {
-      throw new Error(`Error: could not post comment on pull request #${prNumber} in ${repo}`);
-    }
-
-    if (!response.ok) {
-      throw new Error(`Error: could not post comment on pull request #${prNumber} in ${repo}`);
-    }
+  async _postComment(repoPath, prNumber, content) {
+    await this._issueClient(repoPath).postComment(prNumber, content);
   }
 
   /**
