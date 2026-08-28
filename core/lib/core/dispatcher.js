@@ -3,19 +3,13 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { COMMANDS } from './commands.js';
 import RepoContext from '../context/RepoContext.js';
 import InvocationLog from '../utils/logging/InvocationLog.js';
+import { resolveInstallPath } from '../utils/file/InstallRoot.js';
 
 const libDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-// Three levels up from core/lib/core, mirroring how engine_dispatch.sh
-// itself resolves core/bin/arcanum's path in the other direction.
-const configChainPath = path.join(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..',
-  '..',
-  '..',
-  'arcanum',
-  '_lib',
-  'config_chain.sh'
-);
+// The walk back to the arcanum install root lives in InstallRoot.js;
+// this mirrors how engine_dispatch.sh itself resolves core/bin/arcanum's
+// path in the other direction.
+const configChainPath = resolveInstallPath('arcanum', '_lib', 'config_chain.sh');
 
 /**
  * Owns a single CLI invocation's dispatch: registry lookup, the

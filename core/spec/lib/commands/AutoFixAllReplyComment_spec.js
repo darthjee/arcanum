@@ -1,6 +1,5 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import path from 'node:path';
 import AutoFixAllReplyComment from '../../../lib/commands/AutoFixAllReplyComment.js';
+import { resolveInstallPath } from '../../../lib/utils/file/InstallRoot.js';
 import { createRepoContextMock } from '../../support/factories/repoContextFactory.js';
 import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
 
@@ -11,19 +10,22 @@ const MODEL_NAME = 'Node Agent';
 const MODEL_EMAIL = 'node@example.com';
 const REPLY_BODY = 'Fixed in the latest commit.';
 const DEFAULT_TEMPLATE = '%%BODY%%\n\n_Replied by: %%AGENT%% agent (%%MODEL_NAME%% %%MODEL_EMAIL%%)_\n';
+const TEMPLATE_PATH = resolveInstallPath('auto-fix-all', 'templates', 'reply.tmpl.md');
 
 /**
- * Writes `auto-fix-all/templates/reply.tmpl.md` under `repoPath`, the
- * exact location `AutoFixAllReplyComment` reads it from.
- * @param {string} repoPath - the fixture repo path.
+ * Build a stub `readFile` that returns `content` for the install-root
+ * template path, mirroring `AutoFixAllReplyComment`'s real read.
  * @param {string} [content] - the template's raw content.
- * @returns {Promise<void>} resolves once written.
+ * @returns {Function} a jasmine spy usable as `readFile`.
  */
-async function writeTemplate(repoPath, content = DEFAULT_TEMPLATE) {
-  const templateDir = path.join(repoPath, 'auto-fix-all', 'templates');
+function fakeReadFile(content = DEFAULT_TEMPLATE) {
+  return jasmine.createSpy('readFile').and.callFake(async (file) => {
+    if (file === TEMPLATE_PATH) {
+      return content;
+    }
 
-  await mkdir(templateDir, { recursive: true });
-  await writeFile(path.join(templateDir, 'reply.tmpl.md'), content);
+    throw new Error(`unexpected readFile call: ${file}`);
+  });
 }
 
 /**
@@ -81,6 +83,7 @@ function stubDeps(overrides = {}) {
   return {
     execFileAsync: fakeExecFileAsync(),
     fetchFn: jasmine.createSpy('fetch').and.resolveTo({ ok: true, json: async () => ({}) }),
+    readFile: fakeReadFile(),
     ...overrides
   };
 }
@@ -107,7 +110,6 @@ describe('AutoFixAllReplyComment', () => {
 
   beforeEach(async () => {
     repoPath = await createTempDir();
-    await writeTemplate(repoPath);
   });
 
   afterEach(async () => {
@@ -201,17 +203,18 @@ describe('AutoFixAllReplyComment', () => {
       it('resolves the PR number, posts the rendered comment, pushes the branch, and resolves with the push stdout', async () => {
         // The template repeats %%AGENT%% so the first-occurrence-only
         // substitution rule is actually exercised.
-        await writeTemplate(
-          repoPath,
-          '%%BODY%%\n\n_Replied by: %%AGENT%% agent (%%MODEL_NAME%% %%MODEL_EMAIL%%)_\nagain: %%AGENT%%\n'
-        );
-
-        const deps = stubDeps();
+        const deps = stubDeps({
+          readFile: fakeReadFile(
+            '%%BODY%%\n\n_Replied by: %%AGENT%% agent (%%MODEL_NAME%% %%MODEL_EMAIL%%)_\nagain: %%AGENT%%\n'
+          )
+        });
         const instance = new AutoFixAllReplyComment(newContext(), deps);
 
         const result = await instance.run(`#${ID}`, AGENT, MODEL_NAME, MODEL_EMAIL, REPLY_BODY);
 
         expect(result).toEqual('branch \'my-branch\' set up to track \'origin/my-branch\'.\n');
+
+        expect(deps.readFile).toHaveBeenCalledWith(TEMPLATE_PATH, 'utf8');
 
         expect(deps.execFileAsync).toHaveBeenCalledWith(jasmine.stringMatching(/resolve_pr_number\.sh$/), [
           repoPath, ID

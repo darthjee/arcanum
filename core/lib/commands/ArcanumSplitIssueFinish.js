@@ -1,22 +1,21 @@
 import { execFile } from 'node:child_process';
 import { readdir, unlink } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import RepoPath from '../utils/file/RepoPath.js';
+import { resolveInstallPath } from '../utils/file/InstallRoot.js';
 import SafeBranch from './SafeBranch.js';
 
 const defaultExecFileAsync = promisify(execFile);
 const USAGE = 'Usage: finish.sh <repo_path> <issue_id>';
 const ISSUES_DIR = 'docs/agents/issues';
 
-const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 // `arcanum-split-issue/scripts/github.sh` is shelled out to exactly
-// like `finish_shell.sh` does — resolved relative to this skill repo's
-// own root (three levels up from `core/lib/commands/`), NOT the target
+// like `finish_shell.sh` does — resolved via `resolveInstallPath`
+// against the arcanum install (the skill repo itself), NOT the target
 // `repoPath` being operated on.
-const GITHUB_SCRIPT = path.join(
-  MODULE_DIR, '..', '..', '..', 'arcanum-split-issue', 'scripts', 'github.sh'
+const GITHUB_SCRIPT = resolveInstallPath(
+  'arcanum-split-issue', 'scripts', 'github.sh'
 );
 
 /**
@@ -63,9 +62,9 @@ class ArcanumSplitIssueFinish {
    * both arguments are present (usage message on missing/empty
    * argument, propagated uncaught so the caller exits 1). Relabels the
    * parent issue by shelling out to `arcanum-split-issue/scripts/github.sh
-   * mark-split` — resolved from this module's own directory (three levels
-   * up from `core/lib/commands/`), like `finish_shell.sh`'s
-   * `"${SCRIPT_DIR}/github.sh"`, NOT relative to `repoPath` — where any
+   * mark-split` — resolved via `resolveInstallPath` against the arcanum
+   * install, like `finish_shell.sh`'s `"${SCRIPT_DIR}/github.sh"`, NOT
+   * relative to `repoPath` — where any
    * failure propagates uncaught, mirroring `set -euo pipefail`. Then
    * deletes the local `docs/agents/issues/` working files
    * whose name starts with `<issueId>-` or `<issueId>_`, and finally
