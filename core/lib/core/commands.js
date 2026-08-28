@@ -13,7 +13,9 @@
  * @property {boolean} [takesRepoContext] - when `true`, the command's
  *   constructor receives a `RepoContext` built from the leading `repoPath`
  *   argument, and that leading argument is stripped from the method args.
- *   No real command entry sets this yet.
+ *   Set on the `arcanum-split-issue-*` and `auto-fix-all-*` lifecycle
+ *   commands (checkout-from-main / cleanup-artifacts / reply-comment /
+ *   wait-ci / wait-ci-and-merge).
  */
 
 /**
@@ -46,8 +48,16 @@ export const COMMANDS = {
   },
   'arcanum-update-run-update-check': { module: 'commands/ArcanumUpdateRunUpdate.js', method: 'check' },
   'arcanum-update-run-update-apply': { module: 'commands/ArcanumUpdateRunUpdate.js', method: 'apply' },
-  'auto-fix-all-checkout-from-main': { module: 'commands/AutoFixAllCheckoutFromMain.js', method: 'run' },
-  'auto-fix-all-cleanup-artifacts': { module: 'commands/AutoFixAllCleanupArtifacts.js', method: 'run' },
+  'auto-fix-all-checkout-from-main': {
+    module: 'commands/AutoFixAllCheckoutFromMain.js',
+    method: 'run',
+    takesRepoContext: true
+  },
+  'auto-fix-all-cleanup-artifacts': {
+    module: 'commands/AutoFixAllCleanupArtifacts.js',
+    method: 'run',
+    takesRepoContext: true
+  },
   'auto-fix-all-config-get': { module: 'commands/AutoFixAllConfig.js', method: 'get' },
   'auto-fix-all-config-is-enabled': { module: 'commands/AutoFixAllConfig.js', method: 'isEnabled' },
   'auto-fix-all-config-set': { module: 'commands/AutoFixAllConfig.js', method: 'set' },
@@ -66,9 +76,21 @@ export const COMMANDS = {
   'auto-fix-all-queue-push': { module: 'commands/AutoFixAllQueue.js', method: 'push' },
   'auto-fix-all-queue-save': { module: 'commands/AutoFixAllQueue.js', method: 'save' },
   'auto-fix-all-queue-wait-next': { module: 'commands/AutoFixAllQueue.js', method: 'waitNext' },
-  'auto-fix-all-reply-comment': { module: 'commands/AutoFixAllReplyComment.js', method: 'run' },
-  'auto-fix-all-wait-ci': { module: 'commands/AutoFixAllWaitCi.js', method: 'run' },
-  'auto-fix-all-wait-ci-and-merge': { module: 'commands/AutoFixAllWaitCiAndMerge.js', method: 'run' },
+  'auto-fix-all-reply-comment': {
+    module: 'commands/AutoFixAllReplyComment.js',
+    method: 'run',
+    takesRepoContext: true
+  },
+  'auto-fix-all-wait-ci': {
+    module: 'commands/AutoFixAllWaitCi.js',
+    method: 'run',
+    takesRepoContext: true
+  },
+  'auto-fix-all-wait-ci-and-merge': {
+    module: 'commands/AutoFixAllWaitCiAndMerge.js',
+    method: 'run',
+    takesRepoContext: true
+  },
   'checkout-safe-branch': { module: 'commands/SafeBranch.js', method: 'run' },
   'dispatch-fixture': { module: 'commands/DispatchFixture.js', method: 'run', log: false },
   // dispatch-fixture-crash is deliberately left logged (entry.log

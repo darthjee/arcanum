@@ -3,10 +3,7 @@ import { readFile as defaultReadFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import GithubToken from '../utils/github/GithubToken.js';
 import IssueClient from '../utils/github/IssueClient.js';
-import Origin from '../utils/git/Origin.js';
-import RepoContext from '../context/RepoContext.js';
 
 const defaultExecFileAsync = promisify(execFile);
 const DEFAULT_TIMEOUT_MS = 30000;
@@ -32,9 +29,10 @@ const RESOLVE_PR_NUMBER_SCRIPT = path.join(
  */
 class AutoFixAllReplyComment {
   /**
+   * @param {import('../context/RepoContext.js').default} repoContext -
+   *   the target repo's context (provides `repoPath` and backs the
+   *   per-call `IssueClient`'s token/repo resolution).
    * @param {object} [deps] - injectable collaborators, for testing.
-   * @param {Origin} [deps.origin] - git-origin resolver.
-   * @param {GithubToken} [deps.githubToken] - GitHub token resolver.
    * @param {Function} [deps.execFileAsync] - promisified `execFile`.
    * @param {Function} [deps.fetchFn] - `fetch`-compatible implementation
    *   (global `fetch` by default).
@@ -43,16 +41,13 @@ class AutoFixAllReplyComment {
    * @param {Function} [deps.readFile] - `node:fs/promises` `readFile`-
    *   compatible implementation, used to read the reply template.
    */
-  constructor({
-    origin = new Origin(),
-    githubToken = new GithubToken(),
+  constructor(repoContext, {
     execFileAsync = defaultExecFileAsync,
     fetchFn = fetch,
     timeoutMs = DEFAULT_TIMEOUT_MS,
     readFile = defaultReadFile
   } = {}) {
-    this._origin = origin;
-    this._githubToken = githubToken;
+    this._repoContext = repoContext;
     this._execFileAsync = execFileAsync;
     this._fetch = fetchFn;
     this._timeoutMs = timeoutMs;
@@ -66,7 +61,6 @@ class AutoFixAllReplyComment {
    * current branch's PR number, posts the rendered reply template as a
    * PR comment over the GitHub REST API, then pushes the current
    * branch.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} id - the currently checked-out branch's issue id
    *   (a leading `#` is stripped); used only to resolve the PR.
    * @param {string} agent - the acting agent's name, for attribution.
@@ -86,58 +80,47 @@ class AutoFixAllReplyComment {
    *   migration's plan's "Shared contracts": it isn't captured/echoed
    *   by the shell script either.
    */
-  async run(repoPath, id, agent, modelName, modelEmail, replyBody) {
+  async run(id, agent, modelName, modelEmail, replyBody) {
     const cleanId = (id || '').replace(/^#/, '');
 
-    if (!repoPath || !/^[0-9]+$/.test(cleanId) || !agent || !modelName || !modelEmail || !replyBody) {
+    if (
+      !this._repoContext.repoPath ||
+      !/^[0-9]+$/.test(cleanId) ||
+      !agent ||
+      !modelName ||
+      !modelEmail ||
+      !replyBody
+    ) {
       throw new Error(USAGE);
     }
 
-    const prNumber = await this._resolvePrNumber(repoPath, cleanId);
-    const content = await this._renderTemplate(repoPath, { body: replyBody, agent, modelName, modelEmail });
+    const prNumber = await this._resolvePrNumber(cleanId);
+    const content = await this._renderTemplate({ body: replyBody, agent, modelName, modelEmail });
 
-    await this._postComment(repoPath, prNumber, content);
+    await this._postComment(prNumber, content);
 
-    return this._pushCurrentBranch(repoPath);
+    return this._pushCurrentBranch();
   }
 
   /**
-   * Build a fresh, per-call `RepoContext` wrapping `repoPath` — mirrors
-   * `AutoFixAllGithub#_prOperations`/`SpawnIssue#_repoContext`, since
-   * `core/bin/arcanum` always builds a zero-arg
-   * `new AutoFixAllReplyComment()` before `repoPath` is known.
-   * @param {string} repoPath - the target repo's local checkout path.
-   * @returns {RepoContext} the per-call context.
-   */
-  _repoContext(repoPath) {
-    return new RepoContext({
-      repoPath,
-      origin: this._origin,
-      githubToken: this._githubToken
-    });
-  }
-
-  /**
-   * Build a fresh, per-call `IssueClient` wrapping `repoPath`'s
-   * `RepoContext` — see `#_repoContext`.
-   * @param {string} repoPath - the target repo's local checkout path.
+   * Build a fresh, per-call `IssueClient` wrapping the injected
+   * `RepoContext`.
    * @returns {IssueClient} the per-call issue REST client.
    */
-  _issueClient(repoPath) {
+  _issueClient() {
     return new IssueClient({
-      context: this._repoContext(repoPath),
+      context: this._repoContext,
       fetchFn: this._fetch,
       timeoutMs: this._timeoutMs
     });
   }
 
   /**
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} id - the numeric issue id (leading `#` already stripped).
    * @returns {Promise<string>} the current branch's PR number.
    */
-  async _resolvePrNumber(repoPath, id) {
-    const { stdout } = await this._execFileAsync(RESOLVE_PR_NUMBER_SCRIPT, [repoPath, id]);
+  async _resolvePrNumber(id) {
+    const { stdout } = await this._execFileAsync(RESOLVE_PR_NUMBER_SCRIPT, [this._repoContext.repoPath, id]);
 
     return stdout.trim();
   }
@@ -147,7 +130,6 @@ class AutoFixAllReplyComment {
    * placeholders, matching bash's `${var/pattern/repl}` (single,
    * first-occurrence substitution per placeholder, no templating
    * library).
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {object} fields - the substitution fields.
    * @param {string} fields.body - replaces `%%BODY%%`.
    * @param {string} fields.agent - replaces `%%AGENT%%`.
@@ -155,8 +137,8 @@ class AutoFixAllReplyComment {
    * @param {string} fields.modelEmail - replaces `%%MODEL_EMAIL%%`.
    * @returns {Promise<string>} the rendered reply content.
    */
-  async _renderTemplate(repoPath, { body, agent, modelName, modelEmail }) {
-    const templatePath = path.join(repoPath, TEMPLATE_RELATIVE_PATH);
+  async _renderTemplate({ body, agent, modelName, modelEmail }) {
+    const templatePath = path.join(this._repoContext.repoPath, TEMPLATE_RELATIVE_PATH);
     const template = await this._readFile(templatePath, 'utf8');
 
     let content = template;
@@ -198,13 +180,12 @@ class AutoFixAllReplyComment {
    * throws the exact `Error: could not post comment on pull request
    * #<prNumber> in <repo>` message this method used to raise itself, so
    * its rejection is left to propagate unwrapped.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} prNumber - the target pull request's number.
    * @param {string} content - the rendered comment body.
    * @returns {Promise<void>} resolves once the comment is posted.
    */
-  async _postComment(repoPath, prNumber, content) {
-    await this._issueClient(repoPath).postComment(prNumber, content);
+  async _postComment(prNumber, content) {
+    await this._issueClient().postComment(prNumber, content);
   }
 
   /**
@@ -217,17 +198,16 @@ class AutoFixAllReplyComment {
    * successful `-u` push regardless of whether the branch was already
    * tracked (its transfer summary goes to stderr instead) — is left
    * unredirected by `push.sh`, so it's relayed here too.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @returns {Promise<string>} `git push`'s own stdout.
    */
-  async _pushCurrentBranch(repoPath) {
+  async _pushCurrentBranch() {
     const { stdout: branchStdout } = await this._execFileAsync(
-      'git', ['-C', repoPath, 'branch', '--show-current']
+      'git', ['-C', this._repoContext.repoPath, 'branch', '--show-current']
     );
     const branch = branchStdout.trim();
 
     const { stdout } = await this._execFileAsync(
-      'git', ['-C', repoPath, 'push', '-u', 'origin', `${branch}:${branch}`]
+      'git', ['-C', this._repoContext.repoPath, 'push', '-u', 'origin', `${branch}:${branch}`]
     );
 
     return stdout;

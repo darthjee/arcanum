@@ -31,9 +31,9 @@ describe('AutoFixAllCheckoutFromMain', () => {
     it('rejects with the Usage error when repoPath is missing, before any validation or git call', async () => {
       const repoPath = { validate: jasmine.createSpy('validate') };
       const execFileSpy = jasmine.createSpy('execFileAsync');
-      const checkoutFromMain = new AutoFixAllCheckoutFromMain({ execFileAsync: execFileSpy, repoPath });
+      const checkoutFromMain = new AutoFixAllCheckoutFromMain({ repoPath: '' }, { execFileAsync: execFileSpy, repoPath });
 
-      await expectAsync(checkoutFromMain.run('', '42')).toBeRejectedWithError(
+      await expectAsync(checkoutFromMain.run('42')).toBeRejectedWithError(
         'Usage: checkout_from_main.sh <repo_path> <id>'
       );
       expect(repoPath.validate).not.toHaveBeenCalled();
@@ -43,9 +43,12 @@ describe('AutoFixAllCheckoutFromMain', () => {
     it('rejects with the Usage error when id is missing, before any validation or git call', async () => {
       const repoPath = { validate: jasmine.createSpy('validate') };
       const execFileSpy = jasmine.createSpy('execFileAsync');
-      const checkoutFromMain = new AutoFixAllCheckoutFromMain({ execFileAsync: execFileSpy, repoPath });
+      const checkoutFromMain = new AutoFixAllCheckoutFromMain(
+        { repoPath: '/repo' },
+        { execFileAsync: execFileSpy, repoPath }
+      );
 
-      await expectAsync(checkoutFromMain.run('/repo', '')).toBeRejectedWithError(
+      await expectAsync(checkoutFromMain.run('')).toBeRejectedWithError(
         'Usage: checkout_from_main.sh <repo_path> <id>'
       );
       expect(repoPath.validate).not.toHaveBeenCalled();
@@ -56,9 +59,12 @@ describe('AutoFixAllCheckoutFromMain', () => {
       const validationError = new Error('Error: not a directory: /nope');
       const repoPath = { validate: jasmine.createSpy('validate').and.rejectWith(validationError) };
       const execFileSpy = jasmine.createSpy('execFileAsync');
-      const checkoutFromMain = new AutoFixAllCheckoutFromMain({ execFileAsync: execFileSpy, repoPath });
+      const checkoutFromMain = new AutoFixAllCheckoutFromMain(
+        { repoPath: '/nope' },
+        { execFileAsync: execFileSpy, repoPath }
+      );
 
-      await expectAsync(checkoutFromMain.run('/nope', '42')).toBeRejectedWith(validationError);
+      await expectAsync(checkoutFromMain.run('42')).toBeRejectedWith(validationError);
       expect(execFileSpy).not.toHaveBeenCalled();
     });
 
@@ -78,9 +84,12 @@ describe('AutoFixAllCheckoutFromMain', () => {
 
         return Promise.resolve({ stdout: '', stderr: '' });
       });
-      const checkoutFromMain = new AutoFixAllCheckoutFromMain({ execFileAsync: execFileSpy, repoPath });
+      const checkoutFromMain = new AutoFixAllCheckoutFromMain(
+        { repoPath: '/repo' },
+        { execFileAsync: execFileSpy, repoPath }
+      );
 
-      await expectAsync(checkoutFromMain.run('/repo', '42')).toBeResolvedTo('BRANCH=issue-42\nSTATUS=ok\n');
+      await expectAsync(checkoutFromMain.run('42')).toBeResolvedTo('BRANCH=issue-42\nSTATUS=ok\n');
     });
 
     it('rejects with the shell-matching message on a non-tolerated main-fetch failure', async () => {
@@ -93,9 +102,12 @@ describe('AutoFixAllCheckoutFromMain', () => {
 
         return Promise.resolve({ stdout: '', stderr: '' });
       });
-      const checkoutFromMain = new AutoFixAllCheckoutFromMain({ execFileAsync: execFileSpy, repoPath });
+      const checkoutFromMain = new AutoFixAllCheckoutFromMain(
+        { repoPath: '/repo' },
+        { execFileAsync: execFileSpy, repoPath }
+      );
 
-      await expectAsync(checkoutFromMain.run('/repo', '42')).toBeRejectedWithError(
+      await expectAsync(checkoutFromMain.run('42')).toBeRejectedWithError(
         'Error: git fetch origin main failed: fatal: unable to access remote'
       );
     });
@@ -114,9 +126,12 @@ describe('AutoFixAllCheckoutFromMain', () => {
 
         return Promise.resolve({ stdout: '', stderr: '' });
       });
-      const checkoutFromMain = new AutoFixAllCheckoutFromMain({ execFileAsync: execFileSpy, repoPath });
+      const checkoutFromMain = new AutoFixAllCheckoutFromMain(
+        { repoPath: '/repo' },
+        { execFileAsync: execFileSpy, repoPath }
+      );
 
-      await expectAsync(checkoutFromMain.run('/repo', '42')).toBeRejectedWithError(
+      await expectAsync(checkoutFromMain.run('42')).toBeRejectedWithError(
         'Error: git fetch origin issue-42 failed: fatal: unable to access remote'
       );
     });
@@ -136,9 +151,9 @@ describe('AutoFixAllCheckoutFromMain', () => {
       await git(['update-ref', '-d', 'refs/heads/main'], repo.remotePath);
       await git(['update-ref', '-d', 'refs/remotes/origin/main'], repo.repoPath);
 
-      const checkoutFromMain = new AutoFixAllCheckoutFromMain();
+      const checkoutFromMain = new AutoFixAllCheckoutFromMain({ repoPath: repo.repoPath });
 
-      await expectAsync(checkoutFromMain.run(repo.repoPath, '42')).toBeResolvedTo('BRANCH=issue-42\nSTATUS=ok\n');
+      await expectAsync(checkoutFromMain.run('42')).toBeResolvedTo('BRANCH=issue-42\nSTATUS=ok\n');
 
       const { stdout } = await execFileAsync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: repo.repoPath });
       expect(stdout.trim()).toEqual('issue-42');
@@ -147,7 +162,7 @@ describe('AutoFixAllCheckoutFromMain', () => {
     it('creates issue-<id> from origin/main when it exists (default fixture shape)', async () => {
       repo = await createGitFixtureRepo();
 
-      const checkoutFromMain = new AutoFixAllCheckoutFromMain();
+      const checkoutFromMain = new AutoFixAllCheckoutFromMain({ repoPath: repo.repoPath });
 
       // `git checkout -b` from a remote-tracking start point (here,
       // origin/main) prints its own "branch '<name>' set up to track
@@ -155,7 +170,7 @@ describe('AutoFixAllCheckoutFromMain', () => {
       // AutoFixAllCheckoutFromMain#run's doc comment. Assert on the
       // substantive suffix rather than git's exact (version-dependent)
       // wording.
-      const output = await checkoutFromMain.run(repo.repoPath, '42');
+      const output = await checkoutFromMain.run('42');
       expect(output).toContain('BRANCH=issue-42\nSTATUS=ok\n');
 
       const { stdout: head } = await execFileAsync('git', ['rev-parse', 'HEAD'], { cwd: repo.repoPath });
@@ -173,9 +188,9 @@ describe('AutoFixAllCheckoutFromMain', () => {
       await git(['push', '--quiet', 'origin', 'main'], repo.repoPath);
       await git(['checkout', 'main'], repo.repoPath);
 
-      const checkoutFromMain = new AutoFixAllCheckoutFromMain();
+      const checkoutFromMain = new AutoFixAllCheckoutFromMain({ repoPath: repo.repoPath });
 
-      await expectAsync(checkoutFromMain.run(repo.repoPath, '42')).toBeResolvedTo('BRANCH=issue-42\nSTATUS=ok\n');
+      await expectAsync(checkoutFromMain.run('42')).toBeResolvedTo('BRANCH=issue-42\nSTATUS=ok\n');
 
       const { stdout } = await execFileAsync('git', ['log', '--oneline', 'issue-42'], { cwd: repo.repoPath });
       expect(stdout).toContain('main update');
@@ -188,12 +203,12 @@ describe('AutoFixAllCheckoutFromMain', () => {
       await git(['checkout', 'main'], repo.repoPath);
       await git(['branch', '-D', 'issue-77'], repo.repoPath);
 
-      const checkoutFromMain = new AutoFixAllCheckoutFromMain();
+      const checkoutFromMain = new AutoFixAllCheckoutFromMain({ repoPath: repo.repoPath });
 
       // See the comment in the previous test — `git checkout -b` from a
       // remote-tracking start point (here, origin/issue-77) also prints
       // its own tracking-setup line ahead of BRANCH=/STATUS=.
-      const output = await checkoutFromMain.run(repo.repoPath, '77');
+      const output = await checkoutFromMain.run('77');
       expect(output).toContain('BRANCH=issue-77\nSTATUS=ok\n');
 
       const { stdout } = await execFileAsync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: repo.repoPath });
@@ -221,12 +236,12 @@ describe('AutoFixAllCheckoutFromMain', () => {
       await git(['commit', '--quiet', '-m', 'main change'], repo.repoPath);
       await git(['push', '--quiet', 'origin', 'main'], repo.repoPath);
 
-      const checkoutFromMain = new AutoFixAllCheckoutFromMain();
+      const checkoutFromMain = new AutoFixAllCheckoutFromMain({ repoPath: repo.repoPath });
 
       let thrown;
 
       try {
-        await checkoutFromMain.run(repo.repoPath, '99');
+        await checkoutFromMain.run('99');
       } catch (error) {
         thrown = error;
       }

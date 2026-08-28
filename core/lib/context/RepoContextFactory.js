@@ -75,6 +75,28 @@ class RepoContextFactory {
       issueStateService: this._issueStateService,
       configChain: this._configChain
     });
+
+    return this.buildFromContext(context);
+  }
+
+  /**
+   * Wraps the context-bound clients around an existing `RepoContext`
+   * instead of constructing a fresh one. Used when a caller already
+   * holds a ready-made `RepoContext` (e.g. one injected by `Dispatcher`)
+   * but still needs the full `PrOperations`/`PrChecker` bundle.
+   *
+   * `origin`/`githubToken`/`issueStateService`/`configChain` come from
+   * the passed `context`, so the factory's own copies of those are not
+   * consulted on this path — only `execFileAsync`/`fetchFn`/`timeoutMs`
+   * are.
+   * @param {RepoContext} context - an existing `RepoContext` to reuse
+   *   verbatim as the bundle's `context`.
+   * @returns {{context: RepoContext, gitClient: GitClient,
+   *   gitBranch: GitBranch, git: Git, githubClient: GitHubClient,
+   *   issueClient: IssueClient}} the same flat six-key bundle `build`
+   *   returns, with `context` being the passed-in instance verbatim.
+   */
+  buildFromContext(context) {
     const gitClient = new GitClient({ context, execFileAsync: this._execFileAsync });
     const gitBranch = new GitBranch({ context, gitClient });
     const git = new Git({ context, gitBranch });

@@ -17,11 +17,14 @@ const TOLERATED_FETCH_FAILURE = /couldn't find remote ref|not found|no such ref/
  */
 class AutoFixAllCheckoutFromMain {
   /**
+   * @param {import('../context/RepoContext.js').default} repoContext -
+   *   the target repo's context (provides `repoPath`).
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Function} [deps.execFileAsync] - promisified `execFile`.
    * @param {RepoPath} [deps.repoPath] - repo-path validation helper.
    */
-  constructor({ execFileAsync = defaultExecFileAsync, repoPath = new RepoPath({ execFileAsync }) } = {}) {
+  constructor(repoContext, { execFileAsync = defaultExecFileAsync, repoPath = new RepoPath({ execFileAsync }) } = {}) {
+    this._repoContext = repoContext;
     this._execFileAsync = execFileAsync;
     this._repoPath = repoPath;
   }
@@ -34,7 +37,6 @@ class AutoFixAllCheckoutFromMain {
    * either), reuses `issue-<id>` (local or remote) merged up to date
    * with `origin/main` when it already exists, or creates it fresh from
    * `origin/main` (falling back to local `main`) otherwise.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} id - the issue's numeric id.
    * @returns {Promise<string>} the `BRANCH=<branch>\nSTATUS=ok\n` output,
    *   prefixed with any incidental `git checkout` stdout (e.g. a branch
@@ -45,7 +47,9 @@ class AutoFixAllCheckoutFromMain {
    *   conflicted-file list, exactly like the shell script's captured
    *   `git_branch_merge_main` output.
    */
-  async run(repoPath, id) {
+  async run(id) {
+    const repoPath = this._repoContext.repoPath;
+
     if (!repoPath || !id) {
       throw new Error(USAGE);
     }
@@ -54,11 +58,11 @@ class AutoFixAllCheckoutFromMain {
 
     const branch = `issue-${id}`;
 
-    await this._fetchTolerant(repoPath, 'main');
-    await this._fetchTolerant(repoPath, branch);
+    await this._fetchTolerant('main');
+    await this._fetchTolerant(branch);
 
-    const localExists = await this._refExists(repoPath, `refs/heads/${branch}`);
-    const remoteExists = await this._refExists(repoPath, `refs/remotes/origin/${branch}`);
+    const localExists = await this._refExists(`refs/heads/${branch}`);
+    const remoteExists = await this._refExists(`refs/remotes/origin/${branch}`);
 
     let status = 'ok';
     let conflicts = '';
@@ -73,9 +77,9 @@ class AutoFixAllCheckoutFromMain {
         ).stdout;
       }
 
-      await this._fetchTolerant(repoPath, 'main');
+      await this._fetchTolerant('main');
 
-      if (await this._refExists(repoPath, 'refs/remotes/origin/main')) {
+      if (await this._refExists('refs/remotes/origin/main')) {
         try {
           await this._execFileAsync('git', ['merge', '--no-edit', 'origin/main'], { cwd: repoPath });
         } catch (error) {
@@ -88,7 +92,7 @@ class AutoFixAllCheckoutFromMain {
           conflicts = (error.stdout || '') + stdout;
         }
       }
-    } else if (await this._refExists(repoPath, 'refs/remotes/origin/main')) {
+    } else if (await this._refExists('refs/remotes/origin/main')) {
       checkoutOutput = (
         await this._execFileAsync('git', ['checkout', '-b', branch, 'origin/main'], { cwd: repoPath })
       ).stdout;
@@ -117,14 +121,13 @@ class AutoFixAllCheckoutFromMain {
    * `TOLERATED_FETCH_FAILURE`) as a non-error. Any other failure throws,
    * matching `git_branch_fetch_main`'s (and the inline branch-fetch
    * block's) two distinct messages.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} ref - the remote ref to fetch (`main` or `issue-<id>`).
    * @returns {Promise<void>} resolves once the fetch succeeds or is
    *   tolerated.
    */
-  async _fetchTolerant(repoPath, ref) {
+  async _fetchTolerant(ref) {
     try {
-      await this._execFileAsync('git', ['fetch', 'origin', ref], { cwd: repoPath });
+      await this._execFileAsync('git', ['fetch', 'origin', ref], { cwd: this._repoContext.repoPath });
     } catch (error) {
       const stderr = error.stderr || '';
 
@@ -137,13 +140,12 @@ class AutoFixAllCheckoutFromMain {
   }
 
   /**
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} ref - the ref to check, e.g. `refs/heads/issue-1`.
    * @returns {Promise<boolean>} whether `ref` exists.
    */
-  async _refExists(repoPath, ref) {
+  async _refExists(ref) {
     try {
-      await this._execFileAsync('git', ['show-ref', '--verify', '--quiet', ref], { cwd: repoPath });
+      await this._execFileAsync('git', ['show-ref', '--verify', '--quiet', ref], { cwd: this._repoContext.repoPath });
 
       return true;
     } catch (error) {

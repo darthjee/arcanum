@@ -70,11 +70,14 @@ function defaultExecFileAsync(file, args = [], options = {}) {
  */
 class AutoFixAllCleanupArtifacts {
   /**
+   * @param {import('../context/RepoContext.js').default} repoContext -
+   *   the target repo's context (provides `repoPath`).
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Function} [deps.execFileAsync] - promisified `execFile`.
    * @param {RepoPath} [deps.repoPath] - repo-path validation helper.
    */
-  constructor({ execFileAsync = defaultExecFileAsync, repoPath = new RepoPath({ execFileAsync }) } = {}) {
+  constructor(repoContext, { execFileAsync = defaultExecFileAsync, repoPath = new RepoPath({ execFileAsync }) } = {}) {
+    this._repoContext = repoContext;
     this._execFileAsync = execFileAsync;
     this._repoPath = repoPath;
   }
@@ -89,7 +92,6 @@ class AutoFixAllCleanupArtifacts {
    * of `issueFile`/`planDir` when tracked, then — only if something ends
    * up staged — commits with a hardcoded message and pushes the current
    * branch.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} issueFile - the issue markdown file's path (relative
    *   to `repoPath`).
    * @param {string} planDir - the plan directory's path (relative to
@@ -107,53 +109,53 @@ class AutoFixAllCleanupArtifacts {
    *   redirects either call's stdout, so the native side relays both
    *   verbatim, in order, for byte-identical parity.
    */
-  async run(repoPath, issueFile, planDir, id, modelName, modelEmail) {
+  async run(issueFile, planDir, id, modelName, modelEmail) {
+    const repoPath = this._repoContext.repoPath;
+
     if (!repoPath || !issueFile || !planDir || !id || !modelName || !modelEmail) {
       throw new Error(USAGE);
     }
 
     await this._repoPath.validate(repoPath);
 
-    if (await this._isTracked(repoPath, issueFile)) {
+    if (await this._isTracked(issueFile)) {
       await this._execFileAsync('git', ['rm', issueFile], { cwd: repoPath });
     }
 
-    if ((await this._isDirectory(repoPath, planDir)) && (await this._isTracked(repoPath, planDir))) {
+    if ((await this._isDirectory(planDir)) && (await this._isTracked(planDir))) {
       await this._execFileAsync('git', ['rm', '-r', planDir], { cwd: repoPath });
     }
 
-    if (await this._nothingStaged(repoPath)) {
+    if (await this._nothingStaged()) {
       return '';
     }
 
-    const commitStdout = await this._commit(repoPath, id, modelName, modelEmail);
-    const pushStdout = await this._pushCurrentBranch(repoPath);
+    const commitStdout = await this._commit(id, modelName, modelEmail);
+    const pushStdout = await this._pushCurrentBranch();
 
     return commitStdout + pushStdout;
   }
 
   /**
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} target - the file/dir path to check, relative to
    *   `repoPath`.
    * @returns {Promise<boolean>} whether `git ls-files <target>` reports
    *   any tracked path.
    */
-  async _isTracked(repoPath, target) {
-    const { stdout } = await this._execFileAsync('git', ['ls-files', target], { cwd: repoPath });
+  async _isTracked(target) {
+    const { stdout } = await this._execFileAsync('git', ['ls-files', target], { cwd: this._repoContext.repoPath });
 
     return stdout.trim().length > 0;
   }
 
   /**
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} target - the path to check, relative to `repoPath`.
    * @returns {Promise<boolean>} whether `target` exists on disk and is a
    *   directory.
    */
-  async _isDirectory(repoPath, target) {
+  async _isDirectory(target) {
     try {
-      const stats = await stat(`${repoPath}/${target}`);
+      const stats = await stat(`${this._repoContext.repoPath}/${target}`);
 
       return stats.isDirectory();
     } catch {
@@ -162,13 +164,12 @@ class AutoFixAllCleanupArtifacts {
   }
 
   /**
-   * @param {string} repoPath - the target repo's local checkout path.
    * @returns {Promise<boolean>} whether `git diff --cached --quiet`
    *   reports nothing staged.
    */
-  async _nothingStaged(repoPath) {
+  async _nothingStaged() {
     try {
-      await this._execFileAsync('git', ['diff', '--cached', '--quiet'], { cwd: repoPath });
+      await this._execFileAsync('git', ['diff', '--cached', '--quiet'], { cwd: this._repoContext.repoPath });
 
       return true;
     } catch (error) {
@@ -187,13 +188,12 @@ class AutoFixAllCleanupArtifacts {
    * `agent_email.sh`) — including leaving `git commit`'s own stdout
    * (unlike the `git rm` calls above, the shell script never redirects
    * this one to `/dev/null`) for the caller to relay.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} id - the issue's numeric id.
    * @param {string} modelName - the acting model's display name.
    * @param {string} modelEmail - the acting model's email.
    * @returns {Promise<string>} `git commit`'s own stdout.
    */
-  async _commit(repoPath, id, modelName, modelEmail) {
+  async _commit(id, modelName, modelEmail) {
     const message = [
       `chore(docs): remove planning artifacts (issue #${id})`,
       '',
@@ -201,7 +201,10 @@ class AutoFixAllCleanupArtifacts {
       `Co-Authored-By: architect agent <${modelEmail}>`
     ].join('\n');
 
-    const { stdout } = await this._execFileAsync('git', ['commit', '-F', '-'], { cwd: repoPath, input: message });
+    const { stdout } = await this._execFileAsync('git', ['commit', '-F', '-'], {
+      cwd: this._repoContext.repoPath,
+      input: message
+    });
 
     return stdout;
   }
@@ -215,17 +218,16 @@ class AutoFixAllCleanupArtifacts {
    * 'origin/<name>'.` confirmation — its transfer summary goes to
    * stderr instead) is left unredirected in the shell script, so it's
    * relayed here too, same as `#_commit`'s.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @returns {Promise<string>} `git push`'s own stdout.
    */
-  async _pushCurrentBranch(repoPath) {
+  async _pushCurrentBranch() {
     const { stdout: branchStdout } = await this._execFileAsync('git', ['branch', '--show-current'], {
-      cwd: repoPath
+      cwd: this._repoContext.repoPath
     });
     const branch = branchStdout.trim();
 
     const { stdout } = await this._execFileAsync('git', ['push', '-u', 'origin', `${branch}:${branch}`], {
-      cwd: repoPath
+      cwd: this._repoContext.repoPath
     });
 
     return stdout;

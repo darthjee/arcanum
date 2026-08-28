@@ -11,6 +11,7 @@ function stubDeps(overrides = {}) {
   return {
     waitCi: { run: jasmine.createSpy('waitCi.run').and.resolveTo('passed\n') },
     github: { prMerge: jasmine.createSpy('github.prMerge').and.resolveTo('https://github.com/darthjee/arcanum/pull/7\n') },
+    repoPathValidator: { validate: jasmine.createSpy('validate').and.resolveTo(undefined) },
     ...overrides
   };
 }
@@ -19,11 +20,24 @@ describe('AutoFixAllWaitCiAndMerge', () => {
   describe('#run', () => {
     it('throws the usage message when repo_path is missing', async () => {
       const deps = stubDeps();
-      const instance = new AutoFixAllWaitCiAndMerge(deps);
+      const instance = new AutoFixAllWaitCiAndMerge({ repoPath: '' }, deps);
 
-      await expectAsync(instance.run('')).toBeRejectedWithError(
+      await expectAsync(instance.run(MODEL_EMAIL)).toBeRejectedWithError(
         'Usage: wait_ci_and_merge.sh <repo_path> [model_email]'
       );
+      expect(deps.repoPathValidator.validate).not.toHaveBeenCalled();
+      expect(deps.waitCi.run).not.toHaveBeenCalled();
+      expect(deps.github.prMerge).not.toHaveBeenCalled();
+    });
+
+    it('propagates a repo-path validation failure before waiting for CI', async () => {
+      const validationError = new Error('Error: not a directory: /repo/path');
+      const deps = stubDeps({
+        repoPathValidator: { validate: jasmine.createSpy('validate').and.rejectWith(validationError) }
+      });
+      const instance = new AutoFixAllWaitCiAndMerge({ repoPath: REPO_PATH }, deps);
+
+      await expectAsync(instance.run(MODEL_EMAIL)).toBeRejectedWith(validationError);
       expect(deps.waitCi.run).not.toHaveBeenCalled();
       expect(deps.github.prMerge).not.toHaveBeenCalled();
     });
@@ -31,20 +45,20 @@ describe('AutoFixAllWaitCiAndMerge', () => {
     describe('when CI passed', () => {
       it('merges the pull request and resolves "passed\\n<url>\\n"', async () => {
         const deps = stubDeps();
-        const instance = new AutoFixAllWaitCiAndMerge(deps);
+        const instance = new AutoFixAllWaitCiAndMerge({ repoPath: REPO_PATH }, deps);
 
-        await expectAsync(instance.run(REPO_PATH, MODEL_EMAIL)).toBeResolvedTo(
+        await expectAsync(instance.run(MODEL_EMAIL)).toBeResolvedTo(
           'passed\nhttps://github.com/darthjee/arcanum/pull/7\n'
         );
-        expect(deps.waitCi.run).toHaveBeenCalledWith(REPO_PATH);
+        expect(deps.waitCi.run).toHaveBeenCalledWith();
         expect(deps.github.prMerge).toHaveBeenCalledWith(REPO_PATH, MODEL_EMAIL);
       });
 
       it('forwards an omitted modelEmail as undefined', async () => {
         const deps = stubDeps();
-        const instance = new AutoFixAllWaitCiAndMerge(deps);
+        const instance = new AutoFixAllWaitCiAndMerge({ repoPath: REPO_PATH }, deps);
 
-        await instance.run(REPO_PATH);
+        await instance.run();
 
         expect(deps.github.prMerge).toHaveBeenCalledWith(REPO_PATH, undefined);
       });
@@ -53,9 +67,9 @@ describe('AutoFixAllWaitCiAndMerge', () => {
         const deps = stubDeps({
           github: { prMerge: jasmine.createSpy('github.prMerge').and.rejectWith(new Error('Error: could not merge PR #7 on darthjee/arcanum')) }
         });
-        const instance = new AutoFixAllWaitCiAndMerge(deps);
+        const instance = new AutoFixAllWaitCiAndMerge({ repoPath: REPO_PATH }, deps);
 
-        await expectAsync(instance.run(REPO_PATH, MODEL_EMAIL)).toBeRejectedWithError(
+        await expectAsync(instance.run(MODEL_EMAIL)).toBeRejectedWithError(
           'Error: could not merge PR #7 on darthjee/arcanum'
         );
       });
@@ -66,9 +80,9 @@ describe('AutoFixAllWaitCiAndMerge', () => {
         const deps = stubDeps({
           waitCi: { run: jasmine.createSpy('waitCi.run').and.resolveTo('failed\nbuild\n') }
         });
-        const instance = new AutoFixAllWaitCiAndMerge(deps);
+        const instance = new AutoFixAllWaitCiAndMerge({ repoPath: REPO_PATH }, deps);
 
-        await expectAsync(instance.run(REPO_PATH, MODEL_EMAIL)).toBeResolvedTo('failed\nbuild\n');
+        await expectAsync(instance.run(MODEL_EMAIL)).toBeResolvedTo('failed\nbuild\n');
         expect(deps.github.prMerge).not.toHaveBeenCalled();
       });
     });
@@ -78,9 +92,9 @@ describe('AutoFixAllWaitCiAndMerge', () => {
         const deps = stubDeps({
           waitCi: { run: jasmine.createSpy('waitCi.run').and.rejectWith(new Error('Error: no pull request found for the current branch on darthjee/arcanum')) }
         });
-        const instance = new AutoFixAllWaitCiAndMerge(deps);
+        const instance = new AutoFixAllWaitCiAndMerge({ repoPath: REPO_PATH }, deps);
 
-        await expectAsync(instance.run(REPO_PATH, MODEL_EMAIL)).toBeRejectedWithError(
+        await expectAsync(instance.run(MODEL_EMAIL)).toBeRejectedWithError(
           'Error: no pull request found for the current branch on darthjee/arcanum'
         );
         expect(deps.github.prMerge).not.toHaveBeenCalled();
