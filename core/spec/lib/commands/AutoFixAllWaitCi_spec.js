@@ -1,4 +1,5 @@
 import AutoFixAllWaitCi from '../../../lib/commands/AutoFixAllWaitCi.js';
+import RepoContextFactory from '../../../lib/context/RepoContextFactory.js';
 
 const REPO_PATH = '/repo/path';
 const REPO = 'darthjee/arcanum';
@@ -83,40 +84,57 @@ function fakeFetch({ pulls = [{ number: 7 }], headSequence = ['sha-1'], checkRun
   });
 }
 
-/**
- * @param {object} [overrides] - collaborator overrides.
- * @returns {object} a set of stub collaborators for AutoFixAllWaitCi.
- */
-function stubDeps(overrides = {}) {
-  return {
-    origin: {
-      resolve: async () => ({ domain: 'github.com', repo: REPO }),
-      resolveWithRef: async () => ({ domain: 'github.com', repo: REPO, repoRef: REPO })
-    },
-    githubToken: { get: async () => TOKEN },
-    repoConfig: { getIgnoredCheckPatterns: jasmine.createSpy('getIgnoredCheckPatterns').and.resolveTo([]) },
-    execFileAsync: fakeExecFileAsync(),
-    fetchFn: fakeFetch(),
-    sleepFn: jasmine.createSpy('sleep').and.resolveTo(undefined),
-    pollIntervalMs: 5000,
-    ...overrides
-  };
-}
-
 describe('AutoFixAllWaitCi', () => {
+  /**
+   * Build an `AutoFixAllWaitCi` wired through a fake-backed
+   * `RepoContextFactory`. The flat override keys (`origin`/`githubToken`/
+   * `execFileAsync`/`fetchFn`/`timeoutMs`) feed the factory; any other
+   * key (`repoConfig`/`pollIntervalMs`/`sleepFn`) is forwarded straight
+   * to the command constructor.
+   * @param {object} [overrides] - per-test wiring overrides.
+   * @returns {AutoFixAllWaitCi} the assembled command instance.
+   */
+  function newWaitCi(overrides = {}) {
+    const {
+      origin = {
+        resolve: async () => ({ domain: 'github.com', repo: REPO }),
+        resolveWithRef: async () => ({ domain: 'github.com', repo: REPO, repoRef: REPO })
+      },
+      githubToken = { get: async () => TOKEN },
+      execFileAsync = fakeExecFileAsync(),
+      fetchFn = fakeFetch(),
+      timeoutMs = 5,
+      ...rest
+    } = overrides;
+
+    return new AutoFixAllWaitCi({
+      repoContextFactory: new RepoContextFactory({
+        origin,
+        githubToken,
+        execFileAsync,
+        fetchFn,
+        timeoutMs
+      }),
+      ...rest
+    });
+  }
+
+  const stubRepoConfig = () => ({
+    getIgnoredCheckPatterns: jasmine.createSpy('getIgnoredCheckPatterns').and.resolveTo([])
+  });
+
   describe('#run', () => {
     it('throws the usage message when repo_path is missing', async () => {
-      const deps = stubDeps();
-      const instance = new AutoFixAllWaitCi(deps);
+      const execFileAsync = fakeExecFileAsync();
+      const instance = newWaitCi({ execFileAsync, repoConfig: stubRepoConfig() });
 
       await expectAsync(instance.run('')).toBeRejectedWithError('Usage: wait_ci.sh <repo_path>');
-      expect(deps.execFileAsync).not.toHaveBeenCalled();
+      expect(execFileAsync).not.toHaveBeenCalled();
     });
 
     describe('when no pull request is found for the current branch', () => {
       it('throws the same error message the shell script prints', async () => {
-        const deps = stubDeps({ fetchFn: fakeFetch({ pulls: [] }) });
-        const instance = new AutoFixAllWaitCi(deps);
+        const instance = newWaitCi({ fetchFn: fakeFetch({ pulls: [] }), repoConfig: stubRepoConfig() });
 
         await expectAsync(instance.run(REPO_PATH)).toBeRejectedWithError(
           `Error: no pull request found for the current branch on ${REPO}`
@@ -124,10 +142,10 @@ describe('AutoFixAllWaitCi', () => {
       });
 
       it('also throws when the pulls lookup itself fails', async () => {
-        const deps = stubDeps({
-          fetchFn: jasmine.createSpy('fetch').and.rejectWith(new Error('network down'))
+        const instance = newWaitCi({
+          fetchFn: jasmine.createSpy('fetch').and.rejectWith(new Error('network down')),
+          repoConfig: stubRepoConfig()
         });
-        const instance = new AutoFixAllWaitCi(deps);
 
         await expectAsync(instance.run(REPO_PATH)).toBeRejectedWithError(
           `Error: no pull request found for the current branch on ${REPO}`
@@ -137,25 +155,28 @@ describe('AutoFixAllWaitCi', () => {
 
     describe('when zero check-runs are registered yet', () => {
       it('keeps polling until check-runs show up', async () => {
-        const deps = stubDeps({
+        const sleepFn = jasmine.createSpy('sleep').and.resolveTo(undefined);
+        const instance = newWaitCi({
           fetchFn: fakeFetch({
             checkRunsSequence: [
               [],
               [{ name: 'build', status: 'completed', conclusion: 'success' }]
             ]
-          })
+          }),
+          repoConfig: stubRepoConfig(),
+          sleepFn
         });
-        const instance = new AutoFixAllWaitCi(deps);
 
         await expectAsync(instance.run(REPO_PATH)).toBeResolvedTo('passed\n');
-        expect(deps.sleepFn).toHaveBeenCalledTimes(1);
-        expect(deps.sleepFn).toHaveBeenCalledWith(5000);
+        expect(sleepFn).toHaveBeenCalledTimes(1);
+        expect(sleepFn).toHaveBeenCalledWith(5000);
       });
     });
 
     describe('ignored check patterns', () => {
       it('excludes matching check-runs (case-insensitively) from the passed/failed/total accounting', async () => {
-        const deps = stubDeps({
+        const sleepFn = jasmine.createSpy('sleep').and.resolveTo(undefined);
+        const instance = newWaitCi({
           repoConfig: {
             getIgnoredCheckPatterns: jasmine.createSpy('getIgnoredCheckPatterns').and.resolveTo(['codacy'])
           },
@@ -166,41 +187,43 @@ describe('AutoFixAllWaitCi', () => {
                 { name: 'build', status: 'completed', conclusion: 'success' }
               ]
             ]
-          })
+          }),
+          sleepFn
         });
-        const instance = new AutoFixAllWaitCi(deps);
 
         await expectAsync(instance.run(REPO_PATH)).toBeResolvedTo('passed\n');
-        expect(deps.sleepFn).not.toHaveBeenCalled();
+        expect(sleepFn).not.toHaveBeenCalled();
       });
 
       it('is read only once, not re-read on every poll iteration', async () => {
-        const deps = stubDeps({
+        const repoConfig = stubRepoConfig();
+        const instance = newWaitCi({
           fetchFn: fakeFetch({
             checkRunsSequence: [
               [{ name: 'build', status: 'in_progress', conclusion: null }],
               [{ name: 'build', status: 'completed', conclusion: 'success' }]
             ]
-          })
+          }),
+          repoConfig,
+          sleepFn: jasmine.createSpy('sleep').and.resolveTo(undefined)
         });
-        const instance = new AutoFixAllWaitCi(deps);
 
         await expectAsync(instance.run(REPO_PATH)).toBeResolvedTo('passed\n');
-        expect(deps.repoConfig.getIgnoredCheckPatterns).toHaveBeenCalledTimes(1);
+        expect(repoConfig.getIgnoredCheckPatterns).toHaveBeenCalledTimes(1);
       });
     });
 
     describe('when every (non-ignored) check-run has completed successfully', () => {
       it('resolves with "passed\\n"', async () => {
-        const deps = stubDeps({
+        const instance = newWaitCi({
           fetchFn: fakeFetch({
             checkRunsSequence: [[
               { name: 'build', status: 'completed', conclusion: 'success' },
               { name: 'lint', status: 'completed', conclusion: 'success' }
             ]]
-          })
+          }),
+          repoConfig: stubRepoConfig()
         });
-        const instance = new AutoFixAllWaitCi(deps);
 
         await expectAsync(instance.run(REPO_PATH)).toBeResolvedTo('passed\n');
       });
@@ -208,7 +231,7 @@ describe('AutoFixAllWaitCi', () => {
 
     describe('when a check-run has completed with a failure/cancelled/timed_out conclusion', () => {
       it('resolves with "failed\\n" plus each failed check-run\'s name', async () => {
-        const deps = stubDeps({
+        const instance = newWaitCi({
           fetchFn: fakeFetch({
             checkRunsSequence: [[
               { name: 'build', status: 'completed', conclusion: 'failure' },
@@ -216,9 +239,9 @@ describe('AutoFixAllWaitCi', () => {
               { name: 'e2e', status: 'completed', conclusion: 'cancelled' },
               { name: 'deploy', status: 'completed', conclusion: 'timed_out' }
             ]]
-          })
+          }),
+          repoConfig: stubRepoConfig()
         });
-        const instance = new AutoFixAllWaitCi(deps);
 
         await expectAsync(instance.run(REPO_PATH)).toBeResolvedTo('failed\nbuild\ne2e\ndeploy\n');
       });
@@ -226,48 +249,54 @@ describe('AutoFixAllWaitCi', () => {
 
     describe('when a check-run is still pending', () => {
       it('keeps polling until every check-run has completed', async () => {
-        const deps = stubDeps({
+        const sleepFn = jasmine.createSpy('sleep').and.resolveTo(undefined);
+        const instance = newWaitCi({
           fetchFn: fakeFetch({
             checkRunsSequence: [
               [{ name: 'build', status: 'in_progress', conclusion: null }],
               [{ name: 'build', status: 'completed', conclusion: 'success' }]
             ]
-          })
+          }),
+          repoConfig: stubRepoConfig(),
+          sleepFn
         });
-        const instance = new AutoFixAllWaitCi(deps);
 
         await expectAsync(instance.run(REPO_PATH)).toBeResolvedTo('passed\n');
-        expect(deps.sleepFn).toHaveBeenCalledTimes(1);
+        expect(sleepFn).toHaveBeenCalledTimes(1);
       });
     });
 
     describe('transient fetch/API errors', () => {
       it('retries (does not raise) when the head-commit fetch is not ok', async () => {
-        const deps = stubDeps({
+        const sleepFn = jasmine.createSpy('sleep').and.resolveTo(undefined);
+        const instance = newWaitCi({
           fetchFn: fakeFetch({
             headSequence: [{ ok: false }, 'sha-1'],
             checkRunsSequence: [[{ name: 'build', status: 'completed', conclusion: 'success' }]]
-          })
+          }),
+          repoConfig: stubRepoConfig(),
+          sleepFn
         });
-        const instance = new AutoFixAllWaitCi(deps);
 
         await expectAsync(instance.run(REPO_PATH)).toBeResolvedTo('passed\n');
-        expect(deps.sleepFn).toHaveBeenCalledTimes(1);
+        expect(sleepFn).toHaveBeenCalledTimes(1);
       });
 
       it('retries (does not raise) when the check-runs fetch is not ok', async () => {
-        const deps = stubDeps({
+        const sleepFn = jasmine.createSpy('sleep').and.resolveTo(undefined);
+        const instance = newWaitCi({
           fetchFn: fakeFetch({
             checkRunsSequence: [
               { ok: false },
               { ok: true, json: async () => ({ check_runs: [{ name: 'build', status: 'completed', conclusion: 'success' }] }) }
             ]
-          })
+          }),
+          repoConfig: stubRepoConfig(),
+          sleepFn
         });
-        const instance = new AutoFixAllWaitCi(deps);
 
         await expectAsync(instance.run(REPO_PATH)).toBeResolvedTo('passed\n');
-        expect(deps.sleepFn).toHaveBeenCalledTimes(1);
+        expect(sleepFn).toHaveBeenCalledTimes(1);
       });
 
       it('retries (does not raise) when a poll-loop fetch call rejects outright', async () => {
@@ -289,11 +318,11 @@ describe('AutoFixAllWaitCi', () => {
 
           return { ok: true, json: async () => ({ check_runs: [{ name: 'build', status: 'completed', conclusion: 'success' }] }) };
         });
-        const deps = stubDeps({ fetchFn });
-        const instance = new AutoFixAllWaitCi(deps);
+        const sleepFn = jasmine.createSpy('sleep').and.resolveTo(undefined);
+        const instance = newWaitCi({ fetchFn, repoConfig: stubRepoConfig(), sleepFn });
 
         await expectAsync(instance.run(REPO_PATH)).toBeResolvedTo('passed\n');
-        expect(deps.sleepFn).toHaveBeenCalledTimes(1);
+        expect(sleepFn).toHaveBeenCalledTimes(1);
       });
 
       // A malformed ignored-pattern regex's "keep polling instead of
@@ -308,16 +337,14 @@ describe('AutoFixAllWaitCi', () => {
     });
 
     it('sends the resolved GitHub token as a bearer header on every REST call', async () => {
-      const deps = stubDeps({
-        fetchFn: fakeFetch({
-          checkRunsSequence: [[{ name: 'build', status: 'completed', conclusion: 'success' }]]
-        })
+      const fetchFn = fakeFetch({
+        checkRunsSequence: [[{ name: 'build', status: 'completed', conclusion: 'success' }]]
       });
-      const instance = new AutoFixAllWaitCi(deps);
+      const instance = newWaitCi({ fetchFn, repoConfig: stubRepoConfig() });
 
       await instance.run(REPO_PATH);
 
-      deps.fetchFn.calls.allArgs().forEach(([, options]) => {
+      fetchFn.calls.allArgs().forEach(([, options]) => {
         expect(options.headers.Authorization).toEqual(`Bearer ${TOKEN}`);
       });
     });
