@@ -1,4 +1,5 @@
 import AutoFixAllWaitCi from '../../../lib/commands/AutoFixAllWaitCi.js';
+import RepoContext from '../../../lib/context/RepoContext.js';
 import RepoContextFactory from '../../../lib/context/RepoContextFactory.js';
 
 const REPO_PATH = '/repo/path';
@@ -87,15 +88,17 @@ function fakeFetch({ pulls = [{ number: 7 }], headSequence = ['sha-1'], checkRun
 describe('AutoFixAllWaitCi', () => {
   /**
    * Build an `AutoFixAllWaitCi` wired through a fake-backed
-   * `RepoContextFactory`. The flat override keys (`origin`/`githubToken`/
-   * `execFileAsync`/`fetchFn`/`timeoutMs`) feed the factory; any other
-   * key (`repoConfig`/`pollIntervalMs`/`sleepFn`) is forwarded straight
-   * to the command constructor.
+   * `RepoContext` + `RepoContextFactory`. The flat override keys
+   * (`repoPath`/`origin`/`githubToken`) feed the `RepoContext`;
+   * `execFileAsync`/`fetchFn`/`timeoutMs` feed the factory; any other
+   * key (`repoConfig`/`pollIntervalMs`/`sleepFn`/`repoPathValidator`) is
+   * forwarded straight to the command constructor.
    * @param {object} [overrides] - per-test wiring overrides.
    * @returns {AutoFixAllWaitCi} the assembled command instance.
    */
   function newWaitCi(overrides = {}) {
     const {
+      repoPath = REPO_PATH,
       origin = {
         resolve: async () => ({ domain: 'github.com', repo: REPO }),
         resolveWithRef: async () => ({ domain: 'github.com', repo: REPO, repoRef: REPO })
@@ -104,17 +107,15 @@ describe('AutoFixAllWaitCi', () => {
       execFileAsync = fakeExecFileAsync(),
       fetchFn = fakeFetch(),
       timeoutMs = 5,
+      repoPathValidator = { validate: jasmine.createSpy('validate').and.resolveTo(undefined) },
       ...rest
     } = overrides;
 
-    return new AutoFixAllWaitCi({
-      repoContextFactory: new RepoContextFactory({
-        origin,
-        githubToken,
-        execFileAsync,
-        fetchFn,
-        timeoutMs
-      }),
+    const repoContext = new RepoContext({ repoPath, origin, githubToken });
+
+    return new AutoFixAllWaitCi(repoContext, {
+      repoContextFactory: new RepoContextFactory({ execFileAsync, fetchFn, timeoutMs }),
+      repoPathValidator,
       ...rest
     });
   }
@@ -126,17 +127,31 @@ describe('AutoFixAllWaitCi', () => {
   describe('#run', () => {
     it('throws the usage message when repo_path is missing', async () => {
       const execFileAsync = fakeExecFileAsync();
-      const instance = newWaitCi({ execFileAsync, repoConfig: stubRepoConfig() });
+      const repoPathValidator = { validate: jasmine.createSpy('validate').and.resolveTo(undefined) };
+      const instance = newWaitCi({ repoPath: '', execFileAsync, repoPathValidator, repoConfig: stubRepoConfig() });
 
-      await expectAsync(instance.run('')).toBeRejectedWithError('Usage: wait_ci.sh <repo_path>');
+      await expectAsync(instance.run()).toBeRejectedWithError('Usage: wait_ci.sh <repo_path>');
       expect(execFileAsync).not.toHaveBeenCalled();
+      expect(repoPathValidator.validate).not.toHaveBeenCalled();
+    });
+
+    it('rejects (before any I/O) when repo-path validation fails for a non-empty path', async () => {
+      const execFileAsync = fakeExecFileAsync();
+      const fetchFn = fakeFetch();
+      const validationError = new Error('Error: not a directory: /repo/path');
+      const repoPathValidator = { validate: jasmine.createSpy('validate').and.rejectWith(validationError) };
+      const instance = newWaitCi({ execFileAsync, fetchFn, repoPathValidator, repoConfig: stubRepoConfig() });
+
+      await expectAsync(instance.run()).toBeRejectedWith(validationError);
+      expect(execFileAsync).not.toHaveBeenCalled();
+      expect(fetchFn).not.toHaveBeenCalled();
     });
 
     describe('when no pull request is found for the current branch', () => {
       it('throws the same error message the shell script prints', async () => {
         const instance = newWaitCi({ fetchFn: fakeFetch({ pulls: [] }), repoConfig: stubRepoConfig() });
 
-        await expectAsync(instance.run(REPO_PATH)).toBeRejectedWithError(
+        await expectAsync(instance.run()).toBeRejectedWithError(
           `Error: no pull request found for the current branch on ${REPO}`
         );
       });
@@ -147,7 +162,7 @@ describe('AutoFixAllWaitCi', () => {
           repoConfig: stubRepoConfig()
         });
 
-        await expectAsync(instance.run(REPO_PATH)).toBeRejectedWithError(
+        await expectAsync(instance.run()).toBeRejectedWithError(
           `Error: no pull request found for the current branch on ${REPO}`
         );
       });
@@ -167,7 +182,7 @@ describe('AutoFixAllWaitCi', () => {
           sleepFn
         });
 
-        await expectAsync(instance.run(REPO_PATH)).toBeResolvedTo('passed\n');
+        await expectAsync(instance.run()).toBeResolvedTo('passed\n');
         expect(sleepFn).toHaveBeenCalledTimes(1);
         expect(sleepFn).toHaveBeenCalledWith(5000);
       });
@@ -191,7 +206,7 @@ describe('AutoFixAllWaitCi', () => {
           sleepFn
         });
 
-        await expectAsync(instance.run(REPO_PATH)).toBeResolvedTo('passed\n');
+        await expectAsync(instance.run()).toBeResolvedTo('passed\n');
         expect(sleepFn).not.toHaveBeenCalled();
       });
 
@@ -208,7 +223,7 @@ describe('AutoFixAllWaitCi', () => {
           sleepFn: jasmine.createSpy('sleep').and.resolveTo(undefined)
         });
 
-        await expectAsync(instance.run(REPO_PATH)).toBeResolvedTo('passed\n');
+        await expectAsync(instance.run()).toBeResolvedTo('passed\n');
         expect(repoConfig.getIgnoredCheckPatterns).toHaveBeenCalledTimes(1);
       });
     });
@@ -225,7 +240,7 @@ describe('AutoFixAllWaitCi', () => {
           repoConfig: stubRepoConfig()
         });
 
-        await expectAsync(instance.run(REPO_PATH)).toBeResolvedTo('passed\n');
+        await expectAsync(instance.run()).toBeResolvedTo('passed\n');
       });
     });
 
@@ -243,7 +258,7 @@ describe('AutoFixAllWaitCi', () => {
           repoConfig: stubRepoConfig()
         });
 
-        await expectAsync(instance.run(REPO_PATH)).toBeResolvedTo('failed\nbuild\ne2e\ndeploy\n');
+        await expectAsync(instance.run()).toBeResolvedTo('failed\nbuild\ne2e\ndeploy\n');
       });
     });
 
@@ -261,7 +276,7 @@ describe('AutoFixAllWaitCi', () => {
           sleepFn
         });
 
-        await expectAsync(instance.run(REPO_PATH)).toBeResolvedTo('passed\n');
+        await expectAsync(instance.run()).toBeResolvedTo('passed\n');
         expect(sleepFn).toHaveBeenCalledTimes(1);
       });
     });
@@ -278,7 +293,7 @@ describe('AutoFixAllWaitCi', () => {
           sleepFn
         });
 
-        await expectAsync(instance.run(REPO_PATH)).toBeResolvedTo('passed\n');
+        await expectAsync(instance.run()).toBeResolvedTo('passed\n');
         expect(sleepFn).toHaveBeenCalledTimes(1);
       });
 
@@ -295,7 +310,7 @@ describe('AutoFixAllWaitCi', () => {
           sleepFn
         });
 
-        await expectAsync(instance.run(REPO_PATH)).toBeResolvedTo('passed\n');
+        await expectAsync(instance.run()).toBeResolvedTo('passed\n');
         expect(sleepFn).toHaveBeenCalledTimes(1);
       });
 
@@ -321,7 +336,7 @@ describe('AutoFixAllWaitCi', () => {
         const sleepFn = jasmine.createSpy('sleep').and.resolveTo(undefined);
         const instance = newWaitCi({ fetchFn, repoConfig: stubRepoConfig(), sleepFn });
 
-        await expectAsync(instance.run(REPO_PATH)).toBeResolvedTo('passed\n');
+        await expectAsync(instance.run()).toBeResolvedTo('passed\n');
         expect(sleepFn).toHaveBeenCalledTimes(1);
       });
 
@@ -342,7 +357,7 @@ describe('AutoFixAllWaitCi', () => {
       });
       const instance = newWaitCi({ fetchFn, repoConfig: stubRepoConfig() });
 
-      await instance.run(REPO_PATH);
+      await instance.run();
 
       fetchFn.calls.allArgs().forEach(([, options]) => {
         expect(options.headers.Authorization).toEqual(`Bearer ${TOKEN}`);

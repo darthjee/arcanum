@@ -1,7 +1,8 @@
 import PrChecker from '../services/PrChecker.js';
 import PrOperations from '../utils/github/PrOperations.js';
-import RepoContextFactory from '../context/RepoContextFactory.js';
 import RepoConfig from '../utils/config/RepoConfig.js';
+import RepoContextFactory from '../context/RepoContextFactory.js';
+import RepoPath from '../utils/file/RepoPath.js';
 
 const DEFAULT_TIMEOUT_MS = 30000;
 const DEFAULT_POLL_INTERVAL_MS = 5000;
@@ -34,12 +35,16 @@ function defaultSleep(ms) {
  */
 class AutoFixAllWaitCi {
   /**
+   * @param {import('../context/RepoContext.js').default} repoContext -
+   *   the target repo's context (provides `repoPath` plus the low-level
+   *   `origin`/`githubToken`/`issueStateService`/`configChain` wiring
+   *   the per-call bundle is built off).
    * @param {object} [deps] - injectable collaborators, for testing.
-   * @param {RepoContextFactory} [deps.repoContextFactory] - builds each
-   *   per-call `RepoContext` bundle (context plus context-bound
-   *   clients) — see `#_prOperations`. Owns the low-level `origin`/
-   *   `githubToken`/`issueStateService`/`configChain`/`execFileAsync`/
-   *   `fetchFn`/`timeoutMs` wiring.
+   * @param {RepoContextFactory} [deps.repoContextFactory] - wraps the
+   *   injected `RepoContext` into a per-call bundle (context plus
+   *   context-bound clients) via `buildFromContext` — see
+   *   `#_prOperations`. Only its `execFileAsync`/`fetchFn`/`timeoutMs`
+   *   knobs are consulted on this path.
    * @param {RepoConfig} [deps.repoConfig] - per-repo config reader.
    * @param {number} [deps.pollIntervalMs] - the wait between poll
    *   attempts, overridable for tests (defaults to the shell script's
@@ -47,17 +52,22 @@ class AutoFixAllWaitCi {
    * @param {Function} [deps.sleepFn] - the poll-loop sleep
    *   implementation, overridable for tests (defaults to a real
    *   `setTimeout`-based sleep).
+   * @param {RepoPath} [deps.repoPathValidator] - repo-path validation
+   *   helper.
    */
-  constructor({
+  constructor(repoContext, {
     repoContextFactory = new RepoContextFactory({ timeoutMs: DEFAULT_TIMEOUT_MS }),
     repoConfig = new RepoConfig(),
     pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
-    sleepFn = defaultSleep
+    sleepFn = defaultSleep,
+    repoPathValidator = new RepoPath()
   } = {}) {
+    this._repoContext = repoContext;
     this._repoContextFactory = repoContextFactory;
     this._repoConfig = repoConfig;
     this._pollIntervalMs = pollIntervalMs;
     this._sleep = sleepFn;
+    this._repoPathValidator = repoPathValidator;
   }
 
   /**
@@ -66,7 +76,6 @@ class AutoFixAllWaitCi {
    * `wait_ci_shell.sh`. Blocks (polling every `pollIntervalMs`) until
    * every check-run on the current branch's PR head commit has
    * completed.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @returns {Promise<string>} `passed\n` on an all-green PR, or
    *   `failed\n<name>\n...` (one failed/cancelled/timed-out check-run
    *   name per line) otherwise.
@@ -74,14 +83,18 @@ class AutoFixAllWaitCi {
    *   branch on <repo>` when the current branch has no open pull
    *   request.
    */
-  async run(repoPath) {
+  async run() {
+    const repoPath = this._repoContext.repoPath;
+
     if (!repoPath) {
       throw new Error(USAGE);
     }
 
+    await this._repoPathValidator.validate(repoPath);
+
     const ignoredPatterns = await this._repoConfig.getIgnoredCheckPatterns(repoPath);
-    const prNumber = Number((await this._prOperations(repoPath).prNumber()).trim());
-    const prChecker = this._prChecker(repoPath);
+    const prNumber = Number((await this._prOperations().prNumber()).trim());
+    const prChecker = this._prChecker();
 
     for (;;) {
       const outcome = await prChecker.pollOnce(prNumber, ignoredPatterns);
@@ -95,29 +108,27 @@ class AutoFixAllWaitCi {
   }
 
   /**
-   * Build a per-call `PrOperations` from a fresh `RepoContextFactory`
-   * bundle (its `context` plus a context-bound `gitClient`/`gitBranch`/
-   * `git`/`githubClient` — the extra `issueClient` key is ignored by
-   * `PrOperations`). The whole bundle is cheap, zero-I/O construction,
-   * so building it per call has no meaningful cost.
-   * @param {string} repoPath - the target repo's local checkout path.
+   * Build a per-call `PrOperations` by wrapping the injected
+   * `RepoContext` into a `RepoContextFactory` bundle (its `context` plus
+   * a context-bound `gitClient`/`gitBranch`/`git`/`githubClient` — the
+   * extra `issueClient` key is ignored by `PrOperations`). The bundle is
+   * cheap, zero-I/O construction, so building it per call has no
+   * meaningful cost.
    * @returns {PrOperations} the per-call `PrOperations` facade.
    */
-  _prOperations(repoPath) {
-    return new PrOperations(this._repoContextFactory.build(repoPath));
+  _prOperations() {
+    return new PrOperations(this._repoContextFactory.buildFromContext(this._repoContext));
   }
 
   /**
-   * Build a per-call `PrChecker`, wrapping a fresh
-   * `_prOperations(repoPath)` — mirrors `_prOperations`'s own per-call
-   * construction, since a context-bound `PrChecker` can't be a
-   * constructor-level shared singleton once `repoPath` varies call to
-   * call.
-   * @param {string} repoPath - the target repo's local checkout path.
+   * Build a per-call `PrChecker`, wrapping a fresh `_prOperations()` —
+   * mirrors `_prOperations`'s own per-call construction, since a
+   * context-bound `PrChecker` can't be a constructor-level shared
+   * singleton.
    * @returns {PrChecker} the per-call `PrChecker` delegate.
    */
-  _prChecker(repoPath) {
-    return new PrChecker({ prOperations: this._prOperations(repoPath) });
+  _prChecker() {
+    return new PrChecker({ prOperations: this._prOperations() });
   }
 }
 

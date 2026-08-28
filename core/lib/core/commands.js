@@ -81,7 +81,11 @@ export const COMMANDS = {
     method: 'run',
     takesRepoContext: true
   },
-  'auto-fix-all-wait-ci': { module: 'commands/AutoFixAllWaitCi.js', method: 'run' },
+  'auto-fix-all-wait-ci': {
+    module: 'commands/AutoFixAllWaitCi.js',
+    method: 'run',
+    takesRepoContext: true
+  },
   'auto-fix-all-wait-ci-and-merge': { module: 'commands/AutoFixAllWaitCiAndMerge.js', method: 'run' },
   'checkout-safe-branch': { module: 'commands/SafeBranch.js', method: 'run' },
   'dispatch-fixture': { module: 'commands/DispatchFixture.js', method: 'run', log: false },
