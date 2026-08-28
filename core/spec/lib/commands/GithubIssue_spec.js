@@ -2,6 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import GithubIssue from '../../../lib/commands/GithubIssue.js';
+import RepoContext from '../../../lib/context/RepoContext.js';
 import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
 
 const fixturesDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'support', 'fixtures');
@@ -49,7 +50,7 @@ describe('GithubIssue', () => {
         json: async () => payload
       });
       const deps = stubDeps();
-      const githubIssue = new GithubIssue({ ...deps, fetchFn });
+      const githubIssue = new GithubIssue(undefined, { ...deps, fetchFn });
 
       const result = await githubIssue.fetch(repoPath, '321');
 
@@ -65,7 +66,7 @@ describe('GithubIssue', () => {
     it('calls fetch with the correct REST URL and Authorization header', async () => {
       const payload = await loadFixture('github_issue_success.json');
       const fetchFn = jasmine.createSpy('fetch').and.resolveTo({ ok: true, json: async () => payload });
-      const githubIssue = new GithubIssue({ ...stubDeps(), fetchFn });
+      const githubIssue = new GithubIssue(undefined, { ...stubDeps(), fetchFn });
 
       await githubIssue.fetch(repoPath, '321');
 
@@ -78,7 +79,7 @@ describe('GithubIssue', () => {
     it('maps GitHub labels to canonical tags, deduplicated, and writes the state file', async () => {
       const payload = await loadFixture('github_issue_success.json');
       const fetchFn = jasmine.createSpy('fetch').and.resolveTo({ ok: true, json: async () => payload });
-      const githubIssue = new GithubIssue({ ...stubDeps(), fetchFn });
+      const githubIssue = new GithubIssue(undefined, { ...stubDeps(), fetchFn });
 
       await githubIssue.fetch(repoPath, '321');
 
@@ -104,7 +105,7 @@ describe('GithubIssue', () => {
           labels: []
         })
       });
-      const githubIssue = new GithubIssue({ ...stubDeps(), fetchFn });
+      const githubIssue = new GithubIssue(undefined, { ...stubDeps(), fetchFn });
 
       const result = await githubIssue.fetch(repoPath, '7');
 
@@ -118,7 +119,7 @@ describe('GithubIssue', () => {
         status: 404,
         json: async () => notFound
       });
-      const githubIssue = new GithubIssue({ ...stubDeps(), fetchFn });
+      const githubIssue = new GithubIssue(undefined, { ...stubDeps(), fetchFn });
 
       await expectAsync(githubIssue.fetch(repoPath, '404')).toBeRejectedWithError(
         'Error: could not fetch issue #404 from darthjee/arcanum'
@@ -127,7 +128,7 @@ describe('GithubIssue', () => {
 
     it('throws the exact fetch-failure message on a network error', async () => {
       const fetchFn = jasmine.createSpy('fetch').and.rejectWith(new Error('network down'));
-      const githubIssue = new GithubIssue({ ...stubDeps(), fetchFn });
+      const githubIssue = new GithubIssue(undefined, { ...stubDeps(), fetchFn });
 
       await expectAsync(githubIssue.fetch(repoPath, '5')).toBeRejectedWithError(
         'Error: could not fetch issue #5 from darthjee/arcanum'
@@ -140,7 +141,7 @@ describe('GithubIssue', () => {
           throw new Error('Error: could not obtain GitHub token via gh auth token');
         }
       };
-      const githubIssue = new GithubIssue({ ...stubDeps({ githubToken }), fetchFn: jasmine.createSpy('fetch') });
+      const githubIssue = new GithubIssue(undefined, { ...stubDeps({ githubToken }), fetchFn: jasmine.createSpy('fetch') });
 
       await expectAsync(githubIssue.fetch(repoPath, '5')).toBeRejectedWithError(
         'Error: could not obtain GitHub token via gh auth token'
@@ -152,7 +153,7 @@ describe('GithubIssue', () => {
         new Promise((resolve, reject) => {
           options.signal.addEventListener('abort', () => reject(new Error('aborted')));
         });
-      const githubIssue = new GithubIssue({ ...stubDeps(), fetchFn, timeoutMs: 10 });
+      const githubIssue = new GithubIssue(undefined, { ...stubDeps(), fetchFn, timeoutMs: 10 });
 
       const start = Date.now();
 
@@ -166,7 +167,7 @@ describe('GithubIssue', () => {
 
   describe('#info', () => {
     it('returns the DOMAIN=/REPO= fields resolved from origin', async () => {
-      const githubIssue = new GithubIssue(stubDeps());
+      const githubIssue = new GithubIssue(undefined, stubDeps());
 
       const result = await githubIssue.info(repoPath);
 
@@ -175,7 +176,7 @@ describe('GithubIssue', () => {
 
     it('round-trips a non-GitHub domain into the same DOMAIN=/REPO= shape', async () => {
       const origin = { resolve: async () => ({ domain: 'git.example.com', repo: 'acme/widgets' }) };
-      const githubIssue = new GithubIssue(stubDeps({ origin }));
+      const githubIssue = new GithubIssue(undefined, stubDeps({ origin }));
 
       const result = await githubIssue.info(repoPath);
 
@@ -188,7 +189,7 @@ describe('GithubIssue', () => {
           throw new Error(`Error: '${repoPath}' is not a git repository or has no 'origin' remote`);
         }
       };
-      const githubIssue = new GithubIssue(stubDeps({ origin }));
+      const githubIssue = new GithubIssue(undefined, stubDeps({ origin }));
 
       await expectAsync(githubIssue.info(repoPath)).toBeRejectedWithError(
         `Error: '${repoPath}' is not a git repository or has no 'origin' remote`
@@ -212,7 +213,7 @@ describe('GithubIssue', () => {
       const payload = await loadFixture('github_issue_create_success.json');
       const fetchFn = jasmine.createSpy('fetch').and.resolveTo({ ok: true, json: async () => payload });
       const file = await writeBodyFile('Please add a dark mode toggle to settings.\n');
-      const githubIssue = new GithubIssue({ ...stubDeps(), fetchFn });
+      const githubIssue = new GithubIssue(undefined, { ...stubDeps(), fetchFn });
 
       const result = await githubIssue.create(repoPath, 'New feature: dark mode', file);
 
@@ -231,7 +232,7 @@ describe('GithubIssue', () => {
       for (const trailing of ['', '\n', '\n\n\n']) {
         const fetchFn = jasmine.createSpy('fetch').and.resolveTo({ ok: true, json: async () => payload });
         const file = await writeBodyFile(`body content${trailing}`);
-        const githubIssue = new GithubIssue({ ...stubDeps(), fetchFn });
+        const githubIssue = new GithubIssue(undefined, { ...stubDeps(), fetchFn });
 
         await githubIssue.create(repoPath, 'New feature: dark mode', file);
 
@@ -248,7 +249,7 @@ describe('GithubIssue', () => {
       const payload = await loadFixture('github_issue_create_success.json');
       const fetchFn = jasmine.createSpy('fetch').and.resolveTo({ ok: true, json: async () => payload });
       const file = await writeBodyFile('the body');
-      const githubIssue = new GithubIssue({ ...stubDeps(), fetchFn });
+      const githubIssue = new GithubIssue(undefined, { ...stubDeps(), fetchFn });
 
       await githubIssue.create(repoPath, 'New feature: dark mode', file);
 
@@ -267,7 +268,7 @@ describe('GithubIssue', () => {
       const payload = await loadFixture('github_issue_create_success.json');
       const fetchFn = jasmine.createSpy('fetch').and.resolveTo({ ok: true, json: async () => payload });
       const file = await writeBodyFile('the body');
-      const githubIssue = new GithubIssue({ ...stubDeps(), fetchFn });
+      const githubIssue = new GithubIssue(undefined, { ...stubDeps(), fetchFn });
 
       await githubIssue.create(repoPath, 'New feature: dark mode', file);
 
@@ -282,7 +283,7 @@ describe('GithubIssue', () => {
       };
       const fetchFn = jasmine.createSpy('fetch');
       const origin = { resolve: jasmine.createSpy('resolve') };
-      const githubIssue = new GithubIssue({ ...stubDeps({ repoPath: repoPathDep, origin }), fetchFn });
+      const githubIssue = new GithubIssue(undefined, { ...stubDeps({ repoPath: repoPathDep, origin }), fetchFn });
 
       await expectAsync(githubIssue.create(repoPath, 'title', 'missing.md')).toBeRejectedWithError(
         `Error: not a directory: ${repoPath}`
@@ -296,7 +297,7 @@ describe('GithubIssue', () => {
       const fetchFn = jasmine.createSpy('fetch');
       const origin = { resolve: jasmine.createSpy('resolve') };
       const missingFile = path.join(repoPath, 'does-not-exist.md');
-      const githubIssue = new GithubIssue({ ...stubDeps({ origin }), fetchFn });
+      const githubIssue = new GithubIssue(undefined, { ...stubDeps({ origin }), fetchFn });
 
       await expectAsync(githubIssue.create(repoPath, 'title', missingFile)).toBeRejectedWithError(
         `Error: file not found: ${missingFile}`
@@ -309,7 +310,7 @@ describe('GithubIssue', () => {
     it('throws the exact create-failure message on a non-2xx response', async () => {
       const fetchFn = jasmine.createSpy('fetch').and.resolveTo({ ok: false, status: 422, json: async () => ({}) });
       const file = await writeBodyFile('the body');
-      const githubIssue = new GithubIssue({ ...stubDeps(), fetchFn });
+      const githubIssue = new GithubIssue(undefined, { ...stubDeps(), fetchFn });
 
       await expectAsync(githubIssue.create(repoPath, 'title', file)).toBeRejectedWithError(
         'Error: could not create issue on darthjee/arcanum'
@@ -319,7 +320,7 @@ describe('GithubIssue', () => {
     it('throws the exact create-failure message on a network error', async () => {
       const fetchFn = jasmine.createSpy('fetch').and.rejectWith(new Error('network down'));
       const file = await writeBodyFile('the body');
-      const githubIssue = new GithubIssue({ ...stubDeps(), fetchFn });
+      const githubIssue = new GithubIssue(undefined, { ...stubDeps(), fetchFn });
 
       await expectAsync(githubIssue.create(repoPath, 'title', file)).toBeRejectedWithError(
         'Error: could not create issue on darthjee/arcanum'
@@ -333,11 +334,100 @@ describe('GithubIssue', () => {
         }
       };
       const file = await writeBodyFile('the body');
-      const githubIssue = new GithubIssue({ ...stubDeps({ githubToken }), fetchFn: jasmine.createSpy('fetch') });
+      const githubIssue = new GithubIssue(undefined, { ...stubDeps({ githubToken }), fetchFn: jasmine.createSpy('fetch') });
 
       await expectAsync(githubIssue.create(repoPath, 'title', file)).toBeRejectedWithError(
         'Error: could not obtain GitHub token via gh auth token'
       );
+    });
+  });
+
+  describe('context-injected (CLI flag-on) path', () => {
+    // On this path `Dispatcher.commandArgs()` has already stripped the
+    // leading `repoPath` positional, so the entry methods are invoked
+    // with the remaining args only — `create(title, file)` / `info()` —
+    // and resolve `repoPath` from the injected `RepoContext`.
+    /**
+     * @param {string} content - the body file's raw content.
+     * @returns {Promise<string>} the created body file's absolute path.
+     */
+    async function writeBodyFile(content) {
+      const filePath = path.join(repoPath, 'body.md');
+      await writeFile(filePath, content);
+
+      return filePath;
+    }
+
+    describe('#create', () => {
+      it('resolves repoPath from the injected RepoContext and shifts the passed positionals', async () => {
+        const payload = await loadFixture('github_issue_create_success.json');
+        const fetchFn = jasmine.createSpy('fetch').and.resolveTo({ ok: true, json: async () => payload });
+        const file = await writeBodyFile('the body');
+        const deps = stubDeps();
+        const githubIssue = new GithubIssue(new RepoContext({ repoPath }), { ...deps, fetchFn });
+
+        const result = await githubIssue.create('New feature: dark mode', file);
+
+        expect(deps.repoPath.validate).toHaveBeenCalledWith(repoPath);
+        expect(result).toEqual(
+          'ID=42\nTITLE=New feature: dark mode\nFILE=docs/agents/issues/42-new-feature-dark-mode.md\n' +
+            'DOMAIN=github.com\nREPO=darthjee/arcanum\n'
+        );
+        expect(fetchFn).toHaveBeenCalledWith('https://api.github.com/repos/darthjee/arcanum/issues', {
+          method: 'POST',
+          headers: {
+            Authorization: 'Bearer fake-token',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ title: 'New feature: dark mode', body: 'the body' }),
+          signal: jasmine.any(AbortSignal)
+        });
+
+        const written = await readFile(path.join(repoPath, 'docs/agents/issues/42-new-feature-dark-mode.md'), 'utf8');
+        expect(written).toEqual('the body\n');
+      });
+
+      it('propagates repoPath.validate rejection and makes no network call', async () => {
+        const repoPathDep = {
+          validate: jasmine.createSpy('validate').and.rejectWith(new Error(`Error: not a directory: ${repoPath}`))
+        };
+        const fetchFn = jasmine.createSpy('fetch');
+        const origin = { resolve: jasmine.createSpy('resolve') };
+        const githubIssue = new GithubIssue(new RepoContext({ repoPath }), {
+          ...stubDeps({ repoPath: repoPathDep, origin }),
+          fetchFn
+        });
+
+        await expectAsync(githubIssue.create('title', 'missing.md')).toBeRejectedWithError(
+          `Error: not a directory: ${repoPath}`
+        );
+
+        expect(fetchFn).not.toHaveBeenCalled();
+        expect(origin.resolve).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('#info', () => {
+      it('resolves repoPath from the injected RepoContext when called with no argument', async () => {
+        const origin = {
+          resolve: jasmine.createSpy('resolve').and.resolveTo({ domain: 'github.com', repo: 'darthjee/arcanum' })
+        };
+        const githubIssue = new GithubIssue(new RepoContext({ repoPath }), stubDeps({ origin }));
+
+        const result = await githubIssue.info();
+
+        expect(origin.resolve).toHaveBeenCalledWith(repoPath);
+        expect(result).toEqual('DOMAIN=github.com\nREPO=darthjee/arcanum\n');
+      });
+
+      it('does not validate repoPath', async () => {
+        const deps = stubDeps();
+        const githubIssue = new GithubIssue(new RepoContext({ repoPath }), deps);
+
+        await githubIssue.info();
+
+        expect(deps.repoPath.validate).not.toHaveBeenCalled();
+      });
     });
   });
 });

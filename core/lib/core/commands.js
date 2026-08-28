@@ -138,8 +138,16 @@ export const COMMANDS = {
     takesRepoContext: true,
     log: false
   },
-  'github-issue-create': { module: 'commands/GithubIssue.js', method: 'create' },
-  'github-issue-info': { module: 'commands/GithubIssue.js', method: 'info' },
+  'github-issue-create': {
+    module: 'commands/GithubIssue.js',
+    method: 'create',
+    takesRepoContext: true
+  },
+  'github-issue-info': {
+    module: 'commands/GithubIssue.js',
+    method: 'info',
+    takesRepoContext: true
+  },
   'issue-state': { module: 'commands/IssueState.js', method: 'run' },
   'list-agents': { module: 'commands/ListAgents.js', method: 'run' },
   'permission-grant': { module: 'commands/PermissionGrant.js', method: 'run' },

@@ -30,6 +30,8 @@ describe('COMMANDS', () => {
       'auto-fix-all-wait-ci',
       'auto-fix-all-wait-ci-and-merge',
       'dispatch-fixture-repo-context',
+      'github-issue-create',
+      'github-issue-info',
       'spawn-issue'
     ]);
   });
