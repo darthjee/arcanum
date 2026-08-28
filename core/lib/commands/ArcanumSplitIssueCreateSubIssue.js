@@ -20,8 +20,9 @@ const SUB_ISSUES_FIELD = 'sub-issues';
  */
 class ArcanumSplitIssueCreateSubIssue {
   /**
-   * @param {RepoContext} repoContext - the target repo's context
-   *   (provides `repoPath` and `appendIssueState`).
+   * @param {import('../context/RepoContext.js').default} repoContext -
+   *   the target repo's context (provides `repoPath` and
+   *   `appendIssueState`).
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {SpawnIssue} [deps.spawnIssue] - issue-creation/linking helper.
    * @param {Function} [deps.readFile] - `node:fs/promises`'s `readFile`.

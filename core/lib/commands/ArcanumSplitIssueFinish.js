@@ -20,8 +20,8 @@ const ISSUES_DIR = 'docs/agents/issues';
  */
 class ArcanumSplitIssueFinish {
   /**
-   * @param {RepoContext} repoContext - the target repo's context
-   *   (provides `repoPath`).
+   * @param {import('../context/RepoContext.js').default} repoContext -
+   *   the target repo's context (provides `repoPath`).
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Function} [deps.execFileAsync] - promisified `execFile`.
    * @param {SafeBranch} [deps.safeBranch] - safe-branch checkout helper.

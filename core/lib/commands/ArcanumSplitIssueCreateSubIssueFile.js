@@ -14,8 +14,8 @@ const ISSUES_DIR = 'docs/agents/issues';
  */
 class ArcanumSplitIssueCreateSubIssueFile {
   /**
-   * @param {RepoContext} repoContext - the target repo's context
-   *   (provides `repoPath`).
+   * @param {import('../context/RepoContext.js').default} repoContext -
+   *   the target repo's context (provides `repoPath`).
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Function} [deps.readdir] - `node:fs/promises`'s `readdir`.
    * @param {Function} [deps.mkdir] - `node:fs/promises`'s `mkdir`.
