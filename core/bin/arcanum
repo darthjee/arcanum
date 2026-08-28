@@ -4,138 +4,33 @@
 // entrypoints — see docs/agents/architecture/script-engine.md.
 //
 // `arcanum/_lib/engine_dispatch.sh` invokes this file as plain argv:
-// `core/bin/arcanum <command> <args...>`. This router takes the first
-// argument as the command name, looks it up in the COMMANDS registry
-// below, and dispatches to the matching module under `core/lib/`,
-// passing the remaining arguments through. Real migrated entrypoints are
-// wired into COMMANDS incrementally, one command at a time — starting
-// with `resolve-and-fetch` (issue #193), alongside the
-// `dispatch-fixture`/`dispatch-fixture-crash` proof commands from #192.
+// `core/bin/arcanum <command> <args...>`. This entrypoint parses the
+// first argument as the command name and delegates everything else to
+// `core/lib/core/dispatcher.js`, which owns the command registry lookup
+// (registry lives in `core/lib/core/commands.js`), invocation logging,
+// and module resolution/invocation. All this entrypoint does is: parse
+// argv, run the Dispatcher, print a string result, and enforce the
+// error/exit-code contract.
 
-import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import Dispatcher from '../lib/core/dispatcher.js';
 import DispatchFailure from '../lib/utils/errors/DispatchFailure.js';
-import InvocationLog from '../lib/utils/logging/InvocationLog.js';
-
-const libDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'lib');
-// Two levels up from core/bin, mirroring how engine_dispatch.sh itself
-// resolves core/bin/arcanum's path in the other direction.
-const configChainPath = path.join(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..',
-  '..',
-  'arcanum',
-  '_lib',
-  'config_chain.sh'
-);
-
-/**
- * Registry mapping each supported command name to the `core/lib/`
- * module and method that implements it. Keeping this table as the
- * single source of truth is what lets this router stay generic: adding
- * a migrated entrypoint only ever means adding one entry here.
- * @type {object}
- */
-const COMMANDS = {
-  'arcanum-split-issue-create-sub-issue': {
-    module: 'commands/ArcanumSplitIssueCreateSubIssue.js',
-    method: 'run'
-  },
-  'arcanum-split-issue-create-sub-issue-file': {
-    module: 'commands/ArcanumSplitIssueCreateSubIssueFile.js',
-    method: 'run'
-  },
-  'arcanum-split-issue-finish': { module: 'commands/ArcanumSplitIssueFinish.js', method: 'run' },
-  'arcanum-split-issue-push-sub-issues': {
-    module: 'commands/ArcanumSplitIssuePushSubIssues.js',
-    method: 'run'
-  },
-  'arcanum-update-run-update-check': { module: 'commands/ArcanumUpdateRunUpdate.js', method: 'check' },
-  'arcanum-update-run-update-apply': { module: 'commands/ArcanumUpdateRunUpdate.js', method: 'apply' },
-  'auto-fix-all-checkout-from-main': { module: 'commands/AutoFixAllCheckoutFromMain.js', method: 'run' },
-  'auto-fix-all-cleanup-artifacts': { module: 'commands/AutoFixAllCleanupArtifacts.js', method: 'run' },
-  'auto-fix-all-config-get': { module: 'commands/AutoFixAllConfig.js', method: 'get' },
-  'auto-fix-all-config-is-enabled': { module: 'commands/AutoFixAllConfig.js', method: 'isEnabled' },
-  'auto-fix-all-config-set': { module: 'commands/AutoFixAllConfig.js', method: 'set' },
-  'auto-fix-all-config-toggle': { module: 'commands/AutoFixAllConfig.js', method: 'toggle' },
-  'auto-fix-all-github-add-tag': { module: 'commands/AutoFixAllGithub.js', method: 'addTag' },
-  'auto-fix-all-github-cleanup-branch': { module: 'commands/AutoFixAllGithub.js', method: 'cleanupBranch' },
-  'auto-fix-all-github-has-shipit-label': { module: 'commands/AutoFixAllGithub.js', method: 'hasShipitLabel' },
-  'auto-fix-all-github-pr-merge': { module: 'commands/AutoFixAllGithub.js', method: 'prMerge' },
-  'auto-fix-all-github-pr-number': { module: 'commands/AutoFixAllGithub.js', method: 'prNumber' },
-  'auto-fix-all-github-pr-state': { module: 'commands/AutoFixAllGithub.js', method: 'prState' },
-  'auto-fix-all-github-remove-tag': { module: 'commands/AutoFixAllGithub.js', method: 'removeTag' },
-  'auto-fix-all-queue-empty': { module: 'commands/AutoFixAllQueue.js', method: 'empty' },
-  'auto-fix-all-queue-list': { module: 'commands/AutoFixAllQueue.js', method: 'list' },
-  'auto-fix-all-queue-next': { module: 'commands/AutoFixAllQueue.js', method: 'next' },
-  'auto-fix-all-queue-pop': { module: 'commands/AutoFixAllQueue.js', method: 'pop' },
-  'auto-fix-all-queue-push': { module: 'commands/AutoFixAllQueue.js', method: 'push' },
-  'auto-fix-all-queue-save': { module: 'commands/AutoFixAllQueue.js', method: 'save' },
-  'auto-fix-all-queue-wait-next': { module: 'commands/AutoFixAllQueue.js', method: 'waitNext' },
-  'auto-fix-all-reply-comment': { module: 'commands/AutoFixAllReplyComment.js', method: 'run' },
-  'auto-fix-all-wait-ci': { module: 'commands/AutoFixAllWaitCi.js', method: 'run' },
-  'auto-fix-all-wait-ci-and-merge': { module: 'commands/AutoFixAllWaitCiAndMerge.js', method: 'run' },
-  'checkout-safe-branch': { module: 'commands/SafeBranch.js', method: 'run' },
-  'dispatch-fixture': { module: 'commands/DispatchFixture.js', method: 'run', log: false },
-  // dispatch-fixture-crash is deliberately left logged (entry.log
-  // !== false, the default) — it exists specifically to prove that
-  // InvocationLog#record runs and is awaited before the command's own
-  // (crashing) module is invoked, so logging survives a crash. See
-  // docs/agents/plans/244-add-logs-to-native-nodejs-calls/node.md.
-  'dispatch-fixture-crash': { module: 'commands/DispatchFixture.js', method: 'crash' },
-  'github-issue-create': { module: 'commands/GithubIssue.js', method: 'create' },
-  'github-issue-info': { module: 'commands/GithubIssue.js', method: 'info' },
-  'issue-state': { module: 'commands/IssueState.js', method: 'run' },
-  'list-agents': { module: 'commands/ListAgents.js', method: 'run' },
-  'permission-grant': { module: 'commands/PermissionGrant.js', method: 'run' },
-  'resolve-and-fetch': { module: 'commands/ResolveAndFetch.js', method: 'run' },
-  'resolve-id-and-file': { module: 'commands/ResolveIdAndFile.js', method: 'run' },
-  'resolve-plan-paths': { module: 'commands/ResolvePlanPaths.js', method: 'run' },
-  'spawn-issue': { module: 'commands/SpawnIssue.js', method: 'run' }
-};
-
-/**
- * Dispatch a single CLI invocation to its matching `core/lib/` module.
- * @param {string} command - the command name, e.g. `dispatch-fixture`.
- * @param {string[]} args - the command's own remaining arguments.
- * @returns {Promise<void>} resolves once the command has run.
- */
-async function dispatch(command, args) {
-  const entry = COMMANDS[command];
-
-  if (!entry) {
-    throw new Error(`unknown command '${command}'`);
-  }
-
-  if (entry.log !== false) {
-    await new InvocationLog({ configChainPath }).record(command);
-  }
-
-  const modulePath = pathToFileURL(path.join(libDir, entry.module)).href;
-  const { default: ModuleClass } = await import(modulePath);
-  let output = new ModuleClass()[entry.method](...args);
-
-  // Migrated entrypoints (e.g. resolve-and-fetch) are async — await
-  // their result before deciding whether to print it. dispatch-fixture's
-  // synchronous methods pass straight through unaffected.
-  if (output && typeof output.then === 'function') {
-    output = await output;
-  }
-
-  if (typeof output === 'string') {
-    process.stdout.write(output);
-  }
-}
 
 const [command, ...args] = process.argv.slice(2);
 
-dispatch(command, args).catch((error) => {
-  if (error instanceof DispatchFailure) {
-    process.stdout.write(error.stdout);
-    process.exitCode = error.exitCode ?? 1;
-    return;
-  }
+new Dispatcher(command, args)
+  .dispatch()
+  .then((output) => {
+    if (typeof output === 'string') {
+      process.stdout.write(output);
+    }
+  })
+  .catch((error) => {
+    if (error instanceof DispatchFailure) {
+      process.stdout.write(error.stdout);
+      process.exitCode = error.exitCode ?? 1;
+      return;
+    }
 
-  process.stderr.write(`arcanum: ${error.message}\n`);
-  process.exitCode = 1;
-});
+    process.stderr.write(`arcanum: ${error.message}\n`);
+    process.exitCode = 1;
+  });
