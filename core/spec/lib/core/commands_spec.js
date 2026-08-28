@@ -34,6 +34,8 @@ describe('COMMANDS', () => {
       'github-issue-create',
       'github-issue-info',
       'resolve-and-fetch',
+      'resolve-id-and-file',
+      'resolve-plan-paths',
       'spawn-issue'
     ]);
   });

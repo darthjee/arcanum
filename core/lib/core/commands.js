@@ -160,7 +160,15 @@ export const COMMANDS = {
     method: 'run',
     takesRepoContext: true
   },
-  'resolve-id-and-file': { module: 'commands/ResolveIdAndFile.js', method: 'run' },
-  'resolve-plan-paths': { module: 'commands/ResolvePlanPaths.js', method: 'run' },
+  'resolve-id-and-file': {
+    module: 'commands/ResolveIdAndFile.js',
+    method: 'run',
+    takesRepoContext: true
+  },
+  'resolve-plan-paths': {
+    module: 'commands/ResolvePlanPaths.js',
+    method: 'run',
+    takesRepoContext: true
+  },
   'spawn-issue': { module: 'commands/SpawnIssue.js', method: 'run', takesRepoContext: true }
 };

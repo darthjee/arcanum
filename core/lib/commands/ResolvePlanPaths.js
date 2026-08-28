@@ -14,13 +14,20 @@ const NUMERIC_ID_PATTERN = /^[0-9]+$/;
  */
 class ResolvePlanPaths {
   /**
+   * @param {import('../context/RepoContext.js').default} repoContext -
+   *   the target repo's context (provides `repoPath`).
+   */
+  constructor(repoContext) {
+    this._repoContext = repoContext;
+  }
+
+  /**
    * Resolve the issue file and plan dir/file for a given issue id,
    * creating the plan dir as a side effect. Always resolves to an
    * `ISSUE_FILE=`/`PLAN_DIR=`/`PLAN_FILE=`/`PLAN_EXISTS=` stdout
    * string, exiting 0 — the exceptions are a non-numeric id or no
    * matching issue file, both of which throw (propagated uncaught,
    * same hard-failure class as `ResolveIdAndFile#run`).
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} issuesFolder - the local issues folder to search
    *   for an existing `<id>_*`/`<id>-*` file, relative to `repoPath`.
    * @param {string} plansFolder - the local plans folder under which
@@ -28,7 +35,9 @@ class ResolvePlanPaths {
    * @param {string} id - the issue id.
    * @returns {Promise<string>} the `ISSUE_FILE=.../PLAN_EXISTS=...` output.
    */
-  async run(repoPath, issuesFolder, plansFolder, id) {
+  async run(issuesFolder, plansFolder, id) {
+    const { repoPath } = this._repoContext;
+
     if (!NUMERIC_ID_PATTERN.test(id)) {
       throw new Error(
         `Error: issue id must be numeric and linked to a GitHub issue (got '${id}'). Local-only ids are no longer supported.`

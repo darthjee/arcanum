@@ -13,6 +13,14 @@ const NUMERIC_ID_PATTERN = /^[0-9]+$/;
  */
 class ResolveIdAndFile {
   /**
+   * @param {import('../context/RepoContext.js').default} repoContext -
+   *   the target repo's context (provides `repoPath`).
+   */
+  constructor(repoContext) {
+    this._repoContext = repoContext;
+  }
+
+  /**
    * Resolve an issue id/title/filename from a skill's raw `#<id>
    * [title]` argument string plus the local issues folder. Always
    * resolves to a `SCENARIO=`/`STATUS=` stdout string, exiting 0 — the
@@ -20,13 +28,13 @@ class ResolveIdAndFile {
    * (propagated uncaught, same hard-failure class as
    * `checkout_safe_branch.sh`'s dirty-tree failure: no `SCENARIO=`
    * line, non-zero exit).
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} issuesFolder - the local issues folder to search
    *   for an existing `<id>_*`/`<id>-*` file, relative to `repoPath`.
    * @param {string} [argString] - the raw skill argument string.
    * @returns {Promise<string>} the `SCENARIO=.../STATUS=...` output.
    */
-  async run(repoPath, issuesFolder, argString = '') {
+  async run(issuesFolder, argString = '') {
+    const { repoPath } = this._repoContext;
     const { scenario, id, title } = this._parse(argString);
 
     if (id && !NUMERIC_ID_PATTERN.test(id)) {
