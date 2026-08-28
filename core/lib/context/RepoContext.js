@@ -78,6 +78,17 @@ class RepoContext {
   }
 
   /**
+   * @param {string} id - the numeric issue id.
+   * @param {string} field - the state field's name.
+   * @param {string} jsonValue - the raw JSON text to parse and append.
+   * @returns {Promise<void>} resolves once the state file is written —
+   *   see `IssueStateService#appendJson`.
+   */
+  async appendIssueState(id, field, jsonValue) {
+    return this._issueStateService.appendJson(id, field, jsonValue);
+  }
+
+  /**
    * @param {string} scope - the top-level config namespace.
    * @param {string} key - the config key to read.
    * @returns {Promise<*>} `this.repoPath`'s resolved config value — see
