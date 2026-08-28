@@ -1,15 +1,8 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import RepoContext from '../context/RepoContext.js';
-import IssueStateService from '../services/IssueStateService.js';
 import DispatchFailure from '../utils/errors/DispatchFailure.js';
-import IssueStatePaths from '../utils/file/IssueStatePaths.js';
-import Lock from '../utils/file/Lock.js';
 import RepoPath from '../utils/file/RepoPath.js';
-import JsonParser from '../utils/json/JsonParser.js';
-import JsonReader from '../utils/json/JsonReader.js';
-import JsonValueFormatter from '../utils/json/JsonValueFormatter.js';
 import SpawnIssue from './SpawnIssue.js';
 
 const USAGE = 'Usage: create_sub_issue.sh <repo_path> <issue_id> <sub_issue_file>';
@@ -27,48 +20,33 @@ const SUB_ISSUES_FIELD = 'sub-issues';
  */
 class ArcanumSplitIssueCreateSubIssue {
   /**
+   * @param {import('../context/RepoContext.js').default} repoContext -
+   *   the target repo's context (provides `repoPath` and
+   *   `appendIssueState`).
    * @param {object} [deps] - injectable collaborators, for testing.
-   * @param {RepoPath} [deps.repoPath] - repo-path validation helper.
    * @param {SpawnIssue} [deps.spawnIssue] - issue-creation/linking helper.
    * @param {Function} [deps.readFile] - `node:fs/promises`'s `readFile`.
    * @param {Function} [deps.writeFile] - `node:fs/promises`'s `writeFile`.
    * @param {Function} [deps.mkdtemp] - `node:fs/promises`'s `mkdtemp`.
    * @param {Function} [deps.rm] - `node:fs/promises`'s `rm`.
-   * @param {Lock} [deps.lock] - forwarded to each per-call
-   *   `IssueStateService`.
-   * @param {JsonParser} [deps.jsonParser] - forwarded to each per-call
-   *   `IssueStateService`.
-   * @param {JsonValueFormatter} [deps.jsonValueFormatter] - forwarded
-   *   to each per-call `IssueStateService`.
-   * @param {JsonReader} [deps.jsonReader] - forwarded to each per-call
-   *   `IssueStateService`.
-   * @param {IssueStatePaths} [deps.issueStatePaths] - forwarded to each
-   *   per-call `IssueStateService`.
+   * @param {RepoPath} [deps.repoPathValidator] - repo-path validation
+   *   helper.
    */
-  constructor({
-    repoPath = new RepoPath(),
+  constructor(repoContext, {
     spawnIssue = new SpawnIssue(),
     readFile: readFileFn = readFile,
     writeFile: writeFileFn = writeFile,
     mkdtemp: mkdtempFn = mkdtemp,
     rm: rmFn = rm,
-    lock = new Lock(),
-    jsonParser = new JsonParser(),
-    jsonValueFormatter = new JsonValueFormatter(),
-    jsonReader = new JsonReader(),
-    issueStatePaths = new IssueStatePaths()
+    repoPathValidator = new RepoPath()
   } = {}) {
-    this._repoPath = repoPath;
+    this._repoContext = repoContext;
     this._spawnIssue = spawnIssue;
     this._readFile = readFileFn;
     this._writeFile = writeFileFn;
     this._mkdtemp = mkdtempFn;
     this._rm = rmFn;
-    this._lock = lock;
-    this._jsonParser = jsonParser;
-    this._jsonValueFormatter = jsonValueFormatter;
-    this._jsonReader = jsonReader;
-    this._issueStatePaths = issueStatePaths;
+    this._repoPathValidator = repoPathValidator;
   }
 
   /**
@@ -82,8 +60,9 @@ class ArcanumSplitIssueCreateSubIssue {
    * `--as-subissue`, tracks the new id in per-issue state, and returns
    * `STATUS=ok\nID=<new_id>\n` (prefixed with the progress line). On
    * `SpawnIssue#run`'s `DispatchFailure`, re-throws it as this module's
-   * own `DispatchFailure`, prefixed with the same progress line.
-   * @param {string} repoPath - the target repo's local checkout path.
+   * own `DispatchFailure`, prefixed with the same progress line. The new
+   * id is tracked in per-issue state via
+   * `RepoContext#appendIssueState`.
    * @param {string} issueId - the parent issue's numeric id.
    * @param {string} subIssueFile - path (absolute, or relative to
    *   `repoPath`) to the sub-issue draft file.
@@ -96,14 +75,14 @@ class ArcanumSplitIssueCreateSubIssue {
    *   `echo "$SPAWN_OUTPUT"; echo "STATUS=failed"` — `STATUS=failed`
    *   legitimately appears twice).
    */
-  async run(repoPath, issueId, subIssueFile) {
-    if (!repoPath || !issueId || !subIssueFile) {
+  async run(issueId, subIssueFile) {
+    if (!this._repoContext.repoPath || !issueId || !subIssueFile) {
       throw new Error(USAGE);
     }
 
-    await this._repoPath.validate(repoPath);
+    await this._repoPathValidator.validate(this._repoContext.repoPath);
 
-    const resolvedFile = path.resolve(repoPath, subIssueFile);
+    const resolvedFile = path.resolve(this._repoContext.repoPath, subIssueFile);
     let content;
 
     try {
@@ -122,10 +101,10 @@ class ArcanumSplitIssueCreateSubIssue {
     try {
       await this._writeFile(tmpBodyFile, `${body}\n`);
 
-      const spawnOutput = await this._spawn(repoPath, issueId, title, tmpBodyFile, progressLine);
+      const spawnOutput = await this._spawn(issueId, title, tmpBodyFile, progressLine);
       const newId = this._extractField(spawnOutput, 'ID');
 
-      await this._issueStateService(repoPath).appendJson(issueId, SUB_ISSUES_FIELD, JSON.stringify(newId));
+      await this._repoContext.appendIssueState(issueId, SUB_ISSUES_FIELD, JSON.stringify(newId));
 
       return `${progressLine}STATUS=ok\nID=${newId}\n`;
     } finally {
@@ -143,7 +122,6 @@ class ArcanumSplitIssueCreateSubIssue {
    * script's own additional `STATUS=failed` line is appended on top —
    * i.e. `STATUS=failed` legitimately appears twice in the resulting
    * stdout, not once (verified against the real shell script's output).
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} issueId - the parent issue's numeric id.
    * @param {string} title - the sub-issue's title.
    * @param {string} bodyFile - the scratch file holding the parsed body.
@@ -154,9 +132,9 @@ class ArcanumSplitIssueCreateSubIssue {
    *   `SpawnIssue#run`'s own `STATUS=failed\n` stdout followed by this
    *   module's own extra `STATUS=failed\n` line.
    */
-  async _spawn(repoPath, issueId, title, bodyFile, progressLine) {
+  async _spawn(issueId, title, bodyFile, progressLine) {
     try {
-      return await this._spawnIssue.run(repoPath, issueId, title, bodyFile, AS_SUBISSUE_FLAG);
+      return await this._spawnIssue.run(this._repoContext.repoPath, issueId, title, bodyFile, AS_SUBISSUE_FLAG);
     } catch (error) {
       if (error instanceof DispatchFailure) {
         throw new DispatchFailure(`${progressLine}${error.stdout}STATUS=failed\n`, error.exitCode);
@@ -226,26 +204,6 @@ class ArcanumSplitIssueCreateSubIssue {
     }
 
     return countSegment || '?';
-  }
-
-  /**
-   * Build a per-call `IssueStateService`, wrapping `repoPath` into a
-   * fresh `RepoContext` — mirroring `IssueState.js`'s
-   * `_issueStateService(repoPath)` helper.
-   * @param {string} repoPath - the target repo's local checkout path.
-   * @returns {IssueStateService} the per-call `IssueStateService`.
-   */
-  _issueStateService(repoPath) {
-    const context = new RepoContext({ repoPath });
-
-    return new IssueStateService({
-      context,
-      lock: this._lock,
-      jsonParser: this._jsonParser,
-      jsonValueFormatter: this._jsonValueFormatter,
-      jsonReader: this._jsonReader,
-      issueStatePaths: this._issueStatePaths
-    });
   }
 
   /**

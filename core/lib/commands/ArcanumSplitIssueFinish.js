@@ -20,25 +20,29 @@ const ISSUES_DIR = 'docs/agents/issues';
  */
 class ArcanumSplitIssueFinish {
   /**
+   * @param {import('../context/RepoContext.js').default} repoContext -
+   *   the target repo's context (provides `repoPath`).
    * @param {object} [deps] - injectable collaborators, for testing.
-   * @param {RepoPath} [deps.repoPath] - repo-path validation helper.
    * @param {Function} [deps.execFileAsync] - promisified `execFile`.
    * @param {SafeBranch} [deps.safeBranch] - safe-branch checkout helper.
    * @param {Function} [deps.readdir] - `node:fs/promises`'s `readdir`.
    * @param {Function} [deps.unlink] - `node:fs/promises`'s `unlink`.
+   * @param {RepoPath} [deps.repoPathValidator] - repo-path validation
+   *   helper.
    */
-  constructor({
-    repoPath = new RepoPath(),
+  constructor(repoContext, {
     execFileAsync = defaultExecFileAsync,
     safeBranch = new SafeBranch(),
     readdir: readdirFn = readdir,
-    unlink: unlinkFn = unlink
+    unlink: unlinkFn = unlink,
+    repoPathValidator = new RepoPath()
   } = {}) {
-    this._repoPath = repoPath;
+    this._repoContext = repoContext;
     this._execFileAsync = execFileAsync;
     this._safeBranch = safeBranch;
     this._readdir = readdirFn;
     this._unlink = unlinkFn;
+    this._repoPathValidator = repoPathValidator;
   }
 
   /**
@@ -53,27 +57,26 @@ class ArcanumSplitIssueFinish {
    * pipefail`), deletes the local `docs/agents/issues/` working files
    * whose name starts with `<issueId>-` or `<issueId>_`, and finally
    * releases the working tree back to the configured safe branch.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} issueId - the parent issue's numeric id.
    * @returns {Promise<string>} the `Deleted:\n  <path>\n...\n` (or
    *   `Deleted: (nothing to clean up)\n`) block followed by
    *   `BRANCH=<branch>\n`.
    */
-  async run(repoPath, issueId) {
-    if (!repoPath || !issueId) {
+  async run(issueId) {
+    if (!this._repoContext.repoPath || !issueId) {
       throw new Error(USAGE);
     }
 
-    await this._repoPath.validate(repoPath);
+    await this._repoPathValidator.validate(this._repoContext.repoPath);
 
     await this._execFileAsync(
-      path.join(repoPath, 'arcanum-split-issue', 'scripts', 'github.sh'),
-      ['mark-split', repoPath, issueId]
+      path.join(this._repoContext.repoPath, 'arcanum-split-issue', 'scripts', 'github.sh'),
+      ['mark-split', this._repoContext.repoPath, issueId]
     );
 
-    const deletedBlock = await this._deleteWorkingFiles(repoPath, issueId);
+    const deletedBlock = await this._deleteWorkingFiles(issueId);
 
-    const branch = await this._safeBranch.checkout(repoPath);
+    const branch = await this._safeBranch.checkout(this._repoContext.repoPath);
 
     return `${deletedBlock}BRANCH=${branch}\n`;
   }
@@ -84,12 +87,12 @@ class ArcanumSplitIssueFinish {
    * — mirroring `finish_shell.sh`'s two separate `for` loops (and their
    * `nullglob`-driven silent no-op when the directory itself is
    * missing) exactly, including the two-pass ordering.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} issueId - the parent issue's numeric id.
    * @returns {Promise<string>} the `Deleted:\n  <path>\n...\n` block, or
    *   `Deleted: (nothing to clean up)\n` when nothing matched.
    */
-  async _deleteWorkingFiles(repoPath, issueId) {
+  async _deleteWorkingFiles(issueId) {
+    const repoPath = this._repoContext.repoPath;
     let entries;
 
     try {

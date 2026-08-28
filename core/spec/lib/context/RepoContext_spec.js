@@ -8,7 +8,7 @@ describe('RepoContext', () => {
       repoPath: REPO_PATH,
       origin: { resolveWithRef: jasmine.createSpy(), resolve: jasmine.createSpy() },
       githubToken: { get: jasmine.createSpy() },
-      issueStateService: { get: jasmine.createSpy() },
+      issueStateService: { get: jasmine.createSpy(), appendJson: jasmine.createSpy() },
       configChain: { read: jasmine.createSpy() },
       githubIssue: { create: jasmine.createSpy() },
       ...overrides
@@ -60,6 +60,18 @@ describe('RepoContext', () => {
 
       expect(get).toHaveBeenCalledWith('5', 'pr_id');
       expect(result).toEqual('99');
+    });
+  });
+
+  describe('#appendIssueState', () => {
+    it('delegates to issueStateService.appendJson with id, field, and jsonValue', async () => {
+      const appendJson = jasmine.createSpy().and.resolveTo(undefined);
+      const context = newContext({ issueStateService: { appendJson } });
+
+      const result = await context.appendIssueState('5', 'sub_issues', '"7"');
+
+      expect(appendJson).toHaveBeenCalledWith('5', 'sub_issues', '"7"');
+      expect(result).toBeUndefined();
     });
   });
 

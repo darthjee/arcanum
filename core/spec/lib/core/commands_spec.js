@@ -9,10 +9,16 @@ describe('COMMANDS', () => {
     expect(COMMANDS['dispatch-fixture'].log).toBe(false);
   });
 
-  it('only sets takesRepoContext on the dispatch-fixture-repo-context test entry', () => {
+  it('sets takesRepoContext on the migrated arcanum-split-issue entries and the test fixture', () => {
     const withFlag = Object.keys(COMMANDS).filter((name) => COMMANDS[name].takesRepoContext);
 
-    expect(withFlag).toEqual(['dispatch-fixture-repo-context']);
+    expect(withFlag).toEqual([
+      'arcanum-split-issue-create-sub-issue',
+      'arcanum-split-issue-create-sub-issue-file',
+      'arcanum-split-issue-finish',
+      'arcanum-split-issue-push-sub-issues',
+      'dispatch-fixture-repo-context'
+    ]);
   });
 
   it('gives every entry a module path and a method', () => {

@@ -19,7 +19,7 @@ import RepoContext from '../../../lib/context/RepoContext.js';
 export function createRepoContextMock({ repoPath = '/fake/repo', ...overrides } = {}) {
   const origin = { resolveWithRef: jasmine.createSpy(), resolve: jasmine.createSpy(), ...overrides.origin };
   const githubToken = { get: jasmine.createSpy(), ...overrides.githubToken };
-  const issueStateService = { get: jasmine.createSpy(), ...overrides.issueStateService };
+  const issueStateService = { get: jasmine.createSpy(), appendJson: jasmine.createSpy(), ...overrides.issueStateService };
   const configChain = { read: jasmine.createSpy(), ...overrides.configChain };
   const githubIssue = { create: jasmine.createSpy(), ...overrides.githubIssue };
 

@@ -26,16 +26,23 @@
 export const COMMANDS = {
   'arcanum-split-issue-create-sub-issue': {
     module: 'commands/ArcanumSplitIssueCreateSubIssue.js',
-    method: 'run'
+    method: 'run',
+    takesRepoContext: true
   },
   'arcanum-split-issue-create-sub-issue-file': {
     module: 'commands/ArcanumSplitIssueCreateSubIssueFile.js',
-    method: 'run'
+    method: 'run',
+    takesRepoContext: true
   },
-  'arcanum-split-issue-finish': { module: 'commands/ArcanumSplitIssueFinish.js', method: 'run' },
+  'arcanum-split-issue-finish': {
+    module: 'commands/ArcanumSplitIssueFinish.js',
+    method: 'run',
+    takesRepoContext: true
+  },
   'arcanum-split-issue-push-sub-issues': {
     module: 'commands/ArcanumSplitIssuePushSubIssues.js',
-    method: 'run'
+    method: 'run',
+    takesRepoContext: true
   },
   'arcanum-update-run-update-check': { module: 'commands/ArcanumUpdateRunUpdate.js', method: 'check' },
   'arcanum-update-run-update-apply': { module: 'commands/ArcanumUpdateRunUpdate.js', method: 'apply' },

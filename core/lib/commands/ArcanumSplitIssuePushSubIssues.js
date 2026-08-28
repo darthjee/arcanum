@@ -19,18 +19,22 @@ const ISSUES_DIR = 'docs/agents/issues';
  */
 class ArcanumSplitIssuePushSubIssues {
   /**
+   * @param {import('../context/RepoContext.js').default} repoContext -
+   *   the target repo's context (provides `repoPath`).
    * @param {object} [deps] - injectable collaborators, for testing.
-   * @param {RepoPath} [deps.repoPath] - repo-path validation helper.
+   * @param {RepoPath} [deps.repoPathValidator] - repo-path validation
+   *   helper.
    * @param {ArcanumSplitIssueCreateSubIssue} [deps.createSubIssue] -
    *   per-file sub-issue creation helper.
    * @param {Function} [deps.readdir] - `node:fs/promises`'s `readdir`.
    */
-  constructor({
-    repoPath = new RepoPath(),
-    createSubIssue = new ArcanumSplitIssueCreateSubIssue(),
+  constructor(repoContext, {
+    repoPathValidator = new RepoPath(),
+    createSubIssue = new ArcanumSplitIssueCreateSubIssue(repoContext),
     readdir: readdirFn = readdir
   } = {}) {
-    this._repoPath = repoPath;
+    this._repoContext = repoContext;
+    this._repoPathValidator = repoPathValidator;
     this._createSubIssue = createSubIssue;
     this._readdir = readdirFn;
   }
@@ -46,7 +50,6 @@ class ArcanumSplitIssuePushSubIssues {
    * each call's own stdout entirely (mirroring the shell script's
    * `OUTPUT=$(...)` capture, whose contents never reach this driver's own
    * stdout on either path), stopping at the first failure.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} issueId - the parent issue's numeric id.
    * @returns {Promise<string>} `STATUS=ok\nCREATED=<csv of file:id
    *   pairs, possibly empty>\n` when every file succeeds (or there were
@@ -56,21 +59,21 @@ class ArcanumSplitIssuePushSubIssues {
    *   succeeded so far, possibly empty>\nFAILED=<the file that
    *   failed>\n`.
    */
-  async run(repoPath, issueId) {
-    if (!repoPath || !issueId) {
+  async run(issueId) {
+    if (!this._repoContext.repoPath || !issueId) {
       throw new Error(USAGE);
     }
 
-    await this._repoPath.validate(repoPath);
+    await this._repoPathValidator.validate(this._repoContext.repoPath);
 
-    const files = await this._matchingFiles(repoPath, issueId);
+    const files = await this._matchingFiles(issueId);
     const created = [];
 
     for (const file of files) {
       let output;
 
       try {
-        output = await this._createSubIssue.run(repoPath, issueId, file);
+        output = await this._createSubIssue.run(issueId, file);
       } catch {
         throw new DispatchFailure(
           `STATUS=failed\nCREATED=${created.join(',')}\nFAILED=${file}\n`
@@ -93,12 +96,11 @@ class ArcanumSplitIssuePushSubIssues {
    * `sort` over the same paths. An absent `docs/agents/issues/` directory
    * yields an empty list (mirrors the shell glob's `nullglob` behavior
    * when the directory itself doesn't exist).
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} issueId - the parent issue's numeric id.
    * @returns {Promise<string[]>} the sorted, relative matching file paths.
    */
-  async _matchingFiles(repoPath, issueId) {
-    const issuesDir = path.join(repoPath, ISSUES_DIR);
+  async _matchingFiles(issueId) {
+    const issuesDir = path.join(this._repoContext.repoPath, ISSUES_DIR);
     let entries;
 
     try {
