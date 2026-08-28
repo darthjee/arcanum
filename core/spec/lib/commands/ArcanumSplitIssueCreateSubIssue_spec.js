@@ -110,7 +110,7 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
         let capturedBody;
         const deps = stubDeps({
           spawnIssue: {
-            run: jasmine.createSpy('run').and.callFake(async (rp, id, title, bodyFile) => {
+            run: jasmine.createSpy('run').and.callFake(async (id, title, bodyFile) => {
               capturedBody = await readFile(bodyFile, 'utf8');
 
               return 'STATUS=ok\nID=42\nURL=https://github.com/darthjee/arcanum/issues/42\n';
@@ -122,7 +122,6 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
         await instance.run(ISSUE_ID, subIssueFile);
 
         expect(deps.spawnIssue.run).toHaveBeenCalledWith(
-          repoPath,
           ISSUE_ID,
           'My Sub Issue',
           jasmine.any(String),
@@ -139,7 +138,6 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
         await instance.run(ISSUE_ID, subIssueFile);
 
         expect(deps.spawnIssue.run).toHaveBeenCalledWith(
-          repoPath,
           ISSUE_ID,
           'Plain Title',
           jasmine.any(String),
@@ -182,7 +180,6 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
         const result = await instance.run(ISSUE_ID, subIssueFile);
 
         expect(deps.spawnIssue.run).toHaveBeenCalledWith(
-          repoPath,
           ISSUE_ID,
           'My Sub Issue',
           jasmine.any(String),
@@ -201,7 +198,7 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
 
         await instance.run(ISSUE_ID, subIssueFile);
 
-        const [, , , bodyFile] = deps.spawnIssue.run.calls.mostRecent().args;
+        const [, , bodyFile] = deps.spawnIssue.run.calls.mostRecent().args;
 
         await expectAsync(access(bodyFile)).toBeRejected();
       });
@@ -262,7 +259,7 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
         try {
           await instance.run(ISSUE_ID, subIssueFile);
         } catch {
-          bodyFile = deps.spawnIssue.run.calls.mostRecent().args[3];
+          bodyFile = deps.spawnIssue.run.calls.mostRecent().args[2];
         }
 
         await expectAsync(access(bodyFile)).toBeRejected();

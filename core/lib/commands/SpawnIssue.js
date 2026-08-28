@@ -3,11 +3,8 @@ import { access, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import DispatchFailure from '../utils/errors/DispatchFailure.js';
-import GithubIssue from './GithubIssue.js';
 import IssueLinker from '../utils/issue/IssueLinker.js';
 import LabelApplicator from '../utils/issue/LabelApplicator.js';
-import Origin from '../utils/git/Origin.js';
-import RepoContext from '../context/RepoContext.js';
 import RepoPath from '../utils/file/RepoPath.js';
 
 const defaultExecFileAsync = promisify(execFile);
@@ -41,14 +38,10 @@ function defaultSleep(seconds) {
  */
 class SpawnIssue {
   /**
+   * @param {import('../context/RepoContext.js').default} repoContext -
+   *   the target repo's context (provides `repoPath` plus the
+   *   `resolve`/`readConfig`/`createIssue` wiring `run` reaches).
    * @param {object} [deps] - injectable collaborators, for testing.
-   * @param {RepoPath} [deps.repoPath] - repo-path validation helper.
-   * @param {Origin} [deps.origin] - git-origin resolver, forwarded into
-   *   each per-call `RepoContext`.
-   * @param {GithubIssue} [deps.githubIssue] - GitHub issue create
-   *   helper, forwarded into each per-call `RepoContext`.
-   * @param {object} [deps.configChain] - 3-tier config reader,
-   *   forwarded into each per-call `RepoContext`.
    * @param {Function} [deps.execFileAsync] - promisified `execFile`,
    *   forwarded to the default `labelApplicator`/`issueLinker`.
    * @param {Function} [deps.sleepFn] - retry-loop sleep implementation,
@@ -58,47 +51,26 @@ class SpawnIssue {
    *   parent-label carryover delegate.
    * @param {IssueLinker} [deps.issueLinker] - best-effort
    *   parent/new-issue cross-linking delegate.
+   * @param {RepoPath} [deps.repoPathValidator] - repo-path validation
+   *   helper.
    */
-  constructor({
-    repoPath = new RepoPath(),
-    origin = new Origin(),
-    githubIssue = new GithubIssue(),
-    configChain,
+  constructor(repoContext, {
     execFileAsync = defaultExecFileAsync,
     sleepFn = defaultSleep,
     labelApplicator = new LabelApplicator({ execFileAsync }),
-    issueLinker = new IssueLinker({ execFileAsync })
+    issueLinker = new IssueLinker({ execFileAsync }),
+    repoPathValidator = new RepoPath()
   } = {}) {
-    this._repoPath = repoPath;
-    this._origin = origin;
-    this._githubIssue = githubIssue;
-    this._configChain = configChain;
+    this._repoContext = repoContext;
     this._execFileAsync = execFileAsync;
     this._sleep = sleepFn;
     this._labelApplicator = labelApplicator;
     this._issueLinker = issueLinker;
-  }
-
-  /**
-   * Build a fresh, per-call `RepoContext` wrapping `repoPath` — mirrors
-   * `AutoFixAllGithub#_prOperations`'s per-call context construction,
-   * since `core/bin/arcanum` always builds a zero-arg `new SpawnIssue()`
-   * before `repoPath` is known.
-   * @param {string} repoPath - the target repo's local checkout path.
-   * @returns {RepoContext} the per-call context.
-   */
-  _repoContext(repoPath) {
-    return new RepoContext({
-      repoPath,
-      origin: this._origin,
-      githubIssue: this._githubIssue,
-      configChain: this._configChain
-    });
+    this._repoPathValidator = repoPathValidator;
   }
 
   /**
    * Spawn a brand-new GitHub issue linked back to `parentId`.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} parentId - the parent issue's numeric id.
    * @param {string} title - the new issue's title.
    * @param {string} bodyFile - the local file whose contents become the
@@ -110,7 +82,9 @@ class SpawnIssue {
    * @throws {DispatchFailure} when `create`'s retry budget is exhausted
    *   — carries the `STATUS=failed\n` stdout payload.
    */
-  async run(repoPath, parentId, title, bodyFile, asSubissueFlag) {
+  async run(parentId, title, bodyFile, asSubissueFlag) {
+    const repoPath = this._repoContext.repoPath;
+
     if (!repoPath || !parentId || !title || !bodyFile) {
       throw new Error(USAGE);
     }
@@ -121,13 +95,13 @@ class SpawnIssue {
 
     const asSubissue = asSubissueFlag === AS_SUBISSUE_FLAG;
 
-    await this._repoPath.validate(repoPath);
+    await this._repoPathValidator.validate(repoPath);
 
     if (!(await this._fileExists(bodyFile))) {
       throw new Error(`Error: file not found: ${bodyFile}`);
     }
 
-    const context = this._repoContext(repoPath);
+    const context = this._repoContext;
     const { domain, repo } = await context.resolve();
     const maxRetryCount = this._numberOrDefault(
       await context.readConfig('plan-issues', 'max-retry-count'), DEFAULT_MAX_RETRY_COUNT

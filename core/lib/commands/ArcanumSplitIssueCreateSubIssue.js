@@ -33,7 +33,7 @@ class ArcanumSplitIssueCreateSubIssue {
    *   helper.
    */
   constructor(repoContext, {
-    spawnIssue = new SpawnIssue(),
+    spawnIssue = new SpawnIssue(repoContext),
     readFile: readFileFn = readFile,
     writeFile: writeFileFn = writeFile,
     mkdtemp: mkdtempFn = mkdtemp,
@@ -134,7 +134,7 @@ class ArcanumSplitIssueCreateSubIssue {
    */
   async _spawn(issueId, title, bodyFile, progressLine) {
     try {
-      return await this._spawnIssue.run(this._repoContext.repoPath, issueId, title, bodyFile, AS_SUBISSUE_FLAG);
+      return await this._spawnIssue.run(issueId, title, bodyFile, AS_SUBISSUE_FLAG);
     } catch (error) {
       if (error instanceof DispatchFailure) {
         throw new DispatchFailure(`${progressLine}${error.stdout}STATUS=failed\n`, error.exitCode);
