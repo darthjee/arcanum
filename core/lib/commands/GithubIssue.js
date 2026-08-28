@@ -27,6 +27,13 @@ const ISSUES_DIR = 'docs/agents/issues';
  */
 class GithubIssue {
   /**
+   * @param {import('../context/RepoContext.js').default} [repoContext] -
+   *   the target repo's context, supplied only by the
+   *   `github-issue-create` / `github-issue-info` CLI entrypoints (whose
+   *   leading `repoPath` positional is stripped by
+   *   `Dispatcher.commandArgs()`). Absent when `GithubIssue` is used
+   *   zero-arg as a plain `RepoContext` collaborator, in which case the
+   *   entry methods receive an explicit `repoPath`.
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Origin} [deps.origin] - git-origin resolver.
    * @param {GithubToken} [deps.githubToken] - GitHub token resolver.
@@ -46,7 +53,7 @@ class GithubIssue {
    * @param {IssueStatePaths} [deps.issueStatePaths] - forwarded to each
    *   per-call `IssueStateService`.
    */
-  constructor({
+  constructor(repoContext, {
     origin = new Origin(),
     githubToken = new GithubToken(),
     repoPath = new RepoPath(),
@@ -58,6 +65,7 @@ class GithubIssue {
     jsonReader = new JsonReader(),
     issueStatePaths = new IssueStatePaths()
   } = {}) {
+    this._repoContext = repoContext;
     this._origin = origin;
     this._githubToken = githubToken;
     this._repoPath = repoPath;
@@ -111,10 +119,18 @@ class GithubIssue {
    * `RepoPath#validate` (the shell version only calls `_load_origin`
    * here, whose own not-a-git-repo/no-origin failure is already
    * reproduced by `Origin#resolve`'s existing error message).
-   * @param {string} repoPath - the target repo's local checkout path.
+   * @param {string} [repoPath] - the target repo's local checkout path.
+   *   On the collaborator path this is passed explicitly. On the CLI
+   *   (flag-on) path `Dispatcher.commandArgs()` has already stripped the
+   *   leading positional, so `repoPath` is read from `this._repoContext`
+   *   instead (and `info` receives no argument).
    * @returns {Promise<string>} the `DOMAIN=<domain>\nREPO=<repo>\n` output.
    */
   async info(repoPath) {
+    if (this._repoContext) {
+      repoPath = this._repoContext.repoPath;
+    }
+
     const { domain, repo } = await this._origin.resolve(repoPath);
 
     return `DOMAIN=${domain}\nREPO=${repo}\n`;
@@ -130,13 +146,22 @@ class GithubIssue {
    * returns the fields `cmd_create`'s stdout needs. Does not persist
    * any per-issue state file (no `IssueState#write` call), matching the
    * shell.
-   * @param {string} repoPath - the target repo's local checkout path.
+   * @param {string} [repoPath] - the target repo's local checkout path.
+   *   On the collaborator path (`RepoContext#createIssue`) this is passed
+   *   explicitly. On the CLI (flag-on) path `Dispatcher.commandArgs()`
+   *   has already stripped the leading positional, so `repoPath` is read
+   *   from `this._repoContext` and the received positionals are shifted
+   *   back into `title`/`file`.
    * @param {string} title - the new issue's title.
    * @param {string} file - the local file whose contents become the
    *   issue's body.
    * @returns {Promise<string>} the `ID=...\nTITLE=...\nFILE=...\nDOMAIN=...\nREPO=...\n` output.
    */
   async create(repoPath, title, file) {
+    if (this._repoContext) {
+      [repoPath, title, file] = [this._repoContext.repoPath, repoPath, title];
+    }
+
     await this._repoPath.validate(repoPath);
 
     let rawBody;
@@ -189,9 +214,11 @@ class GithubIssue {
    * Build a per-call `IssueClient`, wrapping `repoPath` into a fresh
    * `RepoContext` bound to the shared `origin`/`githubToken` — same
    * per-call shape as `#_issueStateService`, since `fetch`/`create` are
-   * dispatched with `repoPath` known only once the method is called
-   * (see this migration's plan's Notes on why `GithubIssue` itself
-   * keeps a zero-argument constructor).
+   * dispatched with `repoPath` known only once the method is called.
+   * `this._repoContext` (the optional first constructor parameter used
+   * only by the CLI entrypoints) is deliberately not reused here: it is
+   * `undefined` on the collaborator path, and on the CLI path the
+   * builder below already produces an equivalent context.
    * @param {string} repoPath - the target repo's local checkout path.
    * @returns {IssueClient} the per-call `IssueClient`.
    */

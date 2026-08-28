@@ -15,10 +15,13 @@ const FRONTMATTER_DELIMITER = '---';
  */
 class ListAgents {
   /**
+   * @param {import('../context/RepoContext.js').default} repoContext -
+   *   the target repo's context (provides `repoPath`).
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {RepoPath} [deps.repoPath] - repo-path validation helper.
    */
-  constructor({ repoPath = new RepoPath() } = {}) {
+  constructor(repoContext, { repoPath = new RepoPath() } = {}) {
+    this._repoContext = repoContext;
     this._repoPath = repoPath;
   }
 
@@ -32,12 +35,13 @@ class ListAgents {
    * filename order) that has a `name:` frontmatter field. Returns `''`
    * when `agentsDir` doesn't exist or has no `*.md` files, matching the
    * shell script's "prints nothing, exit 0" behavior.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} [agentsDir] - the agents directory, relative to
    *   `repoPath` (defaults to `.claude/agents`).
    * @returns {Promise<string>} the joined `name|description\n` lines.
    */
-  async run(repoPath, agentsDir = '.claude/agents') {
+  async run(agentsDir = '.claude/agents') {
+    const { repoPath } = this._repoContext;
+
     await this._repoPath.validate(repoPath);
 
     const resolvedDir = path.join(repoPath, agentsDir);

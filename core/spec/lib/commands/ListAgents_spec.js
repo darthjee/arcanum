@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import ListAgents from '../../../lib/commands/ListAgents.js';
+import RepoContext from '../../../lib/context/RepoContext.js';
 import { createGitFixtureRepo } from '../../support/utils/gitFixtureRepo.js';
 import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
 
@@ -12,6 +13,14 @@ import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
  */
 async function writeAgentFile(dir, filename, content) {
   await writeFile(path.join(dir, filename), content);
+}
+
+/**
+ * @param {string} repoPath - the context's target repo path.
+ * @returns {ListAgents} a `ListAgents` bound to a real `RepoContext`.
+ */
+function listAgentsFor(repoPath) {
+  return new ListAgents(new RepoContext({ repoPath }));
 }
 
 describe('ListAgents', () => {
@@ -40,8 +49,8 @@ describe('ListAgents', () => {
         '---\nname: apple\ndescription: first alphabetically by name\n---\nbody\n'
       );
 
-      const listAgents = new ListAgents();
-      const output = await listAgents.run(repo.repoPath);
+      const listAgents = listAgentsFor(repo.repoPath);
+      const output = await listAgents.run();
 
       expect(output).toEqual(
         'zebra|last alphabetically by name\napple|first alphabetically by name\n'
@@ -55,8 +64,8 @@ describe('ListAgents', () => {
       await writeAgentFile(agentsDir, 'no-name.md', '---\ndescription: no name here\n---\nbody\n');
       await writeAgentFile(agentsDir, 'valid.md', '---\nname: valid\ndescription: has a name\n---\nbody\n');
 
-      const listAgents = new ListAgents();
-      const output = await listAgents.run(repo.repoPath);
+      const listAgents = listAgentsFor(repo.repoPath);
+      const output = await listAgents.run();
 
       expect(output).toEqual('valid|has a name\n');
     });
@@ -67,8 +76,8 @@ describe('ListAgents', () => {
       await mkdir(agentsDir, { recursive: true });
       await writeAgentFile(agentsDir, 'no-description.md', '---\nname: solo\n---\nbody\n');
 
-      const listAgents = new ListAgents();
-      const output = await listAgents.run(repo.repoPath);
+      const listAgents = listAgentsFor(repo.repoPath);
+      const output = await listAgents.run();
 
       expect(output).toEqual('solo|\n');
     });
@@ -88,8 +97,8 @@ describe('ListAgents', () => {
         '---\nname: "double-quoted"\ndescription: "double-quoted desc"\n---\nbody\n'
       );
 
-      const listAgents = new ListAgents();
-      const output = await listAgents.run(repo.repoPath);
+      const listAgents = listAgentsFor(repo.repoPath);
+      const output = await listAgents.run();
 
       expect(output).toEqual('double-quoted|double-quoted desc\nsingle-quoted|single-quoted desc\n');
     });
@@ -101,8 +110,8 @@ describe('ListAgents', () => {
       await writeAgentFile(agentsDir, 'no-frontmatter.md', 'name: not-frontmatter\ndescription: nope\n');
       await writeAgentFile(agentsDir, 'valid.md', '---\nname: valid\ndescription: has one\n---\nbody\n');
 
-      const listAgents = new ListAgents();
-      const output = await listAgents.run(repo.repoPath);
+      const listAgents = listAgentsFor(repo.repoPath);
+      const output = await listAgents.run();
 
       expect(output).toEqual('valid|has one\n');
     });
@@ -110,8 +119,8 @@ describe('ListAgents', () => {
     it('resolves to \'\' when agentsDir doesn\'t exist', async () => {
       repo = await createGitFixtureRepo();
 
-      const listAgents = new ListAgents();
-      const output = await listAgents.run(repo.repoPath, '.claude/agents');
+      const listAgents = listAgentsFor(repo.repoPath);
+      const output = await listAgents.run('.claude/agents');
 
       expect(output).toEqual('');
     });
@@ -122,8 +131,8 @@ describe('ListAgents', () => {
       await mkdir(agentsDir, { recursive: true });
       await writeAgentFile(agentsDir, 'not-markdown.txt', 'name: nope\n');
 
-      const listAgents = new ListAgents();
-      const output = await listAgents.run(repo.repoPath);
+      const listAgents = listAgentsFor(repo.repoPath);
+      const output = await listAgents.run();
 
       expect(output).toEqual('');
     });
@@ -134,23 +143,23 @@ describe('ListAgents', () => {
       await mkdir(agentsDir, { recursive: true });
       await writeAgentFile(agentsDir, 'default-dir.md', '---\nname: defaulted\ndescription: default dir\n---\nbody\n');
 
-      const listAgents = new ListAgents();
-      const output = await listAgents.run(repo.repoPath);
+      const listAgents = listAgentsFor(repo.repoPath);
+      const output = await listAgents.run();
 
       expect(output).toEqual('defaulted|default dir\n');
     });
 
     it('propagates RepoPath.validate()\'s thrown Error when repo_path is missing', async () => {
-      const listAgents = new ListAgents();
+      const listAgents = listAgentsFor('');
 
-      await expectAsync(listAgents.run('')).toBeRejectedWithError('Error: repo_path is required');
+      await expectAsync(listAgents.run()).toBeRejectedWithError('Error: repo_path is required');
     });
 
     it('propagates RepoPath.validate()\'s thrown Error when the path does not exist', async () => {
-      const listAgents = new ListAgents();
       const missingPath = '/no/such/path/for/list-agents-spec';
+      const listAgents = listAgentsFor(missingPath);
 
-      await expectAsync(listAgents.run(missingPath)).toBeRejectedWithError(
+      await expectAsync(listAgents.run()).toBeRejectedWithError(
         `Error: not a directory: ${missingPath}`
       );
     });
@@ -161,9 +170,9 @@ describe('ListAgents', () => {
       try {
         dir = await createTempDir('arcanum-core-list-agents-spec-');
 
-        const listAgents = new ListAgents();
+        const listAgents = listAgentsFor(dir);
 
-        await expectAsync(listAgents.run(dir)).toBeRejectedWithError(`Error: not a git repository: ${dir}`);
+        await expectAsync(listAgents.run()).toBeRejectedWithError(`Error: not a git repository: ${dir}`);
       } finally {
         if (dir) {
           await removeTempDir(dir);

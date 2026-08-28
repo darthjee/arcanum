@@ -121,7 +121,11 @@ export const COMMANDS = {
     method: 'run',
     takesRepoContext: true
   },
-  'checkout-safe-branch': { module: 'commands/SafeBranch.js', method: 'run' },
+  'checkout-safe-branch': {
+    module: 'commands/SafeBranch.js',
+    method: 'run',
+    takesRepoContext: true
+  },
   'dispatch-fixture': { module: 'commands/DispatchFixture.js', method: 'run', log: false },
   // dispatch-fixture-crash is deliberately left logged (entry.log
   // !== false, the default) — it exists specifically to prove that
@@ -138,13 +142,41 @@ export const COMMANDS = {
     takesRepoContext: true,
     log: false
   },
-  'github-issue-create': { module: 'commands/GithubIssue.js', method: 'create' },
-  'github-issue-info': { module: 'commands/GithubIssue.js', method: 'info' },
-  'issue-state': { module: 'commands/IssueState.js', method: 'run' },
-  'list-agents': { module: 'commands/ListAgents.js', method: 'run' },
+  'github-issue-create': {
+    module: 'commands/GithubIssue.js',
+    method: 'create',
+    takesRepoContext: true
+  },
+  'github-issue-info': {
+    module: 'commands/GithubIssue.js',
+    method: 'info',
+    takesRepoContext: true
+  },
+  'issue-state': {
+    module: 'commands/IssueState.js',
+    method: 'run',
+    takesRepoContext: true
+  },
+  'list-agents': {
+    module: 'commands/ListAgents.js',
+    method: 'run',
+    takesRepoContext: true
+  },
   'permission-grant': { module: 'commands/PermissionGrant.js', method: 'run' },
-  'resolve-and-fetch': { module: 'commands/ResolveAndFetch.js', method: 'run' },
-  'resolve-id-and-file': { module: 'commands/ResolveIdAndFile.js', method: 'run' },
-  'resolve-plan-paths': { module: 'commands/ResolvePlanPaths.js', method: 'run' },
+  'resolve-and-fetch': {
+    module: 'commands/ResolveAndFetch.js',
+    method: 'run',
+    takesRepoContext: true
+  },
+  'resolve-id-and-file': {
+    module: 'commands/ResolveIdAndFile.js',
+    method: 'run',
+    takesRepoContext: true
+  },
+  'resolve-plan-paths': {
+    module: 'commands/ResolvePlanPaths.js',
+    method: 'run',
+    takesRepoContext: true
+  },
   'spawn-issue': { module: 'commands/SpawnIssue.js', method: 'run', takesRepoContext: true }
 };

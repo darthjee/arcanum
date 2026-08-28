@@ -1,25 +1,27 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import RepoContext from '../../../lib/context/RepoContext.js';
 import ResolveAndFetch from '../../../lib/commands/ResolveAndFetch.js';
 import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
-
-/**
- * @param {object} [overrides] - collaborator overrides.
- * @returns {ResolveAndFetch} an instance with a no-op safeBranch and a
- *   githubIssue stub that always fails, unless overridden.
- */
-function buildResolveAndFetch(overrides = {}) {
-  const safeBranch = overrides.safeBranch || { checkout: jasmine.createSpy('checkout').and.resolveTo(undefined) };
-  const githubIssue = overrides.githubIssue || {
-    fetch: jasmine.createSpy('fetch').and.rejectWith(new Error('Error: could not fetch issue #0 from o/r'))
-  };
-
-  return new ResolveAndFetch({ safeBranch, githubIssue });
-}
 
 describe('ResolveAndFetch', () => {
   let repoPath;
   const issuesFolder = 'docs/agents/issues';
+
+  /**
+   * @param {object} [overrides] - collaborator overrides.
+   * @returns {ResolveAndFetch} an instance bound to a real `RepoContext`
+   *   for the per-test `repoPath`, with a no-op safeBranch and a
+   *   githubIssue stub that always fails, unless overridden.
+   */
+  function buildResolveAndFetch(overrides = {}) {
+    const safeBranch = overrides.safeBranch || { checkout: jasmine.createSpy('checkout').and.resolveTo(undefined) };
+    const githubIssue = overrides.githubIssue || {
+      fetch: jasmine.createSpy('fetch').and.rejectWith(new Error('Error: could not fetch issue #0 from o/r'))
+    };
+
+    return new ResolveAndFetch(new RepoContext({ repoPath }), { safeBranch, githubIssue });
+  }
 
   beforeEach(async () => {
     repoPath = await createTempDir();
@@ -35,9 +37,9 @@ describe('ResolveAndFetch', () => {
       const safeBranch = { checkout: jasmine.createSpy('checkout').and.resolveTo(undefined) };
       const resolveAndFetch = buildResolveAndFetch({ safeBranch });
 
-      await resolveAndFetch.run(repoPath, issuesFolder, 'not-valid');
+      await resolveAndFetch.run(issuesFolder, 'not-valid');
 
-      expect(safeBranch.checkout).toHaveBeenCalledWith(repoPath);
+      expect(safeBranch.checkout).toHaveBeenCalledWith();
     });
 
     it('propagates a dirty-tree hard failure uncaught (no STATUS= output)', async () => {
@@ -46,7 +48,7 @@ describe('ResolveAndFetch', () => {
       };
       const resolveAndFetch = buildResolveAndFetch({ safeBranch });
 
-      await expectAsync(resolveAndFetch.run(repoPath, issuesFolder, '#1')).toBeRejectedWithError(
+      await expectAsync(resolveAndFetch.run(issuesFolder, '#1')).toBeRejectedWithError(
         /uncommitted changes/
       );
     });
@@ -58,7 +60,7 @@ describe('ResolveAndFetch', () => {
         it(`returns STATUS=error for '${argString}'`, async () => {
           const resolveAndFetch = buildResolveAndFetch();
 
-          const output = await resolveAndFetch.run(repoPath, issuesFolder, argString);
+          const output = await resolveAndFetch.run(issuesFolder, argString);
 
           expect(output).toEqual(`STATUS=error\nERROR=Error: invalid input '${argString}' — expected '#<id>'\n`);
         });
@@ -74,7 +76,7 @@ describe('ResolveAndFetch', () => {
         };
         const resolveAndFetch = buildResolveAndFetch({ githubIssue });
 
-        const output = await resolveAndFetch.run(repoPath, issuesFolder, '  #1  ');
+        const output = await resolveAndFetch.run(issuesFolder, '  #1  ');
 
         expect(output).toContain('ID=1');
       });
@@ -86,7 +88,7 @@ describe('ResolveAndFetch', () => {
         const githubIssue = { fetch: jasmine.createSpy('fetch') };
         const resolveAndFetch = buildResolveAndFetch({ githubIssue });
 
-        const output = await resolveAndFetch.run(repoPath, issuesFolder, '#42');
+        const output = await resolveAndFetch.run(issuesFolder, '#42');
 
         expect(output).toEqual('STATUS=ok\nID=42\nTITLE=My Cool Issue\nFILE=docs/agents/issues/42_my_cool_issue.md\n');
         expect(githubIssue.fetch).not.toHaveBeenCalled();
@@ -96,7 +98,7 @@ describe('ResolveAndFetch', () => {
         await writeFile(path.join(repoPath, issuesFolder, '7-some-title-here.md'), 'content\n');
         const resolveAndFetch = buildResolveAndFetch();
 
-        const output = await resolveAndFetch.run(repoPath, issuesFolder, '#7');
+        const output = await resolveAndFetch.run(issuesFolder, '#7');
 
         expect(output).toEqual('STATUS=ok\nID=7\nTITLE=Some Title Here\nFILE=docs/agents/issues/7-some-title-here.md\n');
       });
@@ -114,7 +116,7 @@ describe('ResolveAndFetch', () => {
         };
         const resolveAndFetch = buildResolveAndFetch({ githubIssue });
 
-        const output = await resolveAndFetch.run(repoPath, issuesFolder, '#9');
+        const output = await resolveAndFetch.run(issuesFolder, '#9');
 
         expect(output).toEqual(
           'STATUS=ok\nID=9\nTITLE=Fresh Issue\nFILE=docs/agents/issues/9-fresh-issue.md\nDOMAIN=github.com\nREPO=darthjee/arcanum\n'
@@ -130,7 +132,7 @@ describe('ResolveAndFetch', () => {
         };
         const resolveAndFetch = buildResolveAndFetch({ githubIssue });
 
-        const output = await resolveAndFetch.run(repoPath, issuesFolder, '#9');
+        const output = await resolveAndFetch.run(issuesFolder, '#9');
 
         expect(output).toEqual('STATUS=error\nID=9\nERROR=Error: could not fetch issue #9 from darthjee/arcanum\n');
       });
@@ -143,7 +145,7 @@ describe('ResolveAndFetch', () => {
         };
         const resolveAndFetch = buildResolveAndFetch({ githubIssue });
 
-        const output = await resolveAndFetch.run(repoPath, issuesFolder, '#9');
+        const output = await resolveAndFetch.run(issuesFolder, '#9');
 
         expect(output).toEqual('STATUS=error\nID=9\nERROR=Error: could not obtain GitHub token via gh auth token\n');
       });
