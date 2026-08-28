@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import IssueClient from '../utils/github/IssueClient.js';
+import { resolveInstallPath } from '../utils/file/InstallRoot.js';
 
 const defaultExecFileAsync = promisify(execFile);
 const DEFAULT_TIMEOUT_MS = 30000;
@@ -13,11 +14,11 @@ const TEMPLATE_RELATIVE_PATH = 'auto-fix-all/templates/reply.tmpl.md';
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 // `auto-monitor-issue-pr/scripts/resolve_pr_number.sh` is explicitly
 // out-of-batch for this migration (see the issue) — shelled out to
-// exactly like `reply_comment_shell.sh` does, resolved relative to this
-// skill repo's own root (three levels up from `core/lib/commands/`),
-// not the target `repoPath` being operated on.
-const RESOLVE_PR_NUMBER_SCRIPT = path.join(
-  MODULE_DIR, '..', '..', '..', 'auto-monitor-issue-pr', 'scripts', 'resolve_pr_number.sh'
+// exactly like `reply_comment_shell.sh` does, resolved via
+// `resolveInstallPath` against the arcanum install (the skill repo
+// itself), not the target `repoPath` being operated on.
+const RESOLVE_PR_NUMBER_SCRIPT = resolveInstallPath(
+  'auto-monitor-issue-pr', 'scripts', 'resolve_pr_number.sh'
 );
 
 /**
