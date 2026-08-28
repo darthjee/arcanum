@@ -13,6 +13,7 @@ describe('COMMANDS', () => {
     const withFlag = Object.keys(COMMANDS).filter((name) => COMMANDS[name].takesRepoContext);
 
     expect(withFlag).toEqual([
+      'arcanum-split-issue-create-sub-issue',
       'arcanum-split-issue-create-sub-issue-file',
       'arcanum-split-issue-finish',
       'dispatch-fixture-repo-context'
