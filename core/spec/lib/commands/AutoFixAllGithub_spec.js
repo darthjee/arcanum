@@ -286,6 +286,22 @@ describe('AutoFixAllGithub', () => {
   });
 
   describe('#hasShipitLabel', () => {
+    it('rejects when repoPath is missing', async () => {
+      const github = newGithub({ repoPath: '' });
+
+      await expectAsync(github.hasShipitLabel('5')).toBeRejectedWithError(
+        'Usage: github.sh has-shipit-label <repo_path> <id>'
+      );
+    });
+
+    it('rejects when id is missing', async () => {
+      const github = newGithub();
+
+      await expectAsync(github.hasShipitLabel()).toBeRejectedWithError(
+        'Usage: github.sh has-shipit-label <repo_path> <id>'
+      );
+    });
+
     it('resolves for a case-insensitive exact "shipit" label match', async () => {
       const github = newGithub({ fetchFn: fakeFetch({ labels: ['Shipit', 'Other'] }) });
 
