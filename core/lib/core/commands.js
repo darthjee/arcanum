@@ -33,7 +33,11 @@ export const COMMANDS = {
     method: 'run',
     takesRepoContext: true
   },
-  'arcanum-split-issue-finish': { module: 'commands/ArcanumSplitIssueFinish.js', method: 'run' },
+  'arcanum-split-issue-finish': {
+    module: 'commands/ArcanumSplitIssueFinish.js',
+    method: 'run',
+    takesRepoContext: true
+  },
   'arcanum-split-issue-push-sub-issues': {
     module: 'commands/ArcanumSplitIssuePushSubIssues.js',
     method: 'run'

@@ -12,7 +12,7 @@ const ISSUES_DIR = 'docs/agents/issues';
  */
 function stubDeps(overrides = {}) {
   return {
-    repoPath: { validate: jasmine.createSpy('validate').and.resolveTo(undefined) },
+    repoPathValidator: { validate: jasmine.createSpy('validate').and.resolveTo(undefined) },
     execFileAsync: jasmine.createSpy('execFileAsync').and.resolveTo({ stdout: '', stderr: '' }),
     safeBranch: { checkout: jasmine.createSpy('checkout').and.resolveTo('main') },
     ...overrides
@@ -34,33 +34,35 @@ describe('ArcanumSplitIssueFinish', () => {
     describe('argument validation', () => {
       it('throws the usage message when repoPath is missing', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueFinish(deps);
+        const instance = new ArcanumSplitIssueFinish({ repoPath: '' }, deps);
 
-        await expectAsync(instance.run('', ISSUE_ID)).toBeRejectedWithError(
+        await expectAsync(instance.run(ISSUE_ID)).toBeRejectedWithError(
           'Usage: finish.sh <repo_path> <issue_id>'
         );
-        expect(deps.repoPath.validate).not.toHaveBeenCalled();
+        expect(deps.repoPathValidator.validate).not.toHaveBeenCalled();
       });
 
       it('throws the usage message when issueId is missing', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueFinish(deps);
+        const instance = new ArcanumSplitIssueFinish({ repoPath }, deps);
 
-        await expectAsync(instance.run(repoPath, '')).toBeRejectedWithError(
+        await expectAsync(instance.run('')).toBeRejectedWithError(
           'Usage: finish.sh <repo_path> <issue_id>'
         );
-        expect(deps.repoPath.validate).not.toHaveBeenCalled();
+        expect(deps.repoPathValidator.validate).not.toHaveBeenCalled();
       });
     });
 
     describe('when repoPath validation fails', () => {
       it('propagates the rejection uncaught', async () => {
         const deps = stubDeps({
-          repoPath: { validate: jasmine.createSpy('validate').and.rejectWith(new Error('Error: not a directory: x')) }
+          repoPathValidator: {
+            validate: jasmine.createSpy('validate').and.rejectWith(new Error('Error: not a directory: x'))
+          }
         });
-        const instance = new ArcanumSplitIssueFinish(deps);
+        const instance = new ArcanumSplitIssueFinish({ repoPath }, deps);
 
-        await expectAsync(instance.run(repoPath, ISSUE_ID)).toBeRejectedWithError('Error: not a directory: x');
+        await expectAsync(instance.run(ISSUE_ID)).toBeRejectedWithError('Error: not a directory: x');
         expect(deps.execFileAsync).not.toHaveBeenCalled();
       });
     });
@@ -68,9 +70,9 @@ describe('ArcanumSplitIssueFinish', () => {
     describe('relabeling via github.sh mark-split', () => {
       it('invokes execFileAsync with the script path and array args', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueFinish(deps);
+        const instance = new ArcanumSplitIssueFinish({ repoPath }, deps);
 
-        await instance.run(repoPath, ISSUE_ID);
+        await instance.run(ISSUE_ID);
 
         expect(deps.execFileAsync).toHaveBeenCalledWith(
           path.join(repoPath, 'arcanum-split-issue', 'scripts', 'github.sh'),
@@ -83,9 +85,9 @@ describe('ArcanumSplitIssueFinish', () => {
           const deps = stubDeps({
             execFileAsync: jasmine.createSpy('execFileAsync').and.rejectWith(new Error('gh: boom'))
           });
-          const instance = new ArcanumSplitIssueFinish(deps);
+          const instance = new ArcanumSplitIssueFinish({ repoPath }, deps);
 
-          await expectAsync(instance.run(repoPath, ISSUE_ID)).toBeRejectedWithError('gh: boom');
+          await expectAsync(instance.run(ISSUE_ID)).toBeRejectedWithError('gh: boom');
           expect(deps.safeBranch.checkout).not.toHaveBeenCalled();
         });
       });
@@ -103,9 +105,9 @@ describe('ArcanumSplitIssueFinish', () => {
         await writeFile(path.join(issuesDir, `1${ISSUE_ID}-not-matching.md`), 'e');
 
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueFinish(deps);
+        const instance = new ArcanumSplitIssueFinish({ repoPath }, deps);
 
-        const result = await instance.run(repoPath, ISSUE_ID);
+        const result = await instance.run(ISSUE_ID);
 
         expect(result).toEqual(
           'Deleted:\n' +
@@ -127,18 +129,18 @@ describe('ArcanumSplitIssueFinish', () => {
         await writeFile(path.join(issuesDir, 'unrelated.md'), 'd');
 
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueFinish(deps);
+        const instance = new ArcanumSplitIssueFinish({ repoPath }, deps);
 
-        const result = await instance.run(repoPath, ISSUE_ID);
+        const result = await instance.run(ISSUE_ID);
 
         expect(result).toEqual('Deleted: (nothing to clean up)\nBRANCH=main\n');
       });
 
       it('returns "Deleted: (nothing to clean up)\\n" when the issues directory does not exist', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueFinish(deps);
+        const instance = new ArcanumSplitIssueFinish({ repoPath }, deps);
 
-        const result = await instance.run(repoPath, ISSUE_ID);
+        const result = await instance.run(ISSUE_ID);
 
         expect(result).toEqual('Deleted: (nothing to clean up)\nBRANCH=main\n');
       });
@@ -147,9 +149,9 @@ describe('ArcanumSplitIssueFinish', () => {
     describe('safe-branch release', () => {
       it('calls checkout(repoPath), not run, and formats the resolved branch as BRANCH=<branch>\\n', async () => {
         const deps = stubDeps({ safeBranch: { checkout: jasmine.createSpy('checkout').and.resolveTo('feature-x') } });
-        const instance = new ArcanumSplitIssueFinish(deps);
+        const instance = new ArcanumSplitIssueFinish({ repoPath }, deps);
 
-        const result = await instance.run(repoPath, ISSUE_ID);
+        const result = await instance.run(ISSUE_ID);
 
         expect(deps.safeBranch.checkout).toHaveBeenCalledWith(repoPath);
         expect(deps.safeBranch.checkout).toHaveBeenCalledTimes(1);
@@ -161,9 +163,9 @@ describe('ArcanumSplitIssueFinish', () => {
           const deps = stubDeps({
             safeBranch: { checkout: jasmine.createSpy('checkout').and.rejectWith(new Error('dirty tree')) }
           });
-          const instance = new ArcanumSplitIssueFinish(deps);
+          const instance = new ArcanumSplitIssueFinish({ repoPath }, deps);
 
-          await expectAsync(instance.run(repoPath, ISSUE_ID)).toBeRejectedWithError('dirty tree');
+          await expectAsync(instance.run(ISSUE_ID)).toBeRejectedWithError('dirty tree');
         });
       });
     });
@@ -176,9 +178,9 @@ describe('ArcanumSplitIssueFinish', () => {
         await writeFile(path.join(issuesDir, `${ISSUE_ID}-split.md`), 'a');
 
         const deps = stubDeps({ safeBranch: { checkout: jasmine.createSpy('checkout').and.resolveTo('main') } });
-        const instance = new ArcanumSplitIssueFinish(deps);
+        const instance = new ArcanumSplitIssueFinish({ repoPath }, deps);
 
-        const result = await instance.run(repoPath, ISSUE_ID);
+        const result = await instance.run(ISSUE_ID);
 
         expect(result).toEqual(`Deleted:\n  ${ISSUES_DIR}/${ISSUE_ID}-split.md\nBRANCH=main\n`);
       });

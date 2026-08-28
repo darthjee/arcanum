@@ -14,6 +14,7 @@ describe('COMMANDS', () => {
 
     expect(withFlag).toEqual([
       'arcanum-split-issue-create-sub-issue-file',
+      'arcanum-split-issue-finish',
       'dispatch-fixture-repo-context'
     ]);
   });
