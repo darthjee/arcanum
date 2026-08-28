@@ -83,4 +83,59 @@ describe('RepoContextFactory', () => {
       expect(factory.build(REPO_PATH).context).not.toBe(factory.build(REPO_PATH).context);
     });
   });
+
+  describe('#buildFromContext', () => {
+    function newContext() {
+      return new RepoContext({
+        repoPath: REPO_PATH,
+        origin: {
+          resolve: async () => ({ domain: 'github.com', repo: REPO }),
+          resolveWithRef: async () => ({ domain: 'github.com', repo: REPO, repoRef: REPO })
+        },
+        githubToken: { get: async () => TOKEN }
+      });
+    }
+
+    it('returns a flat bundle with all six keys', () => {
+      const bundle = newFactory().buildFromContext(newContext());
+
+      expect(Object.keys(bundle).sort()).toEqual(
+        ['context', 'git', 'gitBranch', 'gitClient', 'githubClient', 'issueClient']
+      );
+    });
+
+    it('returns the same context instance that was passed in', () => {
+      const inputContext = newContext();
+      const bundle = newFactory().buildFromContext(inputContext);
+
+      expect(bundle.context).toBe(inputContext);
+    });
+
+    it('forwards the injected execFileAsync into the returned gitClient', async () => {
+      const execFileAsync = jasmine.createSpy('execFileAsync').and.resolveTo({ stdout: 'feature\n', stderr: '' });
+      const bundle = newFactory({ execFileAsync }).buildFromContext(newContext());
+
+      await expectAsync(bundle.gitClient.currentBranch()).toBeResolvedTo('feature');
+      expect(execFileAsync).toHaveBeenCalledWith('git', ['branch', '--show-current'], { cwd: REPO_PATH });
+    });
+
+    it('forwards the injected fetchFn into both the githubClient and the issueClient', async () => {
+      const fetchFn = jasmine.createSpy('fetch').and.callFake(async (url) => {
+        if (url === 'https://api.github.com/user') {
+          return { ok: true, json: async () => ({ login: 'someone' }) };
+        }
+
+        return { ok: true, json: async () => ({ labels: [] }) };
+      });
+      const bundle = newFactory({ fetchFn }).buildFromContext(newContext());
+
+      await bundle.githubClient.getCurrentUser();
+      await bundle.issueClient.getIssue('5');
+
+      const urls = fetchFn.calls.allArgs().map(([url]) => url);
+
+      expect(urls).toContain('https://api.github.com/user');
+      expect(urls).toContain(`https://api.github.com/repos/${REPO}/issues/5`);
+    });
+  });
 });
