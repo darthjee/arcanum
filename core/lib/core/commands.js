@@ -152,7 +152,11 @@ export const COMMANDS = {
     method: 'info',
     takesRepoContext: true
   },
-  'issue-state': { module: 'commands/IssueState.js', method: 'run' },
+  'issue-state': {
+    module: 'commands/IssueState.js',
+    method: 'run',
+    takesRepoContext: true
+  },
   'list-agents': {
     module: 'commands/ListAgents.js',
     method: 'run',

@@ -1,5 +1,4 @@
 import { mkdir } from 'node:fs/promises';
-import RepoContext from '../context/RepoContext.js';
 import IssueStateService from '../services/IssueStateService.js';
 import IssueStatePaths from '../utils/file/IssueStatePaths.js';
 import Lock from '../utils/file/Lock.js';
@@ -24,6 +23,9 @@ const USAGE_MESSAGE = [
  */
 class IssueState {
   /**
+   * @param {import('../context/RepoContext.js').default} repoContext -
+   *   the target repo's context (provides `repoPath` and is forwarded to
+   *   each per-call `IssueStateService`).
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {RepoPath} [deps.repoPath] - repo-path validation helper.
    * @param {Lock} [deps.lock] - the lock/mutate/release helper, forwarded
@@ -37,7 +39,7 @@ class IssueState {
    * @param {IssueStatePaths} [deps.issueStatePaths] - state/lock path
    *   resolver, forwarded to each per-call `IssueStateService`.
    */
-  constructor({
+  constructor(repoContext, {
     repoPath = new RepoPath(),
     lock = new Lock(),
     jsonParser = new JsonParser(),
@@ -45,6 +47,7 @@ class IssueState {
     jsonReader = new JsonReader(),
     issueStatePaths = new IssueStatePaths()
   } = {}) {
+    this._repoContext = repoContext;
     this._repoPath = repoPath;
     this._lock = lock;
     this._jsonParser = jsonParser;
@@ -63,7 +66,6 @@ class IssueState {
    * and an unknown `subcommand` both throw (propagated uncaught, same
    * hard-failure class the other migrated entrypoints use — the caller,
    * `core/bin/arcanum`, prints the message to stderr and exits 1).
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} subcommand - one of `get`, `set`, `set-json`,
    *   `append-json`.
    * @param {string} id - the numeric issue id.
@@ -74,7 +76,9 @@ class IssueState {
    * @returns {Promise<string>} the command's stdout — the field's value
    *   (plus trailing newline) for `get`, `''` otherwise.
    */
-  async run(repoPath, subcommand, id, field, value) {
+  async run(subcommand, id, field, value) {
+    const { repoPath } = this._repoContext;
+
     if (!repoPath || !subcommand || !id || !field) {
       throw new Error(USAGE_MESSAGE);
     }
@@ -85,7 +89,7 @@ class IssueState {
 
     await mkdir(stateDir, { recursive: true });
 
-    const issueStateService = this._issueStateService(repoPath);
+    const issueStateService = this._issueStateService();
 
     switch (subcommand) {
     case 'get': {
@@ -115,18 +119,14 @@ class IssueState {
   }
 
   /**
-   * Build a per-call `IssueStateService`, wrapping `repoPath` into a
-   * fresh `RepoContext` — mirroring `AutoFixAllGithub#_prOperations`'
-   * bridge between the CLI dispatcher's zero-arg construction and a
-   * `repoPath`-bound collaborator.
-   * @param {string} repoPath - the target repo's local checkout path.
+   * Build a per-call `IssueStateService` bound to the injected
+   * `RepoContext` — `RepoContext` exposes no `set`/`setJson`
+   * passthrough, so `IssueState` keeps constructing its own service.
    * @returns {IssueStateService} the per-call `IssueStateService`.
    */
-  _issueStateService(repoPath) {
-    const context = new RepoContext({ repoPath });
-
+  _issueStateService() {
     return new IssueStateService({
-      context,
+      context: this._repoContext,
       lock: this._lock,
       jsonParser: this._jsonParser,
       jsonValueFormatter: this._jsonValueFormatter,
