@@ -3,10 +3,19 @@ import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import RepoConfig from '../../../lib/utils/config/RepoConfig.js';
+import RepoContext from '../../../lib/context/RepoContext.js';
 import SafeBranch from '../../../lib/commands/SafeBranch.js';
 import { createGitFixtureRepo } from '../../support/utils/gitFixtureRepo.js';
 
 const execFileAsync = promisify(execFile);
+
+/**
+ * @param {string} repoPath - the context's target repo path.
+ * @returns {RepoContext} a real `RepoContext` bound to `repoPath`.
+ */
+function contextFor(repoPath) {
+  return new RepoContext({ repoPath });
+}
 
 describe('SafeBranch', () => {
   describe('#run', () => {
@@ -14,9 +23,9 @@ describe('SafeBranch', () => {
       const validationError = new Error('Error: not a directory: /nope');
       const repoPath = { validate: jasmine.createSpy('validate').and.rejectWith(validationError) };
       const execFileSpy = jasmine.createSpy('execFileAsync');
-      const safeBranch = new SafeBranch({ execFileAsync: execFileSpy, repoPath });
+      const safeBranch = new SafeBranch(contextFor('/nope'), { execFileAsync: execFileSpy, repoPath });
 
-      await expectAsync(safeBranch.run('/nope')).toBeRejectedWith(validationError);
+      await expectAsync(safeBranch.run()).toBeRejectedWith(validationError);
       expect(execFileSpy).not.toHaveBeenCalled();
     });
 
@@ -26,9 +35,9 @@ describe('SafeBranch', () => {
         .createSpy('execFileAsync')
         .and.callFake(() => Promise.resolve({ stdout: '', stderr: '' }));
       const repoConfig = { getSafeBranch: async () => 'origin/develop' };
-      const safeBranch = new SafeBranch({ execFileAsync: execFileSpy, repoConfig, repoPath });
+      const safeBranch = new SafeBranch(contextFor('/repo'), { execFileAsync: execFileSpy, repoConfig, repoPath });
 
-      await expectAsync(safeBranch.run('/repo')).toBeResolvedTo('BRANCH=origin/develop\n');
+      await expectAsync(safeBranch.run()).toBeResolvedTo('BRANCH=origin/develop\n');
       expect(repoPath.validate).toHaveBeenCalledWith('/repo');
     });
 
@@ -42,9 +51,9 @@ describe('SafeBranch', () => {
 
         return Promise.resolve({ stdout: '', stderr: '' });
       });
-      const safeBranch = new SafeBranch({ execFileAsync: execFileSpy, repoPath });
+      const safeBranch = new SafeBranch(contextFor('/repo'), { execFileAsync: execFileSpy, repoPath });
 
-      await expectAsync(safeBranch.run('/repo')).toBeRejectedWithError(/uncommitted changes/);
+      await expectAsync(safeBranch.run()).toBeRejectedWithError(/uncommitted changes/);
     });
   });
 
@@ -58,9 +67,9 @@ describe('SafeBranch', () => {
 
         return Promise.resolve({ stdout: '', stderr: '' });
       });
-      const safeBranch = new SafeBranch({ execFileAsync: execFileSpy });
+      const safeBranch = new SafeBranch(contextFor('/repo'), { execFileAsync: execFileSpy });
 
-      await expectAsync(safeBranch.checkout('/repo')).toBeRejectedWithError(/uncommitted changes/);
+      await expectAsync(safeBranch.checkout()).toBeRejectedWithError(/uncommitted changes/);
       expect(execFileSpy).not.toHaveBeenCalledWith('git', ['fetch', '-p'], jasmine.anything());
     });
 
@@ -72,9 +81,9 @@ describe('SafeBranch', () => {
         return Promise.resolve({ stdout: '', stderr: '' });
       });
       const repoConfig = { getSafeBranch: async () => 'origin/develop' };
-      const safeBranch = new SafeBranch({ execFileAsync: execFileSpy, repoConfig });
+      const safeBranch = new SafeBranch(contextFor('/repo'), { execFileAsync: execFileSpy, repoConfig });
 
-      await safeBranch.checkout('/repo');
+      await safeBranch.checkout();
 
       expect(calls).toContain(['fetch', '-p']);
       expect(calls).toContain(['checkout', 'origin/develop']);
@@ -83,9 +92,9 @@ describe('SafeBranch', () => {
     it('propagates unexpected git errors instead of treating them as "dirty"', async () => {
       const unexpectedError = Object.assign(new Error('git not found'), { code: 127 });
       const execFileSpy = jasmine.createSpy('execFileAsync').and.callFake(() => Promise.reject(unexpectedError));
-      const safeBranch = new SafeBranch({ execFileAsync: execFileSpy });
+      const safeBranch = new SafeBranch(contextFor('/repo'), { execFileAsync: execFileSpy });
 
-      await expectAsync(safeBranch.checkout('/repo')).toBeRejectedWith(unexpectedError);
+      await expectAsync(safeBranch.checkout()).toBeRejectedWith(unexpectedError);
     });
   });
 
@@ -101,9 +110,9 @@ describe('SafeBranch', () => {
     it('checks out origin/main by default, purely offline', async () => {
       repo = await createGitFixtureRepo();
 
-      const safeBranch = new SafeBranch();
+      const safeBranch = new SafeBranch(contextFor(repo.repoPath));
 
-      await safeBranch.checkout(repo.repoPath);
+      await safeBranch.checkout();
 
       const { stdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], { cwd: repo.repoPath });
       const { stdout: originMain } = await execFileAsync('git', ['rev-parse', 'origin/main'], { cwd: repo.repoPath });
@@ -118,9 +127,9 @@ describe('SafeBranch', () => {
 
       const repoConfig = new RepoConfig();
       spyOn(repoConfig, 'getSafeBranch').and.resolveTo('origin/other');
-      const safeBranch = new SafeBranch({ repoConfig });
+      const safeBranch = new SafeBranch(contextFor(repo.repoPath), { repoConfig });
 
-      await safeBranch.checkout(repo.repoPath);
+      await safeBranch.checkout();
 
       const { stdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], { cwd: repo.repoPath });
       const { stdout: originOther } = await execFileAsync('git', ['rev-parse', 'origin/other'], { cwd: repo.repoPath });
@@ -132,9 +141,9 @@ describe('SafeBranch', () => {
       repo = await createGitFixtureRepo();
       await writeFile(path.join(repo.repoPath, 'README.md'), '# fixture (modified)\n');
 
-      const safeBranch = new SafeBranch();
+      const safeBranch = new SafeBranch(contextFor(repo.repoPath));
 
-      await expectAsync(safeBranch.checkout(repo.repoPath)).toBeRejectedWithError(/uncommitted changes/);
+      await expectAsync(safeBranch.checkout()).toBeRejectedWithError(/uncommitted changes/);
     });
   });
 });

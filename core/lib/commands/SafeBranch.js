@@ -15,16 +15,19 @@ const DIRTY_TREE_MESSAGE =
  */
 class SafeBranch {
   /**
+   * @param {import('../context/RepoContext.js').default} repoContext -
+   *   the target repo's context (provides `repoPath`).
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Function} [deps.execFileAsync] - promisified `execFile`.
    * @param {RepoConfig} [deps.repoConfig] - safe-branch config reader.
    * @param {RepoPath} [deps.repoPath] - repo-path validation helper.
    */
-  constructor({
+  constructor(repoContext, {
     execFileAsync = defaultExecFileAsync,
     repoConfig = new RepoConfig(),
     repoPath = new RepoPath({ execFileAsync })
   } = {}) {
+    this._repoContext = repoContext;
     this._execFileAsync = execFileAsync;
     this._repoConfig = repoConfig;
     this._repoPath = repoPath;
@@ -38,13 +41,14 @@ class SafeBranch {
    * semantics), then runs `#checkout`, returning a `BRANCH=<branch>\n`
    * stdout string on success. Any failure (invalid path, dirty working
    * tree) propagates uncaught, per the shared hard-failure contract.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @returns {Promise<string>} the `BRANCH=<branch>\n` output.
    */
-  async run(repoPath) {
+  async run() {
+    const { repoPath } = this._repoContext;
+
     await this._repoPath.validate(repoPath);
 
-    const branch = await this.checkout(repoPath);
+    const branch = await this.checkout();
 
     return `BRANCH=${branch}\n`;
   }
@@ -55,11 +59,12 @@ class SafeBranch {
    * its hard failure (thrown Error, no `STATUS=` line, caller exits
    * non-zero) on a dirty tracked-file working tree. Untracked files
    * never block the checkout.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @returns {Promise<string>} resolves with the checked-out branch
    *   once the safe branch is checked out.
    */
-  async checkout(repoPath) {
+  async checkout() {
+    const { repoPath } = this._repoContext;
+
     if (await this._isDirty(repoPath)) {
       throw new Error(DIRTY_TREE_MESSAGE);
     }

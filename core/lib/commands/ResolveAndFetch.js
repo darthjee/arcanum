@@ -13,11 +13,17 @@ const ID_PATTERN = /^#([0-9]+)$/;
  */
 class ResolveAndFetch {
   /**
+   * @param {import('../context/RepoContext.js').default} repoContext -
+   *   the target repo's context (provides `repoPath`).
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {SafeBranch} [deps.safeBranch] - safe-branch checkout helper.
    * @param {GithubIssue} [deps.githubIssue] - GitHub issue fetcher.
    */
-  constructor({ safeBranch = new SafeBranch(), githubIssue = new GithubIssue() } = {}) {
+  constructor(repoContext, {
+    safeBranch = new SafeBranch(repoContext),
+    githubIssue = new GithubIssue(repoContext)
+  } = {}) {
+    this._repoContext = repoContext;
     this._safeBranch = safeBranch;
     this._githubIssue = githubIssue;
   }
@@ -30,14 +36,15 @@ class ResolveAndFetch {
    * throws (propagated uncaught, matching
    * `checkout_safe_branch.sh`'s own hard-failure behavior: no
    * `STATUS=` line, non-zero exit).
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} issuesFolder - the local issues folder to search
    *   for an existing `<id>_*`/`<id>-*` file, relative to `repoPath`.
    * @param {string} argString - the raw `#<id>` input.
    * @returns {Promise<string>} the `STATUS=...`/`KEY=value...` output.
    */
-  async run(repoPath, issuesFolder, argString) {
-    await this._safeBranch.checkout(repoPath);
+  async run(issuesFolder, argString) {
+    const { repoPath } = this._repoContext;
+
+    await this._safeBranch.checkout();
 
     const id = this._parseId(argString);
 

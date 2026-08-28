@@ -29,9 +29,11 @@ describe('COMMANDS', () => {
       'auto-fix-all-reply-comment',
       'auto-fix-all-wait-ci',
       'auto-fix-all-wait-ci-and-merge',
+      'checkout-safe-branch',
       'dispatch-fixture-repo-context',
       'github-issue-create',
       'github-issue-info',
+      'resolve-and-fetch',
       'spawn-issue'
     ]);
   });

@@ -147,13 +147,13 @@ describe('ArcanumSplitIssueFinish', () => {
     });
 
     describe('safe-branch release', () => {
-      it('calls checkout(repoPath), not run, and formats the resolved branch as BRANCH=<branch>\\n', async () => {
+      it('calls checkout() (context-bound), not run, and formats the resolved branch as BRANCH=<branch>\\n', async () => {
         const deps = stubDeps({ safeBranch: { checkout: jasmine.createSpy('checkout').and.resolveTo('feature-x') } });
         const instance = new ArcanumSplitIssueFinish({ repoPath }, deps);
 
         const result = await instance.run(ISSUE_ID);
 
-        expect(deps.safeBranch.checkout).toHaveBeenCalledWith(repoPath);
+        expect(deps.safeBranch.checkout).toHaveBeenCalledWith();
         expect(deps.safeBranch.checkout).toHaveBeenCalledTimes(1);
         expect(result.endsWith('BRANCH=feature-x\n')).toBeTrue();
       });

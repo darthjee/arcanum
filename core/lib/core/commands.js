@@ -121,7 +121,11 @@ export const COMMANDS = {
     method: 'run',
     takesRepoContext: true
   },
-  'checkout-safe-branch': { module: 'commands/SafeBranch.js', method: 'run' },
+  'checkout-safe-branch': {
+    module: 'commands/SafeBranch.js',
+    method: 'run',
+    takesRepoContext: true
+  },
   'dispatch-fixture': { module: 'commands/DispatchFixture.js', method: 'run', log: false },
   // dispatch-fixture-crash is deliberately left logged (entry.log
   // !== false, the default) — it exists specifically to prove that
@@ -151,7 +155,11 @@ export const COMMANDS = {
   'issue-state': { module: 'commands/IssueState.js', method: 'run' },
   'list-agents': { module: 'commands/ListAgents.js', method: 'run' },
   'permission-grant': { module: 'commands/PermissionGrant.js', method: 'run' },
-  'resolve-and-fetch': { module: 'commands/ResolveAndFetch.js', method: 'run' },
+  'resolve-and-fetch': {
+    module: 'commands/ResolveAndFetch.js',
+    method: 'run',
+    takesRepoContext: true
+  },
   'resolve-id-and-file': { module: 'commands/ResolveIdAndFile.js', method: 'run' },
   'resolve-plan-paths': { module: 'commands/ResolvePlanPaths.js', method: 'run' },
   'spawn-issue': { module: 'commands/SpawnIssue.js', method: 'run', takesRepoContext: true }

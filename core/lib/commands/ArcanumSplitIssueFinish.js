@@ -32,7 +32,7 @@ class ArcanumSplitIssueFinish {
    */
   constructor(repoContext, {
     execFileAsync = defaultExecFileAsync,
-    safeBranch = new SafeBranch(),
+    safeBranch = new SafeBranch(repoContext),
     readdir: readdirFn = readdir,
     unlink: unlinkFn = unlink,
     repoPathValidator = new RepoPath()
@@ -76,7 +76,7 @@ class ArcanumSplitIssueFinish {
 
     const deletedBlock = await this._deleteWorkingFiles(issueId);
 
-    const branch = await this._safeBranch.checkout(this._repoContext.repoPath);
+    const branch = await this._safeBranch.checkout();
 
     return `${deletedBlock}BRANCH=${branch}\n`;
   }
