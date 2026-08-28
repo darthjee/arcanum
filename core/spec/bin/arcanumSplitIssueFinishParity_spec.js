@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { cp, mkdir, readdir, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -20,18 +20,22 @@ import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 // success path needs a real `gh`/GitHub-API call (`mark-split`), which
 // isn't reachable from specs per the repo-wide "no real network calls in
 // specs" rule. That includes the "mark-split itself would need real
-// network access" case below: rather than actually depending on network
-// availability (or its absence) in CI, that case uses a fixture repo
-// whose `origin` remote is a local filesystem path — deterministically
-// offline, but still enough to make `arcanum/_lib/origin.sh`'s
-// `_load_origin` (which `github_issue_shell.sh`'s `mark-split` command
-// calls before ever touching `gh`) fail with "unrecognized origin
-// format", exactly mirroring what happens for any origin `mark-split`
-// can't resolve — including a real GitHub remote unreachable over the
-// network. Both `finish_shell.sh` and the native module shell out to
-// `github.sh mark-split` before doing any file cleanup or safe-branch
-// release, so this exercises the "same point of failure" contract from
-// node.md's step 04 without flaking on network availability.
+// network access" case below. Both sides resolve `github.sh` from their
+// own install directory — `finish_shell.sh` via `"${SCRIPT_DIR}/github.sh"`
+// and the native module via its own module directory (three levels up
+// from `core/lib/commands/`), never relative to the target `repoPath` —
+// so the fixture repo carries no copy of the skill tree. What drives
+// `github.sh mark-split` to fail, deterministically and offline, is the
+// fixture's `origin` remote being a local filesystem path: enough to
+// make `arcanum/_lib/origin.sh`'s `_load_origin` (which
+// `github_issue_shell.sh`'s `mark-split` command calls before ever
+// touching `gh`) fail with "unrecognized origin format", exactly
+// mirroring what happens for any origin `mark-split` can't resolve —
+// including a real GitHub remote unreachable over the network. Both
+// `finish_shell.sh` and the native module shell out to `github.sh
+// mark-split` before doing any file cleanup or safe-branch release, so
+// this exercises the "same point of failure" contract from node.md's
+// step 04 without flaking on network availability.
 
 const execFileAsync = promisify(execFile);
 
@@ -67,30 +71,6 @@ async function runBoth(args, cwd) {
   const native = await runCommand([process.execPath, NATIVE_BIN, 'arcanum-split-issue-finish', ...args], cwd);
 
   return { shell, native };
-}
-
-/**
- * Build a fixture repo (local, offline `origin` remote — see
- * `createGitFixtureRepo`) that also carries its own copy of
- * `arcanum-split-issue/scripts/` and `arcanum/_lib/` — the same layout
- * `finish_shell.sh`'s `github.sh mark-split` call (and the native
- * module's equivalent `execFile` call) expect to find relative to
- * `repoPath` — so both sides reach `mark-split`'s `_load_origin` call
- * (and fail there, deterministically, offline) instead of failing
- * earlier for a missing sibling script.
- * @returns {Promise<{repoPath: string, cleanup: Function}>} the built repo.
- */
-async function createFinishFixtureRepo() {
-  const repo = await createGitFixtureRepo();
-
-  await cp(path.join(REPO_ROOT, 'arcanum'), path.join(repo.repoPath, 'arcanum'), { recursive: true });
-  await cp(
-    path.join(REPO_ROOT, 'arcanum-split-issue'),
-    path.join(repo.repoPath, 'arcanum-split-issue'),
-    { recursive: true }
-  );
-
-  return repo;
 }
 
 describe('arcanum-split-issue-finish parity (shell vs. native)', () => {
@@ -170,7 +150,7 @@ describe('arcanum-split-issue-finish parity (shell vs. native)', () => {
 
   describe('mark-split failing before the cleanup step (deterministic, offline)', () => {
     it('matches shell exit code and stdout — both fail with no Deleted:/BRANCH= output and leave the working files untouched', async () => {
-      const repo = await createFinishFixtureRepo();
+      const repo = await createGitFixtureRepo();
 
       try {
         const issuesDir = path.join(repo.repoPath, 'docs', 'agents', 'issues');
