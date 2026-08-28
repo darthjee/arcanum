@@ -1,17 +1,8 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-import Git from '../utils/git/Git.js';
-import GitBranch from '../utils/git/GitBranch.js';
-import GitClient from '../utils/git/GitClient.js';
-import GithubToken from '../utils/github/GithubToken.js';
-import GitHubClient from '../utils/github/GitHubClient.js';
-import Origin from '../utils/git/Origin.js';
 import PrChecker from '../services/PrChecker.js';
 import PrOperations from '../utils/github/PrOperations.js';
+import RepoContextFactory from '../context/RepoContextFactory.js';
 import RepoConfig from '../utils/config/RepoConfig.js';
-import RepoContext from '../context/RepoContext.js';
 
-const defaultExecFileAsync = promisify(execFile);
 const DEFAULT_TIMEOUT_MS = 30000;
 const DEFAULT_POLL_INTERVAL_MS = 5000;
 const USAGE = 'Usage: wait_ci.sh <repo_path>';
@@ -35,33 +26,21 @@ function defaultSleep(ms) {
  * completed, printing `passed` or `failed` (plus the failed check-run
  * names) to stdout. A thin entrypoint orchestrator — PR-number
  * resolution and the poll-once decision tree are delegated to a
- * per-call, context-bound `PrOperations`/`PrChecker` pair (mirroring
- * `AutoFixAllGithub#_prOperations`), since `repoPath` isn't known until
- * `run(repoPath)` is called. See
+ * per-call `PrOperations`/`PrChecker` pair built off a
+ * `RepoContextFactory` bundle (mirroring `AutoFixAllGithub`), since
+ * `repoPath` isn't known until `run(repoPath)` is called. See
  * docs/agents/plans/262-migrate-auto-fix-all-wait-ci-entrypoint-to-native-node-js/node.md
  * and docs/agents/plans/300-refactor-autofixallwaitci/node.md.
  */
 class AutoFixAllWaitCi {
   /**
-   * Keeps `origin`/`githubToken`/`repoConfig`/`execFileAsync`/`fetchFn`/
-   * `timeoutMs` around as *shared* low-level collaborators, forwarded
-   * into each call's fresh, context-bound `_prOperations(repoPath)`/
-   * `_prChecker(repoPath)` build — not pre-built singletons, since a
-   * `GitClient`/`GitHubClient` built without a `context` can't resolve
-   * `repoPath`/`token`/`repo`/`repoRef` at all (see
-   * `AutoFixAllGithub#_prOperations`'s own docstring).
    * @param {object} [deps] - injectable collaborators, for testing.
-   * @param {Origin} [deps.origin] - git-origin resolver.
-   * @param {GithubToken} [deps.githubToken] - GitHub token resolver.
+   * @param {RepoContextFactory} [deps.repoContextFactory] - builds each
+   *   per-call `RepoContext` bundle (context plus context-bound
+   *   clients) — see `#_prOperations`. Owns the low-level `origin`/
+   *   `githubToken`/`issueStateService`/`configChain`/`execFileAsync`/
+   *   `fetchFn`/`timeoutMs` wiring.
    * @param {RepoConfig} [deps.repoConfig] - per-repo config reader.
-   * @param {Function} [deps.execFileAsync] - promisified `execFile`,
-   *   forwarded to each per-call `gitClient`.
-   * @param {Function} [deps.fetchFn] - `fetch`-compatible implementation
-   *   (global `fetch` by default), forwarded to each per-call
-   *   `githubClient`.
-   * @param {number} [deps.timeoutMs] - each REST call's abort timeout,
-   *   overridable for tests (defaults to the real 30s protocol value),
-   *   forwarded to each per-call `githubClient`.
    * @param {number} [deps.pollIntervalMs] - the wait between poll
    *   attempts, overridable for tests (defaults to the shell script's
    *   real 5s `sleep 5`).
@@ -70,21 +49,13 @@ class AutoFixAllWaitCi {
    *   `setTimeout`-based sleep).
    */
   constructor({
-    origin = new Origin(),
-    githubToken = new GithubToken(),
+    repoContextFactory = new RepoContextFactory({ timeoutMs: DEFAULT_TIMEOUT_MS }),
     repoConfig = new RepoConfig(),
-    execFileAsync = defaultExecFileAsync,
-    fetchFn = fetch,
-    timeoutMs = DEFAULT_TIMEOUT_MS,
     pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
     sleepFn = defaultSleep
   } = {}) {
-    this._origin = origin;
-    this._githubToken = githubToken;
+    this._repoContextFactory = repoContextFactory;
     this._repoConfig = repoConfig;
-    this._execFileAsync = execFileAsync;
-    this._fetch = fetchFn;
-    this._timeoutMs = timeoutMs;
     this._pollIntervalMs = pollIntervalMs;
     this._sleep = sleepFn;
   }
@@ -124,26 +95,16 @@ class AutoFixAllWaitCi {
   }
 
   /**
-   * Build a per-call `PrOperations`, wrapping `repoPath` (plus the
-   * shared `origin`/`githubToken`) into a fresh `RepoContext`, and
-   * building a fresh, context-bound `gitClient`/`githubClient` pair
-   * right alongside it — mirrors `AutoFixAllGithub#_prOperations`
-   * exactly.
+   * Build a per-call `PrOperations` from a fresh `RepoContextFactory`
+   * bundle (its `context` plus a context-bound `gitClient`/`gitBranch`/
+   * `git`/`githubClient` — the extra `issueClient` key is ignored by
+   * `PrOperations`). The whole bundle is cheap, zero-I/O construction,
+   * so building it per call has no meaningful cost.
    * @param {string} repoPath - the target repo's local checkout path.
    * @returns {PrOperations} the per-call `PrOperations` facade.
    */
   _prOperations(repoPath) {
-    const context = new RepoContext({
-      repoPath,
-      origin: this._origin,
-      githubToken: this._githubToken
-    });
-    const gitClient = new GitClient({ context, execFileAsync: this._execFileAsync });
-    const gitBranch = new GitBranch({ context, gitClient });
-    const git = new Git({ context, gitBranch });
-    const githubClient = new GitHubClient({ context, fetchFn: this._fetch, timeoutMs: this._timeoutMs });
-
-    return new PrOperations({ context, gitClient, gitBranch, git, githubClient });
+    return new PrOperations(this._repoContextFactory.build(repoPath));
   }
 
   /**
