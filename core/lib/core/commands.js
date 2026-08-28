@@ -53,7 +53,11 @@ export const COMMANDS = {
     method: 'run',
     takesRepoContext: true
   },
-  'auto-fix-all-cleanup-artifacts': { module: 'commands/AutoFixAllCleanupArtifacts.js', method: 'run' },
+  'auto-fix-all-cleanup-artifacts': {
+    module: 'commands/AutoFixAllCleanupArtifacts.js',
+    method: 'run',
+    takesRepoContext: true
+  },
   'auto-fix-all-config-get': { module: 'commands/AutoFixAllConfig.js', method: 'get' },
   'auto-fix-all-config-is-enabled': { module: 'commands/AutoFixAllConfig.js', method: 'isEnabled' },
   'auto-fix-all-config-set': { module: 'commands/AutoFixAllConfig.js', method: 'set' },

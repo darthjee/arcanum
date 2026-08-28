@@ -84,9 +84,9 @@ describe('AutoFixAllCleanupArtifacts', () => {
     describe('when neither the issue file nor the plan dir is tracked', () => {
       it('does nothing, resolving with empty stdout and issuing no commit/push', async () => {
         const execFileAsync = fakeExecFileAsync({ tracked: [] });
-        const instance = new AutoFixAllCleanupArtifacts({ execFileAsync, repoPath: repoPathDep });
+        const instance = new AutoFixAllCleanupArtifacts({ repoPath }, { execFileAsync, repoPath: repoPathDep });
 
-        const result = await instance.run(repoPath, ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, MODEL_EMAIL);
+        const result = await instance.run(ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, MODEL_EMAIL);
 
         expect(result).toEqual('');
         expect(execFileAsync).not.toHaveBeenCalledWith('git', ['rm', ISSUE_FILE], jasmine.anything());
@@ -99,9 +99,9 @@ describe('AutoFixAllCleanupArtifacts', () => {
     describe('when only the issue file is tracked', () => {
       it('stages only the issue file removal', async () => {
         const execFileAsync = fakeExecFileAsync({ tracked: [ISSUE_FILE] });
-        const instance = new AutoFixAllCleanupArtifacts({ execFileAsync, repoPath: repoPathDep });
+        const instance = new AutoFixAllCleanupArtifacts({ repoPath }, { execFileAsync, repoPath: repoPathDep });
 
-        await instance.run(repoPath, ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, MODEL_EMAIL);
+        await instance.run(ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, MODEL_EMAIL);
 
         expect(execFileAsync).toHaveBeenCalledWith('git', ['rm', ISSUE_FILE], { cwd: repoPath });
         expect(execFileAsync).not.toHaveBeenCalledWith('git', ['rm', '-r', PLAN_DIR], jasmine.anything());
@@ -111,9 +111,9 @@ describe('AutoFixAllCleanupArtifacts', () => {
     describe('when only the plan dir is tracked', () => {
       it('stages only the plan dir removal', async () => {
         const execFileAsync = fakeExecFileAsync({ tracked: [PLAN_DIR] });
-        const instance = new AutoFixAllCleanupArtifacts({ execFileAsync, repoPath: repoPathDep });
+        const instance = new AutoFixAllCleanupArtifacts({ repoPath }, { execFileAsync, repoPath: repoPathDep });
 
-        await instance.run(repoPath, ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, MODEL_EMAIL);
+        await instance.run(ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, MODEL_EMAIL);
 
         expect(execFileAsync).not.toHaveBeenCalledWith('git', ['rm', ISSUE_FILE], jasmine.anything());
         expect(execFileAsync).toHaveBeenCalledWith('git', ['rm', '-r', PLAN_DIR], { cwd: repoPath });
@@ -123,9 +123,9 @@ describe('AutoFixAllCleanupArtifacts', () => {
     describe('when both the issue file and the plan dir are tracked', () => {
       it('stages both removals, commits with the hardcoded message, and pushes the current branch', async () => {
         const execFileAsync = fakeExecFileAsync({ tracked: [ISSUE_FILE, PLAN_DIR] });
-        const instance = new AutoFixAllCleanupArtifacts({ execFileAsync, repoPath: repoPathDep });
+        const instance = new AutoFixAllCleanupArtifacts({ repoPath }, { execFileAsync, repoPath: repoPathDep });
 
-        const result = await instance.run(repoPath, ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, MODEL_EMAIL);
+        const result = await instance.run(ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, MODEL_EMAIL);
 
         expect(result).toEqual('');
         expect(execFileAsync).toHaveBeenCalledWith('git', ['rm', ISSUE_FILE], { cwd: repoPath });
@@ -150,10 +150,10 @@ describe('AutoFixAllCleanupArtifacts', () => {
     describe('argument validation', () => {
       it('throws the usage message when a required argument is missing', async () => {
         const execFileAsync = fakeExecFileAsync();
-        const instance = new AutoFixAllCleanupArtifacts({ execFileAsync, repoPath: repoPathDep });
+        const instance = new AutoFixAllCleanupArtifacts({ repoPath }, { execFileAsync, repoPath: repoPathDep });
 
         await expectAsync(
-          instance.run(repoPath, ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, '')
+          instance.run(ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, '')
         ).toBeRejectedWithError(
           'Usage: cleanup_artifacts.sh <repo_path> <issue_file> <plan_dir> <id> <model_name> <model_email>'
         );
