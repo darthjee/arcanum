@@ -13,7 +13,7 @@ const ISSUES_DIR = 'docs/agents/issues';
  */
 function stubDeps(overrides = {}) {
   return {
-    repoPath: { validate: jasmine.createSpy('validate').and.resolveTo(undefined) },
+    repoPathValidator: { validate: jasmine.createSpy('validate').and.resolveTo(undefined) },
     ...overrides
   };
 }
@@ -38,45 +38,47 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
 
       it('throws the usage message when repoPath is missing', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile(deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: '' }, deps);
 
-        await expectAsync(instance.run('', ISSUE_ID, 'Title', bodyFile)).toBeRejectedWithError(USAGE);
-        expect(deps.repoPath.validate).not.toHaveBeenCalled();
+        await expectAsync(instance.run(ISSUE_ID, 'Title', bodyFile)).toBeRejectedWithError(USAGE);
+        expect(deps.repoPathValidator.validate).not.toHaveBeenCalled();
       });
 
       it('throws the usage message when issueId is missing', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile(deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath }, deps);
 
-        await expectAsync(instance.run(repoPath, '', 'Title', bodyFile)).toBeRejectedWithError(USAGE);
-        expect(deps.repoPath.validate).not.toHaveBeenCalled();
+        await expectAsync(instance.run('', 'Title', bodyFile)).toBeRejectedWithError(USAGE);
+        expect(deps.repoPathValidator.validate).not.toHaveBeenCalled();
       });
 
       it('throws the usage message when title is missing', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile(deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath }, deps);
 
-        await expectAsync(instance.run(repoPath, ISSUE_ID, '', bodyFile)).toBeRejectedWithError(USAGE);
-        expect(deps.repoPath.validate).not.toHaveBeenCalled();
+        await expectAsync(instance.run(ISSUE_ID, '', bodyFile)).toBeRejectedWithError(USAGE);
+        expect(deps.repoPathValidator.validate).not.toHaveBeenCalled();
       });
 
       it('throws the usage message when bodyFile is missing', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile(deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath }, deps);
 
-        await expectAsync(instance.run(repoPath, ISSUE_ID, 'Title', '')).toBeRejectedWithError(USAGE);
-        expect(deps.repoPath.validate).not.toHaveBeenCalled();
+        await expectAsync(instance.run(ISSUE_ID, 'Title', '')).toBeRejectedWithError(USAGE);
+        expect(deps.repoPathValidator.validate).not.toHaveBeenCalled();
       });
     });
 
     describe('when repoPath validation fails', () => {
       it('propagates the rejection uncaught', async () => {
         const deps = stubDeps({
-          repoPath: { validate: jasmine.createSpy('validate').and.rejectWith(new Error('Error: not a directory: x')) }
+          repoPathValidator: {
+            validate: jasmine.createSpy('validate').and.rejectWith(new Error('Error: not a directory: x'))
+          }
         });
-        const instance = new ArcanumSplitIssueCreateSubIssueFile(deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath }, deps);
 
-        await expectAsync(instance.run(repoPath, ISSUE_ID, 'Title', bodyFile)).toBeRejectedWithError(
+        await expectAsync(instance.run(ISSUE_ID, 'Title', bodyFile)).toBeRejectedWithError(
           'Error: not a directory: x'
         );
       });
@@ -85,19 +87,19 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
     describe('when bodyFile does not exist', () => {
       it('throws "Error: file not found: <bodyFile>" using the raw argument in the message', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile(deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath }, deps);
         const missingBodyFile = path.join(repoPath, 'missing.md');
 
-        await expectAsync(instance.run(repoPath, ISSUE_ID, 'Title', missingBodyFile)).toBeRejectedWithError(
+        await expectAsync(instance.run(ISSUE_ID, 'Title', missingBodyFile)).toBeRejectedWithError(
           `Error: file not found: ${missingBodyFile}`
         );
       });
 
       it('resolves a relative bodyFile against repoPath, mirroring the shell cd', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile(deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath }, deps);
 
-        await expectAsync(instance.run(repoPath, ISSUE_ID, 'Title', 'missing.md')).toBeRejectedWithError(
+        await expectAsync(instance.run(ISSUE_ID, 'Title', 'missing.md')).toBeRejectedWithError(
           'Error: file not found: missing.md'
         );
       });
@@ -106,9 +108,9 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
     describe('sub-issue counting', () => {
       it('starts a fresh id at count 01', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile(deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath }, deps);
 
-        const result = await instance.run(repoPath, ISSUE_ID, 'First Sub Issue', bodyFile);
+        const result = await instance.run(ISSUE_ID, 'First Sub Issue', bodyFile);
 
         expect(result).toEqual(`FILE=${ISSUES_DIR}/${ISSUE_ID}_01_first_sub_issue.md\n`);
         const written = await readFile(path.join(repoPath, ISSUES_DIR, `${ISSUE_ID}_01_first_sub_issue.md`), 'utf8');
@@ -118,30 +120,30 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
 
       it('increments the count on a second call', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile(deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath }, deps);
 
-        await instance.run(repoPath, ISSUE_ID, 'First Sub Issue', bodyFile);
-        const result = await instance.run(repoPath, ISSUE_ID, 'Second Sub Issue', bodyFile);
+        await instance.run(ISSUE_ID, 'First Sub Issue', bodyFile);
+        const result = await instance.run(ISSUE_ID, 'Second Sub Issue', bodyFile);
 
         expect(result).toEqual(`FILE=${ISSUES_DIR}/${ISSUE_ID}_02_second_sub_issue.md\n`);
       });
 
       it('picks up an out-of-band file created outside the tool', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile(deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath }, deps);
         const issuesDir = path.join(repoPath, ISSUES_DIR);
 
         await mkdir(issuesDir, { recursive: true });
         await writeFile(path.join(issuesDir, `${ISSUE_ID}_03_manual.md`), '');
 
-        const result = await instance.run(repoPath, ISSUE_ID, 'Fourth Sub Issue', bodyFile);
+        const result = await instance.run(ISSUE_ID, 'Fourth Sub Issue', bodyFile);
 
         expect(result).toEqual(`FILE=${ISSUES_DIR}/${ISSUE_ID}_04_fourth_sub_issue.md\n`);
       });
 
       it('never reuses a count freed by a deleted file (gap-tolerant)', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile(deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath }, deps);
         const issuesDir = path.join(repoPath, ISSUES_DIR);
 
         await mkdir(issuesDir, { recursive: true });
@@ -150,14 +152,14 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
         // the next count must be 05, never reusing 02 or 03.
         await writeFile(path.join(issuesDir, `${ISSUE_ID}_04_fourth.md`), '');
 
-        const result = await instance.run(repoPath, ISSUE_ID, 'Fifth Sub Issue', bodyFile);
+        const result = await instance.run(ISSUE_ID, 'Fifth Sub Issue', bodyFile);
 
         expect(result).toEqual(`FILE=${ISSUES_DIR}/${ISSUE_ID}_05_fifth_sub_issue.md\n`);
       });
 
       it('skips filenames whose count segment is not numeric', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile(deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath }, deps);
         const issuesDir = path.join(repoPath, ISSUES_DIR);
 
         await mkdir(issuesDir, { recursive: true });
@@ -166,14 +168,14 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
         // purely numeric, so it must be skipped rather than counted.
         await writeFile(path.join(issuesDir, `${ISSUE_ID}_12abc_weird.md`), '');
 
-        const result = await instance.run(repoPath, ISSUE_ID, 'Next Sub Issue', bodyFile);
+        const result = await instance.run(ISSUE_ID, 'Next Sub Issue', bodyFile);
 
         expect(result).toEqual(`FILE=${ISSUES_DIR}/${ISSUE_ID}_01_next_sub_issue.md\n`);
       });
 
       it('ignores filenames with fewer than 2 leading digits', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile(deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath }, deps);
         const issuesDir = path.join(repoPath, ISSUES_DIR);
 
         await mkdir(issuesDir, { recursive: true });
@@ -181,16 +183,16 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
         // shell's [0-9][0-9]* glob and must not be counted.
         await writeFile(path.join(issuesDir, `${ISSUE_ID}_5_solo.md`), '');
 
-        const result = await instance.run(repoPath, ISSUE_ID, 'Next Sub Issue', bodyFile);
+        const result = await instance.run(ISSUE_ID, 'Next Sub Issue', bodyFile);
 
         expect(result).toEqual(`FILE=${ISSUES_DIR}/${ISSUE_ID}_01_next_sub_issue.md\n`);
       });
 
       it('creates docs/agents/issues/ when missing', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile(deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath }, deps);
 
-        const result = await instance.run(repoPath, ISSUE_ID, 'First Sub Issue', bodyFile);
+        const result = await instance.run(ISSUE_ID, 'First Sub Issue', bodyFile);
 
         expect(result).toEqual(`FILE=${ISSUES_DIR}/${ISSUE_ID}_01_first_sub_issue.md\n`);
       });
@@ -199,18 +201,18 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
     describe('title-to-snake_case transform', () => {
       it('lowercases, replaces punctuation, collapses repeated separators, and trims ends', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile(deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath }, deps);
 
-        const result = await instance.run(repoPath, ISSUE_ID, 'Hello, World! Foo-Bar', bodyFile);
+        const result = await instance.run(ISSUE_ID, 'Hello, World! Foo-Bar', bodyFile);
 
         expect(result).toEqual(`FILE=${ISSUES_DIR}/${ISSUE_ID}_01_hello_world_foo_bar.md\n`);
       });
 
       it('strips leading/trailing separators produced by leading/trailing punctuation', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile(deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath }, deps);
 
-        const result = await instance.run(repoPath, ISSUE_ID, '__Weird__  Title__', bodyFile);
+        const result = await instance.run(ISSUE_ID, '__Weird__  Title__', bodyFile);
 
         expect(result).toEqual(`FILE=${ISSUES_DIR}/${ISSUE_ID}_01_weird_title.md\n`);
       });
@@ -220,9 +222,9 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
       it('writes "# <title>\\n\\n<body>" and returns FILE=<path>\\n', async () => {
         await writeFile(bodyFile, 'body content here\nsecond line\n');
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile(deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath }, deps);
 
-        const result = await instance.run(repoPath, ISSUE_ID, 'My Title', bodyFile);
+        const result = await instance.run(ISSUE_ID, 'My Title', bodyFile);
         const expectedFile = `${ISSUES_DIR}/${ISSUE_ID}_01_my_title.md`;
 
         expect(result).toEqual(`FILE=${expectedFile}\n`);
@@ -235,9 +237,9 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
       it('copies the body file bytes verbatim, without trailing-newline normalization', async () => {
         await writeFile(bodyFile, 'no trailing newline');
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile(deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath }, deps);
 
-        await instance.run(repoPath, ISSUE_ID, 'My Title', bodyFile);
+        await instance.run(ISSUE_ID, 'My Title', bodyFile);
 
         const written = await readFile(path.join(repoPath, ISSUES_DIR, `${ISSUE_ID}_01_my_title.md`), 'utf8');
 

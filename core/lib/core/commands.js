@@ -30,7 +30,8 @@ export const COMMANDS = {
   },
   'arcanum-split-issue-create-sub-issue-file': {
     module: 'commands/ArcanumSplitIssueCreateSubIssueFile.js',
-    method: 'run'
+    method: 'run',
+    takesRepoContext: true
   },
   'arcanum-split-issue-finish': { module: 'commands/ArcanumSplitIssueFinish.js', method: 'run' },
   'arcanum-split-issue-push-sub-issues': {

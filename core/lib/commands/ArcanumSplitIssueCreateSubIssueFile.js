@@ -14,25 +14,29 @@ const ISSUES_DIR = 'docs/agents/issues';
  */
 class ArcanumSplitIssueCreateSubIssueFile {
   /**
+   * @param {RepoContext} repoContext - the target repo's context
+   *   (provides `repoPath`).
    * @param {object} [deps] - injectable collaborators, for testing.
-   * @param {RepoPath} [deps.repoPath] - repo-path validation helper.
    * @param {Function} [deps.readdir] - `node:fs/promises`'s `readdir`.
    * @param {Function} [deps.mkdir] - `node:fs/promises`'s `mkdir`.
    * @param {Function} [deps.readFile] - `node:fs/promises`'s `readFile`.
    * @param {Function} [deps.writeFile] - `node:fs/promises`'s `writeFile`.
+   * @param {RepoPath} [deps.repoPathValidator] - repo-path validation
+   *   helper.
    */
-  constructor({
-    repoPath = new RepoPath(),
+  constructor(repoContext, {
     readdir: readdirFn = readdir,
     mkdir: mkdirFn = mkdir,
     readFile: readFileFn = readFile,
-    writeFile: writeFileFn = writeFile
+    writeFile: writeFileFn = writeFile,
+    repoPathValidator = new RepoPath()
   } = {}) {
-    this._repoPath = repoPath;
+    this._repoContext = repoContext;
     this._readdir = readdirFn;
     this._mkdir = mkdirFn;
     this._readFile = readFileFn;
     this._writeFile = writeFileFn;
+    this._repoPathValidator = repoPathValidator;
   }
 
   /**
@@ -45,21 +49,20 @@ class ArcanumSplitIssueCreateSubIssueFile {
    * script's `cd`-then-check order), scans `docs/agents/issues/` for the
    * next gap-tolerant zero-padded sub-issue count, snake_cases `title`,
    * writes the new sub-issue file, and returns `FILE=<path>\n`.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} issueId - the parent issue's numeric id.
    * @param {string} title - the sub-issue's title.
    * @param {string} bodyFile - path (absolute, or relative to `repoPath`)
    *   to the sub-issue's body content.
    * @returns {Promise<string>} the `FILE=<path>\n` output.
    */
-  async run(repoPath, issueId, title, bodyFile) {
-    if (!repoPath || !issueId || !title || !bodyFile) {
+  async run(issueId, title, bodyFile) {
+    if (!this._repoContext.repoPath || !issueId || !title || !bodyFile) {
       throw new Error(USAGE);
     }
 
-    await this._repoPath.validate(repoPath);
+    await this._repoPathValidator.validate(this._repoContext.repoPath);
 
-    const resolvedBodyFile = path.resolve(repoPath, bodyFile);
+    const resolvedBodyFile = path.resolve(this._repoContext.repoPath, bodyFile);
     let body;
 
     try {
@@ -68,7 +71,7 @@ class ArcanumSplitIssueCreateSubIssueFile {
       throw new Error(`Error: file not found: ${bodyFile}`);
     }
 
-    const issuesDir = path.join(repoPath, ISSUES_DIR);
+    const issuesDir = path.join(this._repoContext.repoPath, ISSUES_DIR);
 
     await this._mkdir(issuesDir, { recursive: true });
 
@@ -79,7 +82,7 @@ class ArcanumSplitIssueCreateSubIssueFile {
 
     const header = Buffer.from(`# ${title}\n\n`);
 
-    await this._writeFile(path.join(repoPath, ISSUES_DIR, fileName), Buffer.concat([header, body]));
+    await this._writeFile(path.join(this._repoContext.repoPath, ISSUES_DIR, fileName), Buffer.concat([header, body]));
 
     return `FILE=${relativeFile}\n`;
   }
