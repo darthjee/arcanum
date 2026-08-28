@@ -51,7 +51,7 @@ describe('AutoFixAllWaitCiAndMerge', () => {
           'passed\nhttps://github.com/darthjee/arcanum/pull/7\n'
         );
         expect(deps.waitCi.run).toHaveBeenCalledWith();
-        expect(deps.github.prMerge).toHaveBeenCalledWith(REPO_PATH, MODEL_EMAIL);
+        expect(deps.github.prMerge).toHaveBeenCalledWith(MODEL_EMAIL);
       });
 
       it('forwards an omitted modelEmail as undefined', async () => {
@@ -60,7 +60,7 @@ describe('AutoFixAllWaitCiAndMerge', () => {
 
         await instance.run();
 
-        expect(deps.github.prMerge).toHaveBeenCalledWith(REPO_PATH, undefined);
+        expect(deps.github.prMerge).toHaveBeenCalledWith(undefined);
       });
 
       it('propagates an error thrown by the merge call', async () => {

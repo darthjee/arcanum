@@ -15,7 +15,9 @@
  *   argument, and that leading argument is stripped from the method args.
  *   Set on the `arcanum-split-issue-*` and `auto-fix-all-*` lifecycle
  *   commands (checkout-from-main / cleanup-artifacts / reply-comment /
- *   wait-ci / wait-ci-and-merge).
+ *   wait-ci / wait-ci-and-merge), on `spawn-issue`, and on the
+ *   `auto-fix-all-github-*` family (add-tag / cleanup-branch /
+ *   has-shipit-label / pr-merge / pr-number / pr-state / remove-tag).
  */
 
 /**
@@ -62,13 +64,41 @@ export const COMMANDS = {
   'auto-fix-all-config-is-enabled': { module: 'commands/AutoFixAllConfig.js', method: 'isEnabled' },
   'auto-fix-all-config-set': { module: 'commands/AutoFixAllConfig.js', method: 'set' },
   'auto-fix-all-config-toggle': { module: 'commands/AutoFixAllConfig.js', method: 'toggle' },
-  'auto-fix-all-github-add-tag': { module: 'commands/AutoFixAllGithub.js', method: 'addTag' },
-  'auto-fix-all-github-cleanup-branch': { module: 'commands/AutoFixAllGithub.js', method: 'cleanupBranch' },
-  'auto-fix-all-github-has-shipit-label': { module: 'commands/AutoFixAllGithub.js', method: 'hasShipitLabel' },
-  'auto-fix-all-github-pr-merge': { module: 'commands/AutoFixAllGithub.js', method: 'prMerge' },
-  'auto-fix-all-github-pr-number': { module: 'commands/AutoFixAllGithub.js', method: 'prNumber' },
-  'auto-fix-all-github-pr-state': { module: 'commands/AutoFixAllGithub.js', method: 'prState' },
-  'auto-fix-all-github-remove-tag': { module: 'commands/AutoFixAllGithub.js', method: 'removeTag' },
+  'auto-fix-all-github-add-tag': {
+    module: 'commands/AutoFixAllGithub.js',
+    method: 'addTag',
+    takesRepoContext: true
+  },
+  'auto-fix-all-github-cleanup-branch': {
+    module: 'commands/AutoFixAllGithub.js',
+    method: 'cleanupBranch',
+    takesRepoContext: true
+  },
+  'auto-fix-all-github-has-shipit-label': {
+    module: 'commands/AutoFixAllGithub.js',
+    method: 'hasShipitLabel',
+    takesRepoContext: true
+  },
+  'auto-fix-all-github-pr-merge': {
+    module: 'commands/AutoFixAllGithub.js',
+    method: 'prMerge',
+    takesRepoContext: true
+  },
+  'auto-fix-all-github-pr-number': {
+    module: 'commands/AutoFixAllGithub.js',
+    method: 'prNumber',
+    takesRepoContext: true
+  },
+  'auto-fix-all-github-pr-state': {
+    module: 'commands/AutoFixAllGithub.js',
+    method: 'prState',
+    takesRepoContext: true
+  },
+  'auto-fix-all-github-remove-tag': {
+    module: 'commands/AutoFixAllGithub.js',
+    method: 'removeTag',
+    takesRepoContext: true
+  },
   'auto-fix-all-queue-empty': { module: 'commands/AutoFixAllQueue.js', method: 'empty' },
   'auto-fix-all-queue-list': { module: 'commands/AutoFixAllQueue.js', method: 'list' },
   'auto-fix-all-queue-next': { module: 'commands/AutoFixAllQueue.js', method: 'next' },
@@ -116,5 +146,5 @@ export const COMMANDS = {
   'resolve-and-fetch': { module: 'commands/ResolveAndFetch.js', method: 'run' },
   'resolve-id-and-file': { module: 'commands/ResolveIdAndFile.js', method: 'run' },
   'resolve-plan-paths': { module: 'commands/ResolvePlanPaths.js', method: 'run' },
-  'spawn-issue': { module: 'commands/SpawnIssue.js', method: 'run' }
+  'spawn-issue': { module: 'commands/SpawnIssue.js', method: 'run', takesRepoContext: true }
 };

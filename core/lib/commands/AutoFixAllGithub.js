@@ -8,38 +8,43 @@ import TagMutationService from '../services/TagMutationService.js';
 /**
  * Native equivalent of `auto-fix-all/scripts/github.sh`'s 7 GitHub-facing
  * subcommands. A thin facade over just three collaborators: a
- * `RepoContextFactory` that builds each per-call `RepoContext` bundle
- * (PR lifecycle goes through a per-call `PrOperations`, tag/label
- * mutation through a per-call `TagMutationService`, both built off that
- * bundle — `repoPath` differs call to call, so none of the context-bound
- * pieces can be shared), an `issueTaggerFactory` for the per-call
- * `IssueTagger` (`hasShipitLabel` plus the tag-mutation service), and a
+ * `RepoContextFactory` that wraps the constructor-injected `RepoContext`
+ * into a per-call bundle via `buildFromContext` (PR lifecycle goes
+ * through a per-call `PrOperations`, tag/label mutation through a
+ * per-call `TagMutationService`, both built off that bundle — the
+ * context-bound pieces are rebuilt per call, but always off the same
+ * `RepoContext`), an `issueTaggerFactory` for the per-call `IssueTagger`
+ * (`hasShipitLabel` plus the tag-mutation service), and a
  * `BranchCleanup` for local-git branch teardown — see
  * `docs/agents/plans/284-refactor-core-lib-autofixallgithub-js/`,
  * `docs/agents/plans/292-reduce-size-of-properations/`,
  * `docs/agents/plans/294-refactor-properations/`, and
  * `docs/agents/plans/304-refactor-autofixallgithub-to-extract-responsibilities/`.
  * Kept (not removed) since `AutoFixAllWaitCiAndMerge.js` instantiates it
- * directly to call `#prMerge`.
+ * directly (now with a `repoContext`) to call `#prMerge`.
  */
 class AutoFixAllGithub {
   /**
+   * @param {import('../context/RepoContext.js').default} repoContext -
+   *   the target repo's context (provides `repoPath` plus the low-level
+   *   `origin`/`githubToken`/`issueStateService`/`configChain` wiring the
+   *   per-call bundle is built off via `buildFromContext`).
    * @param {object} [deps] - injectable collaborators, for testing.
-   * @param {RepoContextFactory} [deps.repoContextFactory] - builds each
-   *   per-call `RepoContext` bundle (context plus context-bound
-   *   clients) — see `#_prOperations`/`#_issueTagger`/
-   *   `#_tagMutationService`. Owns the low-level `origin`/`githubToken`/
-   *   `issueStateService`/`configChain`/`execFileAsync`/`fetchFn`/
-   *   `timeoutMs` wiring.
+   * @param {RepoContextFactory} [deps.repoContextFactory] - wraps the
+   *   injected `RepoContext` into a per-call bundle (context plus
+   *   context-bound clients) via `buildFromContext` — see
+   *   `#_prOperations`/`#_issueTagger`/`#_tagMutationService`. Only its
+   *   `execFileAsync`/`fetchFn`/`timeoutMs` knobs are consulted on this
+   *   path.
    * @param {Function} [deps.issueTaggerFactory] - builds an
    *   `IssueTagger` (used by `addTag`/`removeTag`/`hasShipitLabel`) from
    *   a per-call `RepoContext` bundle — see `#_issueTagger`. A factory,
-   *   not a pre-built instance, since a context-bound `IssueTagger`
-   *   can't be shared across calls once `repoPath` varies call to call.
+   *   not a pre-built instance, since the context-bound `IssueTagger` is
+   *   rebuilt per call.
    * @param {BranchCleanup} [deps.branchCleanup] - delegate for
    *   `cleanupBranch`.
    */
-  constructor({
+  constructor(repoContext, {
     repoContextFactory = new RepoContextFactory(),
     issueTaggerFactory = (bundle) => new IssueTagger({
       context: bundle.context,
@@ -47,6 +52,7 @@ class AutoFixAllGithub {
     }),
     branchCleanup = new BranchCleanup()
   } = {}) {
+    this._repoContext = repoContext;
     this._repoContextFactory = repoContextFactory;
     this._issueTaggerFactory = issueTaggerFactory;
     this._branchCleanup = branchCleanup;
@@ -54,80 +60,74 @@ class AutoFixAllGithub {
 
   /**
    * `github.sh pr-number` — see `PrOperations#prNumber`.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @returns {Promise<string>} `<number>\n`.
    */
-  async prNumber(repoPath) {
-    if (!repoPath) {
+  async prNumber() {
+    if (!this._repoContext.repoPath) {
       throw new Error('Usage: github.sh pr-number <repo_path>');
     }
 
-    return this._prOperations(repoPath).prNumber();
+    return this._prOperations().prNumber();
   }
 
   /**
    * `github.sh pr-state` — see `PrOperations#prState`.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @returns {Promise<string>} `STATE=<OPEN|MERGED|CLOSED>\n`.
    */
-  async prState(repoPath) {
-    if (!repoPath) {
+  async prState() {
+    if (!this._repoContext.repoPath) {
       throw new Error('Usage: github.sh pr-state <repo_path>');
     }
 
-    return this._prOperations(repoPath).prState();
+    return this._prOperations().prState();
   }
 
   /**
    * `github.sh pr-merge` — see `PrOperations#prMerge`.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} [modelEmail] - the acting model's commit email.
    * @returns {Promise<string>} `<url>\n`, the merged PR's URL.
    */
-  async prMerge(repoPath, modelEmail) {
-    if (!repoPath) {
+  async prMerge(modelEmail) {
+    if (!this._repoContext.repoPath) {
       throw new Error('Usage: github.sh pr-merge <repo_path> [model_email]');
     }
 
-    return this._prOperations(repoPath).prMerge(modelEmail);
+    return this._prOperations().prMerge(modelEmail);
   }
 
   /**
-   * Build a per-call `PrOperations` from a fresh `RepoContextFactory`
-   * bundle (its `context` plus a context-bound `gitClient`/`gitBranch`/
-   * `git`/`githubClient` — the extra `issueClient` key is ignored by
-   * `PrOperations`). The whole bundle is cheap, zero-I/O construction,
-   * so building it per call has no meaningful cost.
-   * @param {string} repoPath - the target repo's local checkout path.
+   * Build a per-call `PrOperations` by wrapping the injected
+   * `RepoContext` into a `RepoContextFactory` bundle (its `context` plus
+   * a context-bound `gitClient`/`gitBranch`/`git`/`githubClient` — the
+   * extra `issueClient` key is ignored by `PrOperations`). The bundle is
+   * cheap, zero-I/O construction, so building it per call has no
+   * meaningful cost.
    * @returns {PrOperations} the per-call `PrOperations` facade.
    */
-  _prOperations(repoPath) {
-    return new PrOperations(this._repoContextFactory.build(repoPath));
+  _prOperations() {
+    return new PrOperations(this._repoContextFactory.buildFromContext(this._repoContext));
   }
 
   /**
    * Build a per-call `IssueTagger` by handing the `issueTaggerFactory` a
-   * fresh `RepoContextFactory` bundle (it reads `.context`/
-   * `.issueClient` off it), since a context-bound `IssueTagger` can't be
-   * a constructor-level shared singleton once `repoPath` varies call to
-   * call.
-   * @param {string} repoPath - the target repo's local checkout path.
+   * `RepoContextFactory` bundle wrapping the injected `RepoContext` (it
+   * reads `.context`/`.issueClient` off it) — the context-bound
+   * `IssueTagger` is rebuilt per call rather than shared.
    * @returns {IssueTagger} the per-call `IssueTagger` delegate.
    */
-  _issueTagger(repoPath) {
-    return this._issueTaggerFactory(this._repoContextFactory.build(repoPath));
+  _issueTagger() {
+    return this._issueTaggerFactory(this._repoContextFactory.buildFromContext(this._repoContext));
   }
 
   /**
-   * Build a per-call `TagMutationService` from a fresh
-   * `RepoContextFactory` bundle — its context-bound `IssueTagger`
-   * (via `issueTaggerFactory`) and `RepoContext` can't be shared once
-   * `repoPath` varies call to call.
-   * @param {string} repoPath - the target repo's local checkout path.
+   * Build a per-call `TagMutationService` from a `RepoContextFactory`
+   * bundle wrapping the injected `RepoContext` — its context-bound
+   * `IssueTagger` (via `issueTaggerFactory`) and `RepoContext` are
+   * rebuilt per call rather than shared.
    * @returns {TagMutationService} the per-call tag-mutation service.
    */
-  _tagMutationService(repoPath) {
-    const bundle = this._repoContextFactory.build(repoPath);
+  _tagMutationService() {
+    const bundle = this._repoContextFactory.buildFromContext(this._repoContext);
 
     return new TagMutationService({
       issueTagger: this._issueTaggerFactory(bundle),
@@ -137,12 +137,11 @@ class AutoFixAllGithub {
 
   /**
    * `github.sh cleanup-branch` — see `BranchCleanup#cleanupBranch`.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} id - the numeric issue id.
    * @returns {Promise<string>} the concatenated git stdout.
    */
-  cleanupBranch(repoPath, id) {
-    return this._branchCleanup.cleanupBranch(repoPath, id);
+  cleanupBranch(id) {
+    return this._branchCleanup.cleanupBranch(this._repoContext.repoPath, id);
   }
 
   /**
@@ -151,19 +150,18 @@ class AutoFixAllGithub {
    * token/label-fetch) or an absent label — `IssueTagger#hasLabel`
    * itself only throws a plain `Error`, so this facade owns that
    * conversion.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} id - the numeric issue id.
    * @returns {Promise<string>} `''` when the issue has a `shipit` label.
    */
-  async hasShipitLabel(repoPath, id) {
-    if (!repoPath || !id) {
+  async hasShipitLabel(id) {
+    if (!this._repoContext.repoPath || !id) {
       throw new Error('Usage: github.sh has-shipit-label <repo_path> <id>');
     }
 
     let hasShipit;
 
     try {
-      hasShipit = await this._issueTagger(repoPath).hasLabel(id, 'shipit');
+      hasShipit = await this._issueTagger().hasLabel(id, 'shipit');
     } catch {
       throw new DispatchFailure('', 1);
     }
@@ -177,32 +175,30 @@ class AutoFixAllGithub {
 
   /**
    * `github.sh add-tag` — see `TagMutationService#addTag`.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} id - the numeric issue id.
    * @param {string} tag - the canonical tag name to add.
    * @returns {Promise<string>} the resulting confirmation line.
    */
-  async addTag(repoPath, id, tag) {
-    if (!repoPath || !id || !tag) {
+  async addTag(id, tag) {
+    if (!this._repoContext.repoPath || !id || !tag) {
       throw new Error('Usage: github.sh add-tag <repo_path> <id> <tag>');
     }
 
-    return this._tagMutationService(repoPath).addTag(id, tag);
+    return this._tagMutationService().addTag(id, tag);
   }
 
   /**
    * `github.sh remove-tag` — see `TagMutationService#removeTag`.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} id - the numeric issue id.
    * @param {string} tag - the canonical tag name to remove.
    * @returns {Promise<string>} the resulting confirmation line.
    */
-  async removeTag(repoPath, id, tag) {
-    if (!repoPath || !id || !tag) {
+  async removeTag(id, tag) {
+    if (!this._repoContext.repoPath || !id || !tag) {
       throw new Error('Usage: github.sh remove-tag <repo_path> <id> <tag>');
     }
 
-    return this._tagMutationService(repoPath).removeTag(id, tag);
+    return this._tagMutationService().removeTag(id, tag);
   }
 }
 
