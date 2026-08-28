@@ -1,7 +1,10 @@
-import { mkdir, readdir, writeFile } from 'node:fs/promises';
+import { access, mkdir, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import ArcanumSplitIssueFinish from '../../../lib/commands/ArcanumSplitIssueFinish.js';
 import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
+
+const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
 
 const ISSUE_ID = '999';
 const ISSUES_DIR = 'docs/agents/issues';
@@ -75,9 +78,22 @@ describe('ArcanumSplitIssueFinish', () => {
         await instance.run(ISSUE_ID);
 
         expect(deps.execFileAsync).toHaveBeenCalledWith(
-          path.join(repoPath, 'arcanum-split-issue', 'scripts', 'github.sh'),
+          jasmine.stringMatching(/arcanum-split-issue[/\\]scripts[/\\]github\.sh$/),
           ['mark-split', repoPath, ISSUE_ID]
         );
+      });
+
+      it('resolves github.sh from the skill install root, not repoPath, and that path exists on disk', async () => {
+        const deps = stubDeps();
+        const instance = new ArcanumSplitIssueFinish({ repoPath }, deps);
+
+        await instance.run(ISSUE_ID);
+
+        const [scriptPath] = deps.execFileAsync.calls.mostRecent().args;
+
+        expect(scriptPath).toEqual(path.join(REPO_ROOT, 'arcanum-split-issue', 'scripts', 'github.sh'));
+        expect(scriptPath.startsWith(repoPath)).toBeFalse();
+        await expectAsync(access(scriptPath)).toBeResolved();
       });
 
       describe('when it rejects', () => {
