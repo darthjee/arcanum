@@ -153,7 +153,11 @@ export const COMMANDS = {
     takesRepoContext: true
   },
   'issue-state': { module: 'commands/IssueState.js', method: 'run' },
-  'list-agents': { module: 'commands/ListAgents.js', method: 'run' },
+  'list-agents': {
+    module: 'commands/ListAgents.js',
+    method: 'run',
+    takesRepoContext: true
+  },
   'permission-grant': { module: 'commands/PermissionGrant.js', method: 'run' },
   'resolve-and-fetch': {
     module: 'commands/ResolveAndFetch.js',

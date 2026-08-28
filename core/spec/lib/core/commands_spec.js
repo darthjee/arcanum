@@ -33,6 +33,7 @@ describe('COMMANDS', () => {
       'dispatch-fixture-repo-context',
       'github-issue-create',
       'github-issue-info',
+      'list-agents',
       'resolve-and-fetch',
       'resolve-id-and-file',
       'resolve-plan-paths',
