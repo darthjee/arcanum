@@ -41,7 +41,8 @@ export const COMMANDS = {
   },
   'arcanum-split-issue-push-sub-issues': {
     module: 'commands/ArcanumSplitIssuePushSubIssues.js',
-    method: 'run'
+    method: 'run',
+    takesRepoContext: true
   },
   'arcanum-update-run-update-check': { module: 'commands/ArcanumUpdateRunUpdate.js', method: 'check' },
   'arcanum-update-run-update-apply': { module: 'commands/ArcanumUpdateRunUpdate.js', method: 'apply' },

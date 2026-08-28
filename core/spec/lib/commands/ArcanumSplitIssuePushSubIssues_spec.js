@@ -15,7 +15,7 @@ const ISSUES_DIR = 'docs/agents/issues';
  */
 function stubDeps(overrides = {}) {
   return {
-    repoPath: { validate: jasmine.createSpy('validate').and.resolveTo(undefined) },
+    repoPathValidator: { validate: jasmine.createSpy('validate').and.resolveTo(undefined) },
     createSubIssue: {
       run: jasmine.createSpy('run').and.resolveTo('STATUS=ok\nID=1\n')
     },
@@ -50,29 +50,31 @@ describe('ArcanumSplitIssuePushSubIssues', () => {
     describe('argument validation', () => {
       it('throws the usage message when repoPath is missing', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssuePushSubIssues(deps);
+        const instance = new ArcanumSplitIssuePushSubIssues({ repoPath: '' }, deps);
 
-        await expectAsync(instance.run('', ISSUE_ID)).toBeRejectedWithError(USAGE);
-        expect(deps.repoPath.validate).not.toHaveBeenCalled();
+        await expectAsync(instance.run(ISSUE_ID)).toBeRejectedWithError(USAGE);
+        expect(deps.repoPathValidator.validate).not.toHaveBeenCalled();
       });
 
       it('throws the usage message when issueId is missing', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssuePushSubIssues(deps);
+        const instance = new ArcanumSplitIssuePushSubIssues({ repoPath }, deps);
 
-        await expectAsync(instance.run(repoPath, '')).toBeRejectedWithError(USAGE);
-        expect(deps.repoPath.validate).not.toHaveBeenCalled();
+        await expectAsync(instance.run('')).toBeRejectedWithError(USAGE);
+        expect(deps.repoPathValidator.validate).not.toHaveBeenCalled();
       });
     });
 
     describe('when repoPath validation fails', () => {
       it('propagates the rejection uncaught', async () => {
         const deps = stubDeps({
-          repoPath: { validate: jasmine.createSpy('validate').and.rejectWith(new Error('Error: not a directory: x')) }
+          repoPathValidator: {
+            validate: jasmine.createSpy('validate').and.rejectWith(new Error('Error: not a directory: x'))
+          }
         });
-        const instance = new ArcanumSplitIssuePushSubIssues(deps);
+        const instance = new ArcanumSplitIssuePushSubIssues({ repoPath }, deps);
 
-        await expectAsync(instance.run(repoPath, ISSUE_ID)).toBeRejectedWithError('Error: not a directory: x');
+        await expectAsync(instance.run(ISSUE_ID)).toBeRejectedWithError('Error: not a directory: x');
         expect(deps.createSubIssue.run).not.toHaveBeenCalled();
       });
     });
@@ -80,9 +82,9 @@ describe('ArcanumSplitIssuePushSubIssues', () => {
     describe('zero matching files', () => {
       it('resolves STATUS=ok with an empty CREATED= when the issues directory does not exist', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssuePushSubIssues(deps);
+        const instance = new ArcanumSplitIssuePushSubIssues({ repoPath }, deps);
 
-        const result = await instance.run(repoPath, ISSUE_ID);
+        const result = await instance.run(ISSUE_ID);
 
         expect(result).toEqual('STATUS=ok\nCREATED=\n');
         expect(deps.createSubIssue.run).not.toHaveBeenCalled();
@@ -91,9 +93,9 @@ describe('ArcanumSplitIssuePushSubIssues', () => {
       it('resolves STATUS=ok with an empty CREATED= when the directory only has unrelated files', async () => {
         await writeIssueFile(repoPath, 'unrelated.md');
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssuePushSubIssues(deps);
+        const instance = new ArcanumSplitIssuePushSubIssues({ repoPath }, deps);
 
-        const result = await instance.run(repoPath, ISSUE_ID);
+        const result = await instance.run(ISSUE_ID);
 
         expect(result).toEqual('STATUS=ok\nCREATED=\n');
         expect(deps.createSubIssue.run).not.toHaveBeenCalled();
@@ -109,25 +111,23 @@ describe('ArcanumSplitIssuePushSubIssues', () => {
 
         const deps = stubDeps({
           createSubIssue: {
-            run: jasmine.createSpy('run').and.callFake(async (rp, id, file) => {
+            run: jasmine.createSpy('run').and.callFake(async (id, file) => {
               const idBySuffix = file.endsWith('01_first.md') ? '10' : '20';
 
               return `STATUS=ok\nID=${idBySuffix}\n`;
             })
           }
         });
-        const instance = new ArcanumSplitIssuePushSubIssues(deps);
+        const instance = new ArcanumSplitIssuePushSubIssues({ repoPath }, deps);
 
-        const result = await instance.run(repoPath, ISSUE_ID);
+        const result = await instance.run(ISSUE_ID);
 
         expect(deps.createSubIssue.run.calls.count()).toEqual(2);
         expect(deps.createSubIssue.run.calls.argsFor(0)).toEqual([
-          repoPath,
           ISSUE_ID,
           `${ISSUES_DIR}/${ISSUE_ID}_01_first.md`
         ]);
         expect(deps.createSubIssue.run.calls.argsFor(1)).toEqual([
-          repoPath,
           ISSUE_ID,
           `${ISSUES_DIR}/${ISSUE_ID}_02_second.md`
         ]);
@@ -145,13 +145,12 @@ describe('ArcanumSplitIssuePushSubIssues', () => {
         await writeIssueFile(repoPath, `${ISSUE_ID}_01nounderscore.md`);
 
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssuePushSubIssues(deps);
+        const instance = new ArcanumSplitIssuePushSubIssues({ repoPath }, deps);
 
-        const result = await instance.run(repoPath, ISSUE_ID);
+        const result = await instance.run(ISSUE_ID);
 
         expect(deps.createSubIssue.run.calls.count()).toEqual(1);
         expect(deps.createSubIssue.run).toHaveBeenCalledWith(
-          repoPath,
           ISSUE_ID,
           `${ISSUES_DIR}/${ISSUE_ID}_01_matches.md`
         );
@@ -173,7 +172,7 @@ describe('ArcanumSplitIssuePushSubIssues', () => {
 
         const deps = stubDeps({
           createSubIssue: {
-            run: jasmine.createSpy('run').and.callFake(async (rp, id, file) => {
+            run: jasmine.createSpy('run').and.callFake(async (id, file) => {
               if (file.endsWith('02_second.md')) {
                 throw error;
               }
@@ -182,12 +181,12 @@ describe('ArcanumSplitIssuePushSubIssues', () => {
             })
           }
         });
-        const instance = new ArcanumSplitIssuePushSubIssues(deps);
+        const instance = new ArcanumSplitIssuePushSubIssues({ repoPath }, deps);
 
         let thrown;
 
         try {
-          await instance.run(repoPath, ISSUE_ID);
+          await instance.run(ISSUE_ID);
         } catch (thrownError) {
           thrown = thrownError;
         }
@@ -230,12 +229,12 @@ describe('ArcanumSplitIssuePushSubIssues', () => {
         const deps = stubDeps({
           createSubIssue: { run: jasmine.createSpy('run').and.rejectWith(new DispatchFailure('STATUS=failed\n')) }
         });
-        const instance = new ArcanumSplitIssuePushSubIssues(deps);
+        const instance = new ArcanumSplitIssuePushSubIssues({ repoPath }, deps);
 
         let thrown;
 
         try {
-          await instance.run(repoPath, ISSUE_ID);
+          await instance.run(ISSUE_ID);
         } catch (error) {
           thrown = error;
         }

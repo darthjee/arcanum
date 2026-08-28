@@ -16,6 +16,7 @@ describe('COMMANDS', () => {
       'arcanum-split-issue-create-sub-issue',
       'arcanum-split-issue-create-sub-issue-file',
       'arcanum-split-issue-finish',
+      'arcanum-split-issue-push-sub-issues',
       'dispatch-fixture-repo-context'
     ]);
   });
