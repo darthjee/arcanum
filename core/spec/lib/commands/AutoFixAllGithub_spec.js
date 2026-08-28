@@ -1,6 +1,7 @@
 import AutoFixAllGithub from '../../../lib/commands/AutoFixAllGithub.js';
 import BranchCleanup from '../../../lib/utils/git/BranchCleanup.js';
 import DispatchFailure from '../../../lib/utils/errors/DispatchFailure.js';
+import RepoContext from '../../../lib/context/RepoContext.js';
 import RepoContextFactory from '../../../lib/context/RepoContextFactory.js';
 
 const REPO = 'darthjee/arcanum';
@@ -89,16 +90,18 @@ function fakeFetch({
 describe('AutoFixAllGithub', () => {
   /**
    * Build an `AutoFixAllGithub` wired through a fake-backed
-   * `RepoContextFactory` + `BranchCleanup`. The flat override keys
-   * (`origin`/`githubToken`/`issueStateService`/`configChain`/
-   * `execFileAsync`/`fetchFn`/`timeoutMs`) feed the factory; any other
-   * key (e.g. `issueTaggerFactory`) is forwarded straight to the
-   * constructor.
+   * `RepoContext` + `RepoContextFactory` + `BranchCleanup`. The flat
+   * override keys (`repoPath`/`origin`/`githubToken`/`issueStateService`/
+   * `configChain`) feed the `RepoContext`; `execFileAsync`/`fetchFn`/
+   * `timeoutMs` feed the factory; any other key (e.g.
+   * `issueTaggerFactory`) is forwarded straight to the constructor.
+   * Mirrors `AutoFixAllWaitCi_spec.js`'s `newWaitCi`.
    * @param {object} [overrides] - per-test wiring overrides.
    * @returns {AutoFixAllGithub} the assembled command instance.
    */
   function newGithub(overrides = {}) {
     const {
+      repoPath = REPO_PATH,
       origin = {
         resolve: async () => ({ domain: 'github.com', repo: REPO }),
         resolveWithRef: async () => ({ domain: 'github.com', repo: REPO, repoRef: REPO })
@@ -112,23 +115,17 @@ describe('AutoFixAllGithub', () => {
       ...rest
     } = overrides;
 
-    return new AutoFixAllGithub({
-      repoContextFactory: new RepoContextFactory({
-        origin,
-        githubToken,
-        issueStateService,
-        configChain,
-        execFileAsync,
-        fetchFn,
-        timeoutMs
-      }),
+    const repoContext = new RepoContext({ repoPath, origin, githubToken, issueStateService, configChain });
+
+    return new AutoFixAllGithub(repoContext, {
+      repoContextFactory: new RepoContextFactory({ execFileAsync, fetchFn, timeoutMs }),
       branchCleanup: new BranchCleanup({ execFileAsync }),
       ...rest
     });
   }
 
   describe('constructor wiring', () => {
-    it('shares the same origin/githubToken instances (through the injected RepoContextFactory) across issueTagger/prOperations', async () => {
+    it('shares the same origin/githubToken instances (through the injected RepoContext) across issueTagger/prOperations', async () => {
       const origin = jasmine.createSpy('origin.resolve').and.callFake(async () => ({ domain: 'github.com', repo: REPO }));
       const originWithRef = jasmine.createSpy('origin.resolveWithRef').and.callFake(async () => ({
         domain: 'github.com', repo: REPO, repoRef: REPO
@@ -147,7 +144,7 @@ describe('AutoFixAllGithub', () => {
       // #addTag routes through the shared issueTagger flow (origin.resolveWithRef + githubToken.get) —
       // both `_mutateTag`'s own repoRef resolution and the per-call IssueClient's internal resolution
       // route through the same shared instances, so both are called more than once per #addTag call.
-      await github.addTag(REPO_PATH, '5', 'ready_for_work');
+      await github.addTag('5', 'ready_for_work');
       expect(originWithRef).toHaveBeenCalledWith(REPO_PATH);
       expect(tokenGet).toHaveBeenCalledWith(REPO_PATH);
 
@@ -155,12 +152,12 @@ describe('AutoFixAllGithub', () => {
       const tokenGetAfterAddTag = tokenGet.calls.count();
 
       // #prState routes through the shared prOperations flow (also origin.resolveWithRef + githubToken.get).
-      await github.prState(REPO_PATH);
+      await github.prState();
       expect(originWithRef.calls.count()).toEqual(originWithRefAfterAddTag + 1);
       expect(tokenGet.calls.count()).toEqual(tokenGetAfterAddTag + 1);
     });
 
-    it('builds a fresh, context-bound bundle per call via RepoContextFactory, forwarding the shared execFileAsync/fetchFn', async () => {
+    it('routes every call through the injected execFileAsync/fetchFn via buildFromContext, bound to the context repoPath', async () => {
       const execFileAsync = jasmine.createSpy('execFileAsync').and.callFake(async (cmd, args, options) => {
         if (args[0] === 'branch' && args[1] === '--show-current') {
           return { stdout: `branch-for-${options.cwd}\n`, stderr: '' };
@@ -176,26 +173,26 @@ describe('AutoFixAllGithub', () => {
         throw new Error(`unexpected fetch call: ${url}`);
       });
 
-      const github = newGithub({ execFileAsync, fetchFn });
+      const github = newGithub({ repoPath: '/fake/repo/one', execFileAsync, fetchFn });
 
-      // #prState builds its own RepoContext/gitClient/githubClient per call, bound to that call's own
-      // repoPath, but must route through the same injected execFileAsync/fetchFn rather than defaulting
-      // its own — a stale/shared gitClient would resolve every call against the same (wrong) cwd.
-      await github.prState('/fake/repo/one');
-      await github.prState('/fake/repo/two');
+      // #prState rebuilds its RepoContextFactory bundle per call, but always off the single injected
+      // RepoContext — so every call routes through the same injected execFileAsync/fetchFn, bound to
+      // that context's own repoPath (a defaulted/stale client would resolve against the wrong cwd).
+      await github.prState();
+      await github.prState();
 
       const cwds = execFileAsync.calls.allArgs()
         .filter(([, args]) => args[0] === 'branch')
         .map(([, , options]) => options.cwd);
 
-      expect(cwds).toEqual(['/fake/repo/one', '/fake/repo/two']);
+      expect(cwds).toEqual(['/fake/repo/one', '/fake/repo/one']);
       expect(fetchFn.calls.allArgs().filter(([url]) => url.includes('/pulls?head=')).length).toEqual(2);
     });
   });
 
   describe('#prNumber', () => {
     it('rejects when repoPath is missing', async () => {
-      const github = newGithub();
+      const github = newGithub({ repoPath: '' });
 
       await expectAsync(github.prNumber()).toBeRejectedWithError('Usage: github.sh pr-number <repo_path>');
     });
@@ -208,14 +205,14 @@ describe('AutoFixAllGithub', () => {
         fetchFn
       });
 
-      await expectAsync(github.prNumber(REPO_PATH)).toBeResolvedTo('99\n');
+      await expectAsync(github.prNumber()).toBeResolvedTo('99\n');
       expect(fetchFn).not.toHaveBeenCalled();
     });
   });
 
   describe('#prState', () => {
     it('rejects when repoPath is missing', async () => {
-      const github = newGithub();
+      const github = newGithub({ repoPath: '' });
 
       await expectAsync(github.prState()).toBeRejectedWithError('Usage: github.sh pr-state <repo_path>');
     });
@@ -225,7 +222,7 @@ describe('AutoFixAllGithub', () => {
         fetchFn: fakeFetch({ pulls: [{ number: 7, state: 'open', merged: false, merged_at: null }] })
       });
 
-      await expectAsync(github.prState(REPO_PATH)).toBeResolvedTo('STATE=OPEN\n');
+      await expectAsync(github.prState()).toBeResolvedTo('STATE=OPEN\n');
     });
   });
 
@@ -233,7 +230,7 @@ describe('AutoFixAllGithub', () => {
     const PULL = { number: 7, title: 'My PR', html_url: 'https://github.com/darthjee/arcanum/pull/7', state: 'open' };
 
     it('rejects when repoPath is missing', async () => {
-      const github = newGithub();
+      const github = newGithub({ repoPath: '' });
 
       await expectAsync(github.prMerge()).toBeRejectedWithError('Usage: github.sh pr-merge <repo_path> [model_email]');
     });
@@ -242,7 +239,7 @@ describe('AutoFixAllGithub', () => {
       const fetchFn = fakeFetch({ pulls: [PULL] });
       const github = newGithub({ fetchFn });
 
-      await expectAsync(github.prMerge(REPO_PATH)).toBeResolvedTo(`${PULL.html_url}\n`);
+      await expectAsync(github.prMerge()).toBeResolvedTo(`${PULL.html_url}\n`);
 
       const mergeCall = fetchFn.calls.allArgs().find(([, options]) => options.method === 'PUT');
 
@@ -256,7 +253,7 @@ describe('AutoFixAllGithub', () => {
     it('rejects with the merge-failure error when the merge REST call fails', async () => {
       const github = newGithub({ fetchFn: fakeFetch({ pulls: [PULL], mergeOk: false }) });
 
-      await expectAsync(github.prMerge(REPO_PATH)).toBeRejectedWithError(
+      await expectAsync(github.prMerge()).toBeRejectedWithError(
         'could not merge PR #7 on darthjee/arcanum'
       );
     });
@@ -266,7 +263,7 @@ describe('AutoFixAllGithub', () => {
     it('rejects when repoPath or id is missing', async () => {
       const github = newGithub();
 
-      await expectAsync(github.cleanupBranch(REPO_PATH)).toBeRejectedWithError(
+      await expectAsync(github.cleanupBranch()).toBeRejectedWithError(
         'Usage: github.sh cleanup-branch <repo_path> <id>'
       );
     });
@@ -275,7 +272,7 @@ describe('AutoFixAllGithub', () => {
       const execFileAsync = fakeExecFileAsync();
       const github = newGithub({ execFileAsync });
 
-      await expectAsync(github.cleanupBranch(REPO_PATH, '5')).toBeResolvedTo('');
+      await expectAsync(github.cleanupBranch('5')).toBeResolvedTo('');
 
       const calls = execFileAsync.calls.allArgs().map(([cmd, args]) => `${cmd} ${args.join(' ')}`);
 
@@ -292,7 +289,7 @@ describe('AutoFixAllGithub', () => {
     it('resolves for a case-insensitive exact "shipit" label match', async () => {
       const github = newGithub({ fetchFn: fakeFetch({ labels: ['Shipit', 'Other'] }) });
 
-      await expectAsync(github.hasShipitLabel(REPO_PATH, '5')).toBeResolvedTo('');
+      await expectAsync(github.hasShipitLabel('5')).toBeResolvedTo('');
     });
 
     it('rejects with an empty-stdout DispatchFailure (exit 1) when the label is absent', async () => {
@@ -300,7 +297,7 @@ describe('AutoFixAllGithub', () => {
       let thrown;
 
       try {
-        await github.hasShipitLabel(REPO_PATH, '5');
+        await github.hasShipitLabel('5');
       } catch (error) {
         thrown = error;
       }
@@ -315,7 +312,7 @@ describe('AutoFixAllGithub', () => {
       let thrown;
 
       try {
-        await github.hasShipitLabel(REPO_PATH, '5');
+        await github.hasShipitLabel('5');
       } catch (error) {
         thrown = error;
       }
@@ -330,7 +327,7 @@ describe('AutoFixAllGithub', () => {
     it('rejects when repoPath, id, or tag is missing', async () => {
       const github = newGithub();
 
-      await expectAsync(github.addTag(REPO_PATH, '5')).toBeRejectedWithError(
+      await expectAsync(github.addTag('5')).toBeRejectedWithError(
         'Usage: github.sh add-tag <repo_path> <id> <tag>'
       );
     });
@@ -338,7 +335,7 @@ describe('AutoFixAllGithub', () => {
     it('rejects shipit with the human-only guard message', async () => {
       const github = newGithub();
 
-      await expectAsync(github.addTag(REPO_PATH, '5', 'shipit')).toBeRejectedWithError(
+      await expectAsync(github.addTag('5', 'shipit')).toBeRejectedWithError(
         'Error: shipit is human-only; scripts must not add or remove it'
       );
     });
@@ -347,7 +344,7 @@ describe('AutoFixAllGithub', () => {
       const fetchFn = fakeFetch({ labels: ['Ready for Work'] });
       const github = newGithub({ fetchFn });
 
-      await expectAsync(github.addTag(REPO_PATH, '5', 'ready_for_work')).toBeResolvedTo(
+      await expectAsync(github.addTag('5', 'ready_for_work')).toBeResolvedTo(
         'Tag \'ready_for_work\' already present on issue #5 — nothing to do.\n'
       );
       expect(fetchFn.calls.allArgs().some(([, options = {}]) => options.method === 'POST')).toBeFalse();
@@ -357,7 +354,7 @@ describe('AutoFixAllGithub', () => {
       const fetchFn = fakeFetch({ labels: [] });
       const github = newGithub({ fetchFn });
 
-      await expectAsync(github.addTag(REPO_PATH, '5', 'ready_for_work')).toBeResolvedTo(
+      await expectAsync(github.addTag('5', 'ready_for_work')).toBeResolvedTo(
         'Added tag \'ready_for_work\' to issue #5 on darthjee/arcanum\n'
       );
 
@@ -370,7 +367,7 @@ describe('AutoFixAllGithub', () => {
     it('rejects with the fetch-failure error when the current labels cannot be fetched', async () => {
       const github = newGithub({ fetchFn: fakeFetch({ issueViewFails: true }) });
 
-      await expectAsync(github.addTag(REPO_PATH, '5', 'ready_for_work')).toBeRejectedWithError(
+      await expectAsync(github.addTag('5', 'ready_for_work')).toBeRejectedWithError(
         'Error: could not fetch issue #5 from darthjee/arcanum'
       );
     });
@@ -378,7 +375,7 @@ describe('AutoFixAllGithub', () => {
     it('rejects with the update-failure error when the add-label call fails', async () => {
       const github = newGithub({ fetchFn: fakeFetch({ labels: [], mutateOk: false }) });
 
-      await expectAsync(github.addTag(REPO_PATH, '5', 'ready_for_work')).toBeRejectedWithError(
+      await expectAsync(github.addTag('5', 'ready_for_work')).toBeRejectedWithError(
         'Error: could not update issue #5 on darthjee/arcanum'
       );
     });
@@ -388,7 +385,7 @@ describe('AutoFixAllGithub', () => {
     it('rejects when repoPath, id, or tag is missing', async () => {
       const github = newGithub();
 
-      await expectAsync(github.removeTag(REPO_PATH, '5')).toBeRejectedWithError(
+      await expectAsync(github.removeTag('5')).toBeRejectedWithError(
         'Usage: github.sh remove-tag <repo_path> <id> <tag>'
       );
     });
@@ -396,7 +393,7 @@ describe('AutoFixAllGithub', () => {
     it('rejects shipit with the human-only guard message', async () => {
       const github = newGithub();
 
-      await expectAsync(github.removeTag(REPO_PATH, '5', 'shipit')).toBeRejectedWithError(
+      await expectAsync(github.removeTag('5', 'shipit')).toBeRejectedWithError(
         'Error: shipit is human-only; scripts must not add or remove it'
       );
     });
@@ -405,7 +402,7 @@ describe('AutoFixAllGithub', () => {
       const fetchFn = fakeFetch({ labels: [] });
       const github = newGithub({ fetchFn });
 
-      await expectAsync(github.removeTag(REPO_PATH, '5', 'ready_for_work')).toBeResolvedTo(
+      await expectAsync(github.removeTag('5', 'ready_for_work')).toBeResolvedTo(
         'Tag \'ready_for_work\' not present on issue #5 — nothing to do.\n'
       );
       expect(fetchFn.calls.allArgs().some(([, options = {}]) => options.method === 'DELETE')).toBeFalse();
@@ -415,7 +412,7 @@ describe('AutoFixAllGithub', () => {
       const fetchFn = fakeFetch({ labels: ['Ready for Work'] });
       const github = newGithub({ fetchFn });
 
-      await expectAsync(github.removeTag(REPO_PATH, '5', 'ready_for_work')).toBeResolvedTo(
+      await expectAsync(github.removeTag('5', 'ready_for_work')).toBeResolvedTo(
         'Removed tag \'ready_for_work\' from issue #5 on darthjee/arcanum\n'
       );
 
@@ -427,7 +424,7 @@ describe('AutoFixAllGithub', () => {
     it('rejects with the fetch-failure error when the current labels cannot be fetched', async () => {
       const github = newGithub({ fetchFn: fakeFetch({ issueViewFails: true }) });
 
-      await expectAsync(github.removeTag(REPO_PATH, '5', 'ready_for_work')).toBeRejectedWithError(
+      await expectAsync(github.removeTag('5', 'ready_for_work')).toBeRejectedWithError(
         'Error: could not fetch issue #5 from darthjee/arcanum'
       );
     });
@@ -435,7 +432,7 @@ describe('AutoFixAllGithub', () => {
     it('rejects with the update-failure error when the remove-label call fails', async () => {
       const github = newGithub({ fetchFn: fakeFetch({ labels: ['Ready for Work'], mutateOk: false }) });
 
-      await expectAsync(github.removeTag(REPO_PATH, '5', 'ready_for_work')).toBeRejectedWithError(
+      await expectAsync(github.removeTag('5', 'ready_for_work')).toBeRejectedWithError(
         'Error: could not update issue #5 on darthjee/arcanum'
       );
     });

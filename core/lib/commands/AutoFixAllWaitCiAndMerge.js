@@ -23,7 +23,7 @@ class AutoFixAllWaitCiAndMerge {
    */
   constructor(repoContext, {
     waitCi = new AutoFixAllWaitCi(repoContext),
-    github = new AutoFixAllGithub(),
+    github = new AutoFixAllGithub(repoContext),
     repoPathValidator = new RepoPath()
   } = {}) {
     this._repoContext = repoContext;
@@ -60,10 +60,7 @@ class AutoFixAllWaitCiAndMerge {
       return waitOutput;
     }
 
-    // Interim asymmetry: `AutoFixAllGithub` is still positional-`repoPath`
-    // until #312, so `prMerge` is called with `this._repoContext.repoPath`
-    // explicitly rather than reading it from a shared context.
-    const mergeOutput = await this._github.prMerge(repoPath, modelEmail);
+    const mergeOutput = await this._github.prMerge(modelEmail);
 
     return `passed\n${mergeOutput}`;
   }
