@@ -13,7 +13,9 @@
  * @property {boolean} [takesRepoContext] - when `true`, the command's
  *   constructor receives a `RepoContext` built from the leading `repoPath`
  *   argument, and that leading argument is stripped from the method args.
- *   No real command entry sets this yet.
+ *   Set on the `arcanum-split-issue-*` and `auto-fix-all-*` lifecycle
+ *   commands (checkout-from-main / cleanup-artifacts / reply-comment /
+ *   wait-ci / wait-ci-and-merge).
  */
 
 /**
@@ -46,7 +48,11 @@ export const COMMANDS = {
   },
   'arcanum-update-run-update-check': { module: 'commands/ArcanumUpdateRunUpdate.js', method: 'check' },
   'arcanum-update-run-update-apply': { module: 'commands/ArcanumUpdateRunUpdate.js', method: 'apply' },
-  'auto-fix-all-checkout-from-main': { module: 'commands/AutoFixAllCheckoutFromMain.js', method: 'run' },
+  'auto-fix-all-checkout-from-main': {
+    module: 'commands/AutoFixAllCheckoutFromMain.js',
+    method: 'run',
+    takesRepoContext: true
+  },
   'auto-fix-all-cleanup-artifacts': { module: 'commands/AutoFixAllCleanupArtifacts.js', method: 'run' },
   'auto-fix-all-config-get': { module: 'commands/AutoFixAllConfig.js', method: 'get' },
   'auto-fix-all-config-is-enabled': { module: 'commands/AutoFixAllConfig.js', method: 'isEnabled' },
