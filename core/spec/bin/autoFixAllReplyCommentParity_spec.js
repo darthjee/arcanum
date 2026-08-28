@@ -1,5 +1,4 @@
 import { execFile } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
@@ -47,7 +46,6 @@ const execFileAsync = promisify(execFile);
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const SHELL_SCRIPT = path.join(REPO_ROOT, 'auto-fix-all', 'scripts', 'reply_comment_shell.sh');
 const NATIVE_BIN = path.join(REPO_ROOT, 'core', 'bin', 'arcanum');
-const REAL_TEMPLATE_PATH = path.join(REPO_ROOT, 'auto-fix-all', 'templates', 'reply.tmpl.md');
 const FAKE_FETCH_PRELOAD = pathToFileURL(
   path.join(REPO_ROOT, 'core', 'spec', 'support', 'utils', 'fakeGithubApiFetchPreload.js')
 ).href;
@@ -91,11 +89,9 @@ async function git(args, cwd) {
  * itself) to `repo.remotePath`: `git remote get-url origin` still
  * reports the github.com URL (satisfying `Origin.js`/`origin.sh`'s
  * domain/repo parsing), while `git push` never leaves the filesystem.
- * Also seeds `auto-fix-all/templates/reply.tmpl.md` (a copy of the real
- * one) under `repo.repoPath`, since the native side reads its template
- * relative to `repoPath` (unlike the shell script, which reads its own
- * installed copy regardless of `repoPath` — see
- * AutoFixAllReplyComment.js's own doc comment).
+ * Both implementations read the same real installed
+ * `auto-fix-all/templates/reply.tmpl.md` from the arcanum install (not
+ * `repoPath`), so no template copy is seeded here.
  * @param {{repoPath: string, remotePath: string}} repo - the fixture repo.
  * @returns {Promise<void>} resolves once seeded.
  */
@@ -104,12 +100,6 @@ async function seedGithubLikeRepo(repo) {
 
   await seedOriginUrl(repo.repoPath, fakeUrl);
   await git(['config', `url.${repo.remotePath}.pushInsteadOf`, fakeUrl], repo.repoPath);
-
-  const templateContent = await readFile(REAL_TEMPLATE_PATH, 'utf8');
-  const templateDir = path.join(repo.repoPath, 'auto-fix-all', 'templates');
-
-  await mkdir(templateDir, { recursive: true });
-  await writeFile(path.join(templateDir, 'reply.tmpl.md'), templateContent);
 }
 
 describe('auto-fix-all-reply-comment parity (shell vs. native)', () => {

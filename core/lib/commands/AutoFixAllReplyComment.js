@@ -1,7 +1,5 @@
 import { execFile } from 'node:child_process';
 import { readFile as defaultReadFile } from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import IssueClient from '../utils/github/IssueClient.js';
 import { resolveInstallPath } from '../utils/file/InstallRoot.js';
@@ -9,9 +7,7 @@ import { resolveInstallPath } from '../utils/file/InstallRoot.js';
 const defaultExecFileAsync = promisify(execFile);
 const DEFAULT_TIMEOUT_MS = 30000;
 const USAGE = 'Usage: reply_comment.sh <repo_path> <id> <agent> <model_name> <model_email> <reply_body>';
-const TEMPLATE_RELATIVE_PATH = 'auto-fix-all/templates/reply.tmpl.md';
 
-const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 // `auto-monitor-issue-pr/scripts/resolve_pr_number.sh` is explicitly
 // out-of-batch for this migration (see the issue) — shelled out to
 // exactly like `reply_comment_shell.sh` does, resolved via
@@ -127,10 +123,12 @@ class AutoFixAllReplyComment {
   }
 
   /**
-   * Reads `auto-fix-all/templates/reply.tmpl.md` and substitutes its
-   * placeholders, matching bash's `${var/pattern/repl}` (single,
-   * first-occurrence substitution per placeholder, no templating
-   * library).
+   * Reads `auto-fix-all/templates/reply.tmpl.md` from the arcanum
+   * install (resolved via `resolveInstallPath`, never the target
+   * `repoPath`), matching how `reply_comment_shell.sh` reads its own
+   * installed copy, and substitutes its placeholders, matching bash's
+   * `${var/pattern/repl}` (single, first-occurrence substitution per
+   * placeholder, no templating library).
    * @param {object} fields - the substitution fields.
    * @param {string} fields.body - replaces `%%BODY%%`.
    * @param {string} fields.agent - replaces `%%AGENT%%`.
@@ -139,7 +137,7 @@ class AutoFixAllReplyComment {
    * @returns {Promise<string>} the rendered reply content.
    */
   async _renderTemplate({ body, agent, modelName, modelEmail }) {
-    const templatePath = path.join(this._repoContext.repoPath, TEMPLATE_RELATIVE_PATH);
+    const templatePath = resolveInstallPath('auto-fix-all', 'templates', 'reply.tmpl.md');
     const template = await this._readFile(templatePath, 'utf8');
 
     let content = template;
