@@ -76,7 +76,11 @@ export const COMMANDS = {
   'auto-fix-all-queue-push': { module: 'commands/AutoFixAllQueue.js', method: 'push' },
   'auto-fix-all-queue-save': { module: 'commands/AutoFixAllQueue.js', method: 'save' },
   'auto-fix-all-queue-wait-next': { module: 'commands/AutoFixAllQueue.js', method: 'waitNext' },
-  'auto-fix-all-reply-comment': { module: 'commands/AutoFixAllReplyComment.js', method: 'run' },
+  'auto-fix-all-reply-comment': {
+    module: 'commands/AutoFixAllReplyComment.js',
+    method: 'run',
+    takesRepoContext: true
+  },
   'auto-fix-all-wait-ci': { module: 'commands/AutoFixAllWaitCi.js', method: 'run' },
   'auto-fix-all-wait-ci-and-merge': { module: 'commands/AutoFixAllWaitCiAndMerge.js', method: 'run' },
   'checkout-safe-branch': { module: 'commands/SafeBranch.js', method: 'run' },

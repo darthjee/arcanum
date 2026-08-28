@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import AutoFixAllReplyComment from '../../../lib/commands/AutoFixAllReplyComment.js';
+import { createRepoContextMock } from '../../support/factories/repoContextFactory.js';
 import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
 
 const USAGE = 'Usage: reply_comment.sh <repo_path> <id> <agent> <model_name> <model_email> <reply_body>';
@@ -78,11 +79,6 @@ function fakeExecFileAsync({ prNumber = '42', resolveFails = false, pushFails = 
  */
 function stubDeps(overrides = {}) {
   return {
-    origin: {
-      resolve: async () => ({ domain: 'github.com', repo: 'darthjee/arcanum' }),
-      resolveWithRef: async () => ({ domain: 'github.com', repo: 'darthjee/arcanum', repoRef: 'darthjee/arcanum' })
-    },
-    githubToken: { get: async () => 'fake-token' },
     execFileAsync: fakeExecFileAsync(),
     fetchFn: jasmine.createSpy('fetch').and.resolveTo({ ok: true, json: async () => ({}) }),
     ...overrides
@@ -91,6 +87,23 @@ function stubDeps(overrides = {}) {
 
 describe('AutoFixAllReplyComment', () => {
   let repoPath;
+
+  /**
+   * Build a `RepoContext` wired with the `origin`/`githubToken` fakes
+   * `IssueClient` needs to resolve the repo and token.
+   * @param {string} [repoPathValue] - the context's `repoPath`.
+   * @returns {import('../../../lib/context/RepoContext.js').default} the context.
+   */
+  function newContext(repoPathValue = repoPath) {
+    return createRepoContextMock({
+      repoPath: repoPathValue,
+      origin: {
+        resolve: async () => ({ domain: 'github.com', repo: 'darthjee/arcanum' }),
+        resolveWithRef: async () => ({ domain: 'github.com', repo: 'darthjee/arcanum', repoRef: 'darthjee/arcanum' })
+      },
+      githubToken: { get: async () => 'fake-token' }
+    });
+  }
 
   beforeEach(async () => {
     repoPath = await createTempDir();
@@ -105,80 +118,80 @@ describe('AutoFixAllReplyComment', () => {
     describe('argument validation', () => {
       it('throws the usage message when repo_path is missing', async () => {
         const deps = stubDeps();
-        const instance = new AutoFixAllReplyComment(deps);
+        const instance = new AutoFixAllReplyComment(newContext(''), deps);
 
         await expectAsync(
-          instance.run('', ID, AGENT, MODEL_NAME, MODEL_EMAIL, REPLY_BODY)
+          instance.run(ID, AGENT, MODEL_NAME, MODEL_EMAIL, REPLY_BODY)
         ).toBeRejectedWithError(USAGE);
         expect(deps.execFileAsync).not.toHaveBeenCalled();
       });
 
       it('throws the usage message when id is missing', async () => {
         const deps = stubDeps();
-        const instance = new AutoFixAllReplyComment(deps);
+        const instance = new AutoFixAllReplyComment(newContext(), deps);
 
         await expectAsync(
-          instance.run(repoPath, '', AGENT, MODEL_NAME, MODEL_EMAIL, REPLY_BODY)
+          instance.run('', AGENT, MODEL_NAME, MODEL_EMAIL, REPLY_BODY)
         ).toBeRejectedWithError(USAGE);
         expect(deps.execFileAsync).not.toHaveBeenCalled();
       });
 
       it('throws the usage message when id is non-numeric', async () => {
         const deps = stubDeps();
-        const instance = new AutoFixAllReplyComment(deps);
+        const instance = new AutoFixAllReplyComment(newContext(), deps);
 
         await expectAsync(
-          instance.run(repoPath, 'abc', AGENT, MODEL_NAME, MODEL_EMAIL, REPLY_BODY)
+          instance.run('abc', AGENT, MODEL_NAME, MODEL_EMAIL, REPLY_BODY)
         ).toBeRejectedWithError(USAGE);
         expect(deps.execFileAsync).not.toHaveBeenCalled();
       });
 
       it('throws the usage message when id is non-numeric even with a leading #', async () => {
         const deps = stubDeps();
-        const instance = new AutoFixAllReplyComment(deps);
+        const instance = new AutoFixAllReplyComment(newContext(), deps);
 
         await expectAsync(
-          instance.run(repoPath, '#abc', AGENT, MODEL_NAME, MODEL_EMAIL, REPLY_BODY)
+          instance.run('#abc', AGENT, MODEL_NAME, MODEL_EMAIL, REPLY_BODY)
         ).toBeRejectedWithError(USAGE);
         expect(deps.execFileAsync).not.toHaveBeenCalled();
       });
 
       it('throws the usage message when agent is missing', async () => {
         const deps = stubDeps();
-        const instance = new AutoFixAllReplyComment(deps);
+        const instance = new AutoFixAllReplyComment(newContext(), deps);
 
         await expectAsync(
-          instance.run(repoPath, ID, '', MODEL_NAME, MODEL_EMAIL, REPLY_BODY)
+          instance.run(ID, '', MODEL_NAME, MODEL_EMAIL, REPLY_BODY)
         ).toBeRejectedWithError(USAGE);
         expect(deps.execFileAsync).not.toHaveBeenCalled();
       });
 
       it('throws the usage message when model_name is missing', async () => {
         const deps = stubDeps();
-        const instance = new AutoFixAllReplyComment(deps);
+        const instance = new AutoFixAllReplyComment(newContext(), deps);
 
         await expectAsync(
-          instance.run(repoPath, ID, AGENT, '', MODEL_EMAIL, REPLY_BODY)
+          instance.run(ID, AGENT, '', MODEL_EMAIL, REPLY_BODY)
         ).toBeRejectedWithError(USAGE);
         expect(deps.execFileAsync).not.toHaveBeenCalled();
       });
 
       it('throws the usage message when model_email is missing', async () => {
         const deps = stubDeps();
-        const instance = new AutoFixAllReplyComment(deps);
+        const instance = new AutoFixAllReplyComment(newContext(), deps);
 
         await expectAsync(
-          instance.run(repoPath, ID, AGENT, MODEL_NAME, '', REPLY_BODY)
+          instance.run(ID, AGENT, MODEL_NAME, '', REPLY_BODY)
         ).toBeRejectedWithError(USAGE);
         expect(deps.execFileAsync).not.toHaveBeenCalled();
       });
 
       it('throws the usage message when reply_body is missing', async () => {
         const deps = stubDeps();
-        const instance = new AutoFixAllReplyComment(deps);
+        const instance = new AutoFixAllReplyComment(newContext(), deps);
 
         await expectAsync(
-          instance.run(repoPath, ID, AGENT, MODEL_NAME, MODEL_EMAIL, '')
+          instance.run(ID, AGENT, MODEL_NAME, MODEL_EMAIL, '')
         ).toBeRejectedWithError(USAGE);
         expect(deps.execFileAsync).not.toHaveBeenCalled();
       });
@@ -194,9 +207,9 @@ describe('AutoFixAllReplyComment', () => {
         );
 
         const deps = stubDeps();
-        const instance = new AutoFixAllReplyComment(deps);
+        const instance = new AutoFixAllReplyComment(newContext(), deps);
 
-        const result = await instance.run(repoPath, `#${ID}`, AGENT, MODEL_NAME, MODEL_EMAIL, REPLY_BODY);
+        const result = await instance.run(`#${ID}`, AGENT, MODEL_NAME, MODEL_EMAIL, REPLY_BODY);
 
         expect(result).toEqual('branch \'my-branch\' set up to track \'origin/my-branch\'.\n');
 
@@ -227,10 +240,10 @@ describe('AutoFixAllReplyComment', () => {
     describe('when the REST call fails', () => {
       it('throws an Error and never attempts a push when the response is not ok', async () => {
         const deps = stubDeps({ fetchFn: jasmine.createSpy('fetch').and.resolveTo({ ok: false, status: 422 }) });
-        const instance = new AutoFixAllReplyComment(deps);
+        const instance = new AutoFixAllReplyComment(newContext(), deps);
 
         await expectAsync(
-          instance.run(repoPath, ID, AGENT, MODEL_NAME, MODEL_EMAIL, REPLY_BODY)
+          instance.run(ID, AGENT, MODEL_NAME, MODEL_EMAIL, REPLY_BODY)
         ).toBeRejected();
 
         expect(deps.execFileAsync).not.toHaveBeenCalledWith(
@@ -240,10 +253,10 @@ describe('AutoFixAllReplyComment', () => {
 
       it('throws an Error and never attempts a push when fetchFn rejects', async () => {
         const deps = stubDeps({ fetchFn: jasmine.createSpy('fetch').and.rejectWith(new Error('network down')) });
-        const instance = new AutoFixAllReplyComment(deps);
+        const instance = new AutoFixAllReplyComment(newContext(), deps);
 
         await expectAsync(
-          instance.run(repoPath, ID, AGENT, MODEL_NAME, MODEL_EMAIL, REPLY_BODY)
+          instance.run(ID, AGENT, MODEL_NAME, MODEL_EMAIL, REPLY_BODY)
         ).toBeRejected();
 
         expect(deps.execFileAsync).not.toHaveBeenCalledWith(
@@ -255,10 +268,10 @@ describe('AutoFixAllReplyComment', () => {
     describe('when resolve_pr_number.sh fails', () => {
       it('throws an Error and never attempts the REST call', async () => {
         const deps = stubDeps({ execFileAsync: fakeExecFileAsync({ resolveFails: true }) });
-        const instance = new AutoFixAllReplyComment(deps);
+        const instance = new AutoFixAllReplyComment(newContext(), deps);
 
         await expectAsync(
-          instance.run(repoPath, ID, AGENT, MODEL_NAME, MODEL_EMAIL, REPLY_BODY)
+          instance.run(ID, AGENT, MODEL_NAME, MODEL_EMAIL, REPLY_BODY)
         ).toBeRejected();
 
         expect(deps.fetchFn).not.toHaveBeenCalled();
@@ -268,10 +281,10 @@ describe('AutoFixAllReplyComment', () => {
     describe('when git push fails', () => {
       it('throws an Error after the comment was already posted', async () => {
         const deps = stubDeps({ execFileAsync: fakeExecFileAsync({ pushFails: true }) });
-        const instance = new AutoFixAllReplyComment(deps);
+        const instance = new AutoFixAllReplyComment(newContext(), deps);
 
         await expectAsync(
-          instance.run(repoPath, ID, AGENT, MODEL_NAME, MODEL_EMAIL, REPLY_BODY)
+          instance.run(ID, AGENT, MODEL_NAME, MODEL_EMAIL, REPLY_BODY)
         ).toBeRejected();
 
         expect(deps.fetchFn).toHaveBeenCalledTimes(1);
