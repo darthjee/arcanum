@@ -31,8 +31,8 @@ describe('SpawnIssue', () => {
 
   /**
    * Build a real `RepoContext` wrapping fake low-level collaborators —
-   * mirrors `AutoFixAllWaitCi_spec.js`'s `newWaitCi` / the
-   * `takesRepoContext` sibling specs.
+   * mirrors `AutoFixAllWaitCi_spec.js`'s `newWaitCi` / the other
+   * `context: 'repo'` command specs.
    * @param {object} [opts] - context wiring overrides.
    * @param {string} [opts.repoPath] - the context's repo path (defaults
    *   to the per-test temp dir).

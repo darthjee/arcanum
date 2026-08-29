@@ -58,7 +58,7 @@ A single, central Node package at `core/` — not one Node package per skill. `c
 
 Nothing under `context/`, `services/`, or `utils/` may import from `commands/` — a command is an entrypoint, not a library other layers should reach back into.
 
-Because `core/bin/arcanum`'s dispatcher instantiates every command with zero constructor arguments and passes `repoPath` only as a per-call method argument, a command that needs a context-bound `services/` collaborator (fixed to that call's `repoPath`) builds it fresh per call via a small private helper, rather than receiving it ready-made at construction — see `AutoFixAllGithub#_prOperations` for the reference shape.
+Each command declares a `context: 'repo' | 'claude' | 'none'` in the `core/bin/arcanum` dispatch table. For a `context: 'repo'` entry the dispatcher builds a `RepoContext` (bound to that call's `repoPath`) and injects it as the command's sole constructor argument; a `context: 'claude'` entry gets a `ClaudeContext` the same way; a `context: 'none'` entry is constructed with no arguments and keeps its full argument list. A command therefore receives its context-bound collaborators ready-made at construction rather than building them itself per call.
 
 An ESLint flat config enforces: 2-space indentation, single quotes, semicolons, `const`/`let` only (no `var`), strict `===`, no `console.log` (use whatever structured stdout-writing convention the entrypoint's output contract requires instead), and JSDoc on public functions.
 

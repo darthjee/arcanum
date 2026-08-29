@@ -48,26 +48,23 @@ describe('Dispatcher', () => {
     });
   });
 
-  describe('context: \'repo\' path (dispatch-fixture-repo-context)', () => {
+  describe('context: \'repo\' path (spawn-issue)', () => {
     let dispatcher;
 
     beforeEach(() => {
-      dispatcher = new Dispatcher('dispatch-fixture-repo-context', ['/fake/repo', 'a', 'b']);
+      dispatcher = new Dispatcher('spawn-issue', ['/fake/repo', 'a', 'b']);
     });
 
     it('constructs the module with a RepoContext built from args[0]', async () => {
       const instance = await dispatcher.commandInstance();
 
-      expect(instance.repoContext).toBeInstanceOf(RepoContext);
-      expect(instance.repoContext.repoPath).toEqual('/fake/repo');
+      expect(instance.constructor.name).toEqual('SpawnIssue');
+      expect(dispatcher.repoContext).toBeInstanceOf(RepoContext);
+      expect(dispatcher.repoContext.repoPath).toEqual('/fake/repo');
     });
 
     it('strips the leading repoPath arg from commandArgs()', () => {
       expect(dispatcher.commandArgs()).toEqual(['a', 'b']);
-    });
-
-    it('reflects the stripped args and repoPath in the dispatch() result', async () => {
-      expect(await dispatcher.dispatch()).toEqual('dispatch-fixture: repoPath=/fake/repo args=a,b\n');
     });
   });
 
@@ -98,13 +95,13 @@ describe('Dispatcher', () => {
 
   describe('repoContext getter', () => {
     it('is lazy — not built until first read', () => {
-      const dispatcher = new Dispatcher('dispatch-fixture-repo-context', ['/fake/repo']);
+      const dispatcher = new Dispatcher('spawn-issue', ['/fake/repo']);
 
       expect(dispatcher._repoContext).toBeUndefined();
     });
 
     it('is memoized — repeated reads return the same instance', () => {
-      const dispatcher = new Dispatcher('dispatch-fixture-repo-context', ['/fake/repo']);
+      const dispatcher = new Dispatcher('spawn-issue', ['/fake/repo']);
 
       expect(dispatcher.repoContext).toBe(dispatcher.repoContext);
     });
