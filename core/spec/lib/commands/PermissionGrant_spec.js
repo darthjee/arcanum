@@ -2,15 +2,18 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import Lock from '../../../lib/utils/file/Lock.js';
 import PermissionGrant from '../../../lib/commands/PermissionGrant.js';
+import ClaudeContext from '../../../lib/context/ClaudeContext.js';
 import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
 
 describe('PermissionGrant', () => {
   let dir;
   let file;
+  let claudeContext;
 
   beforeEach(async () => {
     dir = await createTempDir();
     file = path.join(dir, '.claude', 'settings.json');
+    claudeContext = new ClaudeContext({ repoPath: dir });
   });
 
   afterEach(async () => {
@@ -20,7 +23,7 @@ describe('PermissionGrant', () => {
   describe('#run', () => {
     describe('an unrecognized or missing action', () => {
       it('rejects with the usage message for an unrecognized action', async () => {
-        const permissionGrant = new PermissionGrant({ lock: new Lock({ sleepMs: 5 }) });
+        const permissionGrant = new PermissionGrant(claudeContext, { lock: new Lock({ sleepMs: 5 }) });
 
         await expectAsync(permissionGrant.run('remove', file, 'Bash(git push:*)')).toBeRejectedWithError(
           'Usage: permission_grant.sh add <file> <pattern>'
@@ -28,7 +31,7 @@ describe('PermissionGrant', () => {
       });
 
       it('rejects with the usage message for a missing action', async () => {
-        const permissionGrant = new PermissionGrant({ lock: new Lock({ sleepMs: 5 }) });
+        const permissionGrant = new PermissionGrant(claudeContext, { lock: new Lock({ sleepMs: 5 }) });
 
         await expectAsync(permissionGrant.run(undefined, file, 'Bash(git push:*)')).toBeRejectedWithError(
           'Usage: permission_grant.sh add <file> <pattern>'
@@ -38,9 +41,19 @@ describe('PermissionGrant', () => {
 
     describe('the "add" action', () => {
       it('creates the file (starting from {}) when it does not exist yet', async () => {
-        const permissionGrant = new PermissionGrant({ lock: new Lock({ sleepMs: 5 }) });
+        const permissionGrant = new PermissionGrant(claudeContext, { lock: new Lock({ sleepMs: 5 }) });
 
         await permissionGrant.run('add', file, 'Bash(git push:*)');
+
+        const written = JSON.parse(await readFile(file, 'utf8'));
+
+        expect(written).toEqual({ permissions: { allow: ['Bash(git push:*)'] } });
+      });
+
+      it('resolves a repo-relative file against the context anchor, not process.cwd()', async () => {
+        const permissionGrant = new PermissionGrant(claudeContext, { lock: new Lock({ sleepMs: 5 }) });
+
+        await permissionGrant.run('add', '.claude/settings.json', 'Bash(git push:*)');
 
         const written = JSON.parse(await readFile(file, 'utf8'));
 
@@ -57,7 +70,7 @@ describe('PermissionGrant', () => {
           })
         );
 
-        const permissionGrant = new PermissionGrant({ lock: new Lock({ sleepMs: 5 }) });
+        const permissionGrant = new PermissionGrant(claudeContext, { lock: new Lock({ sleepMs: 5 }) });
 
         await permissionGrant.run('add', file, 'Bash(git push:*)');
 
@@ -76,7 +89,7 @@ describe('PermissionGrant', () => {
         await mkdir(path.dirname(file), { recursive: true });
         await writeFile(file, JSON.stringify({ permissions: { allow: ['Bash(git push:*)'] } }));
 
-        const permissionGrant = new PermissionGrant({ lock: new Lock({ sleepMs: 5 }) });
+        const permissionGrant = new PermissionGrant(claudeContext, { lock: new Lock({ sleepMs: 5 }) });
 
         await permissionGrant.run('add', file, 'Bash(git push:*)');
 
@@ -89,7 +102,7 @@ describe('PermissionGrant', () => {
         await mkdir(path.dirname(file), { recursive: true });
         await writeFile(file, 'not json');
 
-        const permissionGrant = new PermissionGrant({ lock: new Lock({ sleepMs: 5 }) });
+        const permissionGrant = new PermissionGrant(claudeContext, { lock: new Lock({ sleepMs: 5 }) });
 
         await permissionGrant.run('add', file, 'Bash(git push:*)');
 
@@ -102,7 +115,7 @@ describe('PermissionGrant', () => {
         await mkdir(path.dirname(file), { recursive: true });
         await writeFile(file, '');
 
-        const permissionGrant = new PermissionGrant({ lock: new Lock({ sleepMs: 5 }) });
+        const permissionGrant = new PermissionGrant(claudeContext, { lock: new Lock({ sleepMs: 5 }) });
 
         await permissionGrant.run('add', file, 'Bash(git push:*)');
 
@@ -117,7 +130,7 @@ describe('PermissionGrant', () => {
         await writeFile(blocker, 'i am a file, not a directory');
 
         const blockedFile = path.join(blocker, 'nested', 'settings.json');
-        const permissionGrant = new PermissionGrant({ lock: new Lock({ sleepMs: 5 }) });
+        const permissionGrant = new PermissionGrant(claudeContext, { lock: new Lock({ sleepMs: 5 }) });
 
         spyOn(process.stderr, 'write');
 
@@ -134,7 +147,7 @@ describe('PermissionGrant', () => {
         spyOn(lock, 'acquire').and.callThrough();
         spyOn(lock, 'release').and.callThrough();
 
-        const permissionGrant = new PermissionGrant({ lock });
+        const permissionGrant = new PermissionGrant(claudeContext, { lock });
 
         await permissionGrant.run('add', file, 'Bash(git push:*)');
 
@@ -143,8 +156,8 @@ describe('PermissionGrant', () => {
       });
 
       it('does not corrupt the file under two near-simultaneous writes', async () => {
-        const permissionGrantA = new PermissionGrant({ lock: new Lock({ sleepMs: 5 }) });
-        const permissionGrantB = new PermissionGrant({ lock: new Lock({ sleepMs: 5 }) });
+        const permissionGrantA = new PermissionGrant(claudeContext, { lock: new Lock({ sleepMs: 5 }) });
+        const permissionGrantB = new PermissionGrant(claudeContext, { lock: new Lock({ sleepMs: 5 }) });
 
         await Promise.all([
           permissionGrantA.run('add', file, 'Bash(git push:*)'),

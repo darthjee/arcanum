@@ -22,6 +22,12 @@ import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 // path, the native side reports a stable literal) — only the fixed
 // `add <file> <pattern>` portion (and the exit code / empty stdout) is
 // asserted there.
+//
+// `permission-grant` is a `context: 'claude'` command, so the native
+// invocation takes a leading `<anchor>` argument that `Dispatcher`
+// strips before calling `run(...)`. The parity fixtures pass absolute
+// file paths, so the anchor value doesn't affect resolution — `cwd` is
+// passed for it.
 
 const execFileAsync = promisify(execFile);
 
@@ -56,7 +62,7 @@ async function runCommand([file, ...args], cwd) {
 async function runBoth(shellFile, nativeFile, pattern, cwd) {
   const shell = await runCommand(['bash', SHELL_SCRIPT, 'add', shellFile, pattern], cwd);
   const native = await runCommand(
-    [process.execPath, NATIVE_BIN, 'permission-grant', 'add', nativeFile, pattern],
+    [process.execPath, NATIVE_BIN, 'permission-grant', cwd, 'add', nativeFile, pattern],
     cwd
   );
 
@@ -161,7 +167,7 @@ describe('permission-grant parity (shell vs. native)', () => {
     it('matches exit code and empty stdout, with the fixed usage-message portion in stderr', async () => {
       const shell = await runCommand(['bash', SHELL_SCRIPT, 'remove', shellFile, 'Bash(git push:*)'], cwd);
       const native = await runCommand(
-        [process.execPath, NATIVE_BIN, 'permission-grant', 'remove', nativeFile, 'Bash(git push:*)'],
+        [process.execPath, NATIVE_BIN, 'permission-grant', cwd, 'remove', nativeFile, 'Bash(git push:*)'],
         cwd
       );
 

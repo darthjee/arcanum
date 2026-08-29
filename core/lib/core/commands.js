@@ -170,7 +170,7 @@ export const COMMANDS = {
     method: 'run',
     context: 'repo'
   },
-  'permission-grant': { module: 'commands/PermissionGrant.js', method: 'run' },
+  'permission-grant': { module: 'commands/PermissionGrant.js', method: 'run', context: 'claude' },
   'resolve-and-fetch': {
     module: 'commands/ResolveAndFetch.js',
     method: 'run',
