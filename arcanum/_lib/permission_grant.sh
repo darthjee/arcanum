@@ -19,6 +19,12 @@
 #     can `source` a lib. Only THIS direct-invocation CLI path is
 #     engine_dispatch-routed.
 #
+# Direct-invocation CLI usage:
+#   permission_grant.sh <anchor> add <file> <pattern>
+#   <anchor> — absolute path to the repo root the Claude config is
+#              anchored at; forwarded to engine_dispatch and into the
+#              native passthrough args. <file> may be repo-relative.
+#
 # This file is meant to be SOURCED for its `permission_grant_add`
 # function (re-exported from permission_grant_shell.sh, unchanged); the
 # CLI dispatcher at the bottom is a secondary, direct-invocation
@@ -32,18 +38,24 @@ _PERMISSION_GRANT_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=permission_grant_shell.sh
 source "${_PERMISSION_GRANT_LIB_DIR}/permission_grant_shell.sh"
 
-# Direct-invocation CLI dispatcher: `permission_grant.sh add <file> <pattern>`.
+# Direct-invocation CLI dispatcher: `permission_grant.sh <anchor> add <file> <pattern>`.
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  anchor="${1:-}"
+  if [[ -z "$anchor" ]]; then
+    echo "Usage: $0 <anchor> add <file> <pattern>" >&2
+    exit 1
+  fi
+  shift
   case "${1:-}" in
     add)
       shift
       # shellcheck source=engine_dispatch.sh
       # shellcheck disable=SC1091
       source "${_PERMISSION_GRANT_LIB_DIR}/engine_dispatch.sh"
-      engine_dispatch "$(pwd)" permission-grant "${_PERMISSION_GRANT_LIB_DIR}/permission_grant_shell.sh" -- add "$@"
+      engine_dispatch "$anchor" permission-grant "${_PERMISSION_GRANT_LIB_DIR}/permission_grant_shell.sh" -- "$anchor" add "$@"
       ;;
     *)
-      echo "Usage: $0 add <file> <pattern>" >&2
+      echo "Usage: $0 <anchor> add <file> <pattern>" >&2
       exit 1
       ;;
   esac
