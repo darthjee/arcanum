@@ -1,5 +1,6 @@
 import Dispatcher from '../../../lib/core/dispatcher.js';
 import RepoContext from '../../../lib/context/RepoContext.js';
+import ClaudeContext from '../../../lib/context/ClaudeContext.js';
 
 /**
  * Build a fake `InvocationLog` whose `record` appends ordering markers to
@@ -19,7 +20,7 @@ function fakeInvocationLog(events) {
 }
 
 describe('Dispatcher', () => {
-  describe('flag-off path (dispatch-fixture)', () => {
+  describe("context: 'none' path (dispatch-fixture)", () => {
     let dispatcher;
 
     beforeEach(() => {
@@ -47,7 +48,7 @@ describe('Dispatcher', () => {
     });
   });
 
-  describe('flag-on path (dispatch-fixture-repo-context)', () => {
+  describe("context: 'repo' path (dispatch-fixture-repo-context)", () => {
     let dispatcher;
 
     beforeEach(() => {
@@ -70,6 +71,31 @@ describe('Dispatcher', () => {
     });
   });
 
+  describe("context: 'claude' path (permission-grant)", () => {
+    let dispatcher;
+
+    beforeEach(() => {
+      dispatcher = new Dispatcher('permission-grant', [
+        '/fake/anchor',
+        'add',
+        '/tmp/x.json',
+        'Bash(x)'
+      ]);
+    });
+
+    it('constructs the module with a ClaudeContext built from args[0]', async () => {
+      const instance = await dispatcher.commandInstance();
+
+      expect(instance.constructor.name).toEqual('PermissionGrant');
+      expect(instance._claudeContext).toBeInstanceOf(ClaudeContext);
+      expect(instance._claudeContext.repoPath).toEqual('/fake/anchor');
+    });
+
+    it('strips the leading anchor arg from commandArgs()', () => {
+      expect(dispatcher.commandArgs()).toEqual(['add', '/tmp/x.json', 'Bash(x)']);
+    });
+  });
+
   describe('repoContext getter', () => {
     it('is lazy — not built until first read', () => {
       const dispatcher = new Dispatcher('dispatch-fixture-repo-context', ['/fake/repo']);
@@ -81,6 +107,20 @@ describe('Dispatcher', () => {
       const dispatcher = new Dispatcher('dispatch-fixture-repo-context', ['/fake/repo']);
 
       expect(dispatcher.repoContext).toBe(dispatcher.repoContext);
+    });
+  });
+
+  describe('claudeContext getter', () => {
+    it('is lazy — not built until first read', () => {
+      const dispatcher = new Dispatcher('permission-grant', ['/fake/anchor']);
+
+      expect(dispatcher._claudeContext).toBeUndefined();
+    });
+
+    it('is memoized — repeated reads return the same instance', () => {
+      const dispatcher = new Dispatcher('permission-grant', ['/fake/anchor']);
+
+      expect(dispatcher.claudeContext).toBe(dispatcher.claudeContext);
     });
   });
 

@@ -2,6 +2,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { COMMANDS } from './commands.js';
 import RepoContext from '../context/RepoContext.js';
+import ClaudeContext from '../context/ClaudeContext.js';
 import InvocationLog from '../utils/logging/InvocationLog.js';
 import { resolveInstallPath } from '../utils/file/InstallRoot.js';
 
@@ -15,8 +16,8 @@ const configChainPath = resolveInstallPath('arcanum', '_lib', 'config_chain.sh')
  * Owns a single CLI invocation's dispatch: registry lookup, the
  * unknown-command error, `InvocationLog` recording (awaited before the
  * command module is imported, so a crashing command is still logged),
- * lazy `RepoContext` construction for the `takesRepoContext` flag-on
- * path, module resolution and invocation. See
+ * lazy context construction for the `context: 'repo'` / `context: 'claude'`
+ * paths, module resolution and invocation. See
  * docs/agents/architecture/script-engine.md.
  */
 export default class Dispatcher {
@@ -56,19 +57,25 @@ export default class Dispatcher {
 
   /**
    * Import the command's module and construct its default export, passing
-   * the lazy `RepoContext` when the entry opts in via `takesRepoContext`.
+   * the lazy context the entry opts into via `context`: a `RepoContext`
+   * for `'repo'`, a `ClaudeContext` for `'claude'`, nothing for
+   * `'none'` / absent.
    * @returns {Promise<object>} the constructed command instance.
    */
   async commandInstance() {
     const { default: ModuleClass } = await import(this.modulePath());
-    return this.entry.takesRepoContext
-      ? new ModuleClass(this.repoContext)
-      : new ModuleClass();
+    if (this.entry.context === 'repo') {
+      return new ModuleClass(this.repoContext);
+    }
+    if (this.entry.context === 'claude') {
+      return new ModuleClass(this.claudeContext);
+    }
+    return new ModuleClass();
   }
 
   /**
    * Lazily-built, memoized `RepoContext` for the leading `repoPath`
-   * argument. Only constructed on the `takesRepoContext` flag-on path.
+   * argument. Only constructed on the `context: 'repo'` path.
    * @returns {RepoContext} the context bound to `args[0]`.
    */
   get repoContext() {
@@ -77,12 +84,32 @@ export default class Dispatcher {
   }
 
   /**
+   * Lazily-built, memoized `ClaudeContext` for the leading `<anchor>`
+   * argument. Only constructed on the `context: 'claude'` path.
+   * @returns {ClaudeContext} the context bound to `args[0]`.
+   */
+  get claudeContext() {
+    this._claudeContext ??= new ClaudeContext({ repoPath: this.args[0] });
+    return this._claudeContext;
+  }
+
+  /**
+   * @returns {boolean} whether the entry binds a context to the leading
+   *   argument (`context: 'repo'` or `context: 'claude'`), meaning that
+   *   argument is consumed by the constructor and stripped from the
+   *   method args.
+   */
+  isContextBound() {
+    return this.entry.context === 'repo' || this.entry.context === 'claude';
+  }
+
+  /**
    * The arguments to forward to the command method — with the leading
-   * `repoPath` stripped when the entry takes a `RepoContext`.
+   * argument stripped when the entry binds a context to it.
    * @returns {string[]} the method arguments.
    */
   commandArgs() {
-    return this.entry.takesRepoContext ? this.args.slice(1) : this.args;
+    return this.isContextBound() ? this.args.slice(1) : this.args;
   }
 
   /**
