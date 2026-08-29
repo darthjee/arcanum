@@ -141,15 +141,6 @@ export const COMMANDS = {
   // (crashing) module is invoked, so logging survives a crash. See
   // docs/agents/plans/244-add-logs-to-native-nodejs-calls/node.md.
   'dispatch-fixture-crash': { module: 'commands/DispatchFixture.js', method: 'crash' },
-  // dispatch-fixture-repo-context is test-only: it exercises the
-  // `context: 'repo'` path end to end through the real registry.
-  // Removed together with the fixture in #314.
-  'dispatch-fixture-repo-context': {
-    module: 'commands/DispatchFixtureRepoContext.js',
-    method: 'run',
-    context: 'repo',
-    log: false
-  },
   'github-issue-create': {
     module: 'commands/GithubIssue.js',
     method: 'create',

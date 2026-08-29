@@ -9,7 +9,7 @@ describe('COMMANDS', () => {
     expect(COMMANDS['dispatch-fixture'].log).toBe(false);
   });
 
-  it('sets context: \'repo\' on the migrated arcanum-split-issue, auto-fix-all lifecycle, auto-fix-all-github and spawn-issue entries and the test fixture', () => {
+  it('sets context: \'repo\' on the migrated arcanum-split-issue, auto-fix-all lifecycle, auto-fix-all-github and spawn-issue entries', () => {
     const withRepoContext = Object.keys(COMMANDS).filter((name) => COMMANDS[name].context === 'repo');
 
     expect(withRepoContext).toEqual([
@@ -30,7 +30,6 @@ describe('COMMANDS', () => {
       'auto-fix-all-wait-ci',
       'auto-fix-all-wait-ci-and-merge',
       'checkout-safe-branch',
-      'dispatch-fixture-repo-context',
       'github-issue-create',
       'github-issue-info',
       'issue-state',
