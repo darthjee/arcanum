@@ -23,10 +23,10 @@ If the user has not already seen the rationale (e.g. via the `arcanum/migrations
 On yes, run:
 
 ```bash
-../arcanum/_lib/permission_grant.sh add .claude/settings.json "Bash(auto-fix-all/scripts/wait_ci_and_merge.sh *)"
+../arcanum/_lib/permission_grant.sh "$REPO_PATH" add .claude/settings.json "Bash(auto-fix-all/scripts/wait_ci_and_merge.sh *)"
 ```
 
-> Resolve `../arcanum/_lib/permission_grant.sh` relative to the `init-claude` skill folder.
+> Resolve `../arcanum/_lib/permission_grant.sh` relative to the `init-claude` skill folder. `REPO_PATH` (resolved once at the top of [SKILL.md](SKILL.md)) is the leading anchor argument — the onboarded repo root, against which the script resolves the repo-relative `.claude/settings.json` file argument.
 
 This appends the pattern to `.permissions.allow` in the target repo's `.claude/settings.json`, deduped, without disturbing any other content already in that file.
 
@@ -55,11 +55,11 @@ If the user has not already seen the rationale (e.g. via the paired `arcanum/mig
 On yes, run:
 
 ```bash
-../arcanum/_lib/permission_grant.sh add .claude/settings.json "Bash(auto-fix-issue/scripts/commit_change.sh *)"
-../arcanum/_lib/permission_grant.sh add .claude/settings.json "Bash(auto-fix-issue/scripts/run_checks.sh *)"
-../arcanum/_lib/permission_grant.sh add .claude/settings.json "Bash(git add *)"
+../arcanum/_lib/permission_grant.sh "$REPO_PATH" add .claude/settings.json "Bash(auto-fix-issue/scripts/commit_change.sh *)"
+../arcanum/_lib/permission_grant.sh "$REPO_PATH" add .claude/settings.json "Bash(auto-fix-issue/scripts/run_checks.sh *)"
+../arcanum/_lib/permission_grant.sh "$REPO_PATH" add .claude/settings.json "Bash(git add *)"
 ```
 
-> Resolve `../arcanum/_lib/permission_grant.sh` relative to the `init-claude` skill folder.
+> Resolve `../arcanum/_lib/permission_grant.sh` relative to the `init-claude` skill folder. `REPO_PATH` (resolved once at the top of [SKILL.md](SKILL.md)) is the leading anchor argument — the onboarded repo root, against which the script resolves the repo-relative `.claude/settings.json` file argument.
 
 This appends each pattern to `.permissions.allow` in the target repo's `.claude/settings.json`, deduped, without disturbing any other content already in that file.
