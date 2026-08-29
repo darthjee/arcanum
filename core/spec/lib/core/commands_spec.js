@@ -9,10 +9,10 @@ describe('COMMANDS', () => {
     expect(COMMANDS['dispatch-fixture'].log).toBe(false);
   });
 
-  it('sets takesRepoContext on the migrated arcanum-split-issue, auto-fix-all lifecycle, auto-fix-all-github and spawn-issue entries and the test fixture', () => {
-    const withFlag = Object.keys(COMMANDS).filter((name) => COMMANDS[name].takesRepoContext);
+  it('sets context: \'repo\' on the migrated arcanum-split-issue, auto-fix-all lifecycle, auto-fix-all-github and spawn-issue entries and the test fixture', () => {
+    const withRepoContext = Object.keys(COMMANDS).filter((name) => COMMANDS[name].context === 'repo');
 
-    expect(withFlag).toEqual([
+    expect(withRepoContext).toEqual([
       'arcanum-split-issue-create-sub-issue',
       'arcanum-split-issue-create-sub-issue-file',
       'arcanum-split-issue-finish',
@@ -40,6 +40,10 @@ describe('COMMANDS', () => {
       'resolve-plan-paths',
       'spawn-issue'
     ]);
+  });
+
+  it('sets context: \'claude\' on permission-grant', () => {
+    expect(COMMANDS['permission-grant'].context).toBe('claude');
   });
 
   it('gives every entry a module path and a method', () => {
