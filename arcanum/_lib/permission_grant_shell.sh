@@ -28,6 +28,12 @@
 # function; the CLI dispatcher at the bottom is both the
 # engine_dispatch shell-mode/fallback target and a secondary, direct-
 # invocation convenience.
+#
+# Direct-invocation CLI usage:
+#   permission_grant_shell.sh <anchor> add <file> <pattern>
+#   <anchor> is consumed and ignored — the shell path resolves <file>
+#   against cwd, as today. It exists only for parity with the native
+#   passthrough contract.
 
 _PERMISSION_GRANT_SHELL_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lock.sh
@@ -69,15 +75,21 @@ permission_grant_add() {
   _release_lock
 }
 
-# Direct-invocation CLI dispatcher: `permission_grant_shell.sh add <file> <pattern>`.
+# Direct-invocation CLI dispatcher: `permission_grant_shell.sh <anchor> add <file> <pattern>`.
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  _anchor="${1:-}"
+  if [[ -z "$_anchor" ]]; then
+    echo "Usage: $0 <anchor> add <file> <pattern>" >&2
+    exit 1
+  fi
+  shift
   case "${1:-}" in
     add)
       shift
       permission_grant_add "$@"
       ;;
     *)
-      echo "Usage: $0 add <file> <pattern>" >&2
+      echo "Usage: $0 <anchor> add <file> <pattern>" >&2
       exit 1
       ;;
   esac

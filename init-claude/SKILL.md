@@ -5,7 +5,7 @@ description: Configures CLAUDE.md and .github/copilot-instructions.md for a proj
 
 You are helping the user initialize or update the Claude and Copilot configuration files for the current project.
 
-Resolve `REPO_PATH="$(pwd)"` now — the one moment the target project's root can be trusted from ambient cwd — and thread it through explicitly to any step below that needs it (currently Step 9, [setup_auto_fix_all_settings.md](setup_auto_fix_all_settings.md), and Step 10, [setup_labels.md](setup_labels.md)).
+Resolve `REPO_PATH="$(pwd)"` now — the one moment the target project's root can be trusted from ambient cwd — and thread it through explicitly to any step below that needs it (currently Step 9, [setup_auto_fix_all_settings.md](setup_auto_fix_all_settings.md); Step 10, [setup_labels.md](setup_labels.md); and Step 11, [setup_permissions.md](setup_permissions.md)).
 
 ## Step 1 — Setup PR and commit message templates
 

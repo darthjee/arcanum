@@ -10,14 +10,22 @@
  * @property {string} method - method to invoke on the module's default export.
  * @property {boolean} [log] - `false` to skip `InvocationLog` recording for
  *   this command; any other value (or absent) means the invocation is logged.
- * @property {boolean} [takesRepoContext] - when `true`, the command's
- *   constructor receives a `RepoContext` built from the leading `repoPath`
- *   argument, and that leading argument is stripped from the method args.
- *   Set on the `arcanum-split-issue-*` and `auto-fix-all-*` lifecycle
- *   commands (checkout-from-main / cleanup-artifacts / reply-comment /
- *   wait-ci / wait-ci-and-merge), on `spawn-issue`, and on the
- *   `auto-fix-all-github-*` family (add-tag / cleanup-branch /
- *   has-shipit-label / pr-merge / pr-number / pr-state / remove-tag).
+ * @property {'repo'|'claude'|'none'} [context] - how the dispatcher builds the
+ *   module instance from the leading argument (absent ≡ `'none'`):
+ *   - `'repo'` — `new ModuleClass(repoContext)` where `repoContext` is a
+ *     `RepoContext` built from the leading `repoPath` argument; that leading
+ *     argument is stripped from the method args. Set on the
+ *     `arcanum-split-issue-*` and `auto-fix-all-*` lifecycle commands
+ *     (checkout-from-main / cleanup-artifacts / reply-comment / wait-ci /
+ *     wait-ci-and-merge), on `spawn-issue`, and on the `auto-fix-all-github-*`
+ *     family (add-tag / cleanup-branch / has-shipit-label / pr-merge /
+ *     pr-number / pr-state / remove-tag).
+ *   - `'claude'` — `new ModuleClass(claudeContext)` where `claudeContext` is a
+ *     `ClaudeContext` built from the leading anchor argument; that leading
+ *     argument is stripped from the method args. Only `permission-grant`.
+ *   - `'none'` / absent — `new ModuleClass()`, method args untouched. Applies
+ *     to `dispatch-fixture`, `dispatch-fixture-crash`, `auto-fix-all-config-*`,
+ *     `auto-fix-all-queue-*`, and `arcanum-update-run-update-*`.
  */
 
 /**
@@ -31,34 +39,34 @@ export const COMMANDS = {
   'arcanum-split-issue-create-sub-issue': {
     module: 'commands/ArcanumSplitIssueCreateSubIssue.js',
     method: 'run',
-    takesRepoContext: true
+    context: 'repo'
   },
   'arcanum-split-issue-create-sub-issue-file': {
     module: 'commands/ArcanumSplitIssueCreateSubIssueFile.js',
     method: 'run',
-    takesRepoContext: true
+    context: 'repo'
   },
   'arcanum-split-issue-finish': {
     module: 'commands/ArcanumSplitIssueFinish.js',
     method: 'run',
-    takesRepoContext: true
+    context: 'repo'
   },
   'arcanum-split-issue-push-sub-issues': {
     module: 'commands/ArcanumSplitIssuePushSubIssues.js',
     method: 'run',
-    takesRepoContext: true
+    context: 'repo'
   },
   'arcanum-update-run-update-check': { module: 'commands/ArcanumUpdateRunUpdate.js', method: 'check' },
   'arcanum-update-run-update-apply': { module: 'commands/ArcanumUpdateRunUpdate.js', method: 'apply' },
   'auto-fix-all-checkout-from-main': {
     module: 'commands/AutoFixAllCheckoutFromMain.js',
     method: 'run',
-    takesRepoContext: true
+    context: 'repo'
   },
   'auto-fix-all-cleanup-artifacts': {
     module: 'commands/AutoFixAllCleanupArtifacts.js',
     method: 'run',
-    takesRepoContext: true
+    context: 'repo'
   },
   'auto-fix-all-config-get': { module: 'commands/AutoFixAllConfig.js', method: 'get' },
   'auto-fix-all-config-is-enabled': { module: 'commands/AutoFixAllConfig.js', method: 'isEnabled' },
@@ -67,37 +75,37 @@ export const COMMANDS = {
   'auto-fix-all-github-add-tag': {
     module: 'commands/AutoFixAllGithub.js',
     method: 'addTag',
-    takesRepoContext: true
+    context: 'repo'
   },
   'auto-fix-all-github-cleanup-branch': {
     module: 'commands/AutoFixAllGithub.js',
     method: 'cleanupBranch',
-    takesRepoContext: true
+    context: 'repo'
   },
   'auto-fix-all-github-has-shipit-label': {
     module: 'commands/AutoFixAllGithub.js',
     method: 'hasShipitLabel',
-    takesRepoContext: true
+    context: 'repo'
   },
   'auto-fix-all-github-pr-merge': {
     module: 'commands/AutoFixAllGithub.js',
     method: 'prMerge',
-    takesRepoContext: true
+    context: 'repo'
   },
   'auto-fix-all-github-pr-number': {
     module: 'commands/AutoFixAllGithub.js',
     method: 'prNumber',
-    takesRepoContext: true
+    context: 'repo'
   },
   'auto-fix-all-github-pr-state': {
     module: 'commands/AutoFixAllGithub.js',
     method: 'prState',
-    takesRepoContext: true
+    context: 'repo'
   },
   'auto-fix-all-github-remove-tag': {
     module: 'commands/AutoFixAllGithub.js',
     method: 'removeTag',
-    takesRepoContext: true
+    context: 'repo'
   },
   'auto-fix-all-queue-empty': { module: 'commands/AutoFixAllQueue.js', method: 'empty' },
   'auto-fix-all-queue-list': { module: 'commands/AutoFixAllQueue.js', method: 'list' },
@@ -109,22 +117,22 @@ export const COMMANDS = {
   'auto-fix-all-reply-comment': {
     module: 'commands/AutoFixAllReplyComment.js',
     method: 'run',
-    takesRepoContext: true
+    context: 'repo'
   },
   'auto-fix-all-wait-ci': {
     module: 'commands/AutoFixAllWaitCi.js',
     method: 'run',
-    takesRepoContext: true
+    context: 'repo'
   },
   'auto-fix-all-wait-ci-and-merge': {
     module: 'commands/AutoFixAllWaitCiAndMerge.js',
     method: 'run',
-    takesRepoContext: true
+    context: 'repo'
   },
   'checkout-safe-branch': {
     module: 'commands/SafeBranch.js',
     method: 'run',
-    takesRepoContext: true
+    context: 'repo'
   },
   'dispatch-fixture': { module: 'commands/DispatchFixture.js', method: 'run', log: false },
   // dispatch-fixture-crash is deliberately left logged (entry.log
@@ -134,49 +142,49 @@ export const COMMANDS = {
   // docs/agents/plans/244-add-logs-to-native-nodejs-calls/node.md.
   'dispatch-fixture-crash': { module: 'commands/DispatchFixture.js', method: 'crash' },
   // dispatch-fixture-repo-context is test-only: it exercises the
-  // `takesRepoContext` flag-on path end to end through the real registry.
-  // Removed together with the flag in #308 sub-issue 6.
+  // `context: 'repo'` path end to end through the real registry.
+  // Removed together with the fixture in #314.
   'dispatch-fixture-repo-context': {
     module: 'commands/DispatchFixtureRepoContext.js',
     method: 'run',
-    takesRepoContext: true,
+    context: 'repo',
     log: false
   },
   'github-issue-create': {
     module: 'commands/GithubIssue.js',
     method: 'create',
-    takesRepoContext: true
+    context: 'repo'
   },
   'github-issue-info': {
     module: 'commands/GithubIssue.js',
     method: 'info',
-    takesRepoContext: true
+    context: 'repo'
   },
   'issue-state': {
     module: 'commands/IssueState.js',
     method: 'run',
-    takesRepoContext: true
+    context: 'repo'
   },
   'list-agents': {
     module: 'commands/ListAgents.js',
     method: 'run',
-    takesRepoContext: true
+    context: 'repo'
   },
-  'permission-grant': { module: 'commands/PermissionGrant.js', method: 'run' },
+  'permission-grant': { module: 'commands/PermissionGrant.js', method: 'run', context: 'claude' },
   'resolve-and-fetch': {
     module: 'commands/ResolveAndFetch.js',
     method: 'run',
-    takesRepoContext: true
+    context: 'repo'
   },
   'resolve-id-and-file': {
     module: 'commands/ResolveIdAndFile.js',
     method: 'run',
-    takesRepoContext: true
+    context: 'repo'
   },
   'resolve-plan-paths': {
     module: 'commands/ResolvePlanPaths.js',
     method: 'run',
-    takesRepoContext: true
+    context: 'repo'
   },
-  'spawn-issue': { module: 'commands/SpawnIssue.js', method: 'run', takesRepoContext: true }
+  'spawn-issue': { module: 'commands/SpawnIssue.js', method: 'run', context: 'repo' }
 };

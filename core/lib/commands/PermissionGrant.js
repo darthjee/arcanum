@@ -12,13 +12,22 @@ const USAGE_MESSAGE = 'Usage: permission_grant.sh add <file> <pattern>';
  * scope here — the sourced `permission_grant_add` function used
  * in-process by scripts under `arcanum/migrations/repos` stays pure shell (see
  * docs/agents/plans/236-migrate-permission-grant-entrypoint-to-native-node-js/plan.md).
+ *
+ * The CLI path is a `context: 'claude'` command: `Dispatcher` strips the
+ * leading `<anchor>` argument, builds a `ClaudeContext` from it and injects
+ * it here, so a repo-relative `<file>` resolves against the anchor rather
+ * than the ambient `process.cwd()`.
  */
 class PermissionGrant {
   /**
+   * @param {import('../context/ClaudeContext.js').default} claudeContext -
+   *   the context anchoring `<file>` resolution, injected by `Dispatcher`
+   *   from the leading `<anchor>` CLI argument.
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Lock} [deps.lock] - the lock/mutate/release helper.
    */
-  constructor({ lock = new Lock() } = {}) {
+  constructor(claudeContext, { lock = new Lock() } = {}) {
+    this._claudeContext = claudeContext;
     this._lock = lock;
   }
 
@@ -53,30 +62,34 @@ class PermissionGrant {
    * rename).
    *
    * Degrades silently (stderr warning, no-op, still resolves/exits 0)
-   * if `file`'s parent directory can't be created — same failure
+   * if the target's parent directory can't be created — same failure
    * posture as the shell version.
-   * @param {string} file - the target settings file's path.
+   * @param {string} file - the target settings file's path; absolute
+   *   paths pass through unchanged, repo-relative ones resolve against
+   *   the injected `ClaudeContext`'s anchor.
    * @param {string} pattern - the Bash-permission pattern to allow.
    * @returns {Promise<void>} resolves once the write (or the silent
    *   degrade) has completed.
    */
   async add(file, pattern) {
+    const target = this._claudeContext.resolve(file);
+
     try {
-      await mkdir(path.dirname(file), { recursive: true });
+      await mkdir(path.dirname(target), { recursive: true });
     } catch {
       process.stderr.write(
-        `Warning: could not create the parent directory for ${file} — permission pattern '${pattern}' was not written.\n`
+        `Warning: could not create the parent directory for ${target} — permission pattern '${pattern}' was not written.\n`
       );
 
       return;
     }
 
-    const lockFile = `${file}.lock`;
+    const lockFile = `${target}.lock`;
 
     await this._lock.acquire(lockFile);
 
     try {
-      await this._merge(file, pattern);
+      await this._merge(target, pattern);
     } finally {
       await this._lock.release(lockFile);
     }
