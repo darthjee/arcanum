@@ -20,7 +20,7 @@ function fakeInvocationLog(events) {
 }
 
 describe('Dispatcher', () => {
-  describe("context: 'none' path (dispatch-fixture)", () => {
+  describe('context: \'none\' path (dispatch-fixture)', () => {
     let dispatcher;
 
     beforeEach(() => {
@@ -48,7 +48,7 @@ describe('Dispatcher', () => {
     });
   });
 
-  describe("context: 'repo' path (dispatch-fixture-repo-context)", () => {
+  describe('context: \'repo\' path (dispatch-fixture-repo-context)', () => {
     let dispatcher;
 
     beforeEach(() => {
@@ -71,7 +71,7 @@ describe('Dispatcher', () => {
     });
   });
 
-  describe("context: 'claude' path (permission-grant)", () => {
+  describe('context: \'claude\' path (permission-grant)', () => {
     let dispatcher;
 
     beforeEach(() => {

@@ -23,11 +23,13 @@ import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 // `add <file> <pattern>` portion (and the exit code / empty stdout) is
 // asserted there.
 //
-// `permission-grant` is a `context: 'claude'` command, so the native
-// invocation takes a leading `<anchor>` argument that `Dispatcher`
-// strips before calling `run(...)`. The parity fixtures pass absolute
-// file paths, so the anchor value doesn't affect resolution — `cwd` is
-// passed for it.
+// `permission-grant` is a `context: 'claude'` command, so both the
+// native invocation and (per the scripter-side passthrough contract)
+// the shell dispatcher take a leading `<anchor>` argument. Native:
+// `Dispatcher` strips it and builds a `ClaudeContext`. Shell: the
+// anchor is consumed and ignored (it still resolves `<file>` against
+// cwd). The parity fixtures pass absolute file paths, so the anchor
+// value doesn't affect resolution — `cwd` is passed for it.
 
 const execFileAsync = promisify(execFile);
 
@@ -60,7 +62,7 @@ async function runCommand([file, ...args], cwd) {
  * @returns {Promise<{shell: object, native: object}>} both sides' results.
  */
 async function runBoth(shellFile, nativeFile, pattern, cwd) {
-  const shell = await runCommand(['bash', SHELL_SCRIPT, 'add', shellFile, pattern], cwd);
+  const shell = await runCommand(['bash', SHELL_SCRIPT, cwd, 'add', shellFile, pattern], cwd);
   const native = await runCommand(
     [process.execPath, NATIVE_BIN, 'permission-grant', cwd, 'add', nativeFile, pattern],
     cwd
@@ -165,7 +167,7 @@ describe('permission-grant parity (shell vs. native)', () => {
 
   describe('an unrecognized action', () => {
     it('matches exit code and empty stdout, with the fixed usage-message portion in stderr', async () => {
-      const shell = await runCommand(['bash', SHELL_SCRIPT, 'remove', shellFile, 'Bash(git push:*)'], cwd);
+      const shell = await runCommand(['bash', SHELL_SCRIPT, cwd, 'remove', shellFile, 'Bash(git push:*)'], cwd);
       const native = await runCommand(
         [process.execPath, NATIVE_BIN, 'permission-grant', cwd, 'remove', nativeFile, 'Bash(git push:*)'],
         cwd
