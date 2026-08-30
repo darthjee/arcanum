@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { createGitFixtureRepo } from '../support/utils/gitFixtureRepo.js';
+import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
 // Parity test for the "auto-fix-all-cleanup-artifacts" migrated
 // entrypoint (issue #254) — see docs/agents/architecture/script-engine.md's
@@ -182,6 +183,55 @@ describe('auto-fix-all-cleanup-artifacts parity (shell vs. native)', () => {
         expect(shellLog.stdout).toContain(`chore(docs): remove planning artifacts (issue #${ID})`);
       } finally {
         await Promise.all([shellRepo.cleanup(), nativeRepo.cleanup()]);
+      }
+    });
+  });
+
+  describe('a present-but-non-directory repo_path (hard failure)', () => {
+    it('matches shell exit code and stderr message, with no stdout on either side', async () => {
+      const cwd = await createTempDir('arcanum-core-afaca-parity-');
+
+      try {
+        const missingPath = path.join(cwd, 'no-such-dir');
+        const args = [missingPath, ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, MODEL_EMAIL];
+        const shell = await runCommand([SHELL_SCRIPT, ...args], cwd);
+        const native = await runCommand(
+          [process.execPath, NATIVE_BIN, 'auto-fix-all-cleanup-artifacts', ...args],
+          cwd
+        );
+
+        expect(native.stdout).toEqual(shell.stdout);
+        expect(native.code).toEqual(shell.code);
+        expect(shell.code).not.toEqual(0);
+        expect(shell.stdout).toEqual('');
+        expect(shell.stderr.trim()).toEqual(`Error: not a directory: ${missingPath}`);
+        expect(native.stderr.trim()).toContain(`Error: not a directory: ${missingPath}`);
+      } finally {
+        await removeTempDir(cwd);
+      }
+    });
+  });
+
+  describe('a non-git repo_path (hard failure)', () => {
+    it('matches shell exit code and stderr message, with no stdout on either side', async () => {
+      const cwd = await createTempDir('arcanum-core-afaca-parity-');
+
+      try {
+        const args = [cwd, ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, MODEL_EMAIL];
+        const shell = await runCommand([SHELL_SCRIPT, ...args], cwd);
+        const native = await runCommand(
+          [process.execPath, NATIVE_BIN, 'auto-fix-all-cleanup-artifacts', ...args],
+          cwd
+        );
+
+        expect(native.stdout).toEqual(shell.stdout);
+        expect(native.code).toEqual(shell.code);
+        expect(shell.code).not.toEqual(0);
+        expect(shell.stdout).toEqual('');
+        expect(shell.stderr.trim()).toEqual(`Error: not a git repository: ${cwd}`);
+        expect(native.stderr.trim()).toContain(`Error: not a git repository: ${cwd}`);
+      } finally {
+        await removeTempDir(cwd);
       }
     });
   });

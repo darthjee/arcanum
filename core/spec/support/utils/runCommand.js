@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
+import { createTempDir, removeTempDir } from './tempDir.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -111,4 +112,65 @@ export async function runBoth(subcommand, nativeCommand, extraArgs, shellRepo, n
 export function expectParity(shell, native) {
   expect(native.stdout).toEqual(shell.stdout);
   expect(native.code).toEqual(shell.code);
+}
+
+/**
+ * Run one `auto-fix-all-github` subcommand on both sides against an
+ * arbitrary `repoPath` (not a fixture repo), from a valid `cwd`.
+ * @param {string} subcommand - `github.sh`'s subcommand name.
+ * @param {string} nativeCommand - the matching `core/bin/arcanum` command.
+ * @param {string[]} extraArgs - any arguments after `<repo_path>`.
+ * @param {string} repoPath - the repo-path argument under test.
+ * @param {string} cwd - a valid directory to run both commands in.
+ * @returns {Promise<{shell: object, native: object}>} both sides' results.
+ */
+export async function runBothWithRepoPath(subcommand, nativeCommand, extraArgs, repoPath, cwd) {
+  const shell = await runCommand([SHELL_SCRIPT, subcommand, repoPath, ...extraArgs], cwd);
+  const native = await runCommand(
+    [process.execPath, '--import', FAKE_FETCH_PRELOAD, NATIVE_BIN, nativeCommand, repoPath, ...extraArgs],
+    cwd
+  );
+
+  return { shell, native };
+}
+
+/**
+ * Assert shell/native parity for an `auto-fix-all-github` subcommand
+ * given a present-but-non-directory `repo_path` and a
+ * directory-but-not-a-git-repo `repo_path` — both now rejected uniformly
+ * by `repo_path_enter` (shell) and `RepoContext#validate()` (native).
+ * @param {string} subcommand - `github.sh`'s subcommand name.
+ * @param {string} nativeCommand - the matching `core/bin/arcanum` command.
+ * @param {string[]} [extraArgs] - any arguments after `<repo_path>`.
+ * @returns {Promise<void>} resolves once both cases have been asserted.
+ */
+export async function expectInvalidRepoPathParity(subcommand, nativeCommand, extraArgs = []) {
+  const cwd = await createTempDir('arcanum-core-afgh-parity-');
+
+  try {
+    const missingPath = path.join(cwd, 'no-such-dir');
+    const miss = await runBothWithRepoPath(subcommand, nativeCommand, extraArgs, missingPath, cwd);
+
+    expectParity(miss.shell, miss.native);
+    expect(miss.shell.code).not.toEqual(0);
+    expect(miss.shell.stdout).toEqual('');
+    expect(miss.shell.stderr.trim()).toEqual(`Error: not a directory: ${missingPath}`);
+    expect(miss.native.stderr.trim()).toContain(`Error: not a directory: ${missingPath}`);
+
+    const nonGit = await createTempDir('arcanum-core-afgh-parity-nongit-');
+
+    try {
+      const ng = await runBothWithRepoPath(subcommand, nativeCommand, extraArgs, nonGit, cwd);
+
+      expectParity(ng.shell, ng.native);
+      expect(ng.shell.code).not.toEqual(0);
+      expect(ng.shell.stdout).toEqual('');
+      expect(ng.shell.stderr.trim()).toEqual(`Error: not a git repository: ${nonGit}`);
+      expect(ng.native.stderr.trim()).toContain(`Error: not a git repository: ${nonGit}`);
+    } finally {
+      await removeTempDir(nonGit);
+    }
+  } finally {
+    await removeTempDir(cwd);
+  }
 }

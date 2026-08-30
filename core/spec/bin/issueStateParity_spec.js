@@ -224,4 +224,46 @@ describe('issue-state parity (shell vs. native)', () => {
       expect(native.stderr.trim()).toContain('Unknown command: bogus');
     });
   });
+
+  describe('a present-but-non-directory repo_path', () => {
+    it('matches shell exit code and stderr message, with no stdout on either side', async () => {
+      const missingShell = path.join(shellRepo, 'no-such-dir');
+      const missingNative = path.join(nativeRepo, 'no-such-dir');
+      const shell = await runCommand([SHELL_SCRIPT, missingShell, 'get', '42', 'title'], shellRepo);
+      const native = await runCommand(
+        [process.execPath, NATIVE_BIN, 'issue-state', missingNative, 'get', '42', 'title'],
+        nativeRepo
+      );
+
+      expect(shell.stdout).toEqual('');
+      expect(native.stdout).toEqual('');
+      expect(native.code).toEqual(shell.code);
+      expect(shell.code).not.toEqual(0);
+      expect(shell.stderr.trim()).toEqual(`Error: not a directory: ${missingShell}`);
+      expect(native.stderr.trim()).toContain(`Error: not a directory: ${missingNative}`);
+    });
+  });
+
+  describe('a non-git repo_path', () => {
+    it('matches shell exit code and stderr message, with no stdout on either side', async () => {
+      const nonGit = await createTempDir('arcanum-core-is-parity-nongit-');
+
+      try {
+        const shell = await runCommand([SHELL_SCRIPT, nonGit, 'get', '42', 'title'], shellRepo);
+        const native = await runCommand(
+          [process.execPath, NATIVE_BIN, 'issue-state', nonGit, 'get', '42', 'title'],
+          nativeRepo
+        );
+
+        expect(shell.stdout).toEqual('');
+        expect(native.stdout).toEqual('');
+        expect(native.code).toEqual(shell.code);
+        expect(shell.code).not.toEqual(0);
+        expect(shell.stderr.trim()).toEqual(`Error: not a git repository: ${nonGit}`);
+        expect(native.stderr.trim()).toContain(`Error: not a git repository: ${nonGit}`);
+      } finally {
+        await removeTempDir(nonGit);
+      }
+    });
+  });
 });

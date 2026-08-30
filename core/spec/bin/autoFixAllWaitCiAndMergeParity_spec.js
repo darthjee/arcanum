@@ -150,6 +150,57 @@ describe('auto-fix-all-wait-ci-and-merge parity (shell vs. native)', () => {
     });
   });
 
+  // `wait_ci_and_merge_shell.sh` composes the `wait_ci.sh` /
+  // `github.sh pr-merge` shims rather than calling `repo_path_enter`
+  // itself, so its own stderr wording for a bad `repo_path` isn't
+  // byte-identical to the native dispatcher's — only the stdout /
+  // exit-code contract (empty stdout, non-zero exit, matching codes) is,
+  // which is what's asserted here.
+  describe('a present-but-non-directory repo_path', () => {
+    it('matches shell exit code, with no stdout on either side', async () => {
+      const cwd = await createTempDir('arcanum-core-afawcam-parity-');
+
+      try {
+        const missingPath = path.join(cwd, 'no-such-dir');
+        const shell = await runCommand([SHELL_SCRIPT, missingPath, MODEL_EMAIL], cwd);
+        const native = await runCommand(
+          [process.execPath, NATIVE_BIN, 'auto-fix-all-wait-ci-and-merge', missingPath, MODEL_EMAIL],
+          cwd
+        );
+
+        expect(native.stdout).toEqual(shell.stdout);
+        expect(native.code).toEqual(shell.code);
+        expect(shell.code).not.toEqual(0);
+        expect(shell.stdout).toEqual('');
+        expect(native.stderr.trim()).toContain(`Error: not a directory: ${missingPath}`);
+      } finally {
+        await removeTempDir(cwd);
+      }
+    });
+  });
+
+  describe('a non-git repo_path', () => {
+    it('matches shell exit code, with no stdout on either side', async () => {
+      const cwd = await createTempDir('arcanum-core-afawcam-parity-');
+
+      try {
+        const shell = await runCommand([SHELL_SCRIPT, cwd, MODEL_EMAIL], cwd);
+        const native = await runCommand(
+          [process.execPath, NATIVE_BIN, 'auto-fix-all-wait-ci-and-merge', cwd, MODEL_EMAIL],
+          cwd
+        );
+
+        expect(native.stdout).toEqual(shell.stdout);
+        expect(native.code).toEqual(shell.code);
+        expect(shell.code).not.toEqual(0);
+        expect(shell.stdout).toEqual('');
+        expect(native.stderr.trim()).toContain(`Error: not a git repository: ${cwd}`);
+      } finally {
+        await removeTempDir(cwd);
+      }
+    });
+  });
+
   describe('CI passes and the merge succeeds', () => {
     it('matches shell exit code and "passed\\n<url>\\n" stdout', async () => {
       const fakeGh = await createFakeGhBin();

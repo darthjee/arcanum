@@ -128,4 +128,47 @@ describe('resolve-id-and-file parity (shell vs. native)', () => {
       expect(native.stderr.trim()).toContain(expectedMessage);
     });
   });
+
+  describe('a present-but-non-directory repo_path (hard failure)', () => {
+    it('matches shell exit code and stderr message, with no stdout on either side', async () => {
+      const missingPath = path.join(repoPath, 'no-such-dir');
+      const shell = await runCommand([SHELL_SCRIPT, missingPath, ISSUES_FOLDER, '#42 Title'], repoPath);
+      const native = await runCommand(
+        [process.execPath, NATIVE_BIN, 'resolve-id-and-file', missingPath, ISSUES_FOLDER, '#42 Title'],
+        repoPath
+      );
+      const expectedMessage = `Error: not a directory: ${missingPath}`;
+
+      expect(shell.stdout).toEqual('');
+      expect(native.stdout).toEqual('');
+      expect(native.code).toEqual(shell.code);
+      expect(shell.code).not.toEqual(0);
+      expect(shell.stderr.trim()).toEqual(expectedMessage);
+      expect(native.stderr.trim()).toContain(expectedMessage);
+    });
+  });
+
+  describe('a non-git repo_path (hard failure)', () => {
+    it('matches shell exit code and stderr message, with no stdout on either side', async () => {
+      const nonGit = await createTempDir('arcanum-core-riaf-parity-nongit-');
+
+      try {
+        const shell = await runCommand([SHELL_SCRIPT, nonGit, ISSUES_FOLDER, '#42 Title'], repoPath);
+        const native = await runCommand(
+          [process.execPath, NATIVE_BIN, 'resolve-id-and-file', nonGit, ISSUES_FOLDER, '#42 Title'],
+          repoPath
+        );
+        const expectedMessage = `Error: not a git repository: ${nonGit}`;
+
+        expect(shell.stdout).toEqual('');
+        expect(native.stdout).toEqual('');
+        expect(native.code).toEqual(shell.code);
+        expect(shell.code).not.toEqual(0);
+        expect(shell.stderr.trim()).toEqual(expectedMessage);
+        expect(native.stderr.trim()).toContain(expectedMessage);
+      } finally {
+        await removeTempDir(nonGit);
+      }
+    });
+  });
 });
