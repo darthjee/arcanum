@@ -266,4 +266,51 @@ describe('auto-fix-all-checkout-from-main parity (shell vs. native)', () => {
       }
     });
   });
+
+  describe('a present-but-non-directory repo_path', () => {
+    it('matches shell exit code and stderr message, with no stdout on either side', async () => {
+      const cwd = await createTempDir('arcanum-core-afacfm-parity-');
+
+      try {
+        const missingPath = path.join(cwd, 'no-such-dir');
+        const shell = await runCommand([SHELL_SCRIPT, missingPath, '42'], cwd);
+        const native = await runCommand(
+          [process.execPath, NATIVE_BIN, 'auto-fix-all-checkout-from-main', missingPath, '42'],
+          cwd
+        );
+
+        expect(native.stdout).toEqual(shell.stdout);
+        expect(native.code).toEqual(shell.code);
+        expect(shell.code).not.toEqual(0);
+        expect(shell.stdout).toEqual('');
+        expect(shell.stderr.trim()).toEqual(`Error: not a directory: ${missingPath}`);
+        expect(native.stderr.trim()).toContain(`Error: not a directory: ${missingPath}`);
+      } finally {
+        await removeTempDir(cwd);
+      }
+    });
+  });
+
+  describe('a non-git repo_path', () => {
+    it('matches shell exit code and stderr message, with no stdout on either side', async () => {
+      const cwd = await createTempDir('arcanum-core-afacfm-parity-');
+
+      try {
+        const shell = await runCommand([SHELL_SCRIPT, cwd, '42'], cwd);
+        const native = await runCommand(
+          [process.execPath, NATIVE_BIN, 'auto-fix-all-checkout-from-main', cwd, '42'],
+          cwd
+        );
+
+        expect(native.stdout).toEqual(shell.stdout);
+        expect(native.code).toEqual(shell.code);
+        expect(shell.code).not.toEqual(0);
+        expect(shell.stdout).toEqual('');
+        expect(shell.stderr.trim()).toEqual(`Error: not a git repository: ${cwd}`);
+        expect(native.stderr.trim()).toContain(`Error: not a git repository: ${cwd}`);
+      } finally {
+        await removeTempDir(cwd);
+      }
+    });
+  });
 });

@@ -26,6 +26,10 @@
  *   - `'none'` / absent — `new ModuleClass()`, method args untouched. Applies
  *     to `dispatch-fixture`, `dispatch-fixture-crash`, `auto-fix-all-config-*`,
  *     `auto-fix-all-queue-*`, and `arcanum-update-run-update-*`.
+ * @property {boolean} [validateRepoPath] - defaults to `true` for
+ *   `context: 'repo'`; set `false` to skip the Dispatcher-level
+ *   `RepoContext#validate()` (e.g. entries with their own not-a-repo error
+ *   contract). No effect for `context: 'claude'` / `'none'`.
  */
 
 /**
@@ -149,7 +153,8 @@ export const COMMANDS = {
   'github-issue-info': {
     module: 'commands/GithubIssue.js',
     method: 'info',
-    context: 'repo'
+    context: 'repo',
+    validateRepoPath: false
   },
   'issue-state': {
     module: 'commands/IssueState.js',

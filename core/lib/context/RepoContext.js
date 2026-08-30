@@ -3,6 +3,7 @@ import GithubIssue from '../commands/GithubIssue.js';
 import GithubToken from '../utils/github/GithubToken.js';
 import IssueStateService from '../services/IssueStateService.js';
 import Origin from '../utils/git/Origin.js';
+import RepoPath from '../utils/file/RepoPath.js';
 
 /**
  * Bundles a single repo's `repoPath` with the 5 collaborators
@@ -12,6 +13,13 @@ import Origin from '../utils/git/Origin.js';
  * individually. One `RepoContext` is built per call site (`repoPath`
  * differs call to call), wrapping whichever shared collaborator
  * instances the caller already holds.
+ *
+ * It also owns `repoPath` validation — present / is-a-directory /
+ * is-a-git-repository — via the lazy `validate()` method, mirroring
+ * `arcanum/_lib/repo_path.sh`'s `repo_path_enter`. `Dispatcher` calls it
+ * once on the `context: 'repo'` path (and `#createIssue` calls it for
+ * the in-process collaborator path); it never runs from the constructor,
+ * since specs build `RepoContext` with fake paths.
  */
 class RepoContext {
   /**
@@ -25,6 +33,9 @@ class RepoContext {
    *   state-file reader/writer, bound to this context.
    * @param {ConfigChain} [deps.configChain] - 3-tier config reader.
    * @param {GithubIssue} [deps.githubIssue] - GitHub issue creator.
+   * @param {RepoPath} [deps.repoPathValidator] - `repoPath`
+   *   present/directory/git-repo validator (distinct from the
+   *   `repoPath` string param).
    */
   constructor({
     repoPath,
@@ -32,7 +43,8 @@ class RepoContext {
     githubToken = new GithubToken(),
     issueStateService,
     configChain = new ConfigChain(),
-    githubIssue = new GithubIssue()
+    githubIssue = new GithubIssue(),
+    repoPathValidator = new RepoPath()
   } = {}) {
     this.repoPath = repoPath;
     this._origin = origin;
@@ -40,6 +52,19 @@ class RepoContext {
     this._issueStateService = issueStateService ?? new IssueStateService({ context: this });
     this._configChain = configChain;
     this._githubIssue = githubIssue;
+    this._repoPathValidator = repoPathValidator;
+  }
+
+  /**
+   * Validate this context's `repoPath` — present, a directory, a git
+   * repository — throwing the exact `repo_path_enter` messages on
+   * failure. Called once by `Dispatcher` on the `context: 'repo'` path
+   * (and by `#createIssue`); never from the constructor, since specs
+   * build `RepoContext` with fake paths.
+   * @returns {Promise<void>}
+   */
+  async validate() {
+    return this._repoPathValidator.validate(this.repoPath);
   }
 
   /**
@@ -107,6 +132,7 @@ class RepoContext {
    *   see `GithubIssue#create`.
    */
   async createIssue(title, bodyFile) {
+    await this.validate();
     return this._githubIssue.create(this.repoPath, title, bodyFile);
   }
 }

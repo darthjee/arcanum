@@ -3,7 +3,9 @@ import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { createGitFixtureRepo } from '../../support/utils/gitFixtureRepo.js';
-import { git, NATIVE_BIN, runCommand, SHELL_SCRIPT } from '../../support/utils/runCommand.js';
+import {
+  expectInvalidRepoPathParity, git, NATIVE_BIN, runCommand, SHELL_SCRIPT
+} from '../../support/utils/runCommand.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -77,5 +79,9 @@ describe('auto-fix-all-github parity (shell vs. native) — cleanup-branch', () 
     } finally {
       await Promise.all([shellRepo.cleanup(), nativeRepo.cleanup()]);
     }
+  });
+
+  it('matches shell for a non-directory / non-git repo_path (repo_path_enter parity)', async () => {
+    await expectInvalidRepoPathParity('cleanup-branch', 'auto-fix-all-github-cleanup-branch', ['9']);
   });
 });

@@ -1,6 +1,5 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import RepoPath from '../utils/file/RepoPath.js';
 
 const USAGE = 'Usage: create_sub_issue_file.sh <repo_path> <issue_id> <title> <body_file>';
 const ISSUES_DIR = 'docs/agents/issues';
@@ -21,22 +20,18 @@ class ArcanumSplitIssueCreateSubIssueFile {
    * @param {Function} [deps.mkdir] - `node:fs/promises`'s `mkdir`.
    * @param {Function} [deps.readFile] - `node:fs/promises`'s `readFile`.
    * @param {Function} [deps.writeFile] - `node:fs/promises`'s `writeFile`.
-   * @param {RepoPath} [deps.repoPathValidator] - repo-path validation
-   *   helper.
    */
   constructor(repoContext, {
     readdir: readdirFn = readdir,
     mkdir: mkdirFn = mkdir,
     readFile: readFileFn = readFile,
-    writeFile: writeFileFn = writeFile,
-    repoPathValidator = new RepoPath()
+    writeFile: writeFileFn = writeFile
   } = {}) {
     this._repoContext = repoContext;
     this._readdir = readdirFn;
     this._mkdir = mkdirFn;
     this._readFile = readFileFn;
     this._writeFile = writeFileFn;
-    this._repoPathValidator = repoPathValidator;
   }
 
   /**
@@ -44,7 +39,7 @@ class ArcanumSplitIssueCreateSubIssueFile {
    * migrated entrypoint — byte-identical stdout/exit-code counterpart to
    * `create_sub_issue_file_shell.sh`. Validates all 4 arguments are
    * present (usage message otherwise, propagated uncaught so the caller
-   * exits 1), validates `repoPath` (`RepoPath#validate`), checks that
+   * exits 1), checks that
    * `bodyFile` exists (relative to `repoPath`, mirroring the shell
    * script's `cd`-then-check order), scans `docs/agents/issues/` for the
    * next gap-tolerant zero-padded sub-issue count, snake_cases `title`,
@@ -59,8 +54,6 @@ class ArcanumSplitIssueCreateSubIssueFile {
     if (!this._repoContext.repoPath || !issueId || !title || !bodyFile) {
       throw new Error(USAGE);
     }
-
-    await this._repoPathValidator.validate(this._repoContext.repoPath);
 
     const resolvedBodyFile = path.resolve(this._repoContext.repoPath, bodyFile);
     let body;

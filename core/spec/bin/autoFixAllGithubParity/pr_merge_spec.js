@@ -1,5 +1,5 @@
 import { setupParityTest } from '../../support/factories/githubParitySetup.js';
-import { expectParity, runBoth } from '../../support/utils/runCommand.js';
+import { expectInvalidRepoPathParity, expectParity, runBoth } from '../../support/utils/runCommand.js';
 
 // Parity test for the "auto-fix-all-github pr-merge" migrated
 // entrypoint (issue #265) — see docs/agents/architecture/script-engine.md's
@@ -44,5 +44,9 @@ describe('auto-fix-all-github parity (shell vs. native) — pr-merge', () => {
     } finally {
       await ctx.cleanup();
     }
+  });
+
+  it('matches shell for a non-directory / non-git repo_path (repo_path_enter parity)', async () => {
+    await expectInvalidRepoPathParity('pr-merge', 'auto-fix-all-github-pr-merge');
   });
 });

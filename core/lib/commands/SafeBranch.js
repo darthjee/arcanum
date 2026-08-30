@@ -1,7 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import RepoConfig from '../utils/config/RepoConfig.js';
-import RepoPath from '../utils/file/RepoPath.js';
 
 const defaultExecFileAsync = promisify(execFile);
 
@@ -20,34 +19,28 @@ class SafeBranch {
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Function} [deps.execFileAsync] - promisified `execFile`.
    * @param {RepoConfig} [deps.repoConfig] - safe-branch config reader.
-   * @param {RepoPath} [deps.repoPath] - repo-path validation helper.
    */
   constructor(repoContext, {
     execFileAsync = defaultExecFileAsync,
-    repoConfig = new RepoConfig(),
-    repoPath = new RepoPath({ execFileAsync })
+    repoConfig = new RepoConfig()
   } = {}) {
     this._repoContext = repoContext;
     this._execFileAsync = execFileAsync;
     this._repoConfig = repoConfig;
-    this._repoPath = repoPath;
   }
 
   /**
    * Native implementation of the `checkout-safe-branch` migrated
    * entrypoint — byte-identical stdout/exit-code counterpart to
-   * `arcanum/_lib/checkout_safe_branch_shell.sh`: validates `repoPath`
-   * (`RepoPath#validate`, matching `repo_path_enter`'s messages/exit-1
-   * semantics), then runs `#checkout`, returning a `BRANCH=<branch>\n`
-   * stdout string on success. Any failure (invalid path, dirty working
-   * tree) propagates uncaught, per the shared hard-failure contract.
+   * `arcanum/_lib/checkout_safe_branch_shell.sh`: runs `#checkout`,
+   * returning a `BRANCH=<branch>\n` stdout string on success. `repoPath`
+   * validation (matching `repo_path_enter`'s messages/exit-1 semantics)
+   * is handled upstream by `Dispatcher` via `RepoContext#validate()`.
+   * Any failure (invalid path, dirty working tree) propagates uncaught,
+   * per the shared hard-failure contract.
    * @returns {Promise<string>} the `BRANCH=<branch>\n` output.
    */
   async run() {
-    const { repoPath } = this._repoContext;
-
-    await this._repoPath.validate(repoPath);
-
     const branch = await this.checkout();
 
     return `BRANCH=${branch}\n`;

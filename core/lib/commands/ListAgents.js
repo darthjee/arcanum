@@ -1,6 +1,5 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import RepoPath from '../utils/file/RepoPath.js';
 
 const FRONTMATTER_DELIMITER = '---';
 
@@ -17,21 +16,17 @@ class ListAgents {
   /**
    * @param {import('../context/RepoContext.js').default} repoContext -
    *   the target repo's context (provides `repoPath`).
-   * @param {object} [deps] - injectable collaborators, for testing.
-   * @param {RepoPath} [deps.repoPath] - repo-path validation helper.
    */
-  constructor(repoContext, { repoPath = new RepoPath() } = {}) {
+  constructor(repoContext) {
     this._repoContext = repoContext;
-    this._repoPath = repoPath;
   }
 
   /**
    * Native implementation of the `list-agents` migrated entrypoint —
    * byte-identical stdout/exit-code counterpart to
-   * `arcanum/_lib/list_agents_shell.sh`: validates `repoPath`
-   * (`RepoPath#validate`, matching `repo_path_enter`'s messages/exit-1
-   * semantics), then lists `*.md` files directly under the resolved
-   * `agentsDir`, returning one `name|description\n` line per file (in
+   * `arcanum/_lib/list_agents_shell.sh`: lists `*.md` files directly
+   * under the resolved `agentsDir`, returning one `name|description\n`
+   * line per file (in
    * filename order) that has a `name:` frontmatter field. Returns `''`
    * when `agentsDir` doesn't exist or has no `*.md` files, matching the
    * shell script's "prints nothing, exit 0" behavior.
@@ -41,8 +36,6 @@ class ListAgents {
    */
   async run(agentsDir = '.claude/agents') {
     const { repoPath } = this._repoContext;
-
-    await this._repoPath.validate(repoPath);
 
     const resolvedDir = path.join(repoPath, agentsDir);
     const files = await this._listMarkdownFiles(resolvedDir);

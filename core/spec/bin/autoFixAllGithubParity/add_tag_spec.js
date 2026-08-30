@@ -1,6 +1,8 @@
 import { seedGithubLikeRepo, setupParityTest } from '../../support/factories/githubParitySetup.js';
 import { createGitFixtureRepo } from '../../support/utils/gitFixtureRepo.js';
-import { expectParity, NATIVE_BIN, runBoth, runCommand, SHELL_SCRIPT } from '../../support/utils/runCommand.js';
+import {
+  expectInvalidRepoPathParity, expectParity, NATIVE_BIN, runBoth, runCommand, SHELL_SCRIPT
+} from '../../support/utils/runCommand.js';
 
 // Parity test for the "auto-fix-all-github add-tag" migrated
 // entrypoint (issue #265) — see docs/agents/architecture/script-engine.md's
@@ -55,5 +57,9 @@ describe('auto-fix-all-github parity (shell vs. native) — add-tag', () => {
     } finally {
       await Promise.all([shellRepo.cleanup(), nativeRepo.cleanup()]);
     }
+  });
+
+  it('matches shell for a non-directory / non-git repo_path (repo_path_enter parity)', async () => {
+    await expectInvalidRepoPathParity('add-tag', 'auto-fix-all-github-add-tag', ['5', 'ready_for_work']);
   });
 });

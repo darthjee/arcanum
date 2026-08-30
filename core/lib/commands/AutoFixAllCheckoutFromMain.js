@@ -1,7 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import DispatchFailure from '../utils/errors/DispatchFailure.js';
-import RepoPath from '../utils/file/RepoPath.js';
 
 const defaultExecFileAsync = promisify(execFile);
 const USAGE = 'Usage: checkout_from_main.sh <repo_path> <id>';
@@ -21,12 +20,10 @@ class AutoFixAllCheckoutFromMain {
    *   the target repo's context (provides `repoPath`).
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Function} [deps.execFileAsync] - promisified `execFile`.
-   * @param {RepoPath} [deps.repoPath] - repo-path validation helper.
    */
-  constructor(repoContext, { execFileAsync = defaultExecFileAsync, repoPath = new RepoPath({ execFileAsync }) } = {}) {
+  constructor(repoContext, { execFileAsync = defaultExecFileAsync } = {}) {
     this._repoContext = repoContext;
     this._execFileAsync = execFileAsync;
-    this._repoPath = repoPath;
   }
 
   /**
@@ -53,8 +50,6 @@ class AutoFixAllCheckoutFromMain {
     if (!repoPath || !id) {
       throw new Error(USAGE);
     }
-
-    await this._repoPath.validate(repoPath);
 
     const branch = `issue-${id}`;
 

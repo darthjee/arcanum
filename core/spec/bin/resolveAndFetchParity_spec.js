@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { createGitFixtureRepo } from '../support/utils/gitFixtureRepo.js';
+import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
 // Parity test for the "resolve-and-fetch" migrated entrypoint (issue
 // #193) — see docs/agents/architecture/script-engine.md's "output/
@@ -125,6 +126,49 @@ describe('resolve-and-fetch parity (shell vs. native)', () => {
 
     it('matches shell output for whitespace-trimmed valid input too', async () => {
       await assertParity('  #999998  ');
+    });
+  });
+
+  describe('a present-but-non-directory repo_path (hard failure)', () => {
+    it('matches shell exit code with no stdout on either side', async () => {
+      const missingPath = path.join(repo.repoPath, 'no-such-dir');
+      const shell = await runCommand(
+        ['bash', SHELL_SCRIPT, missingPath, ISSUES_FOLDER, '#42'],
+        repo.repoPath
+      );
+      const native = await runCommand(
+        [process.execPath, NATIVE_BIN, 'resolve-and-fetch', missingPath, ISSUES_FOLDER, '#42'],
+        repo.repoPath
+      );
+
+      expect(shell.stdout).toEqual('');
+      expect(native.stdout).toEqual('');
+      expect(native.code).toEqual(shell.code);
+      expect(shell.code).not.toEqual(0);
+    });
+  });
+
+  describe('a non-git repo_path (hard failure)', () => {
+    it('matches shell exit code with no stdout on either side', async () => {
+      const nonGit = await createTempDir('arcanum-core-raf-parity-nongit-');
+
+      try {
+        const shell = await runCommand(
+          ['bash', SHELL_SCRIPT, nonGit, ISSUES_FOLDER, '#42'],
+          repo.repoPath
+        );
+        const native = await runCommand(
+          [process.execPath, NATIVE_BIN, 'resolve-and-fetch', nonGit, ISSUES_FOLDER, '#42'],
+          repo.repoPath
+        );
+
+        expect(shell.stdout).toEqual('');
+        expect(native.stdout).toEqual('');
+        expect(native.code).toEqual(shell.code);
+        expect(shell.code).not.toEqual(0);
+      } finally {
+        await removeTempDir(nonGit);
+      }
     });
   });
 });

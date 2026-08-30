@@ -3,7 +3,6 @@ import path from 'node:path';
 import ListAgents from '../../../lib/commands/ListAgents.js';
 import RepoContext from '../../../lib/context/RepoContext.js';
 import { createGitFixtureRepo } from '../../support/utils/gitFixtureRepo.js';
-import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
 
 /**
  * @param {string} dir - the directory to write the agent file into.
@@ -147,37 +146,6 @@ describe('ListAgents', () => {
       const output = await listAgents.run();
 
       expect(output).toEqual('defaulted|default dir\n');
-    });
-
-    it('propagates RepoPath.validate()\'s thrown Error when repo_path is missing', async () => {
-      const listAgents = listAgentsFor('');
-
-      await expectAsync(listAgents.run()).toBeRejectedWithError('Error: repo_path is required');
-    });
-
-    it('propagates RepoPath.validate()\'s thrown Error when the path does not exist', async () => {
-      const missingPath = '/no/such/path/for/list-agents-spec';
-      const listAgents = listAgentsFor(missingPath);
-
-      await expectAsync(listAgents.run()).toBeRejectedWithError(
-        `Error: not a directory: ${missingPath}`
-      );
-    });
-
-    it('propagates RepoPath.validate()\'s thrown Error when the path is not a git repository', async () => {
-      let dir;
-
-      try {
-        dir = await createTempDir('arcanum-core-list-agents-spec-');
-
-        const listAgents = listAgentsFor(dir);
-
-        await expectAsync(listAgents.run()).toBeRejectedWithError(`Error: not a git repository: ${dir}`);
-      } finally {
-        if (dir) {
-          await removeTempDir(dir);
-        }
-      }
     });
   });
 });

@@ -15,7 +15,6 @@ const USAGE = 'Usage: create_sub_issue.sh <repo_path> <issue_id> <sub_issue_file
  */
 function stubDeps(overrides = {}) {
   return {
-    repoPathValidator: { validate: jasmine.createSpy('validate').and.resolveTo(undefined) },
     spawnIssue: {
       run: jasmine.createSpy('run').and.resolveTo('STATUS=ok\nID=42\nURL=https://github.com/darthjee/arcanum/issues/42\n')
     },
@@ -44,7 +43,6 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
         const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath: '' }), deps);
 
         await expectAsync(instance.run(ISSUE_ID, subIssueFile)).toBeRejectedWithError(USAGE);
-        expect(deps.repoPathValidator.validate).not.toHaveBeenCalled();
       });
 
       it('throws the usage message when issueId is missing', async () => {
@@ -52,7 +50,6 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
         const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath }), deps);
 
         await expectAsync(instance.run('', subIssueFile)).toBeRejectedWithError(USAGE);
-        expect(deps.repoPathValidator.validate).not.toHaveBeenCalled();
       });
 
       it('throws the usage message when subIssueFile is missing', async () => {
@@ -60,23 +57,6 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
         const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath }), deps);
 
         await expectAsync(instance.run(ISSUE_ID, '')).toBeRejectedWithError(USAGE);
-        expect(deps.repoPathValidator.validate).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('when repoPath validation fails', () => {
-      it('propagates the rejection uncaught', async () => {
-        const deps = stubDeps({
-          repoPathValidator: {
-            validate: jasmine.createSpy('validate').and.rejectWith(new Error('Error: not a directory: x'))
-          }
-        });
-        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath }), deps);
-
-        await expectAsync(instance.run(ISSUE_ID, subIssueFile)).toBeRejectedWithError(
-          'Error: not a directory: x'
-        );
-        expect(deps.spawnIssue.run).not.toHaveBeenCalled();
       });
     });
 

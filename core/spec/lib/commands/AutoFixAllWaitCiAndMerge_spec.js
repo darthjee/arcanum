@@ -11,7 +11,6 @@ function stubDeps(overrides = {}) {
   return {
     waitCi: { run: jasmine.createSpy('waitCi.run').and.resolveTo('passed\n') },
     github: { prMerge: jasmine.createSpy('github.prMerge').and.resolveTo('https://github.com/darthjee/arcanum/pull/7\n') },
-    repoPathValidator: { validate: jasmine.createSpy('validate').and.resolveTo(undefined) },
     ...overrides
   };
 }
@@ -25,19 +24,6 @@ describe('AutoFixAllWaitCiAndMerge', () => {
       await expectAsync(instance.run(MODEL_EMAIL)).toBeRejectedWithError(
         'Usage: wait_ci_and_merge.sh <repo_path> [model_email]'
       );
-      expect(deps.repoPathValidator.validate).not.toHaveBeenCalled();
-      expect(deps.waitCi.run).not.toHaveBeenCalled();
-      expect(deps.github.prMerge).not.toHaveBeenCalled();
-    });
-
-    it('propagates a repo-path validation failure before waiting for CI', async () => {
-      const validationError = new Error('Error: not a directory: /repo/path');
-      const deps = stubDeps({
-        repoPathValidator: { validate: jasmine.createSpy('validate').and.rejectWith(validationError) }
-      });
-      const instance = new AutoFixAllWaitCiAndMerge({ repoPath: REPO_PATH }, deps);
-
-      await expectAsync(instance.run(MODEL_EMAIL)).toBeRejectedWith(validationError);
       expect(deps.waitCi.run).not.toHaveBeenCalled();
       expect(deps.github.prMerge).not.toHaveBeenCalled();
     });

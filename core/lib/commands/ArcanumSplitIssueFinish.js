@@ -2,7 +2,6 @@ import { execFile } from 'node:child_process';
 import { readdir, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import RepoPath from '../utils/file/RepoPath.js';
 import { resolveInstallPath } from '../utils/file/InstallRoot.js';
 import SafeBranch from './SafeBranch.js';
 
@@ -36,29 +35,24 @@ class ArcanumSplitIssueFinish {
    * @param {SafeBranch} [deps.safeBranch] - safe-branch checkout helper.
    * @param {Function} [deps.readdir] - `node:fs/promises`'s `readdir`.
    * @param {Function} [deps.unlink] - `node:fs/promises`'s `unlink`.
-   * @param {RepoPath} [deps.repoPathValidator] - repo-path validation
-   *   helper.
    */
   constructor(repoContext, {
     execFileAsync = defaultExecFileAsync,
     safeBranch = new SafeBranch(repoContext),
     readdir: readdirFn = readdir,
-    unlink: unlinkFn = unlink,
-    repoPathValidator = new RepoPath()
+    unlink: unlinkFn = unlink
   } = {}) {
     this._repoContext = repoContext;
     this._execFileAsync = execFileAsync;
     this._safeBranch = safeBranch;
     this._readdir = readdirFn;
     this._unlink = unlinkFn;
-    this._repoPathValidator = repoPathValidator;
   }
 
   /**
    * Native implementation of the `arcanum-split-issue-finish` migrated
    * entrypoint — byte-identical stdout/exit-code counterpart to
-   * `finish_shell.sh`. Validates `repoPath` (`RepoPath#validate`,
-   * matching `repo_path_enter`'s messages/exit-1 semantics) and that
+   * `finish_shell.sh`. Validates that
    * both arguments are present (usage message on missing/empty
    * argument, propagated uncaught so the caller exits 1). Relabels the
    * parent issue by shelling out to `arcanum-split-issue/scripts/github.sh
@@ -78,8 +72,6 @@ class ArcanumSplitIssueFinish {
     if (!this._repoContext.repoPath || !issueId) {
       throw new Error(USAGE);
     }
-
-    await this._repoPathValidator.validate(this._repoContext.repoPath);
 
     await this._execFileAsync(
       GITHUB_SCRIPT,
