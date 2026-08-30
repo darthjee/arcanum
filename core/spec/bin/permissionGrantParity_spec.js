@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
-// Parity test for the "permission-grant" migrated entrypoint (issue
+// Parity test for the "permission-grant-add" migrated entrypoint (issue
 // #236) — see docs/agents/architecture/script-engine.md's "output/
 // exit-code contract" and
 // docs/agents/plans/236-migrate-permission-grant-entrypoint-to-native-node-js/plan.md's
@@ -13,23 +13,18 @@ import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 // (the same invocation shape engine_dispatch.sh itself uses —
 // `bash "$shell_script"` — invoked directly here, NOT through the
 // arcanum/_lib/permission_grant.sh engine_dispatch shim, so this test
-// isn't circular) and `core/bin/arcanum permission-grant` against
+// isn't circular) and `core/bin/arcanum permission-grant-add` against
 // identical fixture inputs, asserting byte-identical resulting JSON file
 // content, stdout, and exit code.
 //
-// The usage message's leading `$0` portion isn't reproducible verbatim
-// across the two invocations (the shell side reports its own script
-// path, the native side reports a stable literal) — only the fixed
-// `add <file> <pattern>` portion (and the exit code / empty stdout) is
-// asserted there.
-//
-// `permission-grant` is a `context: 'claude'` command, so both the
+// `permission-grant-add` is a `context: 'claude'` command, so both the
 // native invocation and (per the scripter-side passthrough contract)
-// the shell dispatcher take a leading `<anchor>` argument. Native:
-// `Dispatcher` strips it and builds a `ClaudeContext`. Shell: the
-// anchor is consumed and ignored (it still resolves `<file>` against
-// cwd). The parity fixtures pass absolute file paths, so the anchor
-// value doesn't affect resolution — `cwd` is passed for it.
+// the shell dispatcher take a leading `<anchor>` argument followed by
+// `<file> <pattern>` (no `add` token on either side). Native:
+// `Dispatcher` strips the anchor and builds a `ClaudeContext`. Shell:
+// the anchor is consumed and ignored (it still resolves `<file>`
+// against cwd). The parity fixtures pass absolute file paths, so the
+// anchor value doesn't affect resolution — `cwd` is passed for it.
 
 const execFileAsync = promisify(execFile);
 
@@ -62,9 +57,9 @@ async function runCommand([file, ...args], cwd) {
  * @returns {Promise<{shell: object, native: object}>} both sides' results.
  */
 async function runBoth(shellFile, nativeFile, pattern, cwd) {
-  const shell = await runCommand(['bash', SHELL_SCRIPT, cwd, 'add', shellFile, pattern], cwd);
+  const shell = await runCommand(['bash', SHELL_SCRIPT, cwd, shellFile, pattern], cwd);
   const native = await runCommand(
-    [process.execPath, NATIVE_BIN, 'permission-grant', cwd, 'add', nativeFile, pattern],
+    [process.execPath, NATIVE_BIN, 'permission-grant-add', cwd, nativeFile, pattern],
     cwd
   );
 
@@ -162,25 +157,6 @@ describe('permission-grant parity (shell vs. native)', () => {
 
       expect(nativeContent).toEqual(shellContent);
       expect(JSON.parse(shellContent)).toEqual({ permissions: { allow: ['Bash(git push:*)'] } });
-    });
-  });
-
-  describe('an unrecognized action', () => {
-    it('matches exit code and empty stdout, with the fixed usage-message portion in stderr', async () => {
-      const shell = await runCommand(['bash', SHELL_SCRIPT, cwd, 'remove', shellFile, 'Bash(git push:*)'], cwd);
-      const native = await runCommand(
-        [process.execPath, NATIVE_BIN, 'permission-grant', cwd, 'remove', nativeFile, 'Bash(git push:*)'],
-        cwd
-      );
-
-      expect(native.stdout).toEqual(shell.stdout);
-      expect(native.code).toEqual(shell.code);
-      expect(shell.code).toEqual(1);
-      expect(shell.stdout).toEqual('');
-      expect(shell.stderr.trim()).toContain('Usage:');
-      expect(shell.stderr.trim()).toContain('add <file> <pattern>');
-      expect(native.stderr.trim()).toContain('Usage:');
-      expect(native.stderr.trim()).toContain('add <file> <pattern>');
     });
   });
 });

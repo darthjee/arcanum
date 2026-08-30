@@ -60,7 +60,7 @@ One row per entry point tracked in [`arcanum/_lib/migration-status.json`](../../
 | `monitor-issues-github` | No | #230 |
 | `monitor-issues-monitor-issues` | No | #230 |
 | `monitor-issues-rewrite-queue` | No | #230 |
-| `permission-grant` | Yes | #230 |
+| `permission-grant-add` | Yes | #328 |
 | `resolve-and-fetch` | Yes | #193 |
 | `resolve-id-and-file` | Yes | #227 |
 | `resolve-plan-paths` | Yes | #230 |

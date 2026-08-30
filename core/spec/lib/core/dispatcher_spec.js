@@ -71,13 +71,12 @@ describe('Dispatcher', () => {
     });
   });
 
-  describe('context: \'claude\' path (permission-grant)', () => {
+  describe('context: \'claude\' path (permission-grant-add)', () => {
     let dispatcher;
 
     beforeEach(() => {
-      dispatcher = new Dispatcher('permission-grant', [
+      dispatcher = new Dispatcher('permission-grant-add', [
         '/fake/anchor',
-        'add',
         '/tmp/x.json',
         'Bash(x)'
       ]);
@@ -92,7 +91,7 @@ describe('Dispatcher', () => {
     });
 
     it('strips the leading anchor arg from commandArgs()', () => {
-      expect(dispatcher.commandArgs()).toEqual(['add', '/tmp/x.json', 'Bash(x)']);
+      expect(dispatcher.commandArgs()).toEqual(['/tmp/x.json', 'Bash(x)']);
     });
   });
 
@@ -112,13 +111,13 @@ describe('Dispatcher', () => {
 
   describe('claudeContext getter', () => {
     it('is lazy — not built until first read', () => {
-      const dispatcher = new Dispatcher('permission-grant', ['/fake/anchor']);
+      const dispatcher = new Dispatcher('permission-grant-add', ['/fake/anchor']);
 
       expect(dispatcher._claudeContext).toBeUndefined();
     });
 
     it('is memoized — repeated reads return the same instance', () => {
-      const dispatcher = new Dispatcher('permission-grant', ['/fake/anchor']);
+      const dispatcher = new Dispatcher('permission-grant-add', ['/fake/anchor']);
 
       expect(dispatcher.claudeContext).toBe(dispatcher.claudeContext);
     });
@@ -249,11 +248,11 @@ describe('Dispatcher', () => {
     });
 
     it('never validates a context: \'claude\' entry', async () => {
-      const dispatcher = new Dispatcher('permission-grant', ['/no/such/path', 'add', '/tmp/x.json', 'Bash(x)'], {
+      const dispatcher = new Dispatcher('permission-grant-add', ['/no/such/path', '/tmp/x.json', 'Bash(x)'], {
         invocationLog: noopInvocationLog
       });
 
-      spyOn(dispatcher, 'commandInstance').and.resolveTo({ run: async () => 'ok' });
+      spyOn(dispatcher, 'commandInstance').and.resolveTo({ add: async () => 'ok' });
 
       await expectAsync(dispatcher.dispatch()).toBeResolvedTo('ok');
     });

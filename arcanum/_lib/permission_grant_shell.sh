@@ -1,4 +1,4 @@
-# Shell implementation of the "permission-grant" migrated entrypoint —
+# Shell implementation of the "permission-grant-add" migrated entrypoint —
 # see docs/agents/architecture/script-engine.md and
 # docs/agents/plans/236-migrate-permission-grant-entrypoint-to-native-node-js/plan.md
 # for the full design/shared contracts.
@@ -30,7 +30,7 @@
 # invocation convenience.
 #
 # Direct-invocation CLI usage:
-#   permission_grant_shell.sh <anchor> add <file> <pattern>
+#   permission_grant_shell.sh <anchor> <file> <pattern>
 #   <anchor> is consumed and ignored — the shell path resolves <file>
 #   against cwd, as today. It exists only for parity with the native
 #   passthrough contract.
@@ -75,22 +75,13 @@ permission_grant_add() {
   _release_lock
 }
 
-# Direct-invocation CLI dispatcher: `permission_grant_shell.sh <anchor> add <file> <pattern>`.
+# Direct-invocation CLI dispatcher: `permission_grant_shell.sh <anchor> <file> <pattern>`.
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   _anchor="${1:-}"
   if [[ -z "$_anchor" ]]; then
-    echo "Usage: $0 <anchor> add <file> <pattern>" >&2
+    echo "Usage: $0 <anchor> <file> <pattern>" >&2
     exit 1
   fi
   shift
-  case "${1:-}" in
-    add)
-      shift
-      permission_grant_add "$@"
-      ;;
-    *)
-      echo "Usage: $0 <anchor> add <file> <pattern>" >&2
-      exit 1
-      ;;
-  esac
+  permission_grant_add "$@"
 fi

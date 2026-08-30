@@ -7,7 +7,7 @@
   "github-issue-info": true,
   "github-issue": false,
   "issue-state": true,
-  "permission-grant": true,
+  "permission-grant-add": true,
   "checkout-safe-branch": true,
   "list-agents": true,
   "resolve-plan-paths": true,

@@ -1,4 +1,4 @@
-# Thin engine_dispatch shim for the "permission-grant" migrated
+# Thin engine_dispatch shim for the "permission-grant-add" migrated
 # entrypoint — see docs/agents/architecture/script-engine.md and
 # docs/agents/plans/236-migrate-permission-grant-entrypoint-to-native-node-js/plan.md
 # for the full design/shared contracts. Appends a Bash-permission
@@ -23,7 +23,9 @@
 #   permission_grant.sh <anchor> add <file> <pattern>
 #   <anchor> — absolute path to the repo root the Claude config is
 #              anchored at; forwarded to engine_dispatch and into the
-#              native passthrough args. <file> may be repo-relative.
+#              native passthrough args. The `add` verb is consumed by
+#              this file's `case` dispatcher and is NOT forwarded.
+#              <file> may be repo-relative.
 #
 # This file is meant to be SOURCED for its `permission_grant_add`
 # function (re-exported from permission_grant_shell.sh, unchanged); the
@@ -52,7 +54,7 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
       # shellcheck source=engine_dispatch.sh
       # shellcheck disable=SC1091
       source "${_PERMISSION_GRANT_LIB_DIR}/engine_dispatch.sh"
-      engine_dispatch "$anchor" permission-grant "${_PERMISSION_GRANT_LIB_DIR}/permission_grant_shell.sh" -- "$anchor" add "$@"
+      engine_dispatch "$anchor" permission-grant-add "${_PERMISSION_GRANT_LIB_DIR}/permission_grant_shell.sh" -- "$anchor" "$@"
       ;;
     *)
       echo "Usage: $0 <anchor> add <file> <pattern>" >&2
