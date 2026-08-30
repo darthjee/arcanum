@@ -228,13 +228,14 @@ describe('Dispatcher', () => {
       ]);
     });
 
-    it('does NOT validate an absent leading arg — the command\'s own USAGE throw still wins (see #333)', async () => {
+    it('validates an absent leading arg — rejects with "repo_path is required" before importing the module (see #333)', async () => {
       const dispatcher = new Dispatcher('spawn-issue', [], { invocationLog: noopInvocationLog });
+      const commandInstanceSpy = spyOn(dispatcher, 'commandInstance').and.callThrough();
 
-      spyOn(dispatcher.repoContext, 'validate').and.rejectWith(new Error('validate should not run'));
-
-      await expectAsync(dispatcher.dispatch()).toBeRejectedWithError(/^Usage: spawn-issue/);
-      expect(dispatcher.repoContext.validate).not.toHaveBeenCalled();
+      await expectAsync(dispatcher.dispatch()).toBeRejectedWithError(
+        'Error: repo_path is required'
+      );
+      expect(commandInstanceSpy).not.toHaveBeenCalled();
     });
 
     it('skips validation for a validateRepoPath: false entry (github-issue-info)', async () => {

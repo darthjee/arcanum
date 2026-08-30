@@ -39,6 +39,8 @@ Before invoking `core/bin/arcanum <command> <args...>`, `engine_dispatch.sh` set
 
 A native implementation of a given entrypoint must be byte-identical to its shell counterpart in both stdout and exit code — the same `KEY=value` line protocol (or whatever plain-text contract the shell script already prints) and the same exit code for the same inputs. This is what lets every skill's `.md` steps stay engine-agnostic: they call a script by name and parse its documented output, never knowing or caring whether `engine_dispatch.sh` routed that call to shell or native.
 
+**One known intentional divergence (#333):** on the `context: 'repo'` path the native dispatcher now validates `repoPath` unconditionally, so a positional-less `core/bin/arcanum <command>` call rejects with `Error: repo_path is required` (→ `arcanum: Error: repo_path is required`, exit 1), whereas the shell wrappers short-circuit with their own per-script `Usage:` block before ever calling `engine_dispatch`. This is only observable on a direct dispatcher call that no supported wrapper or skill can produce — every `arcanum/_lib/*.sh` and `auto-fix-all/scripts/*.sh` wrapper guards an empty `REPO_PATH` itself before dispatching — so the engine-agnostic contract skills rely on is unaffected.
+
 `core/bin/arcanum`'s `dispatch()` supports three outcomes for a module method's result, in increasing order of severity:
 
 - A returned string: printed to `process.stdout`, exit code 0.
