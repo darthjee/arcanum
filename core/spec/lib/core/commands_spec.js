@@ -48,8 +48,9 @@ describe('COMMANDS', () => {
     ]);
   });
 
-  it('sets context: \'claude\' on permission-grant', () => {
-    expect(COMMANDS['permission-grant'].context).toBe('claude');
+  it('sets context: \'claude\' on permission-grant-add', () => {
+    expect(COMMANDS['permission-grant-add'].context).toBe('claude');
+    expect(COMMANDS['permission-grant-add'].method).toBe('add');
   });
 
   it('sets validateRepoPath: false on the file-only auto-fix-all-queue subcommands and github-issue-info', () => {
