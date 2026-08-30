@@ -15,7 +15,6 @@ const ISSUES_DIR = 'docs/agents/issues';
  */
 function stubDeps(overrides = {}) {
   return {
-    repoPathValidator: { validate: jasmine.createSpy('validate').and.resolveTo(undefined) },
     execFileAsync: jasmine.createSpy('execFileAsync').and.resolveTo({ stdout: '', stderr: '' }),
     safeBranch: { checkout: jasmine.createSpy('checkout').and.resolveTo('main') },
     ...overrides
@@ -42,7 +41,6 @@ describe('ArcanumSplitIssueFinish', () => {
         await expectAsync(instance.run(ISSUE_ID)).toBeRejectedWithError(
           'Usage: finish.sh <repo_path> <issue_id>'
         );
-        expect(deps.repoPathValidator.validate).not.toHaveBeenCalled();
       });
 
       it('throws the usage message when issueId is missing', async () => {
@@ -52,21 +50,6 @@ describe('ArcanumSplitIssueFinish', () => {
         await expectAsync(instance.run('')).toBeRejectedWithError(
           'Usage: finish.sh <repo_path> <issue_id>'
         );
-        expect(deps.repoPathValidator.validate).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('when repoPath validation fails', () => {
-      it('propagates the rejection uncaught', async () => {
-        const deps = stubDeps({
-          repoPathValidator: {
-            validate: jasmine.createSpy('validate').and.rejectWith(new Error('Error: not a directory: x'))
-          }
-        });
-        const instance = new ArcanumSplitIssueFinish({ repoPath }, deps);
-
-        await expectAsync(instance.run(ISSUE_ID)).toBeRejectedWithError('Error: not a directory: x');
-        expect(deps.execFileAsync).not.toHaveBeenCalled();
       });
     });
 

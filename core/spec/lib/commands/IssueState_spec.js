@@ -27,7 +27,6 @@ describe('IssueState', () => {
    */
   function stubDeps(overrides = {}) {
     return {
-      repoPath: { validate: jasmine.createSpy('validate').and.resolveTo(undefined) },
       ...overrides
     };
   }
@@ -64,27 +63,6 @@ describe('IssueState', () => {
         const issueState = new IssueState(buildContext({ repoPath: '' }), stubDeps());
 
         await expectAsync(issueState.run('get', '42', 'title')).toBeRejectedWithError(new RegExp(USAGE_SNIPPET));
-      });
-
-      it('validates repoPath from the injected context before dispatching', async () => {
-        const deps = stubDeps();
-        const issueState = new IssueState(buildContext(), deps);
-
-        await issueState.run('get', '42', 'title');
-
-        expect(deps.repoPath.validate).toHaveBeenCalledWith(repoPath);
-      });
-
-      it('propagates RepoPath.validate rejection without dispatching', async () => {
-        const validationError = new Error(`Error: not a git repository: ${repoPath}`);
-        const deps = stubDeps({
-          repoPath: { validate: jasmine.createSpy('validate').and.rejectWith(validationError) },
-          issueStatePaths: { paths: jasmine.createSpy('paths') }
-        });
-        const issueState = new IssueState(buildContext(), deps);
-
-        await expectAsync(issueState.run('get', '42', 'title')).toBeRejectedWith(validationError);
-        expect(deps.issueStatePaths.paths).not.toHaveBeenCalled();
       });
 
       it('throws Unknown command for an unrecognized subcommand', async () => {

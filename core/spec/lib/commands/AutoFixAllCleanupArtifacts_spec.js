@@ -68,12 +68,10 @@ function fakeExecFileAsync({ tracked = [] } = {}) {
 
 describe('AutoFixAllCleanupArtifacts', () => {
   let repoPath;
-  let repoPathDep;
 
   beforeEach(async () => {
     repoPath = await createTempDir();
     await mkdir(path.join(repoPath, PLAN_DIR), { recursive: true });
-    repoPathDep = { validate: jasmine.createSpy('validate').and.resolveTo(undefined) };
   });
 
   afterEach(async () => {
@@ -84,7 +82,7 @@ describe('AutoFixAllCleanupArtifacts', () => {
     describe('when neither the issue file nor the plan dir is tracked', () => {
       it('does nothing, resolving with empty stdout and issuing no commit/push', async () => {
         const execFileAsync = fakeExecFileAsync({ tracked: [] });
-        const instance = new AutoFixAllCleanupArtifacts({ repoPath }, { execFileAsync, repoPath: repoPathDep });
+        const instance = new AutoFixAllCleanupArtifacts({ repoPath }, { execFileAsync });
 
         const result = await instance.run(ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, MODEL_EMAIL);
 
@@ -99,7 +97,7 @@ describe('AutoFixAllCleanupArtifacts', () => {
     describe('when only the issue file is tracked', () => {
       it('stages only the issue file removal', async () => {
         const execFileAsync = fakeExecFileAsync({ tracked: [ISSUE_FILE] });
-        const instance = new AutoFixAllCleanupArtifacts({ repoPath }, { execFileAsync, repoPath: repoPathDep });
+        const instance = new AutoFixAllCleanupArtifacts({ repoPath }, { execFileAsync });
 
         await instance.run(ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, MODEL_EMAIL);
 
@@ -111,7 +109,7 @@ describe('AutoFixAllCleanupArtifacts', () => {
     describe('when only the plan dir is tracked', () => {
       it('stages only the plan dir removal', async () => {
         const execFileAsync = fakeExecFileAsync({ tracked: [PLAN_DIR] });
-        const instance = new AutoFixAllCleanupArtifacts({ repoPath }, { execFileAsync, repoPath: repoPathDep });
+        const instance = new AutoFixAllCleanupArtifacts({ repoPath }, { execFileAsync });
 
         await instance.run(ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, MODEL_EMAIL);
 
@@ -123,7 +121,7 @@ describe('AutoFixAllCleanupArtifacts', () => {
     describe('when both the issue file and the plan dir are tracked', () => {
       it('stages both removals, commits with the hardcoded message, and pushes the current branch', async () => {
         const execFileAsync = fakeExecFileAsync({ tracked: [ISSUE_FILE, PLAN_DIR] });
-        const instance = new AutoFixAllCleanupArtifacts({ repoPath }, { execFileAsync, repoPath: repoPathDep });
+        const instance = new AutoFixAllCleanupArtifacts({ repoPath }, { execFileAsync });
 
         const result = await instance.run(ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, MODEL_EMAIL);
 
@@ -150,7 +148,7 @@ describe('AutoFixAllCleanupArtifacts', () => {
     describe('argument validation', () => {
       it('throws the usage message when a required argument is missing', async () => {
         const execFileAsync = fakeExecFileAsync();
-        const instance = new AutoFixAllCleanupArtifacts({ repoPath }, { execFileAsync, repoPath: repoPathDep });
+        const instance = new AutoFixAllCleanupArtifacts({ repoPath }, { execFileAsync });
 
         await expectAsync(
           instance.run(ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, '')

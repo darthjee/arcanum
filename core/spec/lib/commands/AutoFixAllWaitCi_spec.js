@@ -91,7 +91,7 @@ describe('AutoFixAllWaitCi', () => {
    * `RepoContext` + `RepoContextFactory`. The flat override keys
    * (`repoPath`/`origin`/`githubToken`) feed the `RepoContext`;
    * `execFileAsync`/`fetchFn`/`timeoutMs` feed the factory; any other
-   * key (`repoConfig`/`pollIntervalMs`/`sleepFn`/`repoPathValidator`) is
+   * key (`repoConfig`/`pollIntervalMs`/`sleepFn`) is
    * forwarded straight to the command constructor.
    * @param {object} [overrides] - per-test wiring overrides.
    * @returns {AutoFixAllWaitCi} the assembled command instance.
@@ -107,7 +107,6 @@ describe('AutoFixAllWaitCi', () => {
       execFileAsync = fakeExecFileAsync(),
       fetchFn = fakeFetch(),
       timeoutMs = 5,
-      repoPathValidator = { validate: jasmine.createSpy('validate').and.resolveTo(undefined) },
       ...rest
     } = overrides;
 
@@ -115,7 +114,6 @@ describe('AutoFixAllWaitCi', () => {
 
     return new AutoFixAllWaitCi(repoContext, {
       repoContextFactory: new RepoContextFactory({ execFileAsync, fetchFn, timeoutMs }),
-      repoPathValidator,
       ...rest
     });
   }
@@ -127,24 +125,10 @@ describe('AutoFixAllWaitCi', () => {
   describe('#run', () => {
     it('throws the usage message when repo_path is missing', async () => {
       const execFileAsync = fakeExecFileAsync();
-      const repoPathValidator = { validate: jasmine.createSpy('validate').and.resolveTo(undefined) };
-      const instance = newWaitCi({ repoPath: '', execFileAsync, repoPathValidator, repoConfig: stubRepoConfig() });
+      const instance = newWaitCi({ repoPath: '', execFileAsync, repoConfig: stubRepoConfig() });
 
       await expectAsync(instance.run()).toBeRejectedWithError('Usage: wait_ci.sh <repo_path>');
       expect(execFileAsync).not.toHaveBeenCalled();
-      expect(repoPathValidator.validate).not.toHaveBeenCalled();
-    });
-
-    it('rejects (before any I/O) when repo-path validation fails for a non-empty path', async () => {
-      const execFileAsync = fakeExecFileAsync();
-      const fetchFn = fakeFetch();
-      const validationError = new Error('Error: not a directory: /repo/path');
-      const repoPathValidator = { validate: jasmine.createSpy('validate').and.rejectWith(validationError) };
-      const instance = newWaitCi({ execFileAsync, fetchFn, repoPathValidator, repoConfig: stubRepoConfig() });
-
-      await expectAsync(instance.run()).toBeRejectedWith(validationError);
-      expect(execFileAsync).not.toHaveBeenCalled();
-      expect(fetchFn).not.toHaveBeenCalled();
     });
 
     describe('when no pull request is found for the current branch', () => {

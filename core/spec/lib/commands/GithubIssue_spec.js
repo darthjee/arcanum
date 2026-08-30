@@ -26,7 +26,6 @@ function stubDeps(overrides = {}) {
       resolveWithRef: async () => ({ domain: 'github.com', repo: 'darthjee/arcanum', repoRef: 'darthjee/arcanum' })
     },
     githubToken: { get: async () => 'fake-token' },
-    repoPath: { validate: jasmine.createSpy('validate').and.resolveTo(undefined) },
     ...overrides
   };
 }
@@ -277,22 +276,6 @@ describe('GithubIssue', () => {
       await expectAsync(readFile(stateFile, 'utf8')).toBeRejected();
     });
 
-    it('propagates repoPath.validate rejection and makes no network call', async () => {
-      const repoPathDep = {
-        validate: jasmine.createSpy('validate').and.rejectWith(new Error(`Error: not a directory: ${repoPath}`))
-      };
-      const fetchFn = jasmine.createSpy('fetch');
-      const origin = { resolve: jasmine.createSpy('resolve') };
-      const githubIssue = new GithubIssue(undefined, { ...stubDeps({ repoPath: repoPathDep, origin }), fetchFn });
-
-      await expectAsync(githubIssue.create(repoPath, 'title', 'missing.md')).toBeRejectedWithError(
-        `Error: not a directory: ${repoPath}`
-      );
-
-      expect(fetchFn).not.toHaveBeenCalled();
-      expect(origin.resolve).not.toHaveBeenCalled();
-    });
-
     it('rejects with the exact file-not-found message before any origin/token/network call', async () => {
       const fetchFn = jasmine.createSpy('fetch');
       const origin = { resolve: jasmine.createSpy('resolve') };
@@ -368,7 +351,6 @@ describe('GithubIssue', () => {
 
         const result = await githubIssue.create('New feature: dark mode', file);
 
-        expect(deps.repoPath.validate).toHaveBeenCalledWith(repoPath);
         expect(result).toEqual(
           'ID=42\nTITLE=New feature: dark mode\nFILE=docs/agents/issues/42-new-feature-dark-mode.md\n' +
             'DOMAIN=github.com\nREPO=darthjee/arcanum\n'
@@ -386,25 +368,6 @@ describe('GithubIssue', () => {
         const written = await readFile(path.join(repoPath, 'docs/agents/issues/42-new-feature-dark-mode.md'), 'utf8');
         expect(written).toEqual('the body\n');
       });
-
-      it('propagates repoPath.validate rejection and makes no network call', async () => {
-        const repoPathDep = {
-          validate: jasmine.createSpy('validate').and.rejectWith(new Error(`Error: not a directory: ${repoPath}`))
-        };
-        const fetchFn = jasmine.createSpy('fetch');
-        const origin = { resolve: jasmine.createSpy('resolve') };
-        const githubIssue = new GithubIssue(new RepoContext({ repoPath }), {
-          ...stubDeps({ repoPath: repoPathDep, origin }),
-          fetchFn
-        });
-
-        await expectAsync(githubIssue.create('title', 'missing.md')).toBeRejectedWithError(
-          `Error: not a directory: ${repoPath}`
-        );
-
-        expect(fetchFn).not.toHaveBeenCalled();
-        expect(origin.resolve).not.toHaveBeenCalled();
-      });
     });
 
     describe('#info', () => {
@@ -418,15 +381,6 @@ describe('GithubIssue', () => {
 
         expect(origin.resolve).toHaveBeenCalledWith(repoPath);
         expect(result).toEqual('DOMAIN=github.com\nREPO=darthjee/arcanum\n');
-      });
-
-      it('does not validate repoPath', async () => {
-        const deps = stubDeps();
-        const githubIssue = new GithubIssue(new RepoContext({ repoPath }), deps);
-
-        await githubIssue.info();
-
-        expect(deps.repoPath.validate).not.toHaveBeenCalled();
       });
     });
   });

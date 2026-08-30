@@ -11,6 +11,7 @@ describe('RepoContext', () => {
       issueStateService: { get: jasmine.createSpy(), appendJson: jasmine.createSpy() },
       configChain: { read: jasmine.createSpy() },
       githubIssue: { create: jasmine.createSpy() },
+      repoPathValidator: { validate: jasmine.createSpy('validate').and.resolveTo(undefined) },
       ...overrides
     });
   }
@@ -87,6 +88,26 @@ describe('RepoContext', () => {
     });
   });
 
+  describe('#validate', () => {
+    it('delegates to repoPathValidator.validate with this.repoPath', async () => {
+      const validate = jasmine.createSpy('validate').and.resolveTo(undefined);
+      const context = newContext({ repoPathValidator: { validate } });
+
+      await context.validate();
+
+      expect(validate).toHaveBeenCalledWith(REPO_PATH);
+    });
+
+    it('propagates the validator rejection', async () => {
+      const validationError = new Error('Error: not a git repository: /fake/repo');
+      const context = newContext({
+        repoPathValidator: { validate: jasmine.createSpy('validate').and.rejectWith(validationError) }
+      });
+
+      await expectAsync(context.validate()).toBeRejectedWith(validationError);
+    });
+  });
+
   describe('#createIssue', () => {
     it('delegates to githubIssue.create with repoPath, title, and bodyFile', async () => {
       const create = jasmine.createSpy().and.resolveTo('ID=5\nTITLE=t\nFILE=f\nDOMAIN=github.com\nREPO=a/b\n');
@@ -96,6 +117,18 @@ describe('RepoContext', () => {
 
       expect(create).toHaveBeenCalledWith(REPO_PATH, 't', 'f');
       expect(result).toEqual('ID=5\nTITLE=t\nFILE=f\nDOMAIN=github.com\nREPO=a/b\n');
+    });
+
+    it('validates first — rejects and never calls githubIssue.create when validation fails', async () => {
+      const validationError = new Error('Error: not a directory: /fake/repo');
+      const create = jasmine.createSpy('create');
+      const context = newContext({
+        githubIssue: { create },
+        repoPathValidator: { validate: jasmine.createSpy('validate').and.rejectWith(validationError) }
+      });
+
+      await expectAsync(context.createIssue('t', 'f')).toBeRejectedWith(validationError);
+      expect(create).not.toHaveBeenCalled();
     });
   });
 

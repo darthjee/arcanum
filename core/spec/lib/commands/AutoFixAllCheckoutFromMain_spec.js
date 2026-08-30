@@ -28,48 +28,30 @@ async function git(args, cwd) {
 
 describe('AutoFixAllCheckoutFromMain', () => {
   describe('#run (stubbed collaborators)', () => {
-    it('rejects with the Usage error when repoPath is missing, before any validation or git call', async () => {
-      const repoPath = { validate: jasmine.createSpy('validate') };
+    it('rejects with the Usage error when repoPath is missing, before any git call', async () => {
       const execFileSpy = jasmine.createSpy('execFileAsync');
-      const checkoutFromMain = new AutoFixAllCheckoutFromMain({ repoPath: '' }, { execFileAsync: execFileSpy, repoPath });
+      const checkoutFromMain = new AutoFixAllCheckoutFromMain({ repoPath: '' }, { execFileAsync: execFileSpy });
 
       await expectAsync(checkoutFromMain.run('42')).toBeRejectedWithError(
         'Usage: checkout_from_main.sh <repo_path> <id>'
       );
-      expect(repoPath.validate).not.toHaveBeenCalled();
       expect(execFileSpy).not.toHaveBeenCalled();
     });
 
-    it('rejects with the Usage error when id is missing, before any validation or git call', async () => {
-      const repoPath = { validate: jasmine.createSpy('validate') };
+    it('rejects with the Usage error when id is missing, before any git call', async () => {
       const execFileSpy = jasmine.createSpy('execFileAsync');
       const checkoutFromMain = new AutoFixAllCheckoutFromMain(
         { repoPath: '/repo' },
-        { execFileAsync: execFileSpy, repoPath }
+        { execFileAsync: execFileSpy }
       );
 
       await expectAsync(checkoutFromMain.run('')).toBeRejectedWithError(
         'Usage: checkout_from_main.sh <repo_path> <id>'
       );
-      expect(repoPath.validate).not.toHaveBeenCalled();
-      expect(execFileSpy).not.toHaveBeenCalled();
-    });
-
-    it('short-circuits before any git call when repo-path validation fails', async () => {
-      const validationError = new Error('Error: not a directory: /nope');
-      const repoPath = { validate: jasmine.createSpy('validate').and.rejectWith(validationError) };
-      const execFileSpy = jasmine.createSpy('execFileAsync');
-      const checkoutFromMain = new AutoFixAllCheckoutFromMain(
-        { repoPath: '/nope' },
-        { execFileAsync: execFileSpy, repoPath }
-      );
-
-      await expectAsync(checkoutFromMain.run('42')).toBeRejectedWith(validationError);
       expect(execFileSpy).not.toHaveBeenCalled();
     });
 
     it('tolerates a missing-remote-ref fetch failure and proceeds', async () => {
-      const repoPath = { validate: jasmine.createSpy('validate').and.resolveTo(undefined) };
       const missingRefError = Object.assign(new Error('fetch failed'), {
         stderr: 'fatal: couldn\'t find remote ref main\n'
       });
@@ -86,14 +68,13 @@ describe('AutoFixAllCheckoutFromMain', () => {
       });
       const checkoutFromMain = new AutoFixAllCheckoutFromMain(
         { repoPath: '/repo' },
-        { execFileAsync: execFileSpy, repoPath }
+        { execFileAsync: execFileSpy }
       );
 
       await expectAsync(checkoutFromMain.run('42')).toBeResolvedTo('BRANCH=issue-42\nSTATUS=ok\n');
     });
 
     it('rejects with the shell-matching message on a non-tolerated main-fetch failure', async () => {
-      const repoPath = { validate: jasmine.createSpy('validate').and.resolveTo(undefined) };
       const fetchError = Object.assign(new Error('fetch failed'), { stderr: 'fatal: unable to access remote\n' });
       const execFileSpy = jasmine.createSpy('execFileAsync').and.callFake((file, args) => {
         if (args[0] === 'fetch' && args[2] === 'main') {
@@ -104,7 +85,7 @@ describe('AutoFixAllCheckoutFromMain', () => {
       });
       const checkoutFromMain = new AutoFixAllCheckoutFromMain(
         { repoPath: '/repo' },
-        { execFileAsync: execFileSpy, repoPath }
+        { execFileAsync: execFileSpy }
       );
 
       await expectAsync(checkoutFromMain.run('42')).toBeRejectedWithError(
@@ -113,7 +94,6 @@ describe('AutoFixAllCheckoutFromMain', () => {
     });
 
     it('rejects with the shell-matching message on a non-tolerated branch-fetch failure', async () => {
-      const repoPath = { validate: jasmine.createSpy('validate').and.resolveTo(undefined) };
       const fetchError = Object.assign(new Error('fetch failed'), { stderr: 'fatal: unable to access remote\n' });
       const execFileSpy = jasmine.createSpy('execFileAsync').and.callFake((file, args) => {
         if (args[0] === 'fetch' && args[2] === 'main') {
@@ -128,7 +108,7 @@ describe('AutoFixAllCheckoutFromMain', () => {
       });
       const checkoutFromMain = new AutoFixAllCheckoutFromMain(
         { repoPath: '/repo' },
-        { execFileAsync: execFileSpy, repoPath }
+        { execFileAsync: execFileSpy }
       );
 
       await expectAsync(checkoutFromMain.run('42')).toBeRejectedWithError(

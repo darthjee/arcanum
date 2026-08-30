@@ -20,7 +20,6 @@ function stubDeps(overrides = {}) {
     sleepFn: jasmine.createSpy('sleepFn').and.resolveTo(undefined),
     labelApplicator: { apply: jasmine.createSpy('apply').and.resolveTo(undefined) },
     issueLinker: { link: jasmine.createSpy('link').and.resolveTo(undefined) },
-    repoPathValidator: { validate: jasmine.createSpy('validate').and.resolveTo(undefined) },
     ...overrides
   };
 }
@@ -46,6 +45,7 @@ describe('SpawnIssue', () => {
       repoPath: contextRepoPath,
       origin: origin ?? { resolve: jasmine.createSpy('resolve').and.resolveTo({ domain: DOMAIN, repo: REPO_REF }) },
       configChain: configChain ?? { read: jasmine.createSpy('read').and.resolveTo(undefined) },
+      repoPathValidator: { validate: jasmine.createSpy('validate').and.resolveTo(undefined) },
       githubIssue
     });
   }
@@ -229,28 +229,12 @@ describe('SpawnIssue', () => {
     });
 
     describe('argument validation', () => {
-      it('rejects when the context has no repoPath, without attempting create or repo-path validation', async () => {
+      it('rejects when the context has no repoPath, without attempting create', async () => {
         const githubIssue = { create: jasmine.createSpy('create') };
         const deps = stubDeps();
         const spawnIssue = new SpawnIssue(buildContext({ repoPath: '', githubIssue }), deps);
 
         await expectAsync(spawnIssue.run('1', 'New issue', bodyFile)).toBeRejectedWithError(USAGE);
-
-        expect(githubIssue.create).not.toHaveBeenCalled();
-        expect(deps.repoPathValidator.validate).not.toHaveBeenCalled();
-      });
-
-      it('rejects (before any create) when repo-path validation fails', async () => {
-        const githubIssue = { create: jasmine.createSpy('create') };
-        const repoPathValidator = {
-          validate: jasmine.createSpy('validate').and.rejectWith(new Error('Error: not a directory: /bad'))
-        };
-        const deps = stubDeps({ repoPathValidator });
-        const spawnIssue = new SpawnIssue(buildContext({ githubIssue }), deps);
-
-        await expectAsync(spawnIssue.run('1', 'New issue', bodyFile)).toBeRejectedWithError(
-          'Error: not a directory: /bad'
-        );
 
         expect(githubIssue.create).not.toHaveBeenCalled();
       });

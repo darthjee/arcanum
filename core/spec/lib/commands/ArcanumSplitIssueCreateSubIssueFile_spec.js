@@ -13,7 +13,6 @@ const ISSUES_DIR = 'docs/agents/issues';
  */
 function stubDeps(overrides = {}) {
   return {
-    repoPathValidator: { validate: jasmine.createSpy('validate').and.resolveTo(undefined) },
     ...overrides
   };
 }
@@ -41,7 +40,6 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
         const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: '' }, deps);
 
         await expectAsync(instance.run(ISSUE_ID, 'Title', bodyFile)).toBeRejectedWithError(USAGE);
-        expect(deps.repoPathValidator.validate).not.toHaveBeenCalled();
       });
 
       it('throws the usage message when issueId is missing', async () => {
@@ -49,7 +47,6 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
         const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath }, deps);
 
         await expectAsync(instance.run('', 'Title', bodyFile)).toBeRejectedWithError(USAGE);
-        expect(deps.repoPathValidator.validate).not.toHaveBeenCalled();
       });
 
       it('throws the usage message when title is missing', async () => {
@@ -57,7 +54,6 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
         const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath }, deps);
 
         await expectAsync(instance.run(ISSUE_ID, '', bodyFile)).toBeRejectedWithError(USAGE);
-        expect(deps.repoPathValidator.validate).not.toHaveBeenCalled();
       });
 
       it('throws the usage message when bodyFile is missing', async () => {
@@ -65,22 +61,6 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
         const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath }, deps);
 
         await expectAsync(instance.run(ISSUE_ID, 'Title', '')).toBeRejectedWithError(USAGE);
-        expect(deps.repoPathValidator.validate).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('when repoPath validation fails', () => {
-      it('propagates the rejection uncaught', async () => {
-        const deps = stubDeps({
-          repoPathValidator: {
-            validate: jasmine.createSpy('validate').and.rejectWith(new Error('Error: not a directory: x'))
-          }
-        });
-        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath }, deps);
-
-        await expectAsync(instance.run(ISSUE_ID, 'Title', bodyFile)).toBeRejectedWithError(
-          'Error: not a directory: x'
-        );
       });
     });
 
