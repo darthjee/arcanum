@@ -26,7 +26,7 @@
  *     `repoPath` is only a queue-file path prefix).
  *   - `'claude'` — `new ModuleClass(claudeContext)` where `claudeContext` is a
  *     `ClaudeContext` built from the leading anchor argument; that leading
- *     argument is stripped from the method args. Only `permission-grant`.
+ *     argument is stripped from the method args. Only `permission-grant-add`.
  *   - `'none'` / absent — `new ModuleClass()`, method args untouched. Applies
  *     to `dispatch-fixture`, `dispatch-fixture-crash`, `auto-fix-all-config-*`,
  *     and `arcanum-update-run-update-*`.
@@ -203,7 +203,7 @@ export const COMMANDS = {
     method: 'run',
     context: 'repo'
   },
-  'permission-grant': { module: 'commands/PermissionGrant.js', method: 'run', context: 'claude' },
+  'permission-grant-add': { module: 'commands/PermissionGrant.js', method: 'add', context: 'claude' },
   'resolve-and-fetch': {
     module: 'commands/ResolveAndFetch.js',
     method: 'run',
