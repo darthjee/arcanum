@@ -9,7 +9,7 @@ describe('COMMANDS', () => {
     expect(COMMANDS['dispatch-fixture'].log).toBe(false);
   });
 
-  it('sets context: \'repo\' on the migrated arcanum-split-issue, auto-fix-all lifecycle, auto-fix-all-github and spawn-issue entries', () => {
+  it('sets context: \'repo\' on the migrated arcanum-split-issue, auto-fix-all lifecycle, auto-fix-all-github, auto-fix-all-queue and spawn-issue entries', () => {
     const withRepoContext = Object.keys(COMMANDS).filter((name) => COMMANDS[name].context === 'repo');
 
     expect(withRepoContext).toEqual([
@@ -26,6 +26,13 @@ describe('COMMANDS', () => {
       'auto-fix-all-github-pr-number',
       'auto-fix-all-github-pr-state',
       'auto-fix-all-github-remove-tag',
+      'auto-fix-all-queue-empty',
+      'auto-fix-all-queue-list',
+      'auto-fix-all-queue-next',
+      'auto-fix-all-queue-pop',
+      'auto-fix-all-queue-push',
+      'auto-fix-all-queue-save',
+      'auto-fix-all-queue-wait-next',
       'auto-fix-all-reply-comment',
       'auto-fix-all-wait-ci',
       'auto-fix-all-wait-ci-and-merge',
@@ -43,6 +50,19 @@ describe('COMMANDS', () => {
 
   it('sets context: \'claude\' on permission-grant', () => {
     expect(COMMANDS['permission-grant'].context).toBe('claude');
+  });
+
+  it('sets validateRepoPath: false on the file-only auto-fix-all-queue subcommands and github-issue-info', () => {
+    const skipValidation = Object.keys(COMMANDS).filter((name) => COMMANDS[name].validateRepoPath === false);
+
+    expect(skipValidation).toEqual([
+      'auto-fix-all-queue-empty',
+      'auto-fix-all-queue-list',
+      'auto-fix-all-queue-next',
+      'auto-fix-all-queue-pop',
+      'auto-fix-all-queue-wait-next',
+      'github-issue-info'
+    ]);
   });
 
   it('gives every entry a module path and a method', () => {

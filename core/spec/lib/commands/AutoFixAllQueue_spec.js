@@ -3,6 +3,8 @@ import path from 'node:path';
 import AutoFixAllQueue from '../../../lib/commands/AutoFixAllQueue.js';
 import DispatchFailure from '../../../lib/utils/errors/DispatchFailure.js';
 import Lock from '../../../lib/utils/file/Lock.js';
+import RepoContext from '../../../lib/context/RepoContext.js';
+import RepoContextFactory from '../../../lib/context/RepoContextFactory.js';
 import { captureStdout } from '../../support/utils/captureStdout.js';
 import { fakeFetch } from '../../support/utils/fakeFetch.js';
 import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
@@ -35,14 +37,22 @@ describe('AutoFixAllQueue', () => {
   }
 
   function newQueue(overrides = {}) {
-    return new AutoFixAllQueue({
+    const {
+      repoPath = dir,
+      origin = { resolveWithRef: async () => ({ domain: 'github.com', repo: REPO, repoRef: REPO }) },
+      githubToken = { get: async () => TOKEN },
+      fetchFn = fakeFetch(),
+      ...rest
+    } = overrides;
+
+    const repoContext = new RepoContext({ repoPath, origin, githubToken });
+
+    return new AutoFixAllQueue(repoContext, {
       lock: new Lock({ sleepMs: 5 }),
-      origin: { resolveWithRef: async () => ({ domain: 'github.com', repo: REPO, repoRef: REPO }) },
-      githubToken: { get: async () => TOKEN },
-      fetchFn: fakeFetch(),
+      repoContextFactory: new RepoContextFactory({ fetchFn }),
       pollIntervalMs: 5,
       sleepFn: async () => {},
-      ...overrides
+      ...rest
     });
   }
 
@@ -52,7 +62,7 @@ describe('AutoFixAllQueue', () => {
 
       const queue = newQueue();
 
-      const { stdout } = await captureStdout(() => queue.save(dir, '1', '2', '3'));
+      const { stdout } = await captureStdout(() => queue.save('1', '2', '3'));
 
       expect(stdout.split('\n')[0]).toEqual('Queue saved: 1 2 3');
       expect(await readQueueFile()).toEqual([{ id: '1' }, { id: '2' }, { id: '3' }]);
@@ -61,14 +71,14 @@ describe('AutoFixAllQueue', () => {
     it('rejects with a plain Error when no ids are given', async () => {
       const queue = newQueue();
 
-      await expectAsync(queue.save(dir)).toBeRejectedWithError('Error: save requires at least one ID');
+      await expectAsync(queue.save()).toBeRejectedWithError('Error: save requires at least one ID');
     });
 
     it('best-effort attempts the label mutation for every given id', async () => {
       const fetchFn = fakeFetch();
       const queue = newQueue({ fetchFn });
 
-      await captureStdout(() => queue.save(dir, '10', '20'));
+      await captureStdout(() => queue.save('10', '20'));
 
       // 3 GET calls per id (enqueued/ready_for_work/created), 1 POST
       // (add enqueued, not yet present) and 2 DELETE (remove
@@ -89,7 +99,7 @@ describe('AutoFixAllQueue', () => {
 
       const queue = newQueue({ fetchFn: fakeFetch({ getFails: true }) });
 
-      const { stdout } = await captureStdout(() => queue.save(dir, '10'));
+      const { stdout } = await captureStdout(() => queue.save('10'));
 
       expect(stdout).toEqual('Queue saved: 10\n');
       expect(process.stderr.write).toHaveBeenCalledWith(
@@ -109,7 +119,7 @@ describe('AutoFixAllQueue', () => {
 
       const { stdout } = await captureStdout(async () => {
         try {
-          await queue.save(dir, '10');
+          await queue.save('10');
         } catch (error) {
           thrown = error;
         }
@@ -128,7 +138,7 @@ describe('AutoFixAllQueue', () => {
 
       const queue = newQueue();
 
-      await expectAsync(queue.next(dir)).toBeResolvedTo('a\n');
+      await expectAsync(queue.next()).toBeResolvedTo('a\n');
       expect(await readQueueFile()).toEqual([{ id: 'a' }, { id: 'b' }]);
     });
 
@@ -137,13 +147,13 @@ describe('AutoFixAllQueue', () => {
 
       const queue = newQueue();
 
-      await expectAsync(queue.next(dir)).toBeResolvedTo('\n');
+      await expectAsync(queue.next()).toBeResolvedTo('\n');
     });
 
     it('returns an empty id when the queue file is absent', async () => {
       const queue = newQueue();
 
-      await expectAsync(queue.next(dir)).toBeResolvedTo('\n');
+      await expectAsync(queue.next()).toBeResolvedTo('\n');
     });
   });
 
@@ -154,7 +164,7 @@ describe('AutoFixAllQueue', () => {
       const sleepFn = jasmine.createSpy('sleep').and.resolveTo(undefined);
       const queue = newQueue({ sleepFn });
 
-      await expectAsync(queue.waitNext(dir)).toBeResolvedTo('a\n');
+      await expectAsync(queue.waitNext()).toBeResolvedTo('a\n');
       expect(sleepFn).not.toHaveBeenCalled();
     });
 
@@ -171,7 +181,7 @@ describe('AutoFixAllQueue', () => {
       });
       const queue = newQueue({ pollIntervalMs: 7, sleepFn });
 
-      await expectAsync(queue.waitNext(dir)).toBeResolvedTo('late\n');
+      await expectAsync(queue.waitNext()).toBeResolvedTo('late\n');
       expect(sleepFn).toHaveBeenCalledTimes(2);
       expect(sleepFn).toHaveBeenCalledWith(7);
     });
@@ -183,7 +193,7 @@ describe('AutoFixAllQueue', () => {
 
       const queue = newQueue();
 
-      const { stdout } = await captureStdout(() => queue.push(dir, '1', '2'));
+      const { stdout } = await captureStdout(() => queue.push('1', '2'));
 
       expect(stdout.split('\n')[0]).toEqual('Pushed: 1 2');
       expect(await readQueueFile()).toEqual([{ id: 'existing' }, { id: '1' }, { id: '2' }]);
@@ -192,7 +202,7 @@ describe('AutoFixAllQueue', () => {
     it('rejects with a plain Error when no ids are given', async () => {
       const queue = newQueue();
 
-      await expectAsync(queue.push(dir)).toBeRejectedWithError('Error: push requires at least one ID');
+      await expectAsync(queue.push()).toBeRejectedWithError('Error: push requires at least one ID');
     });
 
     it('acquires and releases the lock file around the mutation', async () => {
@@ -203,7 +213,7 @@ describe('AutoFixAllQueue', () => {
 
       const queue = newQueue({ lock });
 
-      await captureStdout(() => queue.push(dir, '1'));
+      await captureStdout(() => queue.push('1'));
 
       expect(lock.acquire).toHaveBeenCalledWith(lockFile);
       expect(lock.release).toHaveBeenCalledWith(lockFile);
@@ -213,7 +223,7 @@ describe('AutoFixAllQueue', () => {
       const fetchFn = fakeFetch();
       const queue = newQueue({ fetchFn });
 
-      await captureStdout(() => queue.push(dir, '30'));
+      await captureStdout(() => queue.push('30'));
 
       expect(fetchFn).toHaveBeenCalled();
     });
@@ -223,7 +233,7 @@ describe('AutoFixAllQueue', () => {
 
       const queue = newQueue({ fetchFn: fakeFetch({ mutateFails: true }) });
 
-      const { stdout } = await captureStdout(() => queue.push(dir, '10'));
+      const { stdout } = await captureStdout(() => queue.push('10'));
 
       expect(stdout).toEqual('Pushed: 10\n');
       expect(process.stderr.write).toHaveBeenCalledWith(
@@ -237,7 +247,7 @@ describe('AutoFixAllQueue', () => {
 
       const { stdout } = await captureStdout(async () => {
         try {
-          await queue.push(dir, '10');
+          await queue.push('10');
         } catch (error) {
           thrown = error;
         }
@@ -256,7 +266,7 @@ describe('AutoFixAllQueue', () => {
 
       const queue = newQueue();
 
-      await expectAsync(queue.pop(dir)).toBeResolvedTo(undefined);
+      await expectAsync(queue.pop()).toBeResolvedTo(undefined);
       expect(await readQueueFile()).toEqual([{ id: 'b' }, { id: 'c' }]);
     });
 
@@ -265,7 +275,7 @@ describe('AutoFixAllQueue', () => {
 
       const queue = newQueue();
 
-      const result = await queue.pop(dir);
+      const result = await queue.pop();
 
       expect(result).toBeUndefined();
     });
@@ -280,7 +290,7 @@ describe('AutoFixAllQueue', () => {
 
       const queue = newQueue({ lock });
 
-      await queue.pop(dir);
+      await queue.pop();
 
       expect(lock.acquire).toHaveBeenCalledWith(lockFile);
       expect(lock.release).toHaveBeenCalledWith(lockFile);
@@ -293,13 +303,13 @@ describe('AutoFixAllQueue', () => {
 
       const queue = newQueue();
 
-      await expectAsync(queue.empty(dir)).toBeResolved();
+      await expectAsync(queue.empty()).toBeResolved();
     });
 
     it('resolves when the queue file is absent', async () => {
       const queue = newQueue();
 
-      await expectAsync(queue.empty(dir)).toBeResolved();
+      await expectAsync(queue.empty()).toBeResolved();
     });
 
     it('rejects with a DispatchFailure (stdout "", exit code 1) for a non-empty queue', async () => {
@@ -309,7 +319,7 @@ describe('AutoFixAllQueue', () => {
       let thrown;
 
       try {
-        await queue.empty(dir);
+        await queue.empty();
       } catch (error) {
         thrown = error;
       }
@@ -326,7 +336,7 @@ describe('AutoFixAllQueue', () => {
 
       const queue = newQueue();
 
-      await expectAsync(queue.list(dir)).toBeResolvedTo('a\nb\nc\n');
+      await expectAsync(queue.list()).toBeResolvedTo('a\nb\nc\n');
     });
 
     it('prints "(empty)" for a zero-length queue', async () => {
@@ -334,13 +344,13 @@ describe('AutoFixAllQueue', () => {
 
       const queue = newQueue();
 
-      await expectAsync(queue.list(dir)).toBeResolvedTo('(empty)\n');
+      await expectAsync(queue.list()).toBeResolvedTo('(empty)\n');
     });
 
     it('prints "(empty)" when the queue file is absent', async () => {
       const queue = newQueue();
 
-      await expectAsync(queue.list(dir)).toBeResolvedTo('(empty)\n');
+      await expectAsync(queue.list()).toBeResolvedTo('(empty)\n');
     });
   });
 
@@ -350,7 +360,7 @@ describe('AutoFixAllQueue', () => {
       const first = newQueue({ lock });
       const second = newQueue({ lock });
 
-      await captureStdout(() => Promise.all([first.push(dir, 'a', 'b'), second.push(dir, 'c', 'd')]));
+      await captureStdout(() => Promise.all([first.push('a', 'b'), second.push('c', 'd')]));
 
       const ids = (await readQueueFile()).map((entry) => entry.id).sort();
 
@@ -364,7 +374,7 @@ describe('AutoFixAllQueue', () => {
       const pusher = newQueue({ lock });
       const popper = newQueue({ lock });
 
-      await captureStdout(() => Promise.all([pusher.push(dir, 'next'), popper.pop(dir)]));
+      await captureStdout(() => Promise.all([pusher.push('next'), popper.pop()]));
 
       const ids = (await readQueueFile()).map((entry) => entry.id);
 

@@ -17,15 +17,19 @@
  *     argument is stripped from the method args. Set on the
  *     `arcanum-split-issue-*` and `auto-fix-all-*` lifecycle commands
  *     (checkout-from-main / cleanup-artifacts / reply-comment / wait-ci /
- *     wait-ci-and-merge), on `spawn-issue`, and on the `auto-fix-all-github-*`
+ *     wait-ci-and-merge), on `spawn-issue`, on the `auto-fix-all-github-*`
  *     family (add-tag / cleanup-branch / has-shipit-label / pr-merge /
- *     pr-number / pr-state / remove-tag).
+ *     pr-number / pr-state / remove-tag), and on the `auto-fix-all-queue-*`
+ *     family (empty / list / next / pop / push / save / wait-next) — where
+ *     `save` / `push` keep the Dispatcher `RepoContext#validate()` and the
+ *     five file-only subcommands set `validateRepoPath: false` (their
+ *     `repoPath` is only a queue-file path prefix).
  *   - `'claude'` — `new ModuleClass(claudeContext)` where `claudeContext` is a
  *     `ClaudeContext` built from the leading anchor argument; that leading
  *     argument is stripped from the method args. Only `permission-grant`.
  *   - `'none'` / absent — `new ModuleClass()`, method args untouched. Applies
  *     to `dispatch-fixture`, `dispatch-fixture-crash`, `auto-fix-all-config-*`,
- *     `auto-fix-all-queue-*`, and `arcanum-update-run-update-*`.
+ *     and `arcanum-update-run-update-*`.
  * @property {boolean} [validateRepoPath] - defaults to `true` for
  *   `context: 'repo'`; set `false` to skip the Dispatcher-level
  *   `RepoContext#validate()` (e.g. entries with their own not-a-repo error
@@ -111,13 +115,46 @@ export const COMMANDS = {
     method: 'removeTag',
     context: 'repo'
   },
-  'auto-fix-all-queue-empty': { module: 'commands/AutoFixAllQueue.js', method: 'empty' },
-  'auto-fix-all-queue-list': { module: 'commands/AutoFixAllQueue.js', method: 'list' },
-  'auto-fix-all-queue-next': { module: 'commands/AutoFixAllQueue.js', method: 'next' },
-  'auto-fix-all-queue-pop': { module: 'commands/AutoFixAllQueue.js', method: 'pop' },
-  'auto-fix-all-queue-push': { module: 'commands/AutoFixAllQueue.js', method: 'push' },
-  'auto-fix-all-queue-save': { module: 'commands/AutoFixAllQueue.js', method: 'save' },
-  'auto-fix-all-queue-wait-next': { module: 'commands/AutoFixAllQueue.js', method: 'waitNext' },
+  'auto-fix-all-queue-empty': {
+    module: 'commands/AutoFixAllQueue.js',
+    method: 'empty',
+    context: 'repo',
+    validateRepoPath: false
+  },
+  'auto-fix-all-queue-list': {
+    module: 'commands/AutoFixAllQueue.js',
+    method: 'list',
+    context: 'repo',
+    validateRepoPath: false
+  },
+  'auto-fix-all-queue-next': {
+    module: 'commands/AutoFixAllQueue.js',
+    method: 'next',
+    context: 'repo',
+    validateRepoPath: false
+  },
+  'auto-fix-all-queue-pop': {
+    module: 'commands/AutoFixAllQueue.js',
+    method: 'pop',
+    context: 'repo',
+    validateRepoPath: false
+  },
+  'auto-fix-all-queue-push': {
+    module: 'commands/AutoFixAllQueue.js',
+    method: 'push',
+    context: 'repo'
+  },
+  'auto-fix-all-queue-save': {
+    module: 'commands/AutoFixAllQueue.js',
+    method: 'save',
+    context: 'repo'
+  },
+  'auto-fix-all-queue-wait-next': {
+    module: 'commands/AutoFixAllQueue.js',
+    method: 'waitNext',
+    context: 'repo',
+    validateRepoPath: false
+  },
   'auto-fix-all-reply-comment': {
     module: 'commands/AutoFixAllReplyComment.js',
     method: 'run',
