@@ -132,6 +132,7 @@ class RepoContext {
    *   see `GithubIssue#create`.
    */
   async createIssue(title, bodyFile) {
+    await this.validate();
     return this._githubIssue.create(this.repoPath, title, bodyFile);
   }
 }
