@@ -39,8 +39,9 @@ export default class Dispatcher {
   /**
    * Resolve the command to its module and run it. On the `context: 'repo'`
    * path (unless the entry sets `validateRepoPath: false`), the leading
-   * `repoPath` argument is validated via `RepoContext#validate()` — after
-   * `record`, before the command module is imported.
+   * `repoPath` argument is always validated via `RepoContext#validate()` —
+   * after `record`, before the command module is imported — so an
+   * absent/empty leading arg rejects with `Error: repo_path is required`.
    * @returns {Promise<*>} the command method's resolved return value; a
    *   returned promise is awaited, so the caller always gets a plain value.
    * @throws {Error} `unknown command '<command>'` when the command name is
@@ -55,14 +56,7 @@ export default class Dispatcher {
       await this._invocationLog.record(this.command);
     }
 
-    if (
-      this.entry.context === 'repo' &&
-      this.entry.validateRepoPath !== false &&
-      // The `&& this.args[0]` guard keeps shell parity for the
-      // absent-leading-arg case (the command's own `USAGE` throw still
-      // wins); whether to drop it is #333's call.
-      this.args[0]
-    ) {
+    if (this.entry.context === 'repo' && this.entry.validateRepoPath !== false) {
       await this.repoContext.validate();
     }
 

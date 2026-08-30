@@ -243,7 +243,16 @@ describe('auto-fix-all-checkout-from-main parity (shell vs. native)', () => {
   });
 
   describe('missing required args', () => {
-    it('matches exit code and empty stdout, with the substantive usage text in stderr', async () => {
+    // The empty-leading-arg case is the one intentional stdout-clean
+    // divergence from strict stderr parity (see #333 and
+    // docs/agents/architecture/script-engine.md's "output/exit-code
+    // contract"): the native `context: 'repo'` dispatcher now validates
+    // `repoPath` unconditionally, so it rejects with
+    // `arcanum: Error: repo_path is required` before the command's own
+    // `Usage:` guard runs, whereas the shell script short-circuits with
+    // its `Usage:` block. The output/exit-code contract skills rely on —
+    // empty stdout, exit 1 — still matches on both sides.
+    it('matches exit code and empty stdout for an empty repo_path, with the intentional #333 stderr divergence', async () => {
       const cwd = await createTempDir('arcanum-core-afacfm-parity-');
 
       try {
@@ -259,10 +268,32 @@ describe('auto-fix-all-checkout-from-main parity (shell vs. native)', () => {
         expect(shell.stdout).toEqual('');
         expect(shell.stderr.trim()).toContain('Usage:');
         expect(shell.stderr.trim()).toContain('<repo_path> <id>');
+        expect(native.stderr.trim()).toEqual('arcanum: Error: repo_path is required');
+      } finally {
+        await removeTempDir(cwd);
+      }
+    });
+
+    it('matches exit code, empty stdout, and the Usage: stderr text for a present repo_path but missing id', async () => {
+      const repo = await createGitFixtureRepo();
+
+      try {
+        const shell = await runCommand([SHELL_SCRIPT, repo.repoPath, ''], repo.repoPath);
+        const native = await runCommand(
+          [process.execPath, NATIVE_BIN, 'auto-fix-all-checkout-from-main', repo.repoPath, ''],
+          repo.repoPath
+        );
+
+        expect(native.stdout).toEqual(shell.stdout);
+        expect(native.code).toEqual(shell.code);
+        expect(shell.code).toEqual(1);
+        expect(shell.stdout).toEqual('');
+        expect(shell.stderr.trim()).toContain('Usage:');
+        expect(shell.stderr.trim()).toContain('<repo_path> <id>');
         expect(native.stderr.trim()).toContain('Usage:');
         expect(native.stderr.trim()).toContain('<repo_path> <id>');
       } finally {
-        await removeTempDir(cwd);
+        await repo.cleanup();
       }
     });
   });
