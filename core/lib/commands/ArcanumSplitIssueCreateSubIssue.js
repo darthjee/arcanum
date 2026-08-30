@@ -2,7 +2,6 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import DispatchFailure from '../utils/errors/DispatchFailure.js';
-import RepoPath from '../utils/file/RepoPath.js';
 import SpawnIssue from './SpawnIssue.js';
 
 const USAGE = 'Usage: create_sub_issue.sh <repo_path> <issue_id> <sub_issue_file>';
@@ -29,16 +28,13 @@ class ArcanumSplitIssueCreateSubIssue {
    * @param {Function} [deps.writeFile] - `node:fs/promises`'s `writeFile`.
    * @param {Function} [deps.mkdtemp] - `node:fs/promises`'s `mkdtemp`.
    * @param {Function} [deps.rm] - `node:fs/promises`'s `rm`.
-   * @param {RepoPath} [deps.repoPathValidator] - repo-path validation
-   *   helper.
    */
   constructor(repoContext, {
     spawnIssue = new SpawnIssue(repoContext),
     readFile: readFileFn = readFile,
     writeFile: writeFileFn = writeFile,
     mkdtemp: mkdtempFn = mkdtemp,
-    rm: rmFn = rm,
-    repoPathValidator = new RepoPath()
+    rm: rmFn = rm
   } = {}) {
     this._repoContext = repoContext;
     this._spawnIssue = spawnIssue;
@@ -46,7 +42,6 @@ class ArcanumSplitIssueCreateSubIssue {
     this._writeFile = writeFileFn;
     this._mkdtemp = mkdtempFn;
     this._rm = rmFn;
-    this._repoPathValidator = repoPathValidator;
   }
 
   /**
@@ -54,7 +49,7 @@ class ArcanumSplitIssueCreateSubIssue {
    * migrated entrypoint — byte-identical stdout/exit-code counterpart to
    * `create_sub_issue.sh`. Validates all 3 arguments are present (usage
    * message otherwise, propagated uncaught so the caller exits 1),
-   * validates `repoPath` (`RepoPath#validate`), reads and parses
+   * reads and parses
    * `subIssueFile` (title/body), writes the progress line, delegates the
    * actual create/label/link work to `SpawnIssue#run` with
    * `--as-subissue`, tracks the new id in per-issue state, and returns
@@ -79,8 +74,6 @@ class ArcanumSplitIssueCreateSubIssue {
     if (!this._repoContext.repoPath || !issueId || !subIssueFile) {
       throw new Error(USAGE);
     }
-
-    await this._repoPathValidator.validate(this._repoContext.repoPath);
 
     const resolvedFile = path.resolve(this._repoContext.repoPath, subIssueFile);
     let content;

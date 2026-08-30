@@ -2,7 +2,6 @@ import PrChecker from '../services/PrChecker.js';
 import PrOperations from '../utils/github/PrOperations.js';
 import RepoConfig from '../utils/config/RepoConfig.js';
 import RepoContextFactory from '../context/RepoContextFactory.js';
-import RepoPath from '../utils/file/RepoPath.js';
 
 const DEFAULT_TIMEOUT_MS = 30000;
 const DEFAULT_POLL_INTERVAL_MS = 5000;
@@ -52,22 +51,18 @@ class AutoFixAllWaitCi {
    * @param {Function} [deps.sleepFn] - the poll-loop sleep
    *   implementation, overridable for tests (defaults to a real
    *   `setTimeout`-based sleep).
-   * @param {RepoPath} [deps.repoPathValidator] - repo-path validation
-   *   helper.
    */
   constructor(repoContext, {
     repoContextFactory = new RepoContextFactory({ timeoutMs: DEFAULT_TIMEOUT_MS }),
     repoConfig = new RepoConfig(),
     pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
-    sleepFn = defaultSleep,
-    repoPathValidator = new RepoPath()
+    sleepFn = defaultSleep
   } = {}) {
     this._repoContext = repoContext;
     this._repoContextFactory = repoContextFactory;
     this._repoConfig = repoConfig;
     this._pollIntervalMs = pollIntervalMs;
     this._sleep = sleepFn;
-    this._repoPathValidator = repoPathValidator;
   }
 
   /**
@@ -89,8 +84,6 @@ class AutoFixAllWaitCi {
     if (!repoPath) {
       throw new Error(USAGE);
     }
-
-    await this._repoPathValidator.validate(repoPath);
 
     const ignoredPatterns = await this._repoConfig.getIgnoredCheckPatterns(repoPath);
     const prNumber = Number((await this._prOperations().prNumber()).trim());

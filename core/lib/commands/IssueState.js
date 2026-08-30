@@ -2,7 +2,6 @@ import { mkdir } from 'node:fs/promises';
 import IssueStateService from '../services/IssueStateService.js';
 import IssueStatePaths from '../utils/file/IssueStatePaths.js';
 import Lock from '../utils/file/Lock.js';
-import RepoPath from '../utils/file/RepoPath.js';
 import JsonParser from '../utils/json/JsonParser.js';
 import JsonReader from '../utils/json/JsonReader.js';
 import JsonValueFormatter from '../utils/json/JsonValueFormatter.js';
@@ -27,7 +26,6 @@ class IssueState {
    *   the target repo's context (provides `repoPath` and is forwarded to
    *   each per-call `IssueStateService`).
    * @param {object} [deps] - injectable collaborators, for testing.
-   * @param {RepoPath} [deps.repoPath] - repo-path validation helper.
    * @param {Lock} [deps.lock] - the lock/mutate/release helper, forwarded
    *   to each per-call `IssueStateService`.
    * @param {JsonParser} [deps.jsonParser] - JSON-text parser, forwarded
@@ -40,7 +38,6 @@ class IssueState {
    *   resolver, forwarded to each per-call `IssueStateService`.
    */
   constructor(repoContext, {
-    repoPath = new RepoPath(),
     lock = new Lock(),
     jsonParser = new JsonParser(),
     jsonValueFormatter = new JsonValueFormatter(),
@@ -48,7 +45,6 @@ class IssueState {
     issueStatePaths = new IssueStatePaths()
   } = {}) {
     this._repoContext = repoContext;
-    this._repoPath = repoPath;
     this._lock = lock;
     this._jsonParser = jsonParser;
     this._jsonValueFormatter = jsonValueFormatter;
@@ -59,9 +55,10 @@ class IssueState {
   /**
    * Native implementation of the `issue-state` migrated entrypoint —
    * byte-identical stdout/exit-code counterpart to
-   * `arcanum/_lib/issue_state_shell.sh`. Validates `repoPath`
-   * (`RepoPath#validate`, matching `repo_path_enter`'s messages/exit-1
-   * semantics), then dispatches on `subcommand`. Missing required args
+   * `arcanum/_lib/issue_state_shell.sh`. `repoPath` validation
+   * (`repo_path_enter` parity) is handled upstream by `Dispatcher` via
+   * `RepoContext#validate()`; this method dispatches on `subcommand`.
+   * Missing required args
    * (`repoPath`/`subcommand`/`id`/`field` — `value` is never required)
    * and an unknown `subcommand` both throw (propagated uncaught, same
    * hard-failure class the other migrated entrypoints use — the caller,
@@ -82,8 +79,6 @@ class IssueState {
     if (!repoPath || !subcommand || !id || !field) {
       throw new Error(USAGE_MESSAGE);
     }
-
-    await this._repoPath.validate(repoPath);
 
     const { stateDir } = this._issueStatePaths.paths(repoPath, id);
 

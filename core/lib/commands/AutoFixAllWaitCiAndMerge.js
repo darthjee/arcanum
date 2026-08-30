@@ -1,6 +1,5 @@
 import AutoFixAllGithub from './AutoFixAllGithub.js';
 import AutoFixAllWaitCi from './AutoFixAllWaitCi.js';
-import RepoPath from '../utils/file/RepoPath.js';
 
 /**
  * Native equivalent of `auto-fix-all/scripts/wait_ci_and_merge.sh`: a
@@ -18,18 +17,14 @@ class AutoFixAllWaitCiAndMerge {
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {AutoFixAllWaitCi} [deps.waitCi] - the CI-wait orchestrator.
    * @param {AutoFixAllGithub} [deps.github] - the GitHub PR orchestrator.
-   * @param {RepoPath} [deps.repoPathValidator] - repo-path validation
-   *   helper.
    */
   constructor(repoContext, {
     waitCi = new AutoFixAllWaitCi(repoContext),
-    github = new AutoFixAllGithub(repoContext),
-    repoPathValidator = new RepoPath()
+    github = new AutoFixAllGithub(repoContext)
   } = {}) {
     this._repoContext = repoContext;
     this._waitCi = waitCi;
     this._github = github;
-    this._repoPathValidator = repoPathValidator;
   }
 
   /**
@@ -51,8 +46,6 @@ class AutoFixAllWaitCiAndMerge {
     if (!repoPath) {
       throw new Error('Usage: wait_ci_and_merge.sh <repo_path> [model_email]');
     }
-
-    await this._repoPathValidator.validate(repoPath);
 
     const waitOutput = await this._waitCi.run();
 

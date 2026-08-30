@@ -7,7 +7,6 @@ import GithubToken from '../utils/github/GithubToken.js';
 import IssueStatePaths from '../utils/file/IssueStatePaths.js';
 import Lock from '../utils/file/Lock.js';
 import Origin from '../utils/git/Origin.js';
-import RepoPath from '../utils/file/RepoPath.js';
 import JsonParser from '../utils/json/JsonParser.js';
 import JsonReader from '../utils/json/JsonReader.js';
 import JsonValueFormatter from '../utils/json/JsonValueFormatter.js';
@@ -37,7 +36,6 @@ class GithubIssue {
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Origin} [deps.origin] - git-origin resolver.
    * @param {GithubToken} [deps.githubToken] - GitHub token resolver.
-   * @param {RepoPath} [deps.repoPath] - repo-path validation helper.
    * @param {Function} [deps.fetchFn] - `fetch`-compatible implementation
    *   (global `fetch` by default).
    * @param {number} [deps.timeoutMs] - the REST call's abort timeout,
@@ -56,7 +54,6 @@ class GithubIssue {
   constructor(repoContext, {
     origin = new Origin(),
     githubToken = new GithubToken(),
-    repoPath = new RepoPath(),
     fetchFn = fetch,
     timeoutMs = DEFAULT_TIMEOUT_MS,
     lock = new Lock(),
@@ -68,7 +65,6 @@ class GithubIssue {
     this._repoContext = repoContext;
     this._origin = origin;
     this._githubToken = githubToken;
-    this._repoPath = repoPath;
     this._fetch = fetchFn;
     this._timeoutMs = timeoutMs;
     this._lock = lock;
@@ -115,10 +111,12 @@ class GithubIssue {
    * Native implementation of the `github-issue-info` migrated
    * entrypoint's underlying logic — mirrors `github_issue.sh`'s
    * `cmd_info` exactly: resolves `repoPath`'s git `origin` remote and
-   * returns its `DOMAIN=`/`REPO=` fields. Deliberately skips
-   * `RepoPath#validate` (the shell version only calls `_load_origin`
-   * here, whose own not-a-git-repo/no-origin failure is already
-   * reproduced by `Origin#resolve`'s existing error message).
+   * returns its `DOMAIN=`/`REPO=` fields. Deliberately skips the
+   * `RepoContext#validate()` repo-path guard — the `github-issue-info`
+   * registry entry sets `validateRepoPath: false` — because the shell
+   * version only calls `_load_origin` here, whose own
+   * not-a-git-repo/no-origin failure is already reproduced by
+   * `Origin#resolve`'s existing error message.
    * @param {string} [repoPath] - the target repo's local checkout path.
    *   On the collaborator path this is passed explicitly. On the CLI
    *   (flag-on) path `Dispatcher.commandArgs()` has already stripped the
@@ -139,13 +137,15 @@ class GithubIssue {
   /**
    * Native implementation of the `github-issue-create` migrated
    * entrypoint's underlying logic — mirrors `github_issue.sh`'s
-   * `cmd_create` exactly: validates `repoPath`, reads `file`'s
+   * `cmd_create` exactly: reads `file`'s
    * contents (trailing newlines stripped, matching `$(cat "$file")`'s
    * command-substitution trimming), creates the issue over the GitHub
    * REST API, writes the same body to `docs/agents/issues/`, and
    * returns the fields `cmd_create`'s stdout needs. Does not persist
    * any per-issue state file (no `IssueState#write` call), matching the
-   * shell.
+   * shell. `repoPath` validation (`repo_path_enter` parity) is handled
+   * upstream — by `Dispatcher` via `RepoContext#validate()` on the CLI
+   * path, and by `RepoContext#createIssue` on the collaborator path.
    * @param {string} [repoPath] - the target repo's local checkout path.
    *   On the collaborator path (`RepoContext#createIssue`) this is passed
    *   explicitly. On the CLI (flag-on) path `Dispatcher.commandArgs()`
@@ -161,8 +161,6 @@ class GithubIssue {
     if (this._repoContext) {
       [repoPath, title, file] = [this._repoContext.repoPath, repoPath, title];
     }
-
-    await this._repoPath.validate(repoPath);
 
     let rawBody;
 

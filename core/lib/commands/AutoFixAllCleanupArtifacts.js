@@ -1,7 +1,6 @@
 import { execFile, spawn } from 'node:child_process';
 import { stat } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import RepoPath from '../utils/file/RepoPath.js';
 
 const promisifiedExecFile = promisify(execFile);
 const USAGE = 'Usage: cleanup_artifacts.sh <repo_path> <issue_file> <plan_dir> <id> <model_name> <model_email>';
@@ -74,19 +73,16 @@ class AutoFixAllCleanupArtifacts {
    *   the target repo's context (provides `repoPath`).
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Function} [deps.execFileAsync] - promisified `execFile`.
-   * @param {RepoPath} [deps.repoPath] - repo-path validation helper.
    */
-  constructor(repoContext, { execFileAsync = defaultExecFileAsync, repoPath = new RepoPath({ execFileAsync }) } = {}) {
+  constructor(repoContext, { execFileAsync = defaultExecFileAsync } = {}) {
     this._repoContext = repoContext;
     this._execFileAsync = execFileAsync;
-    this._repoPath = repoPath;
   }
 
   /**
    * Native implementation of the `auto-fix-all-cleanup-artifacts`
    * migrated entrypoint — byte-identical stdout/exit-code counterpart to
-   * `cleanup_artifacts_shell.sh`. Validates `repoPath` (`RepoPath#validate`,
-   * matching `repo_path_enter`'s messages/exit-1 semantics) and that all
+   * `cleanup_artifacts_shell.sh`. Validates that all
    * other arguments are present (usage message on missing/empty
    * argument, propagated uncaught so the caller exits 1). Stages removal
    * of `issueFile`/`planDir` when tracked, then — only if something ends
@@ -115,8 +111,6 @@ class AutoFixAllCleanupArtifacts {
     if (!repoPath || !issueFile || !planDir || !id || !modelName || !modelEmail) {
       throw new Error(USAGE);
     }
-
-    await this._repoPath.validate(repoPath);
 
     if (await this._isTracked(issueFile)) {
       await this._execFileAsync('git', ['rm', issueFile], { cwd: repoPath });

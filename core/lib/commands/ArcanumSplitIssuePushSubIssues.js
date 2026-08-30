@@ -2,7 +2,6 @@ import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import ArcanumSplitIssueCreateSubIssue from './ArcanumSplitIssueCreateSubIssue.js';
 import DispatchFailure from '../utils/errors/DispatchFailure.js';
-import RepoPath from '../utils/file/RepoPath.js';
 
 const USAGE = 'Usage: push_sub_issues.sh <repo_path> <issue_id>';
 const ISSUES_DIR = 'docs/agents/issues';
@@ -22,19 +21,15 @@ class ArcanumSplitIssuePushSubIssues {
    * @param {import('../context/RepoContext.js').default} repoContext -
    *   the target repo's context (provides `repoPath`).
    * @param {object} [deps] - injectable collaborators, for testing.
-   * @param {RepoPath} [deps.repoPathValidator] - repo-path validation
-   *   helper.
    * @param {ArcanumSplitIssueCreateSubIssue} [deps.createSubIssue] -
    *   per-file sub-issue creation helper.
    * @param {Function} [deps.readdir] - `node:fs/promises`'s `readdir`.
    */
   constructor(repoContext, {
-    repoPathValidator = new RepoPath(),
     createSubIssue = new ArcanumSplitIssueCreateSubIssue(repoContext),
     readdir: readdirFn = readdir
   } = {}) {
     this._repoContext = repoContext;
-    this._repoPathValidator = repoPathValidator;
     this._createSubIssue = createSubIssue;
     this._readdir = readdirFn;
   }
@@ -44,7 +39,7 @@ class ArcanumSplitIssuePushSubIssues {
    * migrated entrypoint — byte-identical stdout/exit-code counterpart to
    * `push_sub_issues.sh`. Validates both arguments are present (usage
    * message otherwise, propagated uncaught so the caller exits 1),
-   * validates `repoPath` (`RepoPath#validate`), lists and sorts every
+   * lists and sorts every
    * matching sub-issue draft file under `docs/agents/issues/`, and calls
    * `ArcanumSplitIssueCreateSubIssue#run` for each in order — discarding
    * each call's own stdout entirely (mirroring the shell script's
@@ -63,8 +58,6 @@ class ArcanumSplitIssuePushSubIssues {
     if (!this._repoContext.repoPath || !issueId) {
       throw new Error(USAGE);
     }
-
-    await this._repoPathValidator.validate(this._repoContext.repoPath);
 
     const files = await this._matchingFiles(issueId);
     const created = [];

@@ -5,7 +5,6 @@ import { promisify } from 'node:util';
 import DispatchFailure from '../utils/errors/DispatchFailure.js';
 import IssueLinker from '../utils/issue/IssueLinker.js';
 import LabelApplicator from '../utils/issue/LabelApplicator.js';
-import RepoPath from '../utils/file/RepoPath.js';
 
 const defaultExecFileAsync = promisify(execFile);
 const USAGE = 'Usage: spawn-issue <repo_path> <parent_id> <title> <body_file> [--as-subissue]';
@@ -51,22 +50,18 @@ class SpawnIssue {
    *   parent-label carryover delegate.
    * @param {IssueLinker} [deps.issueLinker] - best-effort
    *   parent/new-issue cross-linking delegate.
-   * @param {RepoPath} [deps.repoPathValidator] - repo-path validation
-   *   helper.
    */
   constructor(repoContext, {
     execFileAsync = defaultExecFileAsync,
     sleepFn = defaultSleep,
     labelApplicator = new LabelApplicator({ execFileAsync }),
-    issueLinker = new IssueLinker({ execFileAsync }),
-    repoPathValidator = new RepoPath()
+    issueLinker = new IssueLinker({ execFileAsync })
   } = {}) {
     this._repoContext = repoContext;
     this._execFileAsync = execFileAsync;
     this._sleep = sleepFn;
     this._labelApplicator = labelApplicator;
     this._issueLinker = issueLinker;
-    this._repoPathValidator = repoPathValidator;
   }
 
   /**
@@ -94,8 +89,6 @@ class SpawnIssue {
     }
 
     const asSubissue = asSubissueFlag === AS_SUBISSUE_FLAG;
-
-    await this._repoPathValidator.validate(repoPath);
 
     if (!(await this._fileExists(bodyFile))) {
       throw new Error(`Error: file not found: ${bodyFile}`);
