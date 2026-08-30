@@ -1,11 +1,8 @@
 import DispatchFailure from '../utils/errors/DispatchFailure.js';
-import GithubToken from '../utils/github/GithubToken.js';
-import IssueClient from '../utils/github/IssueClient.js';
 import IssueTagger from '../utils/issue/IssueTagger.js';
 import Lock from '../utils/file/Lock.js';
-import Origin from '../utils/git/Origin.js';
 import QueueStore from '../utils/queue/QueueStore.js';
-import RepoContext from '../context/RepoContext.js';
+import RepoContextFactory from '../context/RepoContextFactory.js';
 
 const DEFAULT_POLL_INTERVAL_MS = 5000;
 
@@ -37,35 +34,33 @@ function defaultSleep(ms) {
  * mutation is delegated to `IssueTagger` — this class keeps owning the
  * lock acquire → read → write → release sequence itself, since that
  * transaction spans two `QueueStore` calls. See
- * docs/agents/plans/253-refactor-autofixallqueue/node.md.
+ * docs/agents/plans/253-refactor-autofixallqueue/node.md and
+ * docs/agents/plans/323-review-should-autofixallqueue-take-a-constructor-injected-repocontext/node.md.
  */
 class AutoFixAllQueue {
   /**
+   * @param {import('../context/RepoContext.js').default} repoContext -
+   *   the target repo's context (provides `repoPath` plus the low-level
+   *   `origin`/`githubToken` wiring the per-call bundle is built off via
+   *   `buildFromContext`). Every method resolves the queue file under
+   *   `repoContext.repoPath`.
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Lock} [deps.lock] - the lock/mutate/release helper used to
    *   guard `push`/`pop`.
    * @param {QueueStore} [deps.queueStore] - the queue file's I/O
    *   delegate.
-   * @param {Origin} [deps.origin] - git-origin resolver, shared across
-   *   each per-call `RepoContext` built by `#_issueTagger`.
-   * @param {GithubToken} [deps.githubToken] - GitHub token resolver,
-   *   shared across each per-call `RepoContext` built by `#_issueTagger`.
-   * @param {Function} [deps.fetchFn] - `fetch`-compatible implementation
-   *   (global `fetch` by default), forwarded to the default
-   *   `issueTaggerFactory`.
-   * @param {number} [deps.timeoutMs] - each REST call's abort timeout,
-   *   forwarded to the default `issueTaggerFactory` (ignored if
-   *   `issueTaggerFactory` is also given; defaults to `IssueClient`'s
-   *   own real 30s protocol value).
+   * @param {RepoContextFactory} [deps.repoContextFactory] - wraps the
+   *   injected `RepoContext` into a per-call bundle (context plus
+   *   context-bound clients) via `buildFromContext` — see `#_issueTagger`.
+   *   Only its `execFileAsync`/`fetchFn`/`timeoutMs` knobs are consulted
+   *   on this path; callers that need to stub the REST transport pass a
+   *   pre-built `repoContextFactory`.
    * @param {Function} [deps.issueTaggerFactory] - builds an
    *   `IssueTagger` (the best-effort GitHub label-mutation delegate used
-   *   by `save`/`push`) from a per-call `RepoContext` — see
-   *   `#_issueTagger`. A factory, not a pre-built instance, since a
-   *   context-bound `IssueTagger` can't be shared across calls once
-   *   `repoPath` varies call to call. Defaults to an `IssueTagger` built
-   *   from `context` plus an `IssueClient` using `fetchFn`/`timeoutMs`,
-   *   so callers can override just the label-mutation transport without
-   *   also passing a whole custom factory.
+   *   by `save`/`push`) from a per-call `RepoContext` bundle — see
+   *   `#_issueTagger`. A factory, not a pre-built instance, since the
+   *   context-bound `IssueTagger` is rebuilt per call. Defaults to an
+   *   `IssueTagger` built from the bundle's `context` and `issueClient`.
    * @param {number} [deps.pollIntervalMs] - `waitNext`'s poll interval,
    *   overridable for tests (defaults to the shell script's real 5s
    *   `sleep 5`).
@@ -73,24 +68,21 @@ class AutoFixAllQueue {
    *   implementation, overridable for tests (defaults to a real
    *   `setTimeout`-based sleep).
    */
-  constructor({
+  constructor(repoContext, {
     lock = new Lock(),
     queueStore = new QueueStore(),
-    origin = new Origin(),
-    githubToken = new GithubToken(),
-    fetchFn = fetch,
-    timeoutMs,
-    issueTaggerFactory = (context) => new IssueTagger({
-      context,
-      issueClient: new IssueClient({ context, fetchFn, timeoutMs })
+    repoContextFactory = new RepoContextFactory(),
+    issueTaggerFactory = (bundle) => new IssueTagger({
+      context: bundle.context,
+      issueClient: bundle.issueClient
     }),
     pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
     sleepFn = defaultSleep
   } = {}) {
+    this._repoContext = repoContext;
     this._lock = lock;
     this._queueStore = queueStore;
-    this._origin = origin;
-    this._githubToken = githubToken;
+    this._repoContextFactory = repoContextFactory;
     this._issueTaggerFactory = issueTaggerFactory;
     this._pollIntervalMs = pollIntervalMs;
     this._sleep = sleepFn;
@@ -108,7 +100,6 @@ class AutoFixAllQueue {
    * sequence must land on stdout in that exact order, including when a
    * later step throws (`dispatch()` only prints a returned string on
    * success, never partial output from a rejected promise).
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {...string} ids - the ids to save, in order.
    * @returns {Promise<void>} resolves once the queue is written and the
    *   best-effort label mutation has finished.
@@ -118,51 +109,43 @@ class AutoFixAllQueue {
    *   code 1 when the repo's origin/GitHub token can't be resolved —
    *   see `IssueTagger#markEnqueued`'s doc comment.
    */
-  async save(repoPath, ...ids) {
+  async save(...ids) {
     if (ids.length === 0) {
       throw new Error('Error: save requires at least one ID');
     }
 
-    await this._queueStore.write(repoPath, ids.map((id) => ({ id })));
+    await this._queueStore.write(this._repoContext.repoPath, ids.map((id) => ({ id })));
 
     process.stdout.write(`Queue saved: ${ids.join(' ')}\n`);
 
-    await this._issueTagger(repoPath).markEnqueued(ids);
+    await this._issueTagger().markEnqueued(ids);
   }
 
   /**
-   * Build a per-call `IssueTagger`, wrapping `repoPath` (plus the shared
-   * `origin`/`githubToken`) into a fresh `RepoContext` — mirroring
-   * `AutoFixAllGithub#_issueTagger`'s own per-call context construction,
-   * since a context-bound `IssueTagger` can't be a constructor-level
-   * shared singleton once `repoPath` varies call to call. Building the
-   * `RepoContext` itself is synchronous and doesn't resolve `origin`/
-   * `token` — the actual resolution only happens once `#markEnqueued` is
-   * called, so moving the context-building call earlier (before
-   * `save`/`push`'s own stdout confirmation line) doesn't change when a
+   * Build a per-call `IssueTagger` by handing the `issueTaggerFactory` a
+   * `RepoContextFactory` bundle wrapping the injected `RepoContext` (it
+   * reads `.context`/`.issueClient` off it) — mirroring
+   * `AutoFixAllGithub#_issueTagger`. The bundle is cheap, zero-I/O
+   * construction and doesn't resolve `origin`/`token` — the actual
+   * resolution only happens once `#markEnqueued` is called — so building
+   * it per call has no meaningful cost and doesn't change when a
    * resolution failure can occur.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @returns {IssueTagger} the per-call `IssueTagger` delegate.
    */
-  _issueTagger(repoPath) {
-    const context = new RepoContext({
-      repoPath,
-      origin: this._origin,
-      githubToken: this._githubToken
-    });
-
-    return this._issueTaggerFactory(context);
+  _issueTagger() {
+    return this._issueTaggerFactory(
+      this._repoContextFactory.buildFromContext(this._repoContext)
+    );
   }
 
   /**
    * Native implementation of `queue_next_shell.sh`: prints the first
    * entry's id without removing it. Not lock-guarded (read-only).
-   * @param {string} repoPath - the target repo's local checkout path.
    * @returns {Promise<string>} `<id>\n`, or `\n` (empty id) when the
    *   queue is empty/absent.
    */
-  async next(repoPath) {
-    const queue = await this._queueStore.read(repoPath);
+  async next() {
+    const queue = await this._queueStore.read(this._repoContext.repoPath);
     const id = queue.length > 0 ? queue[0].id : '';
 
     return `${id}\n`;
@@ -172,15 +155,14 @@ class AutoFixAllQueue {
    * Native implementation of `queue_wait_next_shell.sh`: like `next`,
    * but if the queue is empty, polls every `pollIntervalMs` (instead of
    * returning empty) until it isn't.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @returns {Promise<string>} `<id>\n`, once the queue is non-empty.
    */
-  async waitNext(repoPath) {
-    let queue = await this._queueStore.read(repoPath);
+  async waitNext() {
+    let queue = await this._queueStore.read(this._repoContext.repoPath);
 
     while (queue.length === 0) {
       await this._sleep(this._pollIntervalMs);
-      queue = await this._queueStore.read(repoPath);
+      queue = await this._queueStore.read(this._repoContext.repoPath);
     }
 
     return `${queue[0].id}\n`;
@@ -191,7 +173,6 @@ class AutoFixAllQueue {
    * of the given ids to the end of the queue, then best-effort tags the
    * affected issues as enqueued. Writes directly to `process.stdout` —
    * see `#save`'s doc comment for why.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {...string} ids - the ids to push, in order.
    * @returns {Promise<void>} resolves once the queue is written and the
    *   best-effort label mutation has finished.
@@ -201,43 +182,45 @@ class AutoFixAllQueue {
    *   code 1 when the repo's origin/GitHub token can't be resolved —
    *   see `IssueTagger#markEnqueued`'s doc comment.
    */
-  async push(repoPath, ...ids) {
+  async push(...ids) {
     if (ids.length === 0) {
       throw new Error('Error: push requires at least one ID');
     }
 
-    const lockFile = this._queueStore.lockFile(repoPath);
+    const lockFile = this._queueStore.lockFile(this._repoContext.repoPath);
 
     await this._lock.acquire(lockFile);
 
     try {
-      const queue = await this._queueStore.read(repoPath);
+      const queue = await this._queueStore.read(this._repoContext.repoPath);
 
-      await this._queueStore.write(repoPath, [...queue, ...ids.map((id) => ({ id }))]);
+      await this._queueStore.write(
+        this._repoContext.repoPath,
+        [...queue, ...ids.map((id) => ({ id }))]
+      );
     } finally {
       await this._lock.release(lockFile);
     }
 
     process.stdout.write(`Pushed: ${ids.join(' ')}\n`);
 
-    await this._issueTagger(repoPath).markEnqueued(ids);
+    await this._issueTagger().markEnqueued(ids);
   }
 
   /**
    * Native implementation of `queue_pop_shell.sh`: lock-guarded removal
    * of the first entry (marks the current issue as done). No stdout.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @returns {Promise<void>} resolves once the entry is removed.
    */
-  async pop(repoPath) {
-    const lockFile = this._queueStore.lockFile(repoPath);
+  async pop() {
+    const lockFile = this._queueStore.lockFile(this._repoContext.repoPath);
 
     await this._lock.acquire(lockFile);
 
     try {
-      const queue = await this._queueStore.read(repoPath);
+      const queue = await this._queueStore.read(this._repoContext.repoPath);
 
-      await this._queueStore.write(repoPath, queue.slice(1));
+      await this._queueStore.write(this._repoContext.repoPath, queue.slice(1));
     } finally {
       await this._lock.release(lockFile);
     }
@@ -245,14 +228,13 @@ class AutoFixAllQueue {
 
   /**
    * Native implementation of `queue_empty_shell.sh`.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @returns {Promise<void>} resolves (no stdout) when the queue has
    *   zero entries.
    * @throws {DispatchFailure} with an empty stdout payload and exit
    *   code 1 when the queue has one or more entries.
    */
-  async empty(repoPath) {
-    const queue = await this._queueStore.read(repoPath);
+  async empty() {
+    const queue = await this._queueStore.read(this._repoContext.repoPath);
 
     if (queue.length === 0) {
       return;
@@ -264,12 +246,11 @@ class AutoFixAllQueue {
   /**
    * Native implementation of `queue_list_shell.sh`: prints every
    * remaining id, one per line.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @returns {Promise<string>} `<id>\n<id>\n...` for a non-empty queue,
    *   or `(empty)\n` when the queue has zero entries.
    */
-  async list(repoPath) {
-    const queue = await this._queueStore.read(repoPath);
+  async list() {
+    const queue = await this._queueStore.read(this._repoContext.repoPath);
 
     if (queue.length === 0) {
       return '(empty)\n';
