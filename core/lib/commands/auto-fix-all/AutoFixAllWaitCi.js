@@ -1,7 +1,7 @@
-import PrChecker from '../services/PrChecker.js';
-import PrOperations from '../utils/github/PrOperations.js';
-import RepoConfig from '../utils/config/RepoConfig.js';
-import RepoContextFactory from '../context/RepoContextFactory.js';
+import PrChecker from '../../services/PrChecker.js';
+import PrOperations from '../../utils/github/PrOperations.js';
+import RepoConfig from '../../utils/config/RepoConfig.js';
+import RepoContextFactory from '../../context/RepoContextFactory.js';
 
 const DEFAULT_TIMEOUT_MS = 30000;
 const DEFAULT_POLL_INTERVAL_MS = 5000;

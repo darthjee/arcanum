@@ -1,8 +1,8 @@
 import { execFile } from 'node:child_process';
 import { readFile as defaultReadFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import IssueClient from '../utils/github/IssueClient.js';
-import { resolveInstallPath } from '../utils/file/InstallRoot.js';
+import IssueClient from '../../utils/github/IssueClient.js';
+import { resolveInstallPath } from '../../utils/file/InstallRoot.js';
 
 const defaultExecFileAsync = promisify(execFile);
 const DEFAULT_TIMEOUT_MS = 30000;

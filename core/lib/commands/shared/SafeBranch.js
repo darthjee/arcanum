@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import RepoConfig from '../utils/config/RepoConfig.js';
+import RepoConfig from '../../utils/config/RepoConfig.js';
 
 const defaultExecFileAsync = promisify(execFile);
 

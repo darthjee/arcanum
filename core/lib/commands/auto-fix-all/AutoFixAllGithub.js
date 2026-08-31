@@ -1,9 +1,9 @@
-import BranchCleanup from '../utils/git/BranchCleanup.js';
-import DispatchFailure from '../utils/errors/DispatchFailure.js';
-import IssueTagger from '../utils/issue/IssueTagger.js';
-import PrOperations from '../utils/github/PrOperations.js';
-import RepoContextFactory from '../context/RepoContextFactory.js';
-import TagMutationService from '../services/TagMutationService.js';
+import BranchCleanup from '../../utils/git/BranchCleanup.js';
+import DispatchFailure from '../../utils/errors/DispatchFailure.js';
+import IssueTagger from '../../utils/issue/IssueTagger.js';
+import PrOperations from '../../utils/github/PrOperations.js';
+import RepoContextFactory from '../../context/RepoContextFactory.js';
+import TagMutationService from '../../services/TagMutationService.js';
 
 /**
  * Native equivalent of `auto-fix-all/scripts/github.sh`'s 7 GitHub-facing

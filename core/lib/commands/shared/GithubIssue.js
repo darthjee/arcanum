@@ -1,16 +1,16 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import RepoContext from '../context/RepoContext.js';
-import IssueClient from '../utils/github/IssueClient.js';
-import IssueStateService from '../services/IssueStateService.js';
-import GithubToken from '../utils/github/GithubToken.js';
-import IssueStatePaths from '../utils/file/IssueStatePaths.js';
-import Lock from '../utils/file/Lock.js';
-import Origin from '../utils/git/Origin.js';
-import JsonParser from '../utils/json/JsonParser.js';
-import JsonReader from '../utils/json/JsonReader.js';
-import JsonValueFormatter from '../utils/json/JsonValueFormatter.js';
-import Tags from '../utils/issue/Tags.js';
+import RepoContext from '../../context/RepoContext.js';
+import IssueClient from '../../utils/github/IssueClient.js';
+import IssueStateService from '../../services/IssueStateService.js';
+import GithubToken from '../../utils/github/GithubToken.js';
+import IssueStatePaths from '../../utils/file/IssueStatePaths.js';
+import Lock from '../../utils/file/Lock.js';
+import Origin from '../../utils/git/Origin.js';
+import JsonParser from '../../utils/json/JsonParser.js';
+import JsonReader from '../../utils/json/JsonReader.js';
+import JsonValueFormatter from '../../utils/json/JsonValueFormatter.js';
+import Tags from '../../utils/issue/Tags.js';
 
 const DEFAULT_TIMEOUT_MS = 30000;
 const ISSUES_DIR = 'docs/agents/issues';

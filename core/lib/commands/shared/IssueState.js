@@ -1,10 +1,10 @@
 import { mkdir } from 'node:fs/promises';
-import IssueStateService from '../services/IssueStateService.js';
-import IssueStatePaths from '../utils/file/IssueStatePaths.js';
-import Lock from '../utils/file/Lock.js';
-import JsonParser from '../utils/json/JsonParser.js';
-import JsonReader from '../utils/json/JsonReader.js';
-import JsonValueFormatter from '../utils/json/JsonValueFormatter.js';
+import IssueStateService from '../../services/IssueStateService.js';
+import IssueStatePaths from '../../utils/file/IssueStatePaths.js';
+import Lock from '../../utils/file/Lock.js';
+import JsonParser from '../../utils/json/JsonParser.js';
+import JsonReader from '../../utils/json/JsonReader.js';
+import JsonValueFormatter from '../../utils/json/JsonValueFormatter.js';
 
 const USAGE_MESSAGE = [
   'Usage: issue_state.sh <repo_path> get <id> <field>',

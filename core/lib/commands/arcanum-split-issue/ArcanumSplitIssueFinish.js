@@ -2,8 +2,8 @@ import { execFile } from 'node:child_process';
 import { readdir, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import { resolveInstallPath } from '../utils/file/InstallRoot.js';
-import SafeBranch from './SafeBranch.js';
+import { resolveInstallPath } from '../../utils/file/InstallRoot.js';
+import SafeBranch from '../shared/SafeBranch.js';
 
 const defaultExecFileAsync = promisify(execFile);
 const USAGE = 'Usage: finish.sh <repo_path> <issue_id>';

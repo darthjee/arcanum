@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import DispatchFailure from '../utils/errors/DispatchFailure.js';
+import DispatchFailure from '../../utils/errors/DispatchFailure.js';
 
 const defaultExecFileAsync = promisify(execFile);
 const USAGE = 'Usage: checkout_from_main.sh <repo_path> <id>';

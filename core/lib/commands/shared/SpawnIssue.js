@@ -2,9 +2,9 @@ import { execFile } from 'node:child_process';
 import { access, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import DispatchFailure from '../utils/errors/DispatchFailure.js';
-import IssueLinker from '../utils/issue/IssueLinker.js';
-import LabelApplicator from '../utils/issue/LabelApplicator.js';
+import DispatchFailure from '../../utils/errors/DispatchFailure.js';
+import IssueLinker from '../../utils/issue/IssueLinker.js';
+import LabelApplicator from '../../utils/issue/LabelApplicator.js';
 
 const defaultExecFileAsync = promisify(execFile);
 const USAGE = 'Usage: spawn-issue <repo_path> <parent_id> <title> <body_file> [--as-subissue]';

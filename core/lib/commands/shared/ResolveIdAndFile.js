@@ -1,4 +1,4 @@
-import IssueFile from '../utils/file/IssueFile.js';
+import IssueFile from '../../utils/file/IssueFile.js';
 
 const ARG_PATTERN = /^#([^\s]+)(.*)$/;
 const NUMERIC_ID_PATTERN = /^[0-9]+$/;

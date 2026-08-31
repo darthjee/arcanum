@@ -1,8 +1,8 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import DispatchFailure from '../utils/errors/DispatchFailure.js';
-import SpawnIssue from './SpawnIssue.js';
+import DispatchFailure from '../../utils/errors/DispatchFailure.js';
+import SpawnIssue from '../shared/SpawnIssue.js';
 
 const USAGE = 'Usage: create_sub_issue.sh <repo_path> <issue_id> <sub_issue_file>';
 const AS_SUBISSUE_FLAG = '--as-subissue';

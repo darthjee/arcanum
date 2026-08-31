@@ -1,8 +1,8 @@
-import DispatchFailure from '../utils/errors/DispatchFailure.js';
-import IssueTagger from '../utils/issue/IssueTagger.js';
-import Lock from '../utils/file/Lock.js';
-import QueueStore from '../utils/queue/QueueStore.js';
-import RepoContextFactory from '../context/RepoContextFactory.js';
+import DispatchFailure from '../../utils/errors/DispatchFailure.js';
+import IssueTagger from '../../utils/issue/IssueTagger.js';
+import Lock from '../../utils/file/Lock.js';
+import QueueStore from '../../utils/queue/QueueStore.js';
+import RepoContextFactory from '../../context/RepoContextFactory.js';
 
 const DEFAULT_POLL_INTERVAL_MS = 5000;
 

@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import Lock from '../utils/file/Lock.js';
+import Lock from '../../utils/file/Lock.js';
 
 /**
  * Native equivalent of `arcanum/_lib/permission_grant_shell.sh`'s CLI

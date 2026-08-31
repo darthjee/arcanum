@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import DispatchFailure from '../utils/errors/DispatchFailure.js';
-import Lock from '../utils/file/Lock.js';
+import DispatchFailure from '../../utils/errors/DispatchFailure.js';
+import Lock from '../../utils/file/Lock.js';
 
 const NAMESPACE = 'auto-fix-all';
 const STATE_KEYS = new Set(['clear_context', 'finish_on_empty_queue']);
