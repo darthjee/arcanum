@@ -1,7 +1,7 @@
-import AutoFixAllReplyComment from '../../../lib/commands/AutoFixAllReplyComment.js';
-import { resolveInstallPath } from '../../../lib/utils/file/InstallRoot.js';
-import { createRepoContextMock } from '../../support/factories/repoContextFactory.js';
-import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
+import AutoFixAllReplyComment from '../../../../lib/commands/auto-fix-all/AutoFixAllReplyComment.js';
+import { resolveInstallPath } from '../../../../lib/utils/file/InstallRoot.js';
+import { createRepoContextMock } from '../../../support/factories/repoContextFactory.js';
+import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 const USAGE = 'Usage: reply_comment.sh <repo_path> <id> <agent> <model_name> <model_email> <reply_body>';
 const ID = '999';

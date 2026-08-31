@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import IssueState from '../../../lib/commands/IssueState.js';
-import RepoContext from '../../../lib/context/RepoContext.js';
-import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
+import IssueState from '../../../../lib/commands/shared/IssueState.js';
+import RepoContext from '../../../../lib/context/RepoContext.js';
+import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 const USAGE_SNIPPET = 'Usage: issue_state.sh <repo_path> get <id> <field>';
 

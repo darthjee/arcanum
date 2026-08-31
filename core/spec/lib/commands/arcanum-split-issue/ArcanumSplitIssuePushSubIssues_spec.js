@@ -1,8 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import ArcanumSplitIssuePushSubIssues from '../../../lib/commands/ArcanumSplitIssuePushSubIssues.js';
-import DispatchFailure from '../../../lib/utils/errors/DispatchFailure.js';
-import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
+import ArcanumSplitIssuePushSubIssues from '../../../../lib/commands/arcanum-split-issue/ArcanumSplitIssuePushSubIssues.js';
+import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
+import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 const ISSUE_ID = '999';
 const USAGE = 'Usage: push_sub_issues.sh <repo_path> <issue_id>';

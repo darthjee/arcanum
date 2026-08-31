@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import ArcanumSplitIssueCreateSubIssueFile from '../../../lib/commands/ArcanumSplitIssueCreateSubIssueFile.js';
-import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
+import ArcanumSplitIssueCreateSubIssueFile from '../../../../lib/commands/arcanum-split-issue/ArcanumSplitIssueCreateSubIssueFile.js';
+import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 const ISSUE_ID = '999';
 const ISSUES_DIR = 'docs/agents/issues';

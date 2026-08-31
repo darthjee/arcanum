@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import path from 'node:path';
-import ArcanumUpdateRunUpdate from '../../../lib/commands/ArcanumUpdateRunUpdate.js';
-import DispatchFailure from '../../../lib/utils/errors/DispatchFailure.js';
+import ArcanumUpdateRunUpdate from '../../../../lib/commands/arcanum-update/ArcanumUpdateRunUpdate.js';
+import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
 
 const REPO_PATH = '/repo/path';
 const BOOTSTRAP_PATH = path.join(REPO_PATH, 'arcanum', 'update', 'bootstrap.sh');

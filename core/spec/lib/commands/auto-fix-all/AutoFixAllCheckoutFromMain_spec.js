@@ -2,9 +2,9 @@ import { execFile } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import AutoFixAllCheckoutFromMain from '../../../lib/commands/AutoFixAllCheckoutFromMain.js';
-import DispatchFailure from '../../../lib/utils/errors/DispatchFailure.js';
-import { createGitFixtureRepo } from '../../support/utils/gitFixtureRepo.js';
+import AutoFixAllCheckoutFromMain from '../../../../lib/commands/auto-fix-all/AutoFixAllCheckoutFromMain.js';
+import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
+import { createGitFixtureRepo } from '../../../support/utils/gitFixtureRepo.js';
 
 const execFileAsync = promisify(execFile);
 

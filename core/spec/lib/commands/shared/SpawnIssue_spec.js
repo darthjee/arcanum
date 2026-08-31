@@ -1,9 +1,9 @@
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import DispatchFailure from '../../../lib/utils/errors/DispatchFailure.js';
-import RepoContext from '../../../lib/context/RepoContext.js';
-import SpawnIssue from '../../../lib/commands/SpawnIssue.js';
-import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
+import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
+import RepoContext from '../../../../lib/context/RepoContext.js';
+import SpawnIssue from '../../../../lib/commands/shared/SpawnIssue.js';
+import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 const REPO_REF = 'darthjee/arcanum';
 const DOMAIN = 'github.com';

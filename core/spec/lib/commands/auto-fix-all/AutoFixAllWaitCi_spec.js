@@ -1,6 +1,6 @@
-import AutoFixAllWaitCi from '../../../lib/commands/AutoFixAllWaitCi.js';
-import RepoContext from '../../../lib/context/RepoContext.js';
-import RepoContextFactory from '../../../lib/context/RepoContextFactory.js';
+import AutoFixAllWaitCi from '../../../../lib/commands/auto-fix-all/AutoFixAllWaitCi.js';
+import RepoContext from '../../../../lib/context/RepoContext.js';
+import RepoContextFactory from '../../../../lib/context/RepoContextFactory.js';
 
 const REPO_PATH = '/repo/path';
 const REPO = 'darthjee/arcanum';

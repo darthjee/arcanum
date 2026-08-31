@@ -1,4 +1,4 @@
-import AutoFixAllWaitCiAndMerge from '../../../lib/commands/AutoFixAllWaitCiAndMerge.js';
+import AutoFixAllWaitCiAndMerge from '../../../../lib/commands/auto-fix-all/AutoFixAllWaitCiAndMerge.js';
 
 const REPO_PATH = '/repo/path';
 const MODEL_EMAIL = 'model@example.com';

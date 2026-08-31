@@ -1,4 +1,4 @@
-import DispatchFixture from '../../../lib/commands/DispatchFixture.js';
+import DispatchFixture from '../../../../lib/commands/shared/DispatchFixture.js';
 
 describe('DispatchFixture', () => {
   let fixture;

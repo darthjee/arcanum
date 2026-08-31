@@ -1,7 +1,7 @@
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import AutoFixAllCleanupArtifacts from '../../../lib/commands/AutoFixAllCleanupArtifacts.js';
-import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
+import AutoFixAllCleanupArtifacts from '../../../../lib/commands/auto-fix-all/AutoFixAllCleanupArtifacts.js';
+import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 const ISSUE_FILE = 'docs/agents/issues/999-test.md';
 const PLAN_DIR = 'docs/agents/plans/999-test';

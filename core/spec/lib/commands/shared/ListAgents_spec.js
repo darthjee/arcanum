@@ -1,8 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import ListAgents from '../../../lib/commands/ListAgents.js';
-import RepoContext from '../../../lib/context/RepoContext.js';
-import { createGitFixtureRepo } from '../../support/utils/gitFixtureRepo.js';
+import ListAgents from '../../../../lib/commands/shared/ListAgents.js';
+import RepoContext from '../../../../lib/context/RepoContext.js';
+import { createGitFixtureRepo } from '../../../support/utils/gitFixtureRepo.js';
 
 /**
  * @param {string} dir - the directory to write the agent file into.

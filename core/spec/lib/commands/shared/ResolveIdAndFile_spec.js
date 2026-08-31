@@ -1,8 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import RepoContext from '../../../lib/context/RepoContext.js';
-import ResolveIdAndFile from '../../../lib/commands/ResolveIdAndFile.js';
-import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
+import RepoContext from '../../../../lib/context/RepoContext.js';
+import ResolveIdAndFile from '../../../../lib/commands/shared/ResolveIdAndFile.js';
+import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 describe('ResolveIdAndFile', () => {
   let repoPath;

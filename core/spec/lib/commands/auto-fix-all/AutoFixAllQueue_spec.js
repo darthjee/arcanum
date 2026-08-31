@@ -1,13 +1,13 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import AutoFixAllQueue from '../../../lib/commands/AutoFixAllQueue.js';
-import DispatchFailure from '../../../lib/utils/errors/DispatchFailure.js';
-import Lock from '../../../lib/utils/file/Lock.js';
-import RepoContext from '../../../lib/context/RepoContext.js';
-import RepoContextFactory from '../../../lib/context/RepoContextFactory.js';
-import { captureStdout } from '../../support/utils/captureStdout.js';
-import { fakeFetch } from '../../support/utils/fakeFetch.js';
-import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
+import AutoFixAllQueue from '../../../../lib/commands/auto-fix-all/AutoFixAllQueue.js';
+import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
+import Lock from '../../../../lib/utils/file/Lock.js';
+import RepoContext from '../../../../lib/context/RepoContext.js';
+import RepoContextFactory from '../../../../lib/context/RepoContextFactory.js';
+import { captureStdout } from '../../../support/utils/captureStdout.js';
+import { fakeFetch } from '../../../support/utils/fakeFetch.js';
+import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 const REPO = 'darthjee/arcanum';
 const TOKEN = 'fake-token';

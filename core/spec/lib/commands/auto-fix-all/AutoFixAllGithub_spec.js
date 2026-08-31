@@ -1,8 +1,8 @@
-import AutoFixAllGithub from '../../../lib/commands/AutoFixAllGithub.js';
-import BranchCleanup from '../../../lib/utils/git/BranchCleanup.js';
-import DispatchFailure from '../../../lib/utils/errors/DispatchFailure.js';
-import RepoContext from '../../../lib/context/RepoContext.js';
-import RepoContextFactory from '../../../lib/context/RepoContextFactory.js';
+import AutoFixAllGithub from '../../../../lib/commands/auto-fix-all/AutoFixAllGithub.js';
+import BranchCleanup from '../../../../lib/utils/git/BranchCleanup.js';
+import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
+import RepoContext from '../../../../lib/context/RepoContext.js';
+import RepoContextFactory from '../../../../lib/context/RepoContextFactory.js';
 
 const REPO = 'darthjee/arcanum';
 const TOKEN = 'fake-token';

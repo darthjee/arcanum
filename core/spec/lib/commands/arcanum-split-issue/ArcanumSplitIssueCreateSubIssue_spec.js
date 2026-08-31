@@ -1,9 +1,9 @@
 import { access, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import ArcanumSplitIssueCreateSubIssue from '../../../lib/commands/ArcanumSplitIssueCreateSubIssue.js';
-import RepoContext from '../../../lib/context/RepoContext.js';
-import DispatchFailure from '../../../lib/utils/errors/DispatchFailure.js';
-import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
+import ArcanumSplitIssueCreateSubIssue from '../../../../lib/commands/arcanum-split-issue/ArcanumSplitIssueCreateSubIssue.js';
+import RepoContext from '../../../../lib/context/RepoContext.js';
+import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
+import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 const ISSUE_ID = '999';
 const USAGE = 'Usage: create_sub_issue.sh <repo_path> <issue_id> <sub_issue_file>';
