@@ -180,6 +180,12 @@ export const COMMANDS = {
   // InvocationLog#record runs and is awaited before the command's own
   // (crashing) module is invoked, so logging survives a crash. See
   // docs/agents/plans/244-add-logs-to-native-nodejs-calls/node.md.
+  // As of #342 this entry backs only the process-level crash-survival
+  // proof in core/spec/bin/arcanum_spec.js, which spawns the real
+  // bin/arcanum binary and has no mocking seam. dispatcher_spec.js's
+  // unit-level crash-survival tests were decoupled from it — they now
+  // anchor on auto-fix-all-config-get plus a mocked commandInstance() —
+  // so do not reintroduce a unit-level dependency on this entry.
   'dispatch-fixture-crash': { module: 'commands/shared/DispatchFixture.js', method: 'crash' },
   'github-issue-create': {
     module: 'commands/shared/GithubIssue.js',
