@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import ArcanumSplitIssueFinish from '../../../../lib/commands/arcanum-split-issue/ArcanumSplitIssueFinish.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
-const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
+const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..');
 
 const ISSUE_ID = '999';
 const ISSUES_DIR = 'docs/agents/issues';

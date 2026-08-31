@@ -5,7 +5,7 @@ import GithubIssue from '../../../../lib/commands/shared/GithubIssue.js';
 import RepoContext from '../../../../lib/context/RepoContext.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
-const fixturesDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'support', 'fixtures');
+const fixturesDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'support', 'fixtures');
 
 /**
  * @param {string} name - the fixture file's name.
