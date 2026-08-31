@@ -28,8 +28,8 @@
  *     `ClaudeContext` built from the leading anchor argument; that leading
  *     argument is stripped from the method args. Only `permission-grant-add`.
  *   - `'none'` / absent — `new ModuleClass()`, method args untouched. Applies
- *     to `dispatch-fixture`, `dispatch-fixture-crash`, `auto-fix-all-config-*`,
- *     and `arcanum-update-run-update-*`.
+ *     to `dispatch-fixture-crash`, `auto-fix-all-config-*`, and
+ *     `arcanum-update-run-update-*`.
  * @property {boolean} [validateRepoPath] - defaults to `true` for
  *   `context: 'repo'`; set `false` to skip the Dispatcher-level
  *   `RepoContext#validate()` (e.g. entries with their own not-a-repo error
@@ -175,7 +175,6 @@ export const COMMANDS = {
     method: 'run',
     context: 'repo'
   },
-  'dispatch-fixture': { module: 'commands/shared/DispatchFixture.js', method: 'run', log: false },
   // dispatch-fixture-crash is deliberately left logged (entry.log
   // !== false, the default) — it exists specifically to prove that
   // InvocationLog#record runs and is awaited before the command's own

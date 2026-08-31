@@ -77,16 +77,6 @@ async function readFileIfExists(filePath) {
 }
 
 describe('bin/arcanum', () => {
-  describe('a known command (dispatch-fixture)', () => {
-    it('routes to DispatchFixture and prints its success output on stdout only', async () => {
-      const { stdout, stderr, code } = await runArcanum(['dispatch-fixture']);
-
-      expect(stdout).toEqual('dispatch-fixture: ok\n');
-      expect(stderr).toEqual('');
-      expect(code).toEqual(0);
-    });
-  });
-
   describe('a known command that crashes (dispatch-fixture-crash)', () => {
     it('exits non-zero and prints nothing to stdout, with no fallback output', async () => {
       const { stdout, code } = await runArcanum(['dispatch-fixture-crash']);
@@ -121,20 +111,6 @@ describe('bin/arcanum', () => {
     afterEach(async () => {
       await repo.cleanup();
       await removeTempDir(logDir);
-    });
-
-    describe('a dev/proof command excluded from logging (dispatch-fixture)', () => {
-      it('leaves the log file untouched even with engine.log.location configured', async () => {
-        await configureLogLocation(repo.repoPath, logDir);
-
-        const { stdout, code } = await runArcanum(['dispatch-fixture'], {
-          ARCANUM_REPO_PATH: repo.repoPath
-        });
-
-        expect(stdout).toEqual('dispatch-fixture: ok\n');
-        expect(code).toEqual(0);
-        expect(await readFileIfExists(logFilePath(logDir, repo.repoPath))).toBeNull();
-      });
     });
 
     describe('a real migrated command (list-agents) with engine.log.location configured', () => {

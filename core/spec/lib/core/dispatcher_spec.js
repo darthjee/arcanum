@@ -1,3 +1,5 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import Dispatcher from '../../../lib/core/dispatcher.js';
 import RepoContext from '../../../lib/context/RepoContext.js';
 import ClaudeContext from '../../../lib/context/ClaudeContext.js';
@@ -23,25 +25,36 @@ function fakeInvocationLog(events) {
 }
 
 describe('Dispatcher', () => {
-  describe('context: \'none\' path (dispatch-fixture)', () => {
+  describe('context: \'none\' path (auto-fix-all-config-get)', () => {
+    let repoPath;
     let dispatcher;
 
-    beforeEach(() => {
-      dispatcher = new Dispatcher('dispatch-fixture', ['/would/blow/up', 'x']);
+    beforeEach(async () => {
+      repoPath = await createTempDir('arcanum-core-dispatcher-spec-none-');
+      await mkdir(path.join(repoPath, '.claude', 'configuration'), { recursive: true });
+      await writeFile(
+        path.join(repoPath, '.claude', 'configuration', 'arcanum-repo-config.json'),
+        JSON.stringify({ 'auto-fix-all': { auto_merge: true } })
+      );
+      dispatcher = new Dispatcher('auto-fix-all-config-get', [repoPath, 'auto_merge']);
+    });
+
+    afterEach(async () => {
+      await removeTempDir(repoPath);
     });
 
     it('constructs the module with no RepoContext argument', async () => {
       const instance = await dispatcher.commandInstance();
 
-      expect(instance.constructor.name).toEqual('DispatchFixture');
+      expect(instance.constructor.name).toEqual('AutoFixAllConfig');
     });
 
     it('returns args unchanged from commandArgs()', () => {
-      expect(dispatcher.commandArgs()).toEqual(['/would/blow/up', 'x']);
+      expect(dispatcher.commandArgs()).toEqual([repoPath, 'auto_merge']);
     });
 
     it('returns the command method result from dispatch()', async () => {
-      expect(await dispatcher.dispatch()).toEqual('dispatch-fixture: ok\n');
+      expect(await dispatcher.dispatch()).toEqual('true\n');
     });
 
     it('never constructs a RepoContext', async () => {
@@ -152,15 +165,6 @@ describe('Dispatcher', () => {
       await expectAsync(dispatcher.dispatch()).toBeRejected();
 
       expect(invocationLog.record).toHaveBeenCalledWith('dispatch-fixture-crash');
-    });
-
-    it('does not record when the entry sets log: false', async () => {
-      const invocationLog = { record: jasmine.createSpy('record').and.resolveTo(undefined) };
-      const dispatcher = new Dispatcher('dispatch-fixture', [], { invocationLog });
-
-      await dispatcher.dispatch();
-
-      expect(invocationLog.record).not.toHaveBeenCalled();
     });
   });
 

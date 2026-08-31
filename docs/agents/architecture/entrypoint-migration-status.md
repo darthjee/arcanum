@@ -43,7 +43,6 @@ One row per entry point tracked in [`arcanum/_lib/migration-status.json`](../../
 | `checkout-safe-branch` | Yes | #230 |
 | `discuss-issue-confirm` | No | #230 |
 | `discuss-issue-render-issue` | No | #230 |
-| `dispatch-fixture` | Yes | #192 |
 | `dispatch-fixture-crash` | Yes | #192 |
 | `github-issue` | No | #230 |
 | `github-issue-create` | Yes | #237 |

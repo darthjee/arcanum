@@ -1,21 +1,14 @@
 /**
- * Throwaway-turned-permanent fixture module proving `core/bin/arcanum`'s
- * command routing and the shell/native dispatch guard's output/exit-code
- * parity contract end to end (see
- * docs/agents/architecture/script-engine.md). Kept as reusable scaffolding
- * for future dispatcher-related tests, the same way
- * `core/spec/support/fixtures/` is kept — not deleted once #192 lands.
+ * Fixture module backing the `dispatch-fixture-crash` command, which proves
+ * that `core/bin/arcanum`'s dispatch guard fails loud (no shell fallback)
+ * when a native implementation exists but crashes (see
+ * docs/agents/architecture/script-engine.md). The shell/native dispatch
+ * parity proof itself is anchored on the real `auto-fix-all-config-get`
+ * command instead (see
+ * docs/agents/plans/340-investigate-removing-dispatch-fixture---dispatch-fixture-crash/plan.md's
+ * "Shared contracts").
  */
 class DispatchFixture {
-  /**
-   * Produce the fixture's success output. Must stay byte-identical to
-   * scripter's shell-side `dispatch-fixture` fixture's stdout.
-   * @returns {string} the exact line to print to stdout, trailing newline included.
-   */
-  run() {
-    return 'dispatch-fixture: ok\n';
-  }
-
   /**
    * Simulate a native-side crash/bug, so the dispatch guard's
    * "native implementation exists but crashes -> fails loud, no
