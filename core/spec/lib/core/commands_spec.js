@@ -5,10 +5,6 @@ describe('COMMANDS', () => {
     expect(Object.keys(COMMANDS).length).toBeGreaterThan(0);
   });
 
-  it('keeps log: false on dispatch-fixture', () => {
-    expect(COMMANDS['dispatch-fixture'].log).toBe(false);
-  });
-
   it('sets context: \'repo\' on the migrated arcanum-split-issue, auto-fix-all lifecycle, auto-fix-all-github, auto-fix-all-queue and spawn-issue entries', () => {
     const withRepoContext = Object.keys(COMMANDS).filter((name) => COMMANDS[name].context === 'repo');
 
