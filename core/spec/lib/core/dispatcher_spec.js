@@ -136,35 +136,46 @@ describe('Dispatcher', () => {
     });
   });
 
+  // These unit-level crash-survival proofs anchor on the already-registered
+  // real context: 'none' command auto-fix-all-config-get plus a mocked
+  // commandInstance() that returns a synthetic instance whose entry method
+  // throws — standing in for a real crash. Since commandInstance()/
+  // entryMethod() are plain registry lookups, no command module actually has
+  // to crash here, so this no longer depends on dispatch-fixture-crash /
+  // DispatchFixture.js (see #342). The process-level proof in
+  // core/spec/bin/arcanum_spec.js still needs the real crashing fixture.
   describe('InvocationLog recording', () => {
     it('awaits record() before importing the command module', async () => {
       const events = [];
-      const dispatcher = new Dispatcher('dispatch-fixture-crash', [], {
+      const dispatcher = new Dispatcher('auto-fix-all-config-get', [], {
         invocationLog: fakeInvocationLog(events)
       });
-      const original = dispatcher.commandInstance.bind(dispatcher);
 
       spyOn(dispatcher, 'commandInstance').and.callFake(async () => {
         events.push('command-instance');
-        return original();
+        return { [dispatcher.entryMethod()]: () => { throw new Error('simulated crash'); } };
       });
 
       await expectAsync(dispatcher.dispatch()).toBeRejected();
 
       expect(events).toEqual([
-        'record-start:dispatch-fixture-crash',
-        'record-end:dispatch-fixture-crash',
+        'record-start:auto-fix-all-config-get',
+        'record-end:auto-fix-all-config-get',
         'command-instance'
       ]);
     });
 
     it('records a crashing command before it crashes', async () => {
       const invocationLog = { record: jasmine.createSpy('record').and.resolveTo(undefined) };
-      const dispatcher = new Dispatcher('dispatch-fixture-crash', [], { invocationLog });
+      const dispatcher = new Dispatcher('auto-fix-all-config-get', [], { invocationLog });
+
+      spyOn(dispatcher, 'commandInstance').and.resolveTo({
+        [dispatcher.entryMethod()]: () => { throw new Error('simulated crash'); }
+      });
 
       await expectAsync(dispatcher.dispatch()).toBeRejected();
 
-      expect(invocationLog.record).toHaveBeenCalledWith('dispatch-fixture-crash');
+      expect(invocationLog.record).toHaveBeenCalledWith('auto-fix-all-config-get');
     });
   });
 
