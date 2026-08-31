@@ -6,7 +6,7 @@
 /**
  * @typedef {object} CommandEntry
  * @property {string} module - path to the implementing module, relative to
- *   `core/lib/` (e.g. `commands/SpawnIssue.js`).
+ *   `core/lib/` (e.g. `commands/shared/SpawnIssue.js`).
  * @property {string} method - method to invoke on the module's default export.
  * @property {boolean} [log] - `false` to skip `InvocationLog` recording for
  *   this command; any other value (or absent) means the invocation is logged.
@@ -45,179 +45,179 @@
  */
 export const COMMANDS = {
   'arcanum-split-issue-create-sub-issue': {
-    module: 'commands/ArcanumSplitIssueCreateSubIssue.js',
+    module: 'commands/arcanum-split-issue/ArcanumSplitIssueCreateSubIssue.js',
     method: 'run',
     context: 'repo'
   },
   'arcanum-split-issue-create-sub-issue-file': {
-    module: 'commands/ArcanumSplitIssueCreateSubIssueFile.js',
+    module: 'commands/arcanum-split-issue/ArcanumSplitIssueCreateSubIssueFile.js',
     method: 'run',
     context: 'repo'
   },
   'arcanum-split-issue-finish': {
-    module: 'commands/ArcanumSplitIssueFinish.js',
+    module: 'commands/arcanum-split-issue/ArcanumSplitIssueFinish.js',
     method: 'run',
     context: 'repo'
   },
   'arcanum-split-issue-push-sub-issues': {
-    module: 'commands/ArcanumSplitIssuePushSubIssues.js',
+    module: 'commands/arcanum-split-issue/ArcanumSplitIssuePushSubIssues.js',
     method: 'run',
     context: 'repo'
   },
-  'arcanum-update-run-update-check': { module: 'commands/ArcanumUpdateRunUpdate.js', method: 'check' },
-  'arcanum-update-run-update-apply': { module: 'commands/ArcanumUpdateRunUpdate.js', method: 'apply' },
+  'arcanum-update-run-update-check': { module: 'commands/arcanum-update/ArcanumUpdateRunUpdate.js', method: 'check' },
+  'arcanum-update-run-update-apply': { module: 'commands/arcanum-update/ArcanumUpdateRunUpdate.js', method: 'apply' },
   'auto-fix-all-checkout-from-main': {
-    module: 'commands/AutoFixAllCheckoutFromMain.js',
+    module: 'commands/auto-fix-all/AutoFixAllCheckoutFromMain.js',
     method: 'run',
     context: 'repo'
   },
   'auto-fix-all-cleanup-artifacts': {
-    module: 'commands/AutoFixAllCleanupArtifacts.js',
+    module: 'commands/auto-fix-all/AutoFixAllCleanupArtifacts.js',
     method: 'run',
     context: 'repo'
   },
-  'auto-fix-all-config-get': { module: 'commands/AutoFixAllConfig.js', method: 'get' },
-  'auto-fix-all-config-is-enabled': { module: 'commands/AutoFixAllConfig.js', method: 'isEnabled' },
-  'auto-fix-all-config-set': { module: 'commands/AutoFixAllConfig.js', method: 'set' },
-  'auto-fix-all-config-toggle': { module: 'commands/AutoFixAllConfig.js', method: 'toggle' },
+  'auto-fix-all-config-get': { module: 'commands/auto-fix-all/AutoFixAllConfig.js', method: 'get' },
+  'auto-fix-all-config-is-enabled': { module: 'commands/auto-fix-all/AutoFixAllConfig.js', method: 'isEnabled' },
+  'auto-fix-all-config-set': { module: 'commands/auto-fix-all/AutoFixAllConfig.js', method: 'set' },
+  'auto-fix-all-config-toggle': { module: 'commands/auto-fix-all/AutoFixAllConfig.js', method: 'toggle' },
   'auto-fix-all-github-add-tag': {
-    module: 'commands/AutoFixAllGithub.js',
+    module: 'commands/auto-fix-all/AutoFixAllGithub.js',
     method: 'addTag',
     context: 'repo'
   },
   'auto-fix-all-github-cleanup-branch': {
-    module: 'commands/AutoFixAllGithub.js',
+    module: 'commands/auto-fix-all/AutoFixAllGithub.js',
     method: 'cleanupBranch',
     context: 'repo'
   },
   'auto-fix-all-github-has-shipit-label': {
-    module: 'commands/AutoFixAllGithub.js',
+    module: 'commands/auto-fix-all/AutoFixAllGithub.js',
     method: 'hasShipitLabel',
     context: 'repo'
   },
   'auto-fix-all-github-pr-merge': {
-    module: 'commands/AutoFixAllGithub.js',
+    module: 'commands/auto-fix-all/AutoFixAllGithub.js',
     method: 'prMerge',
     context: 'repo'
   },
   'auto-fix-all-github-pr-number': {
-    module: 'commands/AutoFixAllGithub.js',
+    module: 'commands/auto-fix-all/AutoFixAllGithub.js',
     method: 'prNumber',
     context: 'repo'
   },
   'auto-fix-all-github-pr-state': {
-    module: 'commands/AutoFixAllGithub.js',
+    module: 'commands/auto-fix-all/AutoFixAllGithub.js',
     method: 'prState',
     context: 'repo'
   },
   'auto-fix-all-github-remove-tag': {
-    module: 'commands/AutoFixAllGithub.js',
+    module: 'commands/auto-fix-all/AutoFixAllGithub.js',
     method: 'removeTag',
     context: 'repo'
   },
   'auto-fix-all-queue-empty': {
-    module: 'commands/AutoFixAllQueue.js',
+    module: 'commands/auto-fix-all/AutoFixAllQueue.js',
     method: 'empty',
     context: 'repo',
     validateRepoPath: false
   },
   'auto-fix-all-queue-list': {
-    module: 'commands/AutoFixAllQueue.js',
+    module: 'commands/auto-fix-all/AutoFixAllQueue.js',
     method: 'list',
     context: 'repo',
     validateRepoPath: false
   },
   'auto-fix-all-queue-next': {
-    module: 'commands/AutoFixAllQueue.js',
+    module: 'commands/auto-fix-all/AutoFixAllQueue.js',
     method: 'next',
     context: 'repo',
     validateRepoPath: false
   },
   'auto-fix-all-queue-pop': {
-    module: 'commands/AutoFixAllQueue.js',
+    module: 'commands/auto-fix-all/AutoFixAllQueue.js',
     method: 'pop',
     context: 'repo',
     validateRepoPath: false
   },
   'auto-fix-all-queue-push': {
-    module: 'commands/AutoFixAllQueue.js',
+    module: 'commands/auto-fix-all/AutoFixAllQueue.js',
     method: 'push',
     context: 'repo'
   },
   'auto-fix-all-queue-save': {
-    module: 'commands/AutoFixAllQueue.js',
+    module: 'commands/auto-fix-all/AutoFixAllQueue.js',
     method: 'save',
     context: 'repo'
   },
   'auto-fix-all-queue-wait-next': {
-    module: 'commands/AutoFixAllQueue.js',
+    module: 'commands/auto-fix-all/AutoFixAllQueue.js',
     method: 'waitNext',
     context: 'repo',
     validateRepoPath: false
   },
   'auto-fix-all-reply-comment': {
-    module: 'commands/AutoFixAllReplyComment.js',
+    module: 'commands/auto-fix-all/AutoFixAllReplyComment.js',
     method: 'run',
     context: 'repo'
   },
   'auto-fix-all-wait-ci': {
-    module: 'commands/AutoFixAllWaitCi.js',
+    module: 'commands/auto-fix-all/AutoFixAllWaitCi.js',
     method: 'run',
     context: 'repo'
   },
   'auto-fix-all-wait-ci-and-merge': {
-    module: 'commands/AutoFixAllWaitCiAndMerge.js',
+    module: 'commands/auto-fix-all/AutoFixAllWaitCiAndMerge.js',
     method: 'run',
     context: 'repo'
   },
   'checkout-safe-branch': {
-    module: 'commands/SafeBranch.js',
+    module: 'commands/shared/SafeBranch.js',
     method: 'run',
     context: 'repo'
   },
-  'dispatch-fixture': { module: 'commands/DispatchFixture.js', method: 'run', log: false },
+  'dispatch-fixture': { module: 'commands/shared/DispatchFixture.js', method: 'run', log: false },
   // dispatch-fixture-crash is deliberately left logged (entry.log
   // !== false, the default) — it exists specifically to prove that
   // InvocationLog#record runs and is awaited before the command's own
   // (crashing) module is invoked, so logging survives a crash. See
   // docs/agents/plans/244-add-logs-to-native-nodejs-calls/node.md.
-  'dispatch-fixture-crash': { module: 'commands/DispatchFixture.js', method: 'crash' },
+  'dispatch-fixture-crash': { module: 'commands/shared/DispatchFixture.js', method: 'crash' },
   'github-issue-create': {
-    module: 'commands/GithubIssue.js',
+    module: 'commands/shared/GithubIssue.js',
     method: 'create',
     context: 'repo'
   },
   'github-issue-info': {
-    module: 'commands/GithubIssue.js',
+    module: 'commands/shared/GithubIssue.js',
     method: 'info',
     context: 'repo',
     validateRepoPath: false
   },
   'issue-state': {
-    module: 'commands/IssueState.js',
+    module: 'commands/shared/IssueState.js',
     method: 'run',
     context: 'repo'
   },
   'list-agents': {
-    module: 'commands/ListAgents.js',
+    module: 'commands/shared/ListAgents.js',
     method: 'run',
     context: 'repo'
   },
-  'permission-grant-add': { module: 'commands/PermissionGrant.js', method: 'add', context: 'claude' },
+  'permission-grant-add': { module: 'commands/shared/PermissionGrant.js', method: 'add', context: 'claude' },
   'resolve-and-fetch': {
-    module: 'commands/ResolveAndFetch.js',
+    module: 'commands/shared/ResolveAndFetch.js',
     method: 'run',
     context: 'repo'
   },
   'resolve-id-and-file': {
-    module: 'commands/ResolveIdAndFile.js',
+    module: 'commands/shared/ResolveIdAndFile.js',
     method: 'run',
     context: 'repo'
   },
   'resolve-plan-paths': {
-    module: 'commands/ResolvePlanPaths.js',
+    module: 'commands/shared/ResolvePlanPaths.js',
     method: 'run',
     context: 'repo'
   },
-  'spawn-issue': { module: 'commands/SpawnIssue.js', method: 'run', context: 'repo' }
+  'spawn-issue': { module: 'commands/shared/SpawnIssue.js', method: 'run', context: 'repo' }
 };

@@ -1,5 +1,5 @@
 import ConfigChain from '../utils/config/ConfigChain.js';
-import GithubIssue from '../commands/GithubIssue.js';
+import GithubIssue from '../commands/shared/GithubIssue.js';
 import GithubToken from '../utils/github/GithubToken.js';
 import IssueStateService from '../services/IssueStateService.js';
 import Origin from '../utils/git/Origin.js';
