@@ -52,9 +52,7 @@ export default class Dispatcher {
       throw new Error(`unknown command '${this.command}'`);
     }
 
-    if (this.entry.log !== false) {
-      await this._invocationLog.record(this.command);
-    }
+    await this._invocationLog.record(this.command);
 
     if (this.entry.context === 'repo' && this.entry.validateRepoPath !== false) {
       await this.repoContext.validate();

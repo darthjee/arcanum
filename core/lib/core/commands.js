@@ -8,8 +8,6 @@
  * @property {string} module - path to the implementing module, relative to
  *   `core/lib/` (e.g. `commands/shared/SpawnIssue.js`).
  * @property {string} method - method to invoke on the module's default export.
- * @property {boolean} [log] - `false` to skip `InvocationLog` recording for
- *   this command; any other value (or absent) means the invocation is logged.
  * @property {'repo'|'claude'|'none'} [context] - how the dispatcher builds the
  *   module instance from the leading argument (absent ≡ `'none'`):
  *   - `'repo'` — `new ModuleClass(repoContext)` where `repoContext` is a
@@ -175,10 +173,10 @@ export const COMMANDS = {
     method: 'run',
     context: 'repo'
   },
-  // dispatch-fixture-crash is deliberately left logged (entry.log
-  // !== false, the default) — it exists specifically to prove that
-  // InvocationLog#record runs and is awaited before the command's own
-  // (crashing) module is invoked, so logging survives a crash. See
+  // dispatch-fixture-crash is logged like every other command — it
+  // exists specifically to prove that InvocationLog#record runs and is
+  // awaited before the command's own (crashing) module is invoked, so
+  // logging survives a crash. See
   // docs/agents/plans/244-add-logs-to-native-nodejs-calls/node.md.
   // As of #342 this entry backs only the process-level crash-survival
   // proof in core/spec/bin/arcanum_spec.js, which spawns the real
