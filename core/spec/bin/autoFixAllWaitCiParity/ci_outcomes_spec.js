@@ -22,7 +22,7 @@ import { FAKE_FETCH_PRELOAD, NATIVE_BIN, runCommand } from '../../support/utils/
 // real one. See preconditions_spec.js for the precondition/validation
 // failure scenarios, and engine_dispatch_spec.js for the real
 // wait_ci.sh shim routing tests.
-describe('auto-fix-all-wait-ci parity (shell vs. native)', () => {
+describe('auto-fix-all-wait-ci parity (shell vs. native) — ci outcomes', () => {
   describe('a passing PR', () => {
     it('matches shell exit code and "passed\\n" stdout', async () => {
       const fakeGh = await createFakeGhBin();

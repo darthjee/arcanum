@@ -20,7 +20,7 @@ import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
 // pull request found for the current branch. See ci_outcomes_spec.js
 // for the passing/failing/ignored-pattern CI-outcome scenarios, and
 // engine_dispatch_spec.js for the real wait_ci.sh shim routing tests.
-describe('auto-fix-all-wait-ci parity (shell vs. native)', () => {
+describe('auto-fix-all-wait-ci parity (shell vs. native) — preconditions', () => {
   describe('a missing required argument', () => {
     it('matches shell exit code and stdout', async () => {
       const cwd = await createTempDir('arcanum-core-afawc-parity-');

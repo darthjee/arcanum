@@ -31,7 +31,7 @@ async function seedEngineMode(repo, mode) {
 // output-parity scenarios (both bypass the engine_dispatch shim, running
 // wait_ci_shell.sh directly). This file instead exercises the real
 // wait_ci.sh engine_dispatch shim itself.
-describe('auto-fix-all-wait-ci parity (shell vs. native)', () => {
+describe('auto-fix-all-wait-ci parity (shell vs. native) — engine_dispatch', () => {
   // Exercises the real auto-fix-all/scripts/wait_ci.sh engine_dispatch
   // shim from node/01 (unlike every scenario above, which bypasses it
   // and compares the two implementations directly) — proving
