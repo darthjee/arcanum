@@ -31,7 +31,7 @@ scripts/queue.sh wait-next "$REPO_PATH"
 
 Call this id `<id>`. Spawn:
 
-> Agent(subagent_type: "architect", prompt: "Read steps/process_one_issue.md (resolved relative to the `auto-fix-all` skill folder) and follow it for issue <id>. REPO_PATH: <resolved_path>. Report OUTCOME=merged, OUTCOME=closed PR_NUMBER=<n>, or OUTCOME=blocked AGENT=<agent-name> ACTION=<description>.")
+> Agent(subagent_type: "architect", prompt: "Read steps/process_one_issue.md (resolved relative to the `auto-fix-all` skill folder) and follow it for issue <id>. REPO_PATH: <resolved_path>. Report OUTCOME=merged, OUTCOME=closed PR_NUMBER=<n>, OUTCOME=blocked AGENT=<agent-name> ACTION=<description>, or OUTCOME=pending PR_NUMBER=<n>.")
 
 Wait for the agent to finish, then parse `OUTCOME` from its report, and proceed to Step 3.
 
@@ -88,6 +88,10 @@ This is the other point in the pipeline where you ask the user something — a s
 - **Skip** — `scripts/queue.sh pop "$REPO_PATH"`, then go back to Step 2, same as the `closed` branch's skip option above.
 
 Deliberately no "do it yourself" option here — that would recreate the exact behavior this outcome exists to prevent. If it's ever wanted, it should be a separate, explicit decision made in the open by a human, not a default silently offered right back on every block.
+
+### `OUTCOME=pending PR_NUMBER=<n>`
+
+The PR isn't at a terminal state yet — nothing to do until it is. Do **not** pop the queue (the id stays at the front, still in progress). Call `ScheduleWakeup(delaySeconds=300, prompt="/auto-fix-all", reason="waiting for PR #<n> to reach a terminal state")` and stop. (Requires `auto-fix-all` to have been invoked via `/loop /auto-fix-all <ids>`, same as the existing `clear_context` wakeup — flag this clearly instead of silently doing nothing if it wasn't.) The next wakeup re-invokes `/auto-fix-all` fresh with no arguments, which re-reads the queue (Step 1's "no arguments" branch) and spawns a brand-new `architect` agent for the same id at Step 2 — `process_one_issue.md`'s existing idempotent guards (branch reuse in `checkout_from_main.sh`, "plan already exists" skip, PR already exists) let it fast-forward straight back to "Monitor the PR" with no wasted rework, then perform one more one-shot check.
 
 ## Step 4 — Done
 

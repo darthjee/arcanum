@@ -18,7 +18,13 @@ or
 OUTCOME=blocked AGENT=<agent-name> ACTION=<description>
 ```
 
-You have no `ScheduleWakeup` and no `AskUserQuestion` — the coordinator that spawned you handles clearing context between issues, asking the user what to do about a closed PR, and asking the user what to do about a blocked specialist dispatch. Everything else (implementation, PR comments, CI failures, the pre-approval shortcut) is yours to handle autonomously, exactly as before.
+or
+
+```
+OUTCOME=pending PR_NUMBER=<n>
+```
+
+You have no `ScheduleWakeup` and no `AskUserQuestion` — the coordinator that spawned you handles clearing context between issues, asking the user what to do about a closed PR, asking the user what to do about a blocked specialist dispatch, and rescheduling itself when the PR is still pending a terminal state. Everything else (implementation, PR comments, CI failures, the pre-approval shortcut) is yours to handle autonomously, exactly as before.
 
 Your invocation prompt also carries `REPO_PATH` (the target project's root, resolved once by the coordinator before spawning you) — thread it through explicitly as the leading argument to every script call below that resolves the GitHub repo, and pass it along unchanged into every nested `steps/run.md` you read directly (never re-resolve it from `pwd`).
 
@@ -81,9 +87,21 @@ scripts/github.sh has-shipit-label "$REPO_PATH" <id>
 
 ## Monitor the PR
 
-Block on the monitor step:
+Run one bounded check:
 
-Read [../../auto-monitor-issue-pr/steps/run.md](../../auto-monitor-issue-pr/steps/run.md) and follow it for `<id>`, carrying `REPO_PATH` forward unchanged. It resolves the PR for the current branch and **blocks** — looping internally (5s sleep, retries silently on transient errors) until the PR is merged, closed, approved, or the owner posts a new comment — then reports the outcome. The first output line is `merged`, `closed`, `approved`, or `commented`.
+Read [../../auto-monitor-issue-pr/steps/run.md](../../auto-monitor-issue-pr/steps/run.md) and follow it for `<id>`, carrying `REPO_PATH` forward unchanged. It resolves the PR for the current branch and performs exactly one bounded check — no blocking, no internal loop — then reports the outcome. The first output line is `pending`, `merged`, `closed`, `approved`, or `commented`.
+
+### If `pending`
+
+Nothing terminal happened this pass, and you (the architect) have no `ScheduleWakeup` to reschedule yourself. Resolve `<pr_number>` first:
+
+```bash
+scripts/github.sh pr-number "$REPO_PATH"
+```
+
+> Resolve `scripts/github.sh` relative to the `auto-fix-all` skill folder.
+
+Stop processing this issue immediately and report `OUTCOME=pending PR_NUMBER=<pr_number>` at the top level — do not loop or retry internally, and do not go back to "Monitor the PR" yourself. The coordinator that spawned you owns rescheduling.
 
 ### If `merged`
 

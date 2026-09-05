@@ -7,9 +7,12 @@
 # absent or empty) or reads/writes the `pr_comments` and `last_comment_time`
 # fields inside .claude/state/issue-<id>.json (when <id> is non-empty).
 #
-# Blocking loop (5s sleep) that polls `gh pr view --json state,comments,reviews`
-# plus the inline review comments API, retrying silently on transient gh
-# errors. When --issue-id is provided the comments-state is a JSON object
+# Single-pass check that polls `gh pr view --json state,comments,reviews`
+# plus the inline review comments API. When neither a terminal state nor a
+# new owner comment is found (including on a transient gh error), the script
+# prints "pending" and exits 0 -- the caller is expected to re-invoke this
+# script later to check again, rather than the script blocking/retrying
+# internally. When --issue-id is provided the comments-state is a JSON object
 # `{"pr_comments":[{id,user,url,state,emojis}],"last_comment_time":<ISO8601>}`
 # tracking each owner comment's three-state lifecycle:
 #   fetched    – comment seen and recorded; reaction not yet added
@@ -47,7 +50,8 @@
 #       3. print "commented" followed by each new comment as a
 #          "---"-preceded block of "id: <id>", "url: <url>", then the body,
 #          exit 0
-#   - otherwise sleep 5s and loop
+#   - otherwise (nothing new found this pass, or a transient gh error)
+#     print "pending", exit 0 -- the caller re-invokes later to check again
 
 set -euo pipefail
 
@@ -152,101 +156,100 @@ if [[ -n "$open_ids" ]]; then
   save_comments_state "$comments_state"
 fi
 
-while true; do
-  push_current_branch 2>/dev/null || true
+push_current_branch 2>/dev/null || true
 
-  pr_data=$(gh pr view "$PR_NUMBER" -R "$REPO_REF" --json state,comments,reviews 2>/dev/null) || {
-    sleep 5
-    continue
-  }
+pr_data=$(gh pr view "$PR_NUMBER" -R "$REPO_REF" --json state,comments,reviews 2>/dev/null) || {
+  echo "pending"
+  exit 0
+}
 
-  state=$(echo "$pr_data" | jq -r '.state' 2>/dev/null) || { sleep 5; continue; }
+state=$(echo "$pr_data" | jq -r '.state' 2>/dev/null) || { echo "pending"; exit 0; }
 
-  if [[ "$state" == "MERGED" ]]; then
-    if [[ -n "$ISSUE_ID" ]]; then
-      rm -f ".claude/state/issue-${ISSUE_ID}.json"
-    else
-      rm -f "$COMMENTS_FILE"
-    fi
-    echo "merged"
-    exit 0
+if [[ "$state" == "MERGED" ]]; then
+  if [[ -n "$ISSUE_ID" ]]; then
+    rm -f ".claude/state/issue-${ISSUE_ID}.json"
+  else
+    rm -f "$COMMENTS_FILE"
   fi
+  echo "merged"
+  exit 0
+fi
 
-  if [[ "$state" == "CLOSED" ]]; then
-    echo "closed"
-    exit 0
-  fi
+if [[ "$state" == "CLOSED" ]]; then
+  echo "closed"
+  exit 0
+fi
 
-  # Check approval: only the LATEST review from the owner counts
-  latest_review_state=$(echo "$pr_data" | jq -r \
-    --arg owner "$PR_OWNER" \
-    '[.reviews[] | select(.author.login == $owner)] | sort_by(.submittedAt) | last | .state' \
-    2>/dev/null) || { sleep 5; continue; }
+# Check approval: only the LATEST review from the owner counts
+latest_review_state=$(echo "$pr_data" | jq -r \
+  --arg owner "$PR_OWNER" \
+  '[.reviews[] | select(.author.login == $owner)] | sort_by(.submittedAt) | last | .state' \
+  2>/dev/null) || { echo "pending"; exit 0; }
 
-  if [[ "$latest_review_state" == "APPROVED" ]]; then
+if [[ "$latest_review_state" == "APPROVED" ]]; then
+  echo "approved"
+  exit 0
+fi
+
+# Fetch inline review comments (different endpoint, different field names)
+review_comments=$(gh api "repos/${REPO_REF}/pulls/${PR_NUMBER}/comments" 2>/dev/null) || {
+  echo "pending"
+  exit 0
+}
+
+# Normalize all sources to {login, createdAt, body, id, url}. The "id" is
+# a GraphQL node id (reactable via addReaction/removeReaction regardless
+# of comment type), already present in each of these responses.
+all_comments=$(jq -n \
+  --argjson conv "$pr_data" \
+  --argjson inline "$review_comments" \
+  '[$conv.comments[] | {login: .author.login, createdAt: .createdAt, body: .body, id: .id, url: .url}] +
+   [$inline[] | {login: .user.login, createdAt: .created_at, body: .body, id: .node_id, url: .html_url}] +
+   [$conv.reviews[] | select(.body != null and (.body | gsub("[[:space:]]"; "") != "")) | {login: .author.login, createdAt: .submittedAt, body: .body, id: .id, url: .url}]' \
+  2>/dev/null) || { echo "pending"; exit 0; }
+
+last_time=$(echo "$comments_state" | jq -r '.last_comment_time // "1970-01-01T00:00:00Z"')
+
+new_comments=$(echo "$all_comments" | jq \
+  --arg owner "$PR_OWNER" \
+  --arg since "$last_time" \
+  '[.[] | select(.login == $owner and .createdAt > $since)]' \
+  2>/dev/null) || { echo "pending"; exit 0; }
+
+count=$(echo "$new_comments" | jq 'length' 2>/dev/null) || { echo "pending"; exit 0; }
+
+if [[ "$count" -gt 0 ]]; then
+  latest_time=$(echo "$new_comments" | jq -r '[.[].createdAt] | max' 2>/dev/null) || { echo "pending"; exit 0; }
+
+  shipit_count=$(echo "$new_comments" | jq \
+    '[.[] | select(.body | test("^[[:space:]]*:shipit:[[:space:]]*$"))] | length' \
+    2>/dev/null) || { echo "pending"; exit 0; }
+
+  if [[ "$shipit_count" -gt 0 ]]; then
     echo "approved"
     exit 0
   fi
 
-  # Fetch inline review comments (different endpoint, different field names)
-  review_comments=$(gh api "repos/${REPO_REF}/pulls/${PR_NUMBER}/comments" 2>/dev/null) || {
-    sleep 5
-    continue
-  }
+  # Phase 1 — write fetched (crash-recovery checkpoint)
+  comments_state=$(load_comments_state)
+  comments_state=$(jq -n --argjson state "$comments_state" --argjson new "$new_comments" --arg latest "$latest_time" \
+    '{pr_comments: (($state.pr_comments // []) + [$new[] | {id, user: .login, url, state: "fetched", emojis: []}]), last_comment_time: $latest}')
+  save_comments_state "$comments_state"
 
-  # Normalize all sources to {login, createdAt, body, id, url}. The "id" is
-  # a GraphQL node id (reactable via addReaction/removeReaction regardless
-  # of comment type), already present in each of these responses.
-  all_comments=$(jq -n \
-    --argjson conv "$pr_data" \
-    --argjson inline "$review_comments" \
-    '[$conv.comments[] | {login: .author.login, createdAt: .createdAt, body: .body, id: .id, url: .url}] +
-     [$inline[] | {login: .user.login, createdAt: .created_at, body: .body, id: .node_id, url: .html_url}] +
-     [$conv.reviews[] | select(.body != null and (.body | gsub("[[:space:]]"; "") != "")) | {login: .author.login, createdAt: .submittedAt, body: .body, id: .id, url: .url}]' \
-    2>/dev/null) || { sleep 5; continue; }
+  # Phase 2 — add reactions and update to processing
+  new_ids=$(echo "$new_comments" | jq -r '.[].id')
+  while IFS= read -r node_id; do
+    [[ -n "$node_id" ]] || continue
+    add_reaction "$node_id" EYES
+  done <<< "$new_ids"
+  comments_state=$(echo "$comments_state" | jq '.pr_comments |= map(if .state == "fetched" then (.state = "processing" | .emojis = [":eyes:"]) else . end)')
+  save_comments_state "$comments_state"
 
-  last_time=$(echo "$comments_state" | jq -r '.last_comment_time // "1970-01-01T00:00:00Z"')
+  # Phase 3 — print output and exit
+  echo "commented"
+  echo "$new_comments" | jq -r '.[] | "---\nid: " + .id + "\nurl: " + .url + "\n" + .body'
+  exit 0
+fi
 
-  new_comments=$(echo "$all_comments" | jq \
-    --arg owner "$PR_OWNER" \
-    --arg since "$last_time" \
-    '[.[] | select(.login == $owner and .createdAt > $since)]' \
-    2>/dev/null) || { sleep 5; continue; }
-
-  count=$(echo "$new_comments" | jq 'length' 2>/dev/null) || { sleep 5; continue; }
-
-  if [[ "$count" -gt 0 ]]; then
-    latest_time=$(echo "$new_comments" | jq -r '[.[].createdAt] | max' 2>/dev/null) || { sleep 5; continue; }
-
-    shipit_count=$(echo "$new_comments" | jq \
-      '[.[] | select(.body | test("^[[:space:]]*:shipit:[[:space:]]*$"))] | length' \
-      2>/dev/null) || { sleep 5; continue; }
-
-    if [[ "$shipit_count" -gt 0 ]]; then
-      echo "approved"
-      exit 0
-    fi
-
-    # Phase 1 — write fetched (crash-recovery checkpoint)
-    comments_state=$(load_comments_state)
-    comments_state=$(jq -n --argjson state "$comments_state" --argjson new "$new_comments" --arg latest "$latest_time" \
-      '{pr_comments: (($state.pr_comments // []) + [$new[] | {id, user: .login, url, state: "fetched", emojis: []}]), last_comment_time: $latest}')
-    save_comments_state "$comments_state"
-
-    # Phase 2 — add reactions and update to processing
-    new_ids=$(echo "$new_comments" | jq -r '.[].id')
-    while IFS= read -r node_id; do
-      [[ -n "$node_id" ]] || continue
-      add_reaction "$node_id" EYES
-    done <<< "$new_ids"
-    comments_state=$(echo "$comments_state" | jq '.pr_comments |= map(if .state == "fetched" then (.state = "processing" | .emojis = [":eyes:"]) else . end)')
-    save_comments_state "$comments_state"
-
-    # Phase 3 — print output and exit
-    echo "commented"
-    echo "$new_comments" | jq -r '.[] | "---\nid: " + .id + "\nurl: " + .url + "\n" + .body'
-    exit 0
-  fi
-
-  sleep 5
-done
+echo "pending"
+exit 0
