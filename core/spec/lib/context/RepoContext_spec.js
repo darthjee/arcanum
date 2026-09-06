@@ -10,7 +10,7 @@ describe('RepoContext', () => {
       githubToken: { get: jasmine.createSpy() },
       issueStateService: { get: jasmine.createSpy(), appendJson: jasmine.createSpy() },
       configChain: { read: jasmine.createSpy() },
-      githubIssue: { create: jasmine.createSpy() },
+      githubIssueService: { create: jasmine.createSpy() },
       repoPathValidator: { validate: jasmine.createSpy('validate').and.resolveTo(undefined) },
       ...overrides
     });
@@ -109,9 +109,9 @@ describe('RepoContext', () => {
   });
 
   describe('#createIssue', () => {
-    it('delegates to githubIssue.create with repoPath, title, and bodyFile', async () => {
+    it('delegates to githubIssueService.create with repoPath, title, and bodyFile', async () => {
       const create = jasmine.createSpy().and.resolveTo('ID=5\nTITLE=t\nFILE=f\nDOMAIN=github.com\nREPO=a/b\n');
-      const context = newContext({ githubIssue: { create } });
+      const context = newContext({ githubIssueService: { create } });
 
       const result = await context.createIssue('t', 'f');
 
@@ -119,11 +119,11 @@ describe('RepoContext', () => {
       expect(result).toEqual('ID=5\nTITLE=t\nFILE=f\nDOMAIN=github.com\nREPO=a/b\n');
     });
 
-    it('validates first — rejects and never calls githubIssue.create when validation fails', async () => {
+    it('validates first — rejects and never calls githubIssueService.create when validation fails', async () => {
       const validationError = new Error('Error: not a directory: /fake/repo');
       const create = jasmine.createSpy('create');
       const context = newContext({
-        githubIssue: { create },
+        githubIssueService: { create },
         repoPathValidator: { validate: jasmine.createSpy('validate').and.rejectWith(validationError) }
       });
 

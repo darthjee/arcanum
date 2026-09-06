@@ -1,7 +1,7 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import RepoContext from '../../context/RepoContext.js';
-import IssueClient from '../../utils/github/IssueClient.js';
+import GithubIssueService from '../../services/GithubIssueService.js';
 import IssueStateService from '../../services/IssueStateService.js';
 import GithubToken from '../../utils/github/GithubToken.js';
 import IssueStatePaths from '../../utils/file/IssueStatePaths.js';
@@ -50,6 +50,9 @@ class GithubIssue {
    *   `IssueStateService`.
    * @param {IssueStatePaths} [deps.issueStatePaths] - forwarded to each
    *   per-call `IssueStateService`.
+   * @param {GithubIssueService} [deps.githubIssueService] - the
+   *   REST-call-plus-file-write logic shared by `#fetch`/`#create`,
+   *   built from the collaborators above by default.
    */
   constructor(repoContext, {
     origin = new Origin(),
@@ -60,7 +63,8 @@ class GithubIssue {
     jsonParser = new JsonParser(),
     jsonValueFormatter = new JsonValueFormatter(),
     jsonReader = new JsonReader(),
-    issueStatePaths = new IssueStatePaths()
+    issueStatePaths = new IssueStatePaths(),
+    githubIssueService = new GithubIssueService({ origin, githubToken, fetchFn, timeoutMs })
   } = {}) {
     this._repoContext = repoContext;
     this._origin = origin;
@@ -72,6 +76,7 @@ class GithubIssue {
     this._jsonValueFormatter = jsonValueFormatter;
     this._jsonReader = jsonReader;
     this._issueStatePaths = issueStatePaths;
+    this._githubIssueService = githubIssueService;
   }
 
   /**
@@ -84,14 +89,14 @@ class GithubIssue {
    */
   async fetch(repoPath, id) {
     const { domain, repo } = await this._origin.resolve(repoPath);
-    const issue = await this._issueClient(repoPath).getIssue(id);
-    const title = this._rawString(issue.title);
-    const body = this._rawString(issue.body);
-    const state = this._rawString(issue.state);
-    const updatedAt = this._rawString(issue.updated_at);
+    const issue = await this._githubIssueService.issueClient(repoPath).getIssue(id);
+    const title = this._githubIssueService.rawString(issue.title);
+    const body = this._githubIssueService.rawString(issue.body);
+    const state = this._githubIssueService.rawString(issue.state);
+    const updatedAt = this._githubIssueService.rawString(issue.updated_at);
     const labels = (issue.labels || []).map((label) => label.name);
 
-    const normalized = this._normalizeTitle(title);
+    const normalized = this._githubIssueService.normalizeTitle(title);
     const filePath = `${ISSUES_DIR}/${id}-${normalized}.md`;
 
     await mkdir(path.join(repoPath, ISSUES_DIR), { recursive: true });
@@ -162,30 +167,7 @@ class GithubIssue {
       [repoPath, title, file] = [this._repoContext.repoPath, repoPath, title];
     }
 
-    let rawBody;
-
-    try {
-      rawBody = await readFile(file, 'utf8');
-    } catch {
-      throw new Error(`Error: file not found: ${file}`);
-    }
-
-    // $(cat "$file") in bash strips ALL trailing newlines via command
-    // substitution; the shell then re-adds exactly one via `printf '%s\n'`.
-    // Match that exactly, in both the POST payload and the written file —
-    // do not just pass the raw file contents through.
-    const body = rawBody.replace(/\n+$/, '');
-
-    const { domain, repo } = await this._origin.resolve(repoPath);
-    const issue = await this._issueClient(repoPath).createIssue(title, body);
-    const id = this._rawString(issue.number);
-    const normalized = this._normalizeTitle(title);
-    const filePath = `${ISSUES_DIR}/${id}-${normalized}.md`;
-
-    await mkdir(path.join(repoPath, ISSUES_DIR), { recursive: true });
-    await writeFile(path.join(repoPath, filePath), `${body}\n`);
-
-    return `ID=${id}\nTITLE=${title}\nFILE=${filePath}\nDOMAIN=${domain}\nREPO=${repo}\n`;
+    return this._githubIssueService.create(repoPath, title, file);
   }
 
   /**
@@ -206,55 +188,6 @@ class GithubIssue {
       jsonReader: this._jsonReader,
       issueStatePaths: this._issueStatePaths
     });
-  }
-
-  /**
-   * Build a per-call `IssueClient`, wrapping `repoPath` into a fresh
-   * `RepoContext` bound to the shared `origin`/`githubToken` — same
-   * per-call shape as `#_issueStateService`, since `fetch`/`create` are
-   * dispatched with `repoPath` known only once the method is called.
-   * `this._repoContext` (the optional first constructor parameter used
-   * only by the CLI entrypoints) is deliberately not reused here: it is
-   * `undefined` on the collaborator path, and on the CLI path the
-   * builder below already produces an equivalent context.
-   * @param {string} repoPath - the target repo's local checkout path.
-   * @returns {IssueClient} the per-call `IssueClient`.
-   */
-  _issueClient(repoPath) {
-    const context = new RepoContext({
-      repoPath,
-      origin: this._origin,
-      githubToken: this._githubToken
-    });
-
-    return new IssueClient({ context, fetchFn: this._fetch, timeoutMs: this._timeoutMs });
-  }
-
-  /**
-   * Mirrors `jq -r`'s rendering of a possibly-null/absent field: the
-   * literal string `"null"` for a JSON `null` value, the value itself
-   * (stringified) otherwise.
-   * @param {*} value - the raw JSON field value.
-   * @returns {string} the `jq -r`-equivalent string form.
-   */
-  _rawString(value) {
-    return value === null || value === undefined ? 'null' : String(value);
-  }
-
-  /**
-   * Native equivalent of `github_issue.sh`'s `normalize_title`:
-   * lowercase, `[^a-z0-9]` -> `-`, collapse repeats, trim
-   * leading/trailing `-`.
-   * @param {string} title - the raw issue title.
-   * @returns {string} the sanitized filename slug.
-   */
-  _normalizeTitle(title) {
-    return title
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-/, '')
-      .replace(/-$/, '');
   }
 }
 
