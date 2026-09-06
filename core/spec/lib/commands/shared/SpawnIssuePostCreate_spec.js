@@ -19,9 +19,9 @@ describe('SpawnIssue#run (post-create side effects)', () => {
   });
 
   it('applies labels and links back with the resolved repoRef, ids, title, and asSubissue flag', async () => {
-    const githubIssue = { create: jasmine.createSpy('create').and.resolveTo(CREATE_OUTPUT) };
+    const githubIssueService = { create: jasmine.createSpy('create').and.resolveTo(CREATE_OUTPUT) };
     const deps = stubDeps();
-    const spawnIssue = new SpawnIssue(buildContext(repoPath, { githubIssue }), deps);
+    const spawnIssue = new SpawnIssue(buildContext(repoPath, { githubIssueService }), deps);
 
     spyOn(process.stderr, 'write');
 
@@ -32,9 +32,9 @@ describe('SpawnIssue#run (post-create side effects)', () => {
   });
 
   it('links back with asSubissue false when the flag is absent', async () => {
-    const githubIssue = { create: jasmine.createSpy('create').and.resolveTo(CREATE_OUTPUT) };
+    const githubIssueService = { create: jasmine.createSpy('create').and.resolveTo(CREATE_OUTPUT) };
     const deps = stubDeps();
-    const spawnIssue = new SpawnIssue(buildContext(repoPath, { githubIssue }), deps);
+    const spawnIssue = new SpawnIssue(buildContext(repoPath, { githubIssueService }), deps);
 
     spyOn(process.stderr, 'write');
 
@@ -44,7 +44,7 @@ describe('SpawnIssue#run (post-create side effects)', () => {
   });
 
   it('warns with the loud multi-line stderr block but still resolves with STATUS=ok', async () => {
-    const githubIssue = {
+    const githubIssueService = {
       create: jasmine
         .createSpy('create')
         .and.resolveTo(
@@ -55,7 +55,7 @@ describe('SpawnIssue#run (post-create side effects)', () => {
         )
     };
     const deps = stubDeps();
-    const spawnIssue = new SpawnIssue(buildContext(repoPath, { githubIssue }), deps);
+    const spawnIssue = new SpawnIssue(buildContext(repoPath, { githubIssueService }), deps);
 
     spyOn(process.stderr, 'write');
 

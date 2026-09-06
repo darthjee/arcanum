@@ -1,5 +1,5 @@
 import ConfigChain from '../utils/config/ConfigChain.js';
-import GithubIssue from '../commands/shared/GithubIssue.js';
+import GithubIssueService from '../services/GithubIssueService.js';
 import GithubToken from '../utils/github/GithubToken.js';
 import IssueStateService from '../services/IssueStateService.js';
 import Origin from '../utils/git/Origin.js';
@@ -8,8 +8,8 @@ import RepoPath from '../utils/file/RepoPath.js';
 /**
  * Bundles a single repo's `repoPath` with the 5 collaborators
  * `PrOperations` (and friends) resolve it against — `origin`,
- * `githubToken`, `issueStateService`, `configChain`, `githubIssue` — so
- * callers stop threading `repoPath` through every method call
+ * `githubToken`, `issueStateService`, `configChain`, `githubIssueService`
+ * — so callers stop threading `repoPath` through every method call
  * individually. One `RepoContext` is built per call site (`repoPath`
  * differs call to call), wrapping whichever shared collaborator
  * instances the caller already holds.
@@ -32,7 +32,8 @@ class RepoContext {
    * @param {IssueStateService} [deps.issueStateService] - issue
    *   state-file reader/writer, bound to this context.
    * @param {ConfigChain} [deps.configChain] - 3-tier config reader.
-   * @param {GithubIssue} [deps.githubIssue] - GitHub issue creator.
+   * @param {GithubIssueService} [deps.githubIssueService] - GitHub issue
+   *   creator.
    * @param {RepoPath} [deps.repoPathValidator] - `repoPath`
    *   present/directory/git-repo validator (distinct from the
    *   `repoPath` string param).
@@ -43,7 +44,7 @@ class RepoContext {
     githubToken = new GithubToken(),
     issueStateService,
     configChain = new ConfigChain(),
-    githubIssue = new GithubIssue(),
+    githubIssueService = new GithubIssueService(),
     repoPathValidator = new RepoPath()
   } = {}) {
     this.repoPath = repoPath;
@@ -51,7 +52,7 @@ class RepoContext {
     this._githubToken = githubToken;
     this._issueStateService = issueStateService ?? new IssueStateService({ context: this });
     this._configChain = configChain;
-    this._githubIssue = githubIssue;
+    this._githubIssueService = githubIssueService;
     this._repoPathValidator = repoPathValidator;
   }
 
@@ -129,11 +130,11 @@ class RepoContext {
    *   issue's body.
    * @returns {Promise<string>} `this.repoPath`'s newly created issue's
    *   `ID=...\nTITLE=...\nFILE=...\nDOMAIN=...\nREPO=...\n` output —
-   *   see `GithubIssue#create`.
+   *   see `GithubIssueService#create`.
    */
   async createIssue(title, bodyFile) {
     await this.validate();
-    return this._githubIssue.create(this.repoPath, title, bodyFile);
+    return this._githubIssueService.create(this.repoPath, title, bodyFile);
   }
 }
 
