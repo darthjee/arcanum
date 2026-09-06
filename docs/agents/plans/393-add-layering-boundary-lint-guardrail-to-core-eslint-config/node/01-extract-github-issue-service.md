@@ -1,0 +1,16 @@
+# Extract shared GitHub-issue-creation logic into a services/ class
+
+`context/RepoContext.js` currently imports `GithubIssue` from `commands/shared/GithubIssue.js` and default-constructs it as the `githubIssue` collaborator behind `RepoContext#createIssue`, which `commands/shared/SpawnIssue.js` calls. `commands/shared/GithubIssue.js` is a genuine `commands/` module (registered as the `github-issue-fetch`/`github-issue-create`/`github-issue-info` dispatch-table entries in `core/commands.js`), so this is a real reverse-layering violation — `context/` reaching into `commands/` — that step 02's lint rule would immediately fail on.
+
+Extract the REST-call-plus-file-write logic that `GithubIssue#create` needs (and its private helpers `_issueClient`, `_normalizeTitle`, `_rawString`) into a new `services/GithubIssueService.js`, exposing at least a `create(repoPath, title, file)` method with the exact same behavior/return shape as today's `GithubIssue#create`. `commands/shared/GithubIssue.js` keeps its CLI-facing shape (constructor-based `repoContext`/positional-shifting for the `github-issue-create` dispatch entry, `fetch`/`info` methods) but delegates the actual create logic to `GithubIssueService` internally. `context/RepoContext.js` depends on `services/GithubIssueService.js` directly instead of `commands/shared/GithubIssue.js` — update its `githubIssue` constructor default (rename the constructor param/field if it clarifies things, but keep `RepoContext#createIssue`'s public signature unchanged) and its JSDoc `@param` type reference.
+
+Decide during implementation whether `fetch`/`info` also move into the service (for consistency) or stay CLI-only in `GithubIssue.js` — either is fine as long as `context/RepoContext.js` ends up with zero imports from `commands/`.
+
+## Files to Change
+
+- `core/lib/services/GithubIssueService.js` — new. Holds the extracted `create` logic (and helpers) moved out of `commands/shared/GithubIssue.js`.
+- `core/lib/commands/shared/GithubIssue.js` — `create` (and its private helpers, if fully extracted) delegates to `services/GithubIssueService.js` instead of implementing the REST/file-write logic inline. Update the JSDoc on the collaborator-path constructor param and on `RepoContext#createIssue` cross-references.
+- `core/lib/context/RepoContext.js` — import and default-construct `services/GithubIssueService.js` instead of `commands/shared/GithubIssue.js`; update the `deps.githubIssue` JSDoc `@param` type.
+- `core/spec/lib/services/GithubIssueService_spec.js` — new. Covers the extracted service directly (reuse fixtures/stubs from `core/spec/support/factories/githubIssue.js` where they still apply).
+- `core/spec/lib/commands/shared/GithubIssueCreate_spec.js` — update only if the delegation changes anything observable through `GithubIssue#create`'s public behavior (it shouldn't, since this is a pure extraction — same inputs/outputs).
+- `core/spec/lib/context/RepoContext_spec.js` — update the `githubIssue` collaborator's injected stub name/type only if the field/param is renamed; the existing spy-based tests should otherwise keep passing unchanged since they exercise `context.createIssue()` through the injected collaborator, not the concrete class.
