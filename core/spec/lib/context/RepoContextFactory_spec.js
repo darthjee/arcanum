@@ -1,3 +1,4 @@
+import GithubToken from '../../../lib/utils/github/GithubToken.js';
 import RepoContext from '../../../lib/context/RepoContext.js';
 import RepoContextFactory from '../../../lib/context/RepoContextFactory.js';
 
@@ -12,7 +13,6 @@ describe('RepoContextFactory', () => {
         resolve: async () => ({ domain: 'github.com', repo: REPO }),
         resolveWithRef: async () => ({ domain: 'github.com', repo: REPO, repoRef: REPO })
       },
-      githubToken: { get: async () => TOKEN },
       issueStateService: { get: async () => '' },
       configChain: { read: async () => undefined },
       execFileAsync: jasmine.createSpy('execFileAsync').and.resolveTo({ stdout: 'main\n', stderr: '' }),
@@ -36,6 +36,13 @@ describe('RepoContextFactory', () => {
 
       expect(bundle.context).toBeInstanceOf(RepoContext);
       expect(bundle.context.repoPath).toEqual(REPO_PATH);
+    });
+
+    it('yields a context with a working getToken, self-built rather than a shared githubToken', () => {
+      const bundle = newFactory().build(REPO_PATH);
+
+      expect(bundle.context._githubToken).toBeInstanceOf(GithubToken);
+      expect(bundle.context._githubToken._repoContext).toBe(bundle.context);
     });
 
     it('forwards the injected execFileAsync into the returned gitClient', async () => {
@@ -67,8 +74,7 @@ describe('RepoContextFactory', () => {
 
     it('yields a usable context when issueStateService/configChain are omitted', () => {
       const factory = new RepoContextFactory({
-        origin: { resolve: async () => ({}), resolveWithRef: async () => ({}) },
-        githubToken: { get: async () => TOKEN }
+        origin: { resolve: async () => ({}), resolveWithRef: async () => ({}) }
       });
 
       const bundle = factory.build(REPO_PATH);

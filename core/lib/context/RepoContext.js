@@ -28,12 +28,15 @@ class RepoContext {
    * @param {string} deps.repoPath - the target repo's local checkout
    *   path.
    * @param {Origin} [deps.origin] - git-origin resolver.
-   * @param {GithubToken} [deps.githubToken] - GitHub token resolver.
+   * @param {GithubToken} [deps.githubToken] - GitHub token resolver;
+   *   defaults to a `GithubToken` built with `{ repoContext: this }`
+   *   when omitted, so `#getToken` can call `get()` arg-free.
    * @param {IssueStateService} [deps.issueStateService] - issue
    *   state-file reader/writer, bound to this context.
    * @param {ConfigChain} [deps.configChain] - 3-tier config reader.
    * @param {GithubIssueService} [deps.githubIssueService] - GitHub issue
-   *   creator.
+   *   creator; defaults to a `GithubIssueService` built with
+   *   `{ repoContext: this }` when omitted.
    * @param {RepoPath} [deps.repoPathValidator] - `repoPath`
    *   present/directory/git-repo validator (distinct from the
    *   `repoPath` string param).
@@ -41,18 +44,18 @@ class RepoContext {
   constructor({
     repoPath,
     origin = new Origin(),
-    githubToken = new GithubToken(),
+    githubToken,
     issueStateService,
     configChain = new ConfigChain(),
-    githubIssueService = new GithubIssueService(),
+    githubIssueService,
     repoPathValidator = new RepoPath()
   } = {}) {
     this.repoPath = repoPath;
     this._origin = origin;
-    this._githubToken = githubToken;
+    this._githubToken = githubToken ?? new GithubToken({ repoContext: this });
     this._issueStateService = issueStateService ?? new IssueStateService({ context: this });
     this._configChain = configChain;
-    this._githubIssueService = githubIssueService;
+    this._githubIssueService = githubIssueService ?? new GithubIssueService({ repoContext: this });
     this._repoPathValidator = repoPathValidator;
   }
 
@@ -87,10 +90,12 @@ class RepoContext {
 
   /**
    * @returns {Promise<string>} `this.repoPath`'s GitHub token — see
-   *   `GithubToken#get`.
+   *   `GithubToken#get`. Calls `get()` with no argument: the
+   *   self-built (or injected) `GithubToken` already carries this
+   *   context, so it resolves `repoPath` from it.
    */
   async getToken() {
-    return this._githubToken.get(this.repoPath);
+    return this._githubToken.get();
   }
 
   /**
