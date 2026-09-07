@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import ConfigChain from '../../../../lib/utils/config/ConfigChain.js';
+import { createRepoContextMock } from '../../../support/factories/repoContextFactory.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 describe('ConfigChain', () => {
@@ -175,6 +176,35 @@ describe('ConfigChain', () => {
       const configChain = new ConfigChain({ env: { HOME: globalDir } });
 
       await expectAsync(configChain.read(repoPath, 'git', 'merge_body_mode')).toBeResolvedTo('coauthors');
+    });
+
+    it('resolves from a constructor-injected repoContext when repoPath is omitted', async () => {
+      await writeLocalState({ git: { merge_body_mode: 'coauthors' } });
+
+      const repoContext = createRepoContextMock({ repoPath });
+      const configChain = new ConfigChain({ env: { CLAUDE_CONFIG_DIR: globalDir }, repoContext });
+
+      await expectAsync(configChain.read(undefined, 'git', 'merge_body_mode')).toBeResolvedTo('coauthors');
+    });
+
+    it('prefers an explicit per-call repoPath over a constructor-injected repoContext', async () => {
+      const otherRepoPath = await createTempDir();
+
+      try {
+        await writeLocalState({ git: { merge_body_mode: 'coauthors' } });
+        await mkdir(path.join(otherRepoPath, '.claude', 'state'), { recursive: true });
+        await writeFile(
+          path.join(otherRepoPath, '.claude', 'state', 'arcanum-config.json'),
+          JSON.stringify({ git: { merge_body_mode: 'full' } })
+        );
+
+        const repoContext = createRepoContextMock({ repoPath: otherRepoPath });
+        const configChain = new ConfigChain({ env: { CLAUDE_CONFIG_DIR: globalDir }, repoContext });
+
+        await expectAsync(configChain.read(repoPath, 'git', 'merge_body_mode')).toBeResolvedTo('coauthors');
+      } finally {
+        await removeTempDir(otherRepoPath);
+      }
     });
   });
 });
