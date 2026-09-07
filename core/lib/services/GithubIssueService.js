@@ -15,7 +15,10 @@ const ISSUES_DIR = 'docs/agents/issues';
  * `utils` layering, may only depend on `utils/`, so it never builds a
  * `RepoContext` itself; it talks to `Origin`/`GithubToken` directly and
  * hands `IssueClient` a plain object satisfying its `context` shape
- * (`resolveWithRef`/`getToken`) instead.
+ * (`resolveWithRef`/`getToken`) instead. It may optionally accept a
+ * caller-supplied, duck-typed `{ repoPath }` context object (never a real
+ * `RepoContext`, and never `import`ed from `context/`) so callers that
+ * already have one can stop threading `repoPath` per call.
  */
 class GithubIssueService {
   /**
@@ -26,10 +29,15 @@ class GithubIssueService {
    *   (global `fetch` by default).
    * @param {number} [deps.timeoutMs] - the REST call's abort timeout,
    *   overridable for tests (defaults to the real 30s protocol value).
+   * @param {{repoPath: string}} [deps.repoContext] - a caller-supplied,
+   *   duck-typed context object (not an actual `RepoContext`), supplying a
+   *   `repoPath` fallback for `#issueClient`/`#create` when no explicit
+   *   `repoPath` argument is passed.
    */
   constructor({
     origin = new Origin(),
-    githubToken = new GithubToken(),
+    repoContext,
+    githubToken = new GithubToken({ repoContext }),
     fetchFn = fetch,
     timeoutMs = DEFAULT_TIMEOUT_MS
   } = {}) {
@@ -37,6 +45,7 @@ class GithubIssueService {
     this._githubToken = githubToken;
     this._fetch = fetchFn;
     this._timeoutMs = timeoutMs;
+    this._repoContext = repoContext;
   }
 
   /**
@@ -48,13 +57,17 @@ class GithubIssueService {
    * same body to `docs/agents/issues/`, and returns the fields
    * `cmd_create`'s stdout needs. Does not persist any per-issue state
    * file, matching the shell.
-   * @param {string} repoPath - the target repo's local checkout path.
+   * @param {string} [repoPath] - the target repo's local checkout path;
+   *   falls back to `this._repoContext.repoPath` when omitted. An
+   *   explicitly passed `repoPath` wins over the constructor context.
    * @param {string} title - the new issue's title.
    * @param {string} file - the local file whose contents become the
    *   issue's body.
    * @returns {Promise<string>} the `ID=...\nTITLE=...\nFILE=...\nDOMAIN=...\nREPO=...\n` output.
    */
   async create(repoPath, title, file) {
+    const targetPath = repoPath ?? this._repoContext?.repoPath;
+
     let rawBody;
 
     try {
@@ -69,14 +82,14 @@ class GithubIssueService {
     // do not just pass the raw file contents through.
     const body = rawBody.replace(/\n+$/, '');
 
-    const { domain, repo } = await this._origin.resolve(repoPath);
-    const issue = await this.issueClient(repoPath).createIssue(title, body);
+    const { domain, repo } = await this._origin.resolve(targetPath);
+    const issue = await this.issueClient(targetPath).createIssue(title, body);
     const id = this.rawString(issue.number);
     const normalized = this.normalizeTitle(title);
     const filePath = `${ISSUES_DIR}/${id}-${normalized}.md`;
 
-    await mkdir(path.join(repoPath, ISSUES_DIR), { recursive: true });
-    await writeFile(path.join(repoPath, filePath), `${body}\n`);
+    await mkdir(path.join(targetPath, ISSUES_DIR), { recursive: true });
+    await writeFile(path.join(targetPath, filePath), `${body}\n`);
 
     return `ID=${id}\nTITLE=${title}\nFILE=${filePath}\nDOMAIN=${domain}\nREPO=${repo}\n`;
   }
@@ -88,13 +101,16 @@ class GithubIssueService {
    * `RepoContext` — this class must not import `context/RepoContext.js`,
    * per `core/lib/`'s one-way layering. Reused by both `#create` and by
    * `commands/shared/GithubIssue.js#fetch`.
-   * @param {string} repoPath - the target repo's local checkout path.
+   * @param {string} [repoPath] - the target repo's local checkout path;
+   *   falls back to `this._repoContext.repoPath` when omitted. An
+   *   explicitly passed `repoPath` wins over the constructor context.
    * @returns {IssueClient} the per-call `IssueClient`.
    */
   issueClient(repoPath) {
+    const targetPath = repoPath ?? this._repoContext?.repoPath;
     const context = {
-      resolveWithRef: () => this._origin.resolveWithRef(repoPath),
-      getToken: () => this._githubToken.get(repoPath)
+      resolveWithRef: () => this._origin.resolveWithRef(targetPath),
+      getToken: () => this._githubToken.get(targetPath)
     };
 
     return new IssueClient({ context, fetchFn: this._fetch, timeoutMs: this._timeoutMs });

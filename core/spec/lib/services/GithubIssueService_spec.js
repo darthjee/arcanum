@@ -141,6 +141,42 @@ describe('GithubIssueService#create', () => {
       'Error: could not obtain GitHub token via gh auth token'
     );
   });
+
+  it('falls back to `repoContext.repoPath` when no `repoPath` argument is passed', async () => {
+    const payload = await loadFixture('github_issue_create_success.json');
+    const fetchFn = jasmine.createSpy('fetch').and.resolveTo({ ok: true, json: async () => payload });
+    const file = await writeBodyFile('the body');
+    const service = new GithubIssueService({ ...stubDeps(), fetchFn, repoContext: { repoPath } });
+
+    await service.create(undefined, 'New feature: dark mode', file);
+
+    const written = await readFile(path.join(repoPath, 'docs/agents/issues/42-new-feature-dark-mode.md'), 'utf8');
+    expect(written).toEqual('the body\n');
+  });
+
+  it('prefers an explicit `repoPath` argument over the constructor `repoContext`', async () => {
+    const payload = await loadFixture('github_issue_create_success.json');
+    const fetchFn = jasmine.createSpy('fetch').and.resolveTo({ ok: true, json: async () => payload });
+    const file = await writeBodyFile('the body');
+    const otherRepoPath = await createTempDir();
+
+    try {
+      const service = new GithubIssueService({ ...stubDeps(), fetchFn, repoContext: { repoPath: otherRepoPath } });
+
+      await service.create(repoPath, 'New feature: dark mode', file);
+
+      const written = await readFile(
+        path.join(repoPath, 'docs/agents/issues/42-new-feature-dark-mode.md'),
+        'utf8'
+      );
+      expect(written).toEqual('the body\n');
+      await expectAsync(
+        readFile(path.join(otherRepoPath, 'docs/agents/issues/42-new-feature-dark-mode.md'), 'utf8')
+      ).toBeRejected();
+    } finally {
+      await removeTempDir(otherRepoPath);
+    }
+  });
 });
 
 describe('GithubIssueService#issueClient', () => {
@@ -161,6 +197,46 @@ describe('GithubIssueService#issueClient', () => {
       'https://api.github.com/repos/a/b/issues/7',
       jasmine.objectContaining({ headers: { Authorization: 'Bearer fake-token' } })
     );
+  });
+
+  it('falls back to `repoContext.repoPath` when no `repoPath` argument is passed', async () => {
+    const origin = {
+      resolve: jasmine.createSpy(),
+      resolveWithRef: jasmine.createSpy().and.resolveTo({ domain: 'github.com', repo: 'a/b', repoRef: 'a/b' })
+    };
+    const githubToken = { get: jasmine.createSpy().and.resolveTo('fake-token') };
+    const fetchFn = jasmine.createSpy('fetch').and.resolveTo({ ok: true, json: async () => ({}) });
+    const service = new GithubIssueService({
+      origin,
+      githubToken,
+      fetchFn,
+      repoContext: { repoPath: '/fake/repo' }
+    });
+
+    await service.issueClient().getIssue('7');
+
+    expect(origin.resolveWithRef).toHaveBeenCalledWith('/fake/repo');
+    expect(githubToken.get).toHaveBeenCalledWith('/fake/repo');
+  });
+
+  it('prefers an explicit `repoPath` argument over the constructor `repoContext`', async () => {
+    const origin = {
+      resolve: jasmine.createSpy(),
+      resolveWithRef: jasmine.createSpy().and.resolveTo({ domain: 'github.com', repo: 'a/b', repoRef: 'a/b' })
+    };
+    const githubToken = { get: jasmine.createSpy().and.resolveTo('fake-token') };
+    const fetchFn = jasmine.createSpy('fetch').and.resolveTo({ ok: true, json: async () => ({}) });
+    const service = new GithubIssueService({
+      origin,
+      githubToken,
+      fetchFn,
+      repoContext: { repoPath: '/fake/repo' }
+    });
+
+    await service.issueClient('/other/repo').getIssue('7');
+
+    expect(origin.resolveWithRef).toHaveBeenCalledWith('/other/repo');
+    expect(githubToken.get).toHaveBeenCalledWith('/other/repo');
   });
 });
 
