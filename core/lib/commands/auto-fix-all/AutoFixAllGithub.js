@@ -142,7 +142,7 @@ class AutoFixAllGithub {
    * @returns {Promise<string>} the concatenated git stdout.
    */
   cleanupBranch(id) {
-    return this._branchCleanup.cleanupBranch(undefined, id);
+    return this._branchCleanup.cleanupBranch(id);
   }
 
   /**

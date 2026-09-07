@@ -25,15 +25,24 @@ function fakeExecFileAsync({ failOn = [] } = {}) {
 }
 
 describe('BranchCleanup', () => {
-  function newBranchCleanup({ repoContext, ...rest } = {}) {
+  function newBranchCleanup({ repoContext = createRepoContextMock({ repoPath: REPO_PATH }), ...rest } = {}) {
     return new BranchCleanup(repoContext, { execFileAsync: fakeExecFileAsync(), ...rest });
   }
 
   describe('#cleanupBranch', () => {
-    it('rejects when repoPath or id is missing', async () => {
+    it('rejects when id is missing', async () => {
       const branchCleanup = newBranchCleanup();
 
-      await expectAsync(branchCleanup.cleanupBranch(REPO_PATH)).toBeRejectedWithError(
+      await expectAsync(branchCleanup.cleanupBranch()).toBeRejectedWithError(
+        'Usage: github.sh cleanup-branch <repo_path> <id>'
+      );
+    });
+
+    it('rejects when the context has no repoPath', async () => {
+      const repoContext = createRepoContextMock({ repoPath: '' });
+      const branchCleanup = newBranchCleanup({ repoContext });
+
+      await expectAsync(branchCleanup.cleanupBranch('5')).toBeRejectedWithError(
         'Usage: github.sh cleanup-branch <repo_path> <id>'
       );
     });
@@ -42,7 +51,7 @@ describe('BranchCleanup', () => {
       const execFileAsync = fakeExecFileAsync();
       const branchCleanup = newBranchCleanup({ execFileAsync });
 
-      await expectAsync(branchCleanup.cleanupBranch(REPO_PATH, '5')).toBeResolvedTo('');
+      await expectAsync(branchCleanup.cleanupBranch('5')).toBeResolvedTo('');
 
       const calls = execFileAsync.calls.allArgs().map(([cmd, args]) => `${cmd} ${args.join(' ')}`);
 
@@ -72,7 +81,7 @@ describe('BranchCleanup', () => {
       });
       const branchCleanup = newBranchCleanup({ execFileAsync });
 
-      await expectAsync(branchCleanup.cleanupBranch(REPO_PATH, '5')).toBeResolvedTo(
+      await expectAsync(branchCleanup.cleanupBranch('5')).toBeResolvedTo(
         'Your branch is up to date with \'origin/main\'.\nHEAD is now at abc123 seed\nDeleted branch issue-5 (was def456).\n'
       );
     });
@@ -81,7 +90,7 @@ describe('BranchCleanup', () => {
       const execFileAsync = fakeExecFileAsync({ failOn: ['push origin --delete'] });
       const branchCleanup = newBranchCleanup({ execFileAsync });
 
-      await expectAsync(branchCleanup.cleanupBranch(REPO_PATH, '5')).toBeResolvedTo('');
+      await expectAsync(branchCleanup.cleanupBranch('5')).toBeResolvedTo('');
       expect(execFileAsync).toHaveBeenCalledTimes(4);
     });
 
@@ -89,36 +98,7 @@ describe('BranchCleanup', () => {
       const execFileAsync = fakeExecFileAsync({ failOn: ['checkout main'] });
       const branchCleanup = newBranchCleanup({ execFileAsync });
 
-      await expectAsync(branchCleanup.cleanupBranch(REPO_PATH, '5')).toBeRejected();
-    });
-
-    describe('when constructed with a repoContext', () => {
-      it('falls back to the injected repoContext\'s repoPath when repoPath is omitted', async () => {
-        const execFileAsync = fakeExecFileAsync();
-        const repoContext = createRepoContextMock({ repoPath: REPO_PATH });
-        const branchCleanup = newBranchCleanup({ execFileAsync, repoContext });
-
-        await expectAsync(branchCleanup.cleanupBranch(undefined, '5')).toBeResolvedTo('');
-
-        const calls = execFileAsync.calls.allArgs().map(([cmd, args]) => `${cmd} ${args.join(' ')}`);
-
-        expect(calls).toEqual([
-          'git push origin --delete issue-5',
-          'git checkout main',
-          'git reset --hard origin/main',
-          'git branch -D issue-5'
-        ]);
-      });
-
-      it('still honors an explicit repoPath argument over the injected repoContext', async () => {
-        const execFileAsync = fakeExecFileAsync();
-        const repoContext = createRepoContextMock({ repoPath: '/other/repo' });
-        const branchCleanup = newBranchCleanup({ execFileAsync, repoContext });
-
-        await expectAsync(branchCleanup.cleanupBranch(REPO_PATH, '5')).toBeResolvedTo('');
-
-        expect(execFileAsync).toHaveBeenCalledWith('git', ['checkout', 'main'], { cwd: REPO_PATH });
-      });
+      await expectAsync(branchCleanup.cleanupBranch('5')).toBeRejected();
     });
   });
 });
