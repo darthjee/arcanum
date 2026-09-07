@@ -18,15 +18,16 @@ class SafeBranch {
    *   the target repo's context (provides `repoPath`).
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Function} [deps.execFileAsync] - promisified `execFile`.
-   * @param {RepoConfig} [deps.repoConfig] - safe-branch config reader.
+   * @param {RepoConfig} [deps.repoConfig] - safe-branch config reader,
+   *   bound to `repoContext` by default.
    */
   constructor(repoContext, {
     execFileAsync = defaultExecFileAsync,
-    repoConfig = new RepoConfig()
+    repoConfig
   } = {}) {
     this._repoContext = repoContext;
     this._execFileAsync = execFileAsync;
-    this._repoConfig = repoConfig;
+    this._repoConfig = repoConfig ?? new RepoConfig(this._repoContext);
   }
 
   /**
@@ -64,7 +65,7 @@ class SafeBranch {
 
     await this._execFileAsync('git', ['fetch', '-p'], { cwd: repoPath });
 
-    const branch = await this._repoConfig.getSafeBranch(repoPath);
+    const branch = await this._repoConfig.getSafeBranch();
 
     await this._execFileAsync('git', ['checkout', branch], { cwd: repoPath });
 

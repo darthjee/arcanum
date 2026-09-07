@@ -44,7 +44,8 @@ class AutoFixAllWaitCi {
    *   context-bound clients) via `buildFromContext` — see
    *   `#_prOperations`. Only its `execFileAsync`/`fetchFn`/`timeoutMs`
    *   knobs are consulted on this path.
-   * @param {RepoConfig} [deps.repoConfig] - per-repo config reader.
+   * @param {RepoConfig} [deps.repoConfig] - per-repo config reader,
+   *   bound to `repoContext` by default.
    * @param {number} [deps.pollIntervalMs] - the wait between poll
    *   attempts, overridable for tests (defaults to the shell script's
    *   real 5s `sleep 5`).
@@ -54,13 +55,13 @@ class AutoFixAllWaitCi {
    */
   constructor(repoContext, {
     repoContextFactory = new RepoContextFactory({ timeoutMs: DEFAULT_TIMEOUT_MS }),
-    repoConfig = new RepoConfig(),
+    repoConfig,
     pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
     sleepFn = defaultSleep
   } = {}) {
     this._repoContext = repoContext;
     this._repoContextFactory = repoContextFactory;
-    this._repoConfig = repoConfig;
+    this._repoConfig = repoConfig ?? new RepoConfig(this._repoContext);
     this._pollIntervalMs = pollIntervalMs;
     this._sleep = sleepFn;
   }
@@ -85,7 +86,7 @@ class AutoFixAllWaitCi {
       throw new Error(USAGE);
     }
 
-    const ignoredPatterns = await this._repoConfig.getIgnoredCheckPatterns(repoPath);
+    const ignoredPatterns = await this._repoConfig.getIgnoredCheckPatterns();
     const prNumber = Number((await this._prOperations().prNumber()).trim());
     const prChecker = this._prChecker();
 
