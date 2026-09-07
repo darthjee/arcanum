@@ -48,7 +48,8 @@ class AutoFixAllQueue {
    * @param {Lock} [deps.lock] - the lock/mutate/release helper used to
    *   guard `push`/`pop`.
    * @param {QueueStore} [deps.queueStore] - the queue file's I/O
-   *   delegate.
+   *   delegate. Defaults to a `QueueStore` constructed with the injected
+   *   `repoContext`, so its calls need no per-call `repoPath`.
    * @param {RepoContextFactory} [deps.repoContextFactory] - wraps the
    *   injected `RepoContext` into a per-call bundle (context plus
    *   context-bound clients) via `buildFromContext` — see `#_issueTagger`.
@@ -70,7 +71,7 @@ class AutoFixAllQueue {
    */
   constructor(repoContext, {
     lock = new Lock(),
-    queueStore = new QueueStore(),
+    queueStore,
     repoContextFactory = new RepoContextFactory(),
     issueTaggerFactory = (bundle) => new IssueTagger({
       context: bundle.context,
@@ -81,7 +82,7 @@ class AutoFixAllQueue {
   } = {}) {
     this._repoContext = repoContext;
     this._lock = lock;
-    this._queueStore = queueStore;
+    this._queueStore = queueStore ?? new QueueStore(this._repoContext);
     this._repoContextFactory = repoContextFactory;
     this._issueTaggerFactory = issueTaggerFactory;
     this._pollIntervalMs = pollIntervalMs;
@@ -114,7 +115,7 @@ class AutoFixAllQueue {
       throw new Error('Error: save requires at least one ID');
     }
 
-    await this._queueStore.write(this._repoContext.repoPath, ids.map((id) => ({ id })));
+    await this._queueStore.write(undefined, ids.map((id) => ({ id })));
 
     process.stdout.write(`Queue saved: ${ids.join(' ')}\n`);
 
@@ -145,7 +146,7 @@ class AutoFixAllQueue {
    *   queue is empty/absent.
    */
   async next() {
-    const queue = await this._queueStore.read(this._repoContext.repoPath);
+    const queue = await this._queueStore.read();
     const id = queue.length > 0 ? queue[0].id : '';
 
     return `${id}\n`;
@@ -158,11 +159,11 @@ class AutoFixAllQueue {
    * @returns {Promise<string>} `<id>\n`, once the queue is non-empty.
    */
   async waitNext() {
-    let queue = await this._queueStore.read(this._repoContext.repoPath);
+    let queue = await this._queueStore.read();
 
     while (queue.length === 0) {
       await this._sleep(this._pollIntervalMs);
-      queue = await this._queueStore.read(this._repoContext.repoPath);
+      queue = await this._queueStore.read();
     }
 
     return `${queue[0].id}\n`;
@@ -187,15 +188,15 @@ class AutoFixAllQueue {
       throw new Error('Error: push requires at least one ID');
     }
 
-    const lockFile = this._queueStore.lockFile(this._repoContext.repoPath);
+    const lockFile = this._queueStore.lockFile();
 
     await this._lock.acquire(lockFile);
 
     try {
-      const queue = await this._queueStore.read(this._repoContext.repoPath);
+      const queue = await this._queueStore.read();
 
       await this._queueStore.write(
-        this._repoContext.repoPath,
+        undefined,
         [...queue, ...ids.map((id) => ({ id }))]
       );
     } finally {
@@ -213,14 +214,14 @@ class AutoFixAllQueue {
    * @returns {Promise<void>} resolves once the entry is removed.
    */
   async pop() {
-    const lockFile = this._queueStore.lockFile(this._repoContext.repoPath);
+    const lockFile = this._queueStore.lockFile();
 
     await this._lock.acquire(lockFile);
 
     try {
-      const queue = await this._queueStore.read(this._repoContext.repoPath);
+      const queue = await this._queueStore.read();
 
-      await this._queueStore.write(this._repoContext.repoPath, queue.slice(1));
+      await this._queueStore.write(undefined, queue.slice(1));
     } finally {
       await this._lock.release(lockFile);
     }
