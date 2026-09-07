@@ -34,7 +34,7 @@ class IssueStateService {
     jsonParser = new JsonParser(),
     jsonValueFormatter = new JsonValueFormatter(),
     jsonReader = new JsonReader(),
-    issueStatePaths = new IssueStatePaths()
+    issueStatePaths = new IssueStatePaths({ repoContext: context })
   } = {}) {
     this._context = context;
     this._lock = lock;
@@ -55,7 +55,7 @@ class IssueStateService {
    * @returns {Promise<string>} the formatted field value, or `''`.
    */
   async get(id, field) {
-    const { stateFile } = this._issueStatePaths.paths(this._context.repoPath, id);
+    const { stateFile } = this._issueStatePaths.paths(undefined, id);
     const current = await this._jsonReader.read(stateFile);
 
     return this._jsonValueFormatter.format(current[field]);
@@ -143,7 +143,7 @@ class IssueStateService {
    * @returns {Promise<void>} resolves once the state file is written.
    */
   async _mutate(id, mutateFn) {
-    const { stateDir, stateFile, lockFile } = this._issueStatePaths.paths(this._context.repoPath, id);
+    const { stateDir, stateFile, lockFile } = this._issueStatePaths.paths(undefined, id);
 
     await mkdir(stateDir, { recursive: true });
     await this._lock.acquire(lockFile);
@@ -166,7 +166,7 @@ class IssueStateService {
    * @returns {Promise<void>} resolves once the state file is written.
    */
   async _corrupt(id) {
-    const { stateDir, stateFile, lockFile } = this._issueStatePaths.paths(this._context.repoPath, id);
+    const { stateDir, stateFile, lockFile } = this._issueStatePaths.paths(undefined, id);
 
     await mkdir(stateDir, { recursive: true });
     await this._lock.acquire(lockFile);
