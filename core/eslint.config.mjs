@@ -49,5 +49,29 @@ export default [
     rules: {
       'jsdoc/require-jsdoc': 'off'
     }
+  },
+  {
+    // Enforces `lib/`'s one-way `commands` → `context`/`services` →
+    // `utils` layering (see docs/agents/architecture/script-engine.md):
+    // nothing under `context/`, `services/`, or `utils/` may import from
+    // `commands/` — a command is an entrypoint, not a library other
+    // layers should reach back into.
+    files: ['lib/context/**/*.js', 'lib/services/**/*.js', 'lib/utils/**/*.js'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/commands/**'],
+              message:
+                'context/, services/, and utils/ may not import from commands/ — see the one-way ' +
+                'commands → context/services → utils layering documented in ' +
+                'docs/agents/architecture/script-engine.md.'
+            }
+          ]
+        }
+      ]
+    }
   }
 ];

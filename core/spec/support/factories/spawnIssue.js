@@ -28,15 +28,15 @@ export function stubDeps(overrides = {}) {
  * @param {object} [opts] - context wiring overrides.
  * @param {object} [opts.origin] - fake git-origin resolver.
  * @param {object} [opts.configChain] - fake 3-tier config reader.
- * @param {object} [opts.githubIssue] - fake GitHub issue creator.
+ * @param {object} [opts.githubIssueService] - fake GitHub issue creator.
  * @returns {RepoContext} the assembled context.
  */
-export function buildContext(repoPath, { origin, configChain, githubIssue } = {}) {
+export function buildContext(repoPath, { origin, configChain, githubIssueService } = {}) {
   return new RepoContext({
     repoPath,
     origin: origin ?? { resolve: jasmine.createSpy('resolve').and.resolveTo({ domain: DOMAIN, repo: REPO_REF }) },
     configChain: configChain ?? { read: jasmine.createSpy('read').and.resolveTo(undefined) },
     repoPathValidator: { validate: jasmine.createSpy('validate').and.resolveTo(undefined) },
-    githubIssue
+    githubIssueService
   });
 }
