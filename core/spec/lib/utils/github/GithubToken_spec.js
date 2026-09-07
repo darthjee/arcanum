@@ -95,5 +95,53 @@ describe('GithubToken', () => {
 
       await expectAsync(githubToken.get('/repo')).toBeResolvedTo('token');
     });
+
+    it('falls back to `repoContext.repoPath` when no `repoPath` argument is passed', async () => {
+      const calls = [];
+      const execFileSpy = jasmine.createSpy('execFileAsync').and.callFake((file, args, options) => {
+        calls.push({ args, options });
+
+        if (args.join(' ') === 'config user.ghuser') {
+          return Promise.reject(new Error('not set'));
+        }
+
+        if (args.join(' ') === 'auth token') {
+          return Promise.resolve({ stdout: 'context-token\n', stderr: '' });
+        }
+
+        return Promise.reject(new Error('unexpected call'));
+      });
+      const githubToken = new GithubToken({ execFileAsync: execFileSpy, repoContext: { repoPath: '/repo' } });
+
+      await expectAsync(githubToken.get()).toBeResolvedTo('context-token');
+
+      const configCall = calls.find(({ args }) => args.join(' ') === 'config user.ghuser');
+
+      expect(configCall.options).toEqual({ cwd: '/repo' });
+    });
+
+    it('prefers an explicit `repoPath` argument over the constructor `repoContext`', async () => {
+      const calls = [];
+      const execFileSpy = jasmine.createSpy('execFileAsync').and.callFake((file, args, options) => {
+        calls.push({ args, options });
+
+        if (args.join(' ') === 'config user.ghuser') {
+          return Promise.reject(new Error('not set'));
+        }
+
+        if (args.join(' ') === 'auth token') {
+          return Promise.resolve({ stdout: 'explicit-token\n', stderr: '' });
+        }
+
+        return Promise.reject(new Error('unexpected call'));
+      });
+      const githubToken = new GithubToken({ execFileAsync: execFileSpy, repoContext: { repoPath: '/repo' } });
+
+      await expectAsync(githubToken.get('/other')).toBeResolvedTo('explicit-token');
+
+      const configCall = calls.find(({ args }) => args.join(' ') === 'config user.ghuser');
+
+      expect(configCall.options).toEqual({ cwd: '/other' });
+    });
   });
 });

@@ -16,17 +16,25 @@ class GithubToken {
   /**
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Function} [deps.execFileAsync] - promisified `execFile`.
+   * @param {import('../../context/RepoContext.js').default} [deps.repoContext] -
+   *   the target repo's context, supplying a `repoPath` fallback for
+   *   `get()` when no explicit `repoPath` argument is passed.
    */
-  constructor({ execFileAsync = defaultExecFileAsync } = {}) {
+  constructor({ execFileAsync = defaultExecFileAsync, repoContext } = {}) {
     this._execFileAsync = execFileAsync;
+    this._repoContext = repoContext;
   }
 
   /**
-   * @param {string} repoPath - the target repo's local checkout path.
+   * @param {string} [repoPath] - the target repo's local checkout path;
+   *   falls back to `this._repoContext.repoPath` when omitted. An
+   *   explicitly passed `repoPath` wins over the constructor context.
    * @returns {Promise<string>} the GitHub token.
    */
   async get(repoPath) {
-    await this._switchGhUser(repoPath);
+    const path = repoPath ?? this._repoContext?.repoPath;
+
+    await this._switchGhUser(path);
 
     try {
       const { stdout } = await this._execFileAsync('gh', ['auth', 'token']);
