@@ -9,15 +9,32 @@ const LOCK_RELATIVE_PATH = path.join('.claude', 'state', 'auto-fix-all-queue.loc
  * file I/O for a repo's `.claude/state/auto-fix-all-queue.json` queue,
  * with no GitHub or lock dependency — the lock acquire/read/write/
  * release transaction itself is owned by the caller (see
- * `AutoFixAllQueue.js`), since it spans two `QueueStore` calls.
+ * `AutoFixAllQueue.js`), since it spans two `QueueStore` calls. Mirrors
+ * `GithubIssue.js`'s dual-mode shape: an optional `repoContext` may be
+ * supplied at construction, in which case each public method's
+ * `repoPath` parameter may be omitted; otherwise every method takes an
+ * explicit `repoPath` per call, as before.
  */
 class QueueStore {
+  /**
+   * @param {import('../../context/RepoContext.js').default} [repoContext] -
+   *   the target repo's context. When supplied, `read`/`write`/
+   *   `queueFile`/`lockFile` fall back to `repoContext.repoPath`
+   *   whenever their own `repoPath` argument is omitted. Absent when
+   *   `QueueStore` is used zero-arg, in which case every method
+   *   receives an explicit `repoPath`.
+   */
+  constructor(repoContext) {
+    this._repoContext = repoContext;
+  }
+
   /**
    * Reads the queue array, mirroring `_read_queue`'s `[[ -s
    * "$QUEUE_FILE" ]]` check: absent or empty file reads as `[]`; an
    * existing, non-empty file is parsed as JSON (a malformed file throws,
    * matching the shell's own `jq` parse failure).
-   * @param {string} repoPath - the target repo's local checkout path.
+   * @param {string} [repoPath] - the target repo's local checkout path;
+   *   falls back to `this._repoContext.repoPath` when omitted.
    * @returns {Promise<Array<{id: string}>>} the queue array.
    */
   async read(repoPath) {
@@ -39,7 +56,8 @@ class QueueStore {
   /**
    * Overwrites the queue file with `entries`, creating
    * `.claude/state/` first if needed.
-   * @param {string} repoPath - the target repo's local checkout path.
+   * @param {string} [repoPath] - the target repo's local checkout path;
+   *   falls back to `this._repoContext.repoPath` when omitted.
    * @param {Array<{id: string}>} entries - the queue's new contents.
    * @returns {Promise<void>} resolves once written.
    */
@@ -51,20 +69,26 @@ class QueueStore {
   }
 
   /**
-   * @param {string} repoPath - the target repo's local checkout path.
+   * @param {string} [repoPath] - the target repo's local checkout path;
+   *   falls back to `this._repoContext.repoPath` when omitted.
    * @returns {string} `.claude/state/auto-fix-all-queue.json`'s
    *   absolute path under `repoPath`.
    */
   queueFile(repoPath) {
+    repoPath = repoPath ?? this._repoContext.repoPath;
+
     return path.join(repoPath, QUEUE_RELATIVE_PATH);
   }
 
   /**
-   * @param {string} repoPath - the target repo's local checkout path.
+   * @param {string} [repoPath] - the target repo's local checkout path;
+   *   falls back to `this._repoContext.repoPath` when omitted.
    * @returns {string} `.claude/state/auto-fix-all-queue.lock`'s
    *   absolute path under `repoPath`.
    */
   lockFile(repoPath) {
+    repoPath = repoPath ?? this._repoContext.repoPath;
+
     return path.join(repoPath, LOCK_RELATIVE_PATH);
   }
 }

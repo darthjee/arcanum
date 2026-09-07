@@ -1,6 +1,7 @@
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import QueueStore from '../../../../lib/utils/queue/QueueStore.js';
+import { createRepoContextMock } from '../../../support/factories/repoContextFactory.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 describe('QueueStore', () => {
@@ -80,6 +81,52 @@ describe('QueueStore', () => {
       await store.write(dir, [{ id: 'new' }]);
 
       await expectAsync(store.read(dir)).toBeResolvedTo([{ id: 'new' }]);
+    });
+  });
+
+  describe('with a repoContext supplied at construction', () => {
+    let repoContext;
+    let contextStore;
+
+    beforeEach(() => {
+      repoContext = createRepoContextMock({ repoPath: dir });
+      contextStore = new QueueStore(repoContext);
+    });
+
+    describe('#queueFile', () => {
+      it('resolves .claude/state/auto-fix-all-queue.json under the repoContext repo path', () => {
+        expect(contextStore.queueFile()).toEqual(queueFile);
+      });
+    });
+
+    describe('#lockFile', () => {
+      it('resolves .claude/state/auto-fix-all-queue.lock under the repoContext repo path', () => {
+        expect(contextStore.lockFile()).toEqual(lockFile);
+      });
+    });
+
+    describe('#read', () => {
+      it('returns an empty array when the queue file is absent', async () => {
+        await expectAsync(contextStore.read()).toBeResolvedTo([]);
+      });
+
+      it('parses a non-empty queue file as JSON', async () => {
+        await mkdir(path.dirname(queueFile), { recursive: true });
+        await writeFile(queueFile, JSON.stringify([{ id: 'a' }, { id: 'b' }]));
+
+        await expectAsync(contextStore.read()).toBeResolvedTo([{ id: 'a' }, { id: 'b' }]);
+      });
+    });
+
+    describe('#write', () => {
+      it('writes pretty-printed JSON with a trailing newline', async () => {
+        await contextStore.write(undefined, [{ id: 'a' }, { id: 'b' }]);
+
+        const raw = await readFile(queueFile, 'utf8');
+
+        expect(raw).toEqual(`${JSON.stringify([{ id: 'a' }, { id: 'b' }], null, 2)}\n`);
+        expect(JSON.parse(raw)).toEqual([{ id: 'a' }, { id: 'b' }]);
+      });
     });
   });
 });
