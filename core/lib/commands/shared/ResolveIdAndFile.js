@@ -43,7 +43,7 @@ class ResolveIdAndFile {
       );
     }
 
-    const issueFile = new IssueFile();
+    const issueFile = new IssueFile(this._repoContext);
 
     if (scenario === 'A') {
       return this._resolveA(issueFile, repoPath, issuesFolder, id, title);
@@ -121,7 +121,7 @@ class ResolveIdAndFile {
    * @returns {Promise<string>} Scenario A's output.
    */
   async _resolveA(issueFile, repoPath, issuesFolder, id, title) {
-    const existing = await issueFile.findExisting(repoPath, issuesFolder, id);
+    const existing = await issueFile.findExisting(undefined, issuesFolder, id);
 
     if (existing) {
       return `SCENARIO=A\nID=${id}\nTITLE=${title}\nFILE=${existing}\nSTATUS=existing\n`;
@@ -142,7 +142,7 @@ class ResolveIdAndFile {
    * @returns {Promise<string>} Scenario C's output.
    */
   async _resolveC(issueFile, repoPath, issuesFolder, id) {
-    const existing = await issueFile.findExisting(repoPath, issuesFolder, id);
+    const existing = await issueFile.findExisting(undefined, issuesFolder, id);
 
     if (existing) {
       const title = issueFile.titleFromFilename(existing);

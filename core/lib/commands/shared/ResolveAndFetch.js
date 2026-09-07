@@ -23,7 +23,7 @@ class ResolveAndFetch {
   constructor(repoContext, {
     safeBranch = new SafeBranch(repoContext),
     githubIssue = new GithubIssue(repoContext),
-    issueFile = new IssueFile()
+    issueFile = new IssueFile(repoContext)
   } = {}) {
     this._repoContext = repoContext;
     this._safeBranch = safeBranch;
@@ -55,7 +55,7 @@ class ResolveAndFetch {
       return `STATUS=error\nERROR=Error: invalid input '${argString}' — expected '#<id>'\n`;
     }
 
-    const existing = await this._issueFile.findExisting(repoPath, issuesFolder, id);
+    const existing = await this._issueFile.findExisting(undefined, issuesFolder, id);
 
     if (existing) {
       const title = this._issueFile.titleFromFilename(existing);
