@@ -19,9 +19,15 @@ class ConfigChain {
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {object} [deps.env] - the environment to resolve
    *   `CLAUDE_CONFIG_DIR`/`HOME` from (defaults to `process.env`).
+   * @param {import('../../context/RepoContext.js').default} [deps.repoContext] -
+   *   the target repo's context, whose `repoPath` `#read` falls back to
+   *   when its own `repoPath` argument is omitted. Optional — `RepoContext.js`
+   *   still builds `ConfigChain` zero-arg internally and passes `repoPath`
+   *   explicitly on every `#read` call.
    */
-  constructor({ env = process.env } = {}) {
+  constructor({ env = process.env, repoContext } = {}) {
     this._env = env;
+    this._repoContext = repoContext;
   }
 
   /**
@@ -40,7 +46,12 @@ class ConfigChain {
    * any tier never throws — it's treated as "no value at this tier"
    * and the chain continues, matching every other native config
    * reader's fail-open convention (`RepoConfig.js`, `AutoFixAllConfig.js`).
-   * @param {string} repoPath - the target repo's local checkout path.
+   * @param {string} [repoPath] - the target repo's local checkout path.
+   *   When omitted (falsy/`undefined`), falls back to the constructor-
+   *   injected `repoContext`'s `repoPath` — an explicit `repoPath` here
+   *   always wins over a constructor-injected `repoContext`, unlike
+   *   `GithubIssue.js`'s `#info`/`#create`, which unconditionally
+   *   overwrite `repoPath` for their CLI entrypoint's sake.
    * @param {string} namespace - the top-level config namespace.
    * @param {...string} keys - one or more keys (each possibly a
    *   dot-separated nested path) to try, in order, within each tier.
@@ -48,7 +59,9 @@ class ConfigChain {
    *   every key in every tier is absent/null.
    */
   async read(repoPath, namespace, ...keys) {
-    for (const file of this._tierFiles(repoPath)) {
+    const resolvedRepoPath = repoPath ?? this._repoContext?.repoPath;
+
+    for (const file of this._tierFiles(resolvedRepoPath)) {
       if (!file) {
         continue;
       }
