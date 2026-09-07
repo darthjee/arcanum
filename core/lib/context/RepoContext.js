@@ -27,7 +27,9 @@ class RepoContext {
    *   collaborators, for testing.
    * @param {string} deps.repoPath - the target repo's local checkout
    *   path.
-   * @param {Origin} [deps.origin] - git-origin resolver.
+   * @param {Origin} [deps.origin] - git-origin resolver; defaults to an
+   *   `Origin` built with `{ repoContext: this, execFileAsync }` when
+   *   omitted, so `#resolve`/`#resolveWithRef` can call it arg-free.
    * @param {GithubToken} [deps.githubToken] - GitHub token resolver;
    *   defaults to a `GithubToken` built with
    *   `{ repoContext: this, execFileAsync }` when omitted, so
@@ -49,7 +51,7 @@ class RepoContext {
    */
   constructor({
     repoPath,
-    origin = new Origin(),
+    origin,
     githubToken,
     issueStateService,
     configChain = new ConfigChain(),
@@ -58,7 +60,7 @@ class RepoContext {
     execFileAsync
   } = {}) {
     this.repoPath = repoPath;
-    this._origin = origin;
+    this._origin = origin ?? new Origin({ repoContext: this, execFileAsync });
     this._githubToken = githubToken ?? new GithubToken({ repoContext: this, execFileAsync });
     this._issueStateService = issueStateService ?? new IssueStateService({ context: this });
     this._configChain = configChain;
@@ -84,7 +86,7 @@ class RepoContext {
    *   `Origin#resolveWithRef`.
    */
   async resolveWithRef() {
-    return this._origin.resolveWithRef(this.repoPath);
+    return this._origin.resolveWithRef();
   }
 
   /**
@@ -92,7 +94,7 @@ class RepoContext {
    *   parsed origin — see `Origin#resolve`.
    */
   async resolve() {
-    return this._origin.resolve(this.repoPath);
+    return this._origin.resolve();
   }
 
   /**
