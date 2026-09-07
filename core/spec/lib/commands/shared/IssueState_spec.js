@@ -86,23 +86,19 @@ describe('IssueState', () => {
         };
         pathsSpy = jasmine
           .createSpy('paths')
-          .and.callFake((rp, id) => {
-            const base = rp ?? repoPath;
-
-            return {
-              stateDir: path.join(base, '.claude', 'state'),
-              stateFile: path.join(base, '.claude', 'state', `issue-${id}.json`),
-              lockFile: path.join(base, '.claude', 'state', `issue-${id}.lock`)
-            };
-          });
+          .and.callFake((id) => ({
+            stateDir: path.join(repoPath, '.claude', 'state'),
+            stateFile: path.join(repoPath, '.claude', 'state', `issue-${id}.json`),
+            lockFile: path.join(repoPath, '.claude', 'state', `issue-${id}.lock`)
+          }));
         issueState = new IssueState(buildContext(), stubDeps({ issueStatePaths: { paths: pathsSpy } }));
         spyOn(issueState, '_issueStateService').and.returnValue(service);
       });
 
-      it('calls paths() without an explicit repoPath — resolution is context-bound', async () => {
+      it('calls paths() with only the id — resolution is context-bound', async () => {
         await issueState.run('get', '42', 'title');
 
-        expect(pathsSpy).toHaveBeenCalledWith(undefined, '42');
+        expect(pathsSpy).toHaveBeenCalledWith('42');
       });
 
       it('get delegates to IssueStateService#get and appends a trailing newline', async () => {
