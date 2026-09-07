@@ -115,7 +115,7 @@ class AutoFixAllQueue {
       throw new Error('Error: save requires at least one ID');
     }
 
-    await this._queueStore.write(undefined, ids.map((id) => ({ id })));
+    await this._queueStore.write(ids.map((id) => ({ id })));
 
     process.stdout.write(`Queue saved: ${ids.join(' ')}\n`);
 
@@ -196,7 +196,6 @@ class AutoFixAllQueue {
       const queue = await this._queueStore.read();
 
       await this._queueStore.write(
-        undefined,
         [...queue, ...ids.map((id) => ({ id }))]
       );
     } finally {
@@ -221,7 +220,7 @@ class AutoFixAllQueue {
     try {
       const queue = await this._queueStore.read();
 
-      await this._queueStore.write(undefined, queue.slice(1));
+      await this._queueStore.write(queue.slice(1));
     } finally {
       await this._lock.release(lockFile);
     }
@@ -235,7 +234,7 @@ class AutoFixAllQueue {
    *   code 1 when the queue has one or more entries.
    */
   async empty() {
-    const queue = await this._queueStore.read(this._repoContext.repoPath);
+    const queue = await this._queueStore.read();
 
     if (queue.length === 0) {
       return;
@@ -251,7 +250,7 @@ class AutoFixAllQueue {
    *   or `(empty)\n` when the queue has zero entries.
    */
   async list() {
-    const queue = await this._queueStore.read(this._repoContext.repoPath);
+    const queue = await this._queueStore.read();
 
     if (queue.length === 0) {
       return '(empty)\n';
