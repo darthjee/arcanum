@@ -11,9 +11,9 @@ import path from 'node:path';
  */
 class IssueFile {
   /**
-   * @param {import('../../context/RepoContext.js').default} [repoContext] -
-   *   the target repo's context, supplying a `findExisting` fallback
-   *   `repoPath` when the per-call one is omitted.
+   * @param {import('../../context/RepoContext.js').default} repoContext -
+   *   the target repo's context, the sole source of `repoPath` for
+   *   `findExisting`.
    */
   constructor(repoContext) {
     this._repoContext = repoContext;
@@ -22,21 +22,18 @@ class IssueFile {
   /**
    * Glob `<issuesFolder>/<id>_*`/`<id>-*` (first match wins — match
    * order is filesystem-dependent, mirroring `find ... | head -1`).
-   * @param {string} [repoPath] - the target repo's local checkout path.
-   *   Falls back to the constructor's `repoContext.repoPath` when
-   *   omitted/falsy — an explicit `repoPath` still wins over it.
    * @param {string} issuesFolder - the folder to search, relative to `repoPath`.
    * @param {string} id - the issue id (numeric, once validated by the caller).
    * @returns {Promise<string|null>} the matched path (in the same
    *   `<issuesFolder>/<filename>` shape the shell prints), or null if
    *   no file matches.
    */
-  async findExisting(repoPath, issuesFolder, id) {
-    const effectiveRepoPath = repoPath ?? this._repoContext?.repoPath;
+  async findExisting(issuesFolder, id) {
+    const { repoPath } = this._repoContext;
     let entries;
 
     try {
-      entries = await readdir(path.join(effectiveRepoPath, issuesFolder));
+      entries = await readdir(path.join(repoPath, issuesFolder));
     } catch {
       return null;
     }

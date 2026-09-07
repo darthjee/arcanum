@@ -55,7 +55,7 @@ class ResolveAndFetch {
       return `STATUS=error\nERROR=Error: invalid input '${argString}' — expected '#<id>'\n`;
     }
 
-    const existing = await this._issueFile.findExisting(undefined, issuesFolder, id);
+    const existing = await this._issueFile.findExisting(issuesFolder, id);
 
     if (existing) {
       const title = this._issueFile.titleFromFilename(existing);
