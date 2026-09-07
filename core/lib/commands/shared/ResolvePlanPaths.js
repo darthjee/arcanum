@@ -44,7 +44,8 @@ class ResolvePlanPaths {
       );
     }
 
-    const issueFile = await IssueFile.findExisting(repoPath, issuesFolder, id);
+    const issueFileHelper = new IssueFile();
+    const issueFile = await issueFileHelper.findExisting(repoPath, issuesFolder, id);
 
     if (!issueFile) {
       throw new Error(`Error: no issue file found for id ${id}`);

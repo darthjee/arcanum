@@ -43,12 +43,14 @@ class ResolveIdAndFile {
       );
     }
 
+    const issueFile = new IssueFile();
+
     if (scenario === 'A') {
-      return this._resolveA(repoPath, issuesFolder, id, title);
+      return this._resolveA(issueFile, repoPath, issuesFolder, id, title);
     }
 
     if (scenario === 'C') {
-      return this._resolveC(repoPath, issuesFolder, id);
+      return this._resolveC(issueFile, repoPath, issuesFolder, id);
     }
 
     return `SCENARIO=B\nID=\nTITLE=${title}\nFILE=\nSTATUS=missing_id\n`;
@@ -111,14 +113,15 @@ class ResolveIdAndFile {
    * Scenario A resolution: an existing-file match reuses the parsed
    * title as-is; no match builds a fresh `FILE=` guess from the
    * snake_case slug of the parsed title.
+   * @param {IssueFile} issueFile - the existing-issue-file lookup helper.
    * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} issuesFolder - the folder to search, relative to `repoPath`.
    * @param {string} id - the numeric issue id.
    * @param {string} title - the parsed title.
    * @returns {Promise<string>} Scenario A's output.
    */
-  async _resolveA(repoPath, issuesFolder, id, title) {
-    const existing = await IssueFile.findExisting(repoPath, issuesFolder, id);
+  async _resolveA(issueFile, repoPath, issuesFolder, id, title) {
+    const existing = await issueFile.findExisting(repoPath, issuesFolder, id);
 
     if (existing) {
       return `SCENARIO=A\nID=${id}\nTITLE=${title}\nFILE=${existing}\nSTATUS=existing\n`;
@@ -132,16 +135,17 @@ class ResolveIdAndFile {
   /**
    * Scenario C resolution: an existing-file match derives `TITLE` from
    * the matched filename; no match leaves `TITLE`/`FILE` empty.
+   * @param {IssueFile} issueFile - the existing-issue-file lookup helper.
    * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} issuesFolder - the folder to search, relative to `repoPath`.
    * @param {string} id - the numeric issue id.
    * @returns {Promise<string>} Scenario C's output.
    */
-  async _resolveC(repoPath, issuesFolder, id) {
-    const existing = await IssueFile.findExisting(repoPath, issuesFolder, id);
+  async _resolveC(issueFile, repoPath, issuesFolder, id) {
+    const existing = await issueFile.findExisting(repoPath, issuesFolder, id);
 
     if (existing) {
-      const title = IssueFile.titleFromFilename(existing);
+      const title = issueFile.titleFromFilename(existing);
 
       return `SCENARIO=C\nID=${id}\nTITLE=${title}\nFILE=${existing}\nSTATUS=existing\n`;
     }

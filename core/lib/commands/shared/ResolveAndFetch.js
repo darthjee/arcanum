@@ -18,14 +18,17 @@ class ResolveAndFetch {
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {SafeBranch} [deps.safeBranch] - safe-branch checkout helper.
    * @param {GithubIssue} [deps.githubIssue] - GitHub issue fetcher.
+   * @param {IssueFile} [deps.issueFile] - existing-issue-file lookup helper.
    */
   constructor(repoContext, {
     safeBranch = new SafeBranch(repoContext),
-    githubIssue = new GithubIssue(repoContext)
+    githubIssue = new GithubIssue(repoContext),
+    issueFile = new IssueFile()
   } = {}) {
     this._repoContext = repoContext;
     this._safeBranch = safeBranch;
     this._githubIssue = githubIssue;
+    this._issueFile = issueFile;
   }
 
   /**
@@ -52,10 +55,10 @@ class ResolveAndFetch {
       return `STATUS=error\nERROR=Error: invalid input '${argString}' — expected '#<id>'\n`;
     }
 
-    const existing = await IssueFile.findExisting(repoPath, issuesFolder, id);
+    const existing = await this._issueFile.findExisting(repoPath, issuesFolder, id);
 
     if (existing) {
-      const title = IssueFile.titleFromFilename(existing);
+      const title = this._issueFile.titleFromFilename(existing);
 
       return `STATUS=ok\nID=${id}\nTITLE=${title}\nFILE=${existing}\n`;
     }

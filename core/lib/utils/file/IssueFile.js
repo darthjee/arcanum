@@ -11,20 +11,32 @@ import path from 'node:path';
  */
 class IssueFile {
   /**
+   * @param {import('../../context/RepoContext.js').default} [repoContext] -
+   *   the target repo's context, supplying a `findExisting` fallback
+   *   `repoPath` when the per-call one is omitted.
+   */
+  constructor(repoContext) {
+    this._repoContext = repoContext;
+  }
+
+  /**
    * Glob `<issuesFolder>/<id>_*`/`<id>-*` (first match wins — match
    * order is filesystem-dependent, mirroring `find ... | head -1`).
-   * @param {string} repoPath - the target repo's local checkout path.
+   * @param {string} [repoPath] - the target repo's local checkout path.
+   *   Falls back to the constructor's `repoContext.repoPath` when
+   *   omitted/falsy — an explicit `repoPath` still wins over it.
    * @param {string} issuesFolder - the folder to search, relative to `repoPath`.
    * @param {string} id - the issue id (numeric, once validated by the caller).
    * @returns {Promise<string|null>} the matched path (in the same
    *   `<issuesFolder>/<filename>` shape the shell prints), or null if
    *   no file matches.
    */
-  static async findExisting(repoPath, issuesFolder, id) {
+  async findExisting(repoPath, issuesFolder, id) {
+    const effectiveRepoPath = repoPath ?? this._repoContext?.repoPath;
     let entries;
 
     try {
-      entries = await readdir(path.join(repoPath, issuesFolder));
+      entries = await readdir(path.join(effectiveRepoPath, issuesFolder));
     } catch {
       return null;
     }
@@ -43,7 +55,7 @@ class IssueFile {
    * @param {string} filePath - the matched existing-file path.
    * @returns {string} the derived title.
    */
-  static titleFromFilename(filePath) {
+  titleFromFilename(filePath) {
     const base = path.basename(filePath, '.md');
     const underscoreIndex = base.indexOf('_');
 

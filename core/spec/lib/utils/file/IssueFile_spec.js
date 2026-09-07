@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import IssueFile from '../../../../lib/utils/file/IssueFile.js';
+import { createRepoContextMock } from '../../../support/factories/repoContextFactory.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 describe('IssueFile', () => {
@@ -15,9 +16,11 @@ describe('IssueFile', () => {
     await removeTempDir(repoPath);
   });
 
-  describe('.findExisting', () => {
+  describe('#findExisting', () => {
     it('returns null when the issues folder does not exist', async () => {
-      const result = await IssueFile.findExisting(repoPath, issuesFolder, '1');
+      const issueFile = new IssueFile();
+
+      const result = await issueFile.findExisting(repoPath, issuesFolder, '1');
 
       expect(result).toBeNull();
     });
@@ -26,7 +29,9 @@ describe('IssueFile', () => {
       await mkdir(path.join(repoPath, issuesFolder), { recursive: true });
       await writeFile(path.join(repoPath, issuesFolder, '2_other.md'), 'content\n');
 
-      const result = await IssueFile.findExisting(repoPath, issuesFolder, '1');
+      const issueFile = new IssueFile();
+
+      const result = await issueFile.findExisting(repoPath, issuesFolder, '1');
 
       expect(result).toBeNull();
     });
@@ -35,7 +40,9 @@ describe('IssueFile', () => {
       await mkdir(path.join(repoPath, issuesFolder), { recursive: true });
       await writeFile(path.join(repoPath, issuesFolder, '42_my_cool_issue.md'), 'content\n');
 
-      const result = await IssueFile.findExisting(repoPath, issuesFolder, '42');
+      const issueFile = new IssueFile();
+
+      const result = await issueFile.findExisting(repoPath, issuesFolder, '42');
 
       expect(result).toEqual('docs/agents/issues/42_my_cool_issue.md');
     });
@@ -44,7 +51,9 @@ describe('IssueFile', () => {
       await mkdir(path.join(repoPath, issuesFolder), { recursive: true });
       await writeFile(path.join(repoPath, issuesFolder, '7-some-title.md'), 'content\n');
 
-      const result = await IssueFile.findExisting(repoPath, issuesFolder, '7');
+      const issueFile = new IssueFile();
+
+      const result = await issueFile.findExisting(repoPath, issuesFolder, '7');
 
       expect(result).toEqual('docs/agents/issues/7-some-title.md');
     });
@@ -53,7 +62,9 @@ describe('IssueFile', () => {
       await mkdir(path.join(repoPath, issuesFolder), { recursive: true });
       await writeFile(path.join(repoPath, issuesFolder, '123_title.md'), 'content\n');
 
-      const result = await IssueFile.findExisting(repoPath, issuesFolder, '12');
+      const issueFile = new IssueFile();
+
+      const result = await issueFile.findExisting(repoPath, issuesFolder, '12');
 
       expect(result).toBeNull();
     });
@@ -62,27 +73,63 @@ describe('IssueFile', () => {
       await mkdir(path.join(repoPath, issuesFolder, 'nested'), { recursive: true });
       await writeFile(path.join(repoPath, issuesFolder, 'nested', '1_nested.md'), 'content\n');
 
-      const result = await IssueFile.findExisting(repoPath, issuesFolder, '1');
+      const issueFile = new IssueFile();
+
+      const result = await issueFile.findExisting(repoPath, issuesFolder, '1');
 
       expect(result).toBeNull();
     });
+
+    it('falls back to the constructor repoContext repoPath when repoPath is omitted', async () => {
+      await mkdir(path.join(repoPath, issuesFolder), { recursive: true });
+      await writeFile(path.join(repoPath, issuesFolder, '42_my_cool_issue.md'), 'content\n');
+
+      const issueFile = new IssueFile(createRepoContextMock({ repoPath }));
+
+      const result = await issueFile.findExisting(undefined, issuesFolder, '42');
+
+      expect(result).toEqual('docs/agents/issues/42_my_cool_issue.md');
+    });
+
+    it('prefers an explicit per-call repoPath over the constructor repoContext', async () => {
+      const otherRepoPath = await createTempDir();
+
+      try {
+        await mkdir(path.join(repoPath, issuesFolder), { recursive: true });
+        await writeFile(path.join(repoPath, issuesFolder, '42_my_cool_issue.md'), 'content\n');
+
+        const issueFile = new IssueFile(createRepoContextMock({ repoPath: otherRepoPath }));
+
+        const result = await issueFile.findExisting(repoPath, issuesFolder, '42');
+
+        expect(result).toEqual('docs/agents/issues/42_my_cool_issue.md');
+      } finally {
+        await removeTempDir(otherRepoPath);
+      }
+    });
   });
 
-  describe('.titleFromFilename', () => {
+  describe('#titleFromFilename', () => {
     it('derives a Title-Cased title from an underscore-separated filename', () => {
-      const title = IssueFile.titleFromFilename('docs/agents/issues/42_my_cool_issue.md');
+      const issueFile = new IssueFile();
+
+      const title = issueFile.titleFromFilename('docs/agents/issues/42_my_cool_issue.md');
 
       expect(title).toEqual('My Cool Issue');
     });
 
     it('derives a Title-Cased title from a dash-separated filename', () => {
-      const title = IssueFile.titleFromFilename('docs/agents/issues/7-some-title-here.md');
+      const issueFile = new IssueFile();
+
+      const title = issueFile.titleFromFilename('docs/agents/issues/7-some-title-here.md');
 
       expect(title).toEqual('Some Title Here');
     });
 
     it('falls back to the whole basename when there is no separator at all', () => {
-      const title = IssueFile.titleFromFilename('docs/agents/issues/999.md');
+      const issueFile = new IssueFile();
+
+      const title = issueFile.titleFromFilename('docs/agents/issues/999.md');
 
       expect(title).toEqual('999');
     });
