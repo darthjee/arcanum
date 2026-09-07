@@ -13,10 +13,14 @@ const defaultExecFileAsync = promisify(execFile);
  */
 class BranchCleanup {
   /**
+   * @param {import('../../context/RepoContext.js').default} [repoContext] -
+   *   the target repo's context. Optional — when omitted, `cleanupBranch`
+   *   requires an explicit `repoPath` argument instead.
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Function} [deps.execFileAsync] - promisified `execFile`.
    */
-  constructor({ execFileAsync = defaultExecFileAsync } = {}) {
+  constructor(repoContext, { execFileAsync = defaultExecFileAsync } = {}) {
+    this._repoContext = repoContext;
     this._execFileAsync = execFileAsync;
   }
 
@@ -36,28 +40,32 @@ class BranchCleanup {
    * byte-identical parity. The remote-delete step tolerates failure
    * (matching the shell's `|| true`, e.g. when the remote branch is
    * already gone); every other step is not tolerant of failure.
-   * @param {string} repoPath - the target repo's local checkout path.
+   * @param {string} [repoPath] - the target repo's local checkout path.
+   *   Falls back to the `repoContext` injected at construction when
+   *   omitted; an explicit argument still takes precedence over it.
    * @param {string} id - the numeric issue id.
    * @returns {Promise<string>} the concatenated stdout of `git checkout
    *   main`, `git reset --hard origin/main`, and `git branch -D
    *   <branch>`.
    */
   async cleanupBranch(repoPath, id) {
-    if (!repoPath || !id) {
+    const effectiveRepoPath = repoPath ?? this._repoContext?.repoPath;
+
+    if (!effectiveRepoPath || !id) {
       throw new Error('Usage: github.sh cleanup-branch <repo_path> <id>');
     }
 
     const branch = `issue-${id}`;
 
     try {
-      await this._execFileAsync('git', ['push', 'origin', '--delete', branch], { cwd: repoPath });
+      await this._execFileAsync('git', ['push', 'origin', '--delete', branch], { cwd: effectiveRepoPath });
     } catch {
       // tolerate failure — matches the shell's `|| true`.
     }
 
-    const { stdout: checkoutStdout } = await this._execFileAsync('git', ['checkout', 'main'], { cwd: repoPath });
-    const { stdout: resetStdout } = await this._execFileAsync('git', ['reset', '--hard', 'origin/main'], { cwd: repoPath });
-    const { stdout: branchStdout } = await this._execFileAsync('git', ['branch', '-D', branch], { cwd: repoPath });
+    const { stdout: checkoutStdout } = await this._execFileAsync('git', ['checkout', 'main'], { cwd: effectiveRepoPath });
+    const { stdout: resetStdout } = await this._execFileAsync('git', ['reset', '--hard', 'origin/main'], { cwd: effectiveRepoPath });
+    const { stdout: branchStdout } = await this._execFileAsync('git', ['branch', '-D', branch], { cwd: effectiveRepoPath });
 
     return `${checkoutStdout}${resetStdout}${branchStdout}`;
   }

@@ -1,4 +1,5 @@
 import BranchCleanup from '../../../../lib/utils/git/BranchCleanup.js';
+import { createRepoContextMock } from '../../../support/factories/repoContextFactory.js';
 
 const REPO_PATH = '/fake/repo';
 
@@ -24,8 +25,8 @@ function fakeExecFileAsync({ failOn = [] } = {}) {
 }
 
 describe('BranchCleanup', () => {
-  function newBranchCleanup(overrides = {}) {
-    return new BranchCleanup({ execFileAsync: fakeExecFileAsync(), ...overrides });
+  function newBranchCleanup({ repoContext, ...rest } = {}) {
+    return new BranchCleanup(repoContext, { execFileAsync: fakeExecFileAsync(), ...rest });
   }
 
   describe('#cleanupBranch', () => {
@@ -89,6 +90,35 @@ describe('BranchCleanup', () => {
       const branchCleanup = newBranchCleanup({ execFileAsync });
 
       await expectAsync(branchCleanup.cleanupBranch(REPO_PATH, '5')).toBeRejected();
+    });
+
+    describe('when constructed with a repoContext', () => {
+      it('falls back to the injected repoContext\'s repoPath when repoPath is omitted', async () => {
+        const execFileAsync = fakeExecFileAsync();
+        const repoContext = createRepoContextMock({ repoPath: REPO_PATH });
+        const branchCleanup = newBranchCleanup({ execFileAsync, repoContext });
+
+        await expectAsync(branchCleanup.cleanupBranch(undefined, '5')).toBeResolvedTo('');
+
+        const calls = execFileAsync.calls.allArgs().map(([cmd, args]) => `${cmd} ${args.join(' ')}`);
+
+        expect(calls).toEqual([
+          'git push origin --delete issue-5',
+          'git checkout main',
+          'git reset --hard origin/main',
+          'git branch -D issue-5'
+        ]);
+      });
+
+      it('still honors an explicit repoPath argument over the injected repoContext', async () => {
+        const execFileAsync = fakeExecFileAsync();
+        const repoContext = createRepoContextMock({ repoPath: '/other/repo' });
+        const branchCleanup = newBranchCleanup({ execFileAsync, repoContext });
+
+        await expectAsync(branchCleanup.cleanupBranch(REPO_PATH, '5')).toBeResolvedTo('');
+
+        expect(execFileAsync).toHaveBeenCalledWith('git', ['checkout', 'main'], { cwd: REPO_PATH });
+      });
     });
   });
 });
