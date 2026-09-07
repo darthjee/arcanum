@@ -9,7 +9,7 @@ import path from 'node:path';
  * docs/agents/architecture/script-engine.md for the migration this
  * supports.
  */
-class IssueFile {
+class IssueFileLocator {
   /**
    * @param {import('../../context/RepoContext.js').default} repoContext -
    *   the target repo's context, the sole source of `repoPath` for
@@ -76,4 +76,4 @@ class IssueFile {
   }
 }
 
-export default IssueFile;
+export default IssueFileLocator;

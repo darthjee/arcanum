@@ -1,5 +1,5 @@
 import GithubIssue from './GithubIssue.js';
-import IssueFile from '../../utils/file/IssueFile.js';
+import IssueFileLocator from '../../utils/file/IssueFileLocator.js';
 import SafeBranch from './SafeBranch.js';
 
 const ID_PATTERN = /^#([0-9]+)$/;
@@ -18,12 +18,12 @@ class ResolveAndFetch {
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {SafeBranch} [deps.safeBranch] - safe-branch checkout helper.
    * @param {GithubIssue} [deps.githubIssue] - GitHub issue fetcher.
-   * @param {IssueFile} [deps.issueFile] - existing-issue-file lookup helper.
+   * @param {IssueFileLocator} [deps.issueFile] - existing-issue-file lookup helper.
    */
   constructor(repoContext, {
     safeBranch = new SafeBranch(repoContext),
     githubIssue = new GithubIssue(repoContext),
-    issueFile = new IssueFile(repoContext)
+    issueFile = new IssueFileLocator(repoContext)
   } = {}) {
     this._repoContext = repoContext;
     this._safeBranch = safeBranch;

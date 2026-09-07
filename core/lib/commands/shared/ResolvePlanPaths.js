@@ -1,6 +1,6 @@
 import { access, mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import IssueFile from '../../utils/file/IssueFile.js';
+import IssueFileLocator from '../../utils/file/IssueFileLocator.js';
 
 const NUMERIC_ID_PATTERN = /^[0-9]+$/;
 
@@ -44,7 +44,7 @@ class ResolvePlanPaths {
       );
     }
 
-    const issueFileHelper = new IssueFile(this._repoContext);
+    const issueFileHelper = new IssueFileLocator(this._repoContext);
     const issueFile = await issueFileHelper.findExisting(issuesFolder, id);
 
     if (!issueFile) {

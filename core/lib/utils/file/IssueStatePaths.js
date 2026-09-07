@@ -3,7 +3,7 @@ import path from 'node:path';
 /**
  * Resolves the `.claude/state/issue-<id>.json` state/lock file paths
  * for a given repo checkout — a path-resolution concern distinct from
- * `IssueFile.js`'s docs-issue markdown lookup.
+ * `IssueFileLocator.js`'s docs-issue markdown lookup.
  */
 class IssueStatePaths {
   /**

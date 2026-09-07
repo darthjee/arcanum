@@ -1,4 +1,4 @@
-import IssueFile from '../../utils/file/IssueFile.js';
+import IssueFileLocator from '../../utils/file/IssueFileLocator.js';
 
 const ARG_PATTERN = /^#([^\s]+)(.*)$/;
 const NUMERIC_ID_PATTERN = /^[0-9]+$/;
@@ -43,7 +43,7 @@ class ResolveIdAndFile {
       );
     }
 
-    const issueFile = new IssueFile(this._repoContext);
+    const issueFile = new IssueFileLocator(this._repoContext);
 
     if (scenario === 'A') {
       return this._resolveA(issueFile, repoPath, issuesFolder, id, title);
@@ -113,7 +113,7 @@ class ResolveIdAndFile {
    * Scenario A resolution: an existing-file match reuses the parsed
    * title as-is; no match builds a fresh `FILE=` guess from the
    * snake_case slug of the parsed title.
-   * @param {IssueFile} issueFile - the existing-issue-file lookup helper.
+   * @param {IssueFileLocator} issueFile - the existing-issue-file lookup helper.
    * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} issuesFolder - the folder to search, relative to `repoPath`.
    * @param {string} id - the numeric issue id.
@@ -135,7 +135,7 @@ class ResolveIdAndFile {
   /**
    * Scenario C resolution: an existing-file match derives `TITLE` from
    * the matched filename; no match leaves `TITLE`/`FILE` empty.
-   * @param {IssueFile} issueFile - the existing-issue-file lookup helper.
+   * @param {IssueFileLocator} issueFile - the existing-issue-file lookup helper.
    * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} issuesFolder - the folder to search, relative to `repoPath`.
    * @param {string} id - the numeric issue id.
