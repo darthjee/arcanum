@@ -13,10 +13,14 @@ const defaultExecFileAsync = promisify(execFile);
  */
 class BranchCleanup {
   /**
+   * @param {import('../../context/RepoContext.js').default} repoContext -
+   *   the target repo's context — the sole source of `repoPath` for
+   *   `cleanupBranch`.
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Function} [deps.execFileAsync] - promisified `execFile`.
    */
-  constructor({ execFileAsync = defaultExecFileAsync } = {}) {
+  constructor(repoContext, { execFileAsync = defaultExecFileAsync } = {}) {
+    this._repoContext = repoContext;
     this._execFileAsync = execFileAsync;
   }
 
@@ -36,17 +40,17 @@ class BranchCleanup {
    * byte-identical parity. The remote-delete step tolerates failure
    * (matching the shell's `|| true`, e.g. when the remote branch is
    * already gone); every other step is not tolerant of failure.
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} id - the numeric issue id.
    * @returns {Promise<string>} the concatenated stdout of `git checkout
    *   main`, `git reset --hard origin/main`, and `git branch -D
    *   <branch>`.
    */
-  async cleanupBranch(repoPath, id) {
-    if (!repoPath || !id) {
+  async cleanupBranch(id) {
+    if (!this._repoContext?.repoPath || !id) {
       throw new Error('Usage: github.sh cleanup-branch <repo_path> <id>');
     }
 
+    const { repoPath } = this._repoContext;
     const branch = `issue-${id}`;
 
     try {

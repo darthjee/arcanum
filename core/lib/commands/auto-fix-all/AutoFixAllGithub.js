@@ -42,7 +42,8 @@ class AutoFixAllGithub {
    *   not a pre-built instance, since the context-bound `IssueTagger` is
    *   rebuilt per call.
    * @param {BranchCleanup} [deps.branchCleanup] - delegate for
-   *   `cleanupBranch`.
+   *   `cleanupBranch`. Defaults to a `BranchCleanup` built off the
+   *   injected `repoContext`.
    */
   constructor(repoContext, {
     repoContextFactory = new RepoContextFactory(),
@@ -50,12 +51,12 @@ class AutoFixAllGithub {
       context: bundle.context,
       issueClient: bundle.issueClient
     }),
-    branchCleanup = new BranchCleanup()
+    branchCleanup
   } = {}) {
     this._repoContext = repoContext;
     this._repoContextFactory = repoContextFactory;
     this._issueTaggerFactory = issueTaggerFactory;
-    this._branchCleanup = branchCleanup;
+    this._branchCleanup = branchCleanup ?? new BranchCleanup(this._repoContext);
   }
 
   /**
@@ -141,7 +142,7 @@ class AutoFixAllGithub {
    * @returns {Promise<string>} the concatenated git stdout.
    */
   cleanupBranch(id) {
-    return this._branchCleanup.cleanupBranch(this._repoContext.repoPath, id);
+    return this._branchCleanup.cleanupBranch(id);
   }
 
   /**
