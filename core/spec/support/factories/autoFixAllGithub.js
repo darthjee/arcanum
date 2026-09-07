@@ -117,7 +117,7 @@ export function createAutoFixAllGithub(overrides = {}) {
 
   return new AutoFixAllGithub(repoContext, {
     repoContextFactory: new RepoContextFactory({ execFileAsync, fetchFn, timeoutMs }),
-    branchCleanup: new BranchCleanup({ execFileAsync }),
+    branchCleanup: new BranchCleanup(repoContext, { execFileAsync }),
     ...rest
   });
 }
