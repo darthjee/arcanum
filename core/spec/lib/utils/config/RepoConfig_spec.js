@@ -6,9 +6,11 @@ import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js'
 
 describe('RepoConfig', () => {
   let repoPath;
+  let repoConfig;
 
   beforeEach(async () => {
     repoPath = await createTempDir();
+    repoConfig = new RepoConfig(createRepoContextMock({ repoPath }));
   });
 
   afterEach(async () => {
@@ -17,9 +19,7 @@ describe('RepoConfig', () => {
 
   describe('#getSafeBranch', () => {
     it('defaults to origin/main when the config file is absent', async () => {
-      const repoConfig = new RepoConfig();
-
-      await expectAsync(repoConfig.getSafeBranch(repoPath)).toBeResolvedTo('origin/main');
+      await expectAsync(repoConfig.getSafeBranch()).toBeResolvedTo('origin/main');
     });
 
     it('reads git.safe_branch from .claude/state/arcanum-config.json when present', async () => {
@@ -29,48 +29,27 @@ describe('RepoConfig', () => {
         JSON.stringify({ git: { safe_branch: 'origin/develop' } })
       );
 
-      const repoConfig = new RepoConfig();
-
-      await expectAsync(repoConfig.getSafeBranch(repoPath)).toBeResolvedTo('origin/develop');
+      await expectAsync(repoConfig.getSafeBranch()).toBeResolvedTo('origin/develop');
     });
 
     it('defaults to origin/main when the key is absent from the config file', async () => {
       await mkdir(path.join(repoPath, '.claude', 'state'), { recursive: true });
       await writeFile(path.join(repoPath, '.claude', 'state', 'arcanum-config.json'), JSON.stringify({}));
 
-      const repoConfig = new RepoConfig();
-
-      await expectAsync(repoConfig.getSafeBranch(repoPath)).toBeResolvedTo('origin/main');
+      await expectAsync(repoConfig.getSafeBranch()).toBeResolvedTo('origin/main');
     });
 
     it('defaults to origin/main when the config file is malformed JSON', async () => {
       await mkdir(path.join(repoPath, '.claude', 'state'), { recursive: true });
       await writeFile(path.join(repoPath, '.claude', 'state', 'arcanum-config.json'), '{not valid json');
 
-      const repoConfig = new RepoConfig();
-
-      await expectAsync(repoConfig.getSafeBranch(repoPath)).toBeResolvedTo('origin/main');
-    });
-
-    it('falls back to the constructor-injected repoContext.repoPath when repoPath is omitted', async () => {
-      await mkdir(path.join(repoPath, '.claude', 'state'), { recursive: true });
-      await writeFile(
-        path.join(repoPath, '.claude', 'state', 'arcanum-config.json'),
-        JSON.stringify({ git: { safe_branch: 'origin/develop' } })
-      );
-
-      const repoContext = createRepoContextMock({ repoPath });
-      const repoConfig = new RepoConfig(repoContext);
-
-      await expectAsync(repoConfig.getSafeBranch()).toBeResolvedTo('origin/develop');
+      await expectAsync(repoConfig.getSafeBranch()).toBeResolvedTo('origin/main');
     });
   });
 
   describe('#getIgnoredCheckPatterns', () => {
     it('defaults to [] when the config file is absent', async () => {
-      const repoConfig = new RepoConfig();
-
-      await expectAsync(repoConfig.getIgnoredCheckPatterns(repoPath)).toBeResolvedTo([]);
+      await expectAsync(repoConfig.getIgnoredCheckPatterns()).toBeResolvedTo([]);
     });
 
     it('reads auto-fix-all.ignored_check_patterns from .claude/configuration/arcanum-repo-config.json when present', async () => {
@@ -80,18 +59,14 @@ describe('RepoConfig', () => {
         JSON.stringify({ 'auto-fix-all': { ignored_check_patterns: ['codacy', 'dependabot'] } })
       );
 
-      const repoConfig = new RepoConfig();
-
-      await expectAsync(repoConfig.getIgnoredCheckPatterns(repoPath)).toBeResolvedTo(['codacy', 'dependabot']);
+      await expectAsync(repoConfig.getIgnoredCheckPatterns()).toBeResolvedTo(['codacy', 'dependabot']);
     });
 
     it('defaults to [] when the auto-fix-all namespace is absent', async () => {
       await mkdir(path.join(repoPath, '.claude', 'configuration'), { recursive: true });
       await writeFile(path.join(repoPath, '.claude', 'configuration', 'arcanum-repo-config.json'), JSON.stringify({}));
 
-      const repoConfig = new RepoConfig();
-
-      await expectAsync(repoConfig.getIgnoredCheckPatterns(repoPath)).toBeResolvedTo([]);
+      await expectAsync(repoConfig.getIgnoredCheckPatterns()).toBeResolvedTo([]);
     });
 
     it('defaults to [] when ignored_check_patterns is absent from the auto-fix-all namespace', async () => {
@@ -101,9 +76,7 @@ describe('RepoConfig', () => {
         JSON.stringify({ 'auto-fix-all': {} })
       );
 
-      const repoConfig = new RepoConfig();
-
-      await expectAsync(repoConfig.getIgnoredCheckPatterns(repoPath)).toBeResolvedTo([]);
+      await expectAsync(repoConfig.getIgnoredCheckPatterns()).toBeResolvedTo([]);
     });
 
     it('defaults to [] when ignored_check_patterns is not itself an array', async () => {
@@ -113,18 +86,14 @@ describe('RepoConfig', () => {
         JSON.stringify({ 'auto-fix-all': { ignored_check_patterns: 'not-an-array' } })
       );
 
-      const repoConfig = new RepoConfig();
-
-      await expectAsync(repoConfig.getIgnoredCheckPatterns(repoPath)).toBeResolvedTo([]);
+      await expectAsync(repoConfig.getIgnoredCheckPatterns()).toBeResolvedTo([]);
     });
 
     it('defaults to [] when the config file is malformed JSON', async () => {
       await mkdir(path.join(repoPath, '.claude', 'configuration'), { recursive: true });
       await writeFile(path.join(repoPath, '.claude', 'configuration', 'arcanum-repo-config.json'), '{not valid json');
 
-      const repoConfig = new RepoConfig();
-
-      await expectAsync(repoConfig.getIgnoredCheckPatterns(repoPath)).toBeResolvedTo([]);
+      await expectAsync(repoConfig.getIgnoredCheckPatterns()).toBeResolvedTo([]);
     });
 
     it('does not fall back to the legacy .claude/configuration/auto-fix-all.json file', async () => {
@@ -134,22 +103,7 @@ describe('RepoConfig', () => {
         JSON.stringify({ ignored_check_patterns: ['codacy'] })
       );
 
-      const repoConfig = new RepoConfig();
-
-      await expectAsync(repoConfig.getIgnoredCheckPatterns(repoPath)).toBeResolvedTo([]);
-    });
-
-    it('falls back to the constructor-injected repoContext.repoPath when repoPath is omitted', async () => {
-      await mkdir(path.join(repoPath, '.claude', 'configuration'), { recursive: true });
-      await writeFile(
-        path.join(repoPath, '.claude', 'configuration', 'arcanum-repo-config.json'),
-        JSON.stringify({ 'auto-fix-all': { ignored_check_patterns: ['codacy', 'dependabot'] } })
-      );
-
-      const repoContext = createRepoContextMock({ repoPath });
-      const repoConfig = new RepoConfig(repoContext);
-
-      await expectAsync(repoConfig.getIgnoredCheckPatterns()).toBeResolvedTo(['codacy', 'dependabot']);
+      await expectAsync(repoConfig.getIgnoredCheckPatterns()).toBeResolvedTo([]);
     });
   });
 });

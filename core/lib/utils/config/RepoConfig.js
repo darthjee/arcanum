@@ -13,33 +13,25 @@ const DEFAULT_SAFE_BRANCH = 'origin/main';
  * `.claude/configuration/arcanum-repo-config.json` (mirroring
  * `wait_ci.sh`'s own `repo_config_read` call).
  *
- * Supports the same dual-mode shape as `GithubIssue.js`: an optional
- * `repoContext` supplied at construction, whose `repoPath` each method
- * falls back to whenever its own `repoPath` argument isn't passed
- * explicitly. Both calling styles — a bare `new RepoConfig()` with an
- * explicit `repoPath` per call, or a `new RepoConfig(repoContext)` with
- * no per-call `repoPath` — work side by side.
+ * `repoContext` is a required constructor parameter — every method reads
+ * `repoPath` from it, matching `GithubIssue.js`'s dual-mode collaborators
+ * once their own fallback is dropped.
  */
 class RepoConfig {
   /**
-   * @param {import('../../context/RepoContext.js').default} [repoContext] -
-   *   the target repo's context, whose `repoPath` each method falls
-   *   back to when its own `repoPath` argument is omitted. Absent when
-   *   `RepoConfig` is used zero-arg with an explicit `repoPath` per
-   *   call.
+   * @param {import('../../context/RepoContext.js').default} repoContext -
+   *   the target repo's context, supplying `repoPath` to every method.
    */
   constructor(repoContext) {
     this._repoContext = repoContext;
   }
 
   /**
-   * @param {string} [repoPath] - the target repo's local checkout path.
-   *   Falls back to `this._repoContext.repoPath` when omitted.
    * @returns {Promise<string>} the configured safe branch, defaulting
    *   to `"origin/main"` when absent/empty/unreadable.
    */
-  async getSafeBranch(repoPath) {
-    repoPath = repoPath ?? this._repoContext.repoPath;
+  async getSafeBranch() {
+    const { repoPath } = this._repoContext;
 
     const configPath = path.join(repoPath, '.claude', 'state', 'arcanum-config.json');
 
@@ -73,14 +65,12 @@ class RepoConfig {
    * (matching the shell script's documented behavior) with no legacy
    * `.claude/configuration/auto-fix-all.json`
    * fallback attempted for this key.
-   * @param {string} [repoPath] - the target repo's local checkout path.
-   *   Falls back to `this._repoContext.repoPath` when omitted.
    * @returns {Promise<Array>} the configured array of regex-string
    *   patterns, defaulting to `[]` when the file/namespace/field is
    *   absent, unreadable, malformed, or not itself an array.
    */
-  async getIgnoredCheckPatterns(repoPath) {
-    repoPath = repoPath ?? this._repoContext.repoPath;
+  async getIgnoredCheckPatterns() {
+    const { repoPath } = this._repoContext;
 
     const configPath = path.join(repoPath, '.claude', 'configuration', 'arcanum-repo-config.json');
 
