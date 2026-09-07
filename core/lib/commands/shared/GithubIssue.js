@@ -65,7 +65,7 @@ class GithubIssue {
     jsonParser = new JsonParser(),
     jsonValueFormatter = new JsonValueFormatter(),
     jsonReader = new JsonReader(),
-    issueStatePaths = new IssueStatePaths(),
+    issueStatePaths = new IssueStatePaths(repoContext),
     githubIssueService = new GithubIssueService({ origin, githubToken, fetchFn, timeoutMs })
   } = {}) {
     this._repoContext = repoContext;
@@ -188,7 +188,7 @@ class GithubIssue {
       jsonParser: this._jsonParser,
       jsonValueFormatter: this._jsonValueFormatter,
       jsonReader: this._jsonReader,
-      issueStatePaths: new IssueStatePaths({ repoContext: context })
+      issueStatePaths: new IssueStatePaths(context)
     });
   }
 }
