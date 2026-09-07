@@ -19,37 +19,37 @@ describe('SpawnIssue#run (argument validation)', () => {
   });
 
   it('rejects when the context has no repoPath, without attempting create', async () => {
-    const githubIssue = { create: jasmine.createSpy('create') };
+    const githubIssueService = { create: jasmine.createSpy('create') };
     const deps = stubDeps();
-    const spawnIssue = new SpawnIssue(buildContext('', { githubIssue }), deps);
+    const spawnIssue = new SpawnIssue(buildContext('', { githubIssueService }), deps);
 
     await expectAsync(spawnIssue.run('1', 'New issue', bodyFile)).toBeRejectedWithError(USAGE);
 
-    expect(githubIssue.create).not.toHaveBeenCalled();
+    expect(githubIssueService.create).not.toHaveBeenCalled();
   });
 
   it('rejects a body file that does not exist, without attempting create', async () => {
-    const githubIssue = { create: jasmine.createSpy('create') };
+    const githubIssueService = { create: jasmine.createSpy('create') };
     const deps = stubDeps();
-    const spawnIssue = new SpawnIssue(buildContext(repoPath, { githubIssue }), deps);
+    const spawnIssue = new SpawnIssue(buildContext(repoPath, { githubIssueService }), deps);
     const missingFile = path.join(repoPath, 'does-not-exist.md');
 
     await expectAsync(spawnIssue.run('1', 'New issue', missingFile)).toBeRejectedWithError(
       `Error: file not found: ${missingFile}`
     );
 
-    expect(githubIssue.create).not.toHaveBeenCalled();
+    expect(githubIssueService.create).not.toHaveBeenCalled();
   });
 
   it('rejects an unrecognized 5th argument', async () => {
-    const githubIssue = { create: jasmine.createSpy('create') };
+    const githubIssueService = { create: jasmine.createSpy('create') };
     const deps = stubDeps();
-    const spawnIssue = new SpawnIssue(buildContext(repoPath, { githubIssue }), deps);
+    const spawnIssue = new SpawnIssue(buildContext(repoPath, { githubIssueService }), deps);
 
     await expectAsync(
       spawnIssue.run('1', 'New issue', bodyFile, '--bogus-flag')
     ).toBeRejected();
 
-    expect(githubIssue.create).not.toHaveBeenCalled();
+    expect(githubIssueService.create).not.toHaveBeenCalled();
   });
 });

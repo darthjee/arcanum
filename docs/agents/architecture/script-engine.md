@@ -51,14 +51,14 @@ A native implementation of a given entrypoint must be byte-identical to its shel
 
 A single, central Node package at `core/` — not one Node package per skill. `core/package.json` declares Yarn as the package manager and zero runtime npm dependencies (built-in Node APIs only, including the global `fetch` for GitHub REST/GraphQL calls instead of a GitHub SDK — mirroring how today's shell scripts already avoid the `gh issue`/`gh api` subcommands in favor of `curl` plus `gh auth token`). Source lives under `core/lib/`; `core/bin/arcanum` is the one executable entrypoint described above.
 
-`core/lib/` is split into 4 folders, with a one-way dependency direction — `commands` → `context`/`services` → `utils` — enforced by convention (no lint rule):
+`core/lib/` is split into 4 folders, with a one-way dependency direction — `commands` → `context`/`services` → `utils` — enforced by `core/eslint.config.mjs`'s `no-restricted-imports` override (scoped to `lib/context/**`, `lib/services/**`, `lib/utils/**`, failing any import specifier matching `**/commands/**`), not merely by convention:
 
 - `commands/` — CLI entrypoints, one per `core/bin/arcanum` dispatch-table module. May depend on `context/`, `services/`, and `utils/`.
 - `context/` — per-call-site bundles of a `repoPath` plus its resolved collaborators (e.g. `RepoContext`, built fresh per call since `repoPath` differs call to call). May depend on `services/` and `utils/`.
 - `services/` — stateful or I/O-owning logic shared by multiple commands/contexts, but not itself a CLI entrypoint (e.g. `IssueStateService`). May depend on `utils/`.
 - `utils/` — stateless or narrowly-scoped helpers with no knowledge of the CLI dispatch surface.
 
-Nothing under `context/`, `services/`, or `utils/` may import from `commands/` — a command is an entrypoint, not a library other layers should reach back into.
+Nothing under `context/`, `services/`, or `utils/` may import from `commands/` — a command is an entrypoint, not a library other layers should reach back into. This is lint-enforced, not just documented: `yarn lint` fails on any such import.
 
 Each command declares a `context: 'repo' | 'claude' | 'none'` in the `core/bin/arcanum` dispatch table. For a `context: 'repo'` entry the dispatcher builds a `RepoContext` (bound to that call's `repoPath`) and injects it as the command's sole constructor argument; a `context: 'claude'` entry gets a `ClaudeContext` the same way; a `context: 'none'` entry is constructed with no arguments and keeps its full argument list. A command therefore receives its context-bound collaborators ready-made at construction rather than building them itself per call.
 
