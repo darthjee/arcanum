@@ -1,3 +1,5 @@
+import GithubIssueService from '../../../lib/services/GithubIssueService.js';
+import GithubToken from '../../../lib/utils/github/GithubToken.js';
 import RepoContext from '../../../lib/context/RepoContext.js';
 
 const REPO_PATH = '/fake/repo';
@@ -41,13 +43,13 @@ describe('RepoContext', () => {
   });
 
   describe('#getToken', () => {
-    it('delegates to githubToken.get with repoPath', async () => {
+    it('delegates to githubToken.get with no arguments', async () => {
       const get = jasmine.createSpy().and.resolveTo('fake-token');
       const context = newContext({ githubToken: { get } });
 
       const result = await context.getToken();
 
-      expect(get).toHaveBeenCalledWith(REPO_PATH);
+      expect(get).toHaveBeenCalledWith();
       expect(result).toEqual('fake-token');
     });
   });
@@ -137,6 +139,92 @@ describe('RepoContext', () => {
       const context = new RepoContext({ repoPath: REPO_PATH });
 
       expect(context.repoPath).toEqual(REPO_PATH);
+    });
+
+    it('self-builds a GithubToken carrying itself as repoContext when none is injected', () => {
+      const context = new RepoContext({ repoPath: REPO_PATH });
+
+      expect(context._githubToken).toBeInstanceOf(GithubToken);
+      expect(context._githubToken._repoContext).toBe(context);
+    });
+
+    it('resolves getToken() against this.repoPath through the self-built GithubToken', async () => {
+      const calls = [];
+      const execFileAsync = jasmine.createSpy('execFileAsync').and.callFake((file, args, options) => {
+        calls.push({ args, options });
+
+        if (args[0] === 'config' && args[1] === 'user.ghuser') {
+          return Promise.reject(new Error('not set'));
+        }
+
+        if (args.join(' ') === 'auth token') {
+          return Promise.resolve({ stdout: 'self-built-token\n', stderr: '' });
+        }
+
+        return Promise.reject(new Error('unexpected call'));
+      });
+      const context = new RepoContext({
+        repoPath: REPO_PATH,
+        githubToken: new GithubToken({ execFileAsync, repoContext: { repoPath: REPO_PATH } })
+      });
+
+      await expectAsync(context.getToken()).toBeResolvedTo('self-built-token');
+
+      const configCall = calls.find(({ args }) => args.join(' ') === 'config user.ghuser');
+      expect(configCall.options).toEqual({ cwd: REPO_PATH });
+    });
+
+    it('self-builds a GithubIssueService carrying itself as repoContext when none is injected', () => {
+      const context = new RepoContext({ repoPath: REPO_PATH });
+
+      expect(context._githubIssueService).toBeInstanceOf(GithubIssueService);
+      expect(context._githubIssueService._repoContext).toBe(context);
+    });
+
+    it('forwards a constructor-injected execFileAsync into the self-built GithubToken\'s real get()', async () => {
+      const calls = [];
+      const execFileAsync = jasmine.createSpy('execFileAsync').and.callFake((file, args, options) => {
+        calls.push({ args, options });
+
+        if (args[0] === 'config' && args[1] === 'user.ghuser') {
+          return Promise.reject(new Error('not set'));
+        }
+
+        if (args.join(' ') === 'auth token') {
+          return Promise.resolve({ stdout: 'forwarded-token\n', stderr: '' });
+        }
+
+        return Promise.reject(new Error('unexpected call'));
+      });
+      const context = new RepoContext({ repoPath: REPO_PATH, execFileAsync });
+
+      await expectAsync(context.getToken()).toBeResolvedTo('forwarded-token');
+
+      const configCall = calls.find(({ args }) => args.join(' ') === 'config user.ghuser');
+      expect(configCall.options).toEqual({ cwd: REPO_PATH });
+    });
+
+    it('forwards a constructor-injected execFileAsync into the self-built GithubIssueService\'s default GithubToken', () => {
+      const execFileAsync = jasmine.createSpy('execFileAsync');
+      const context = new RepoContext({ repoPath: REPO_PATH, execFileAsync });
+
+      expect(context._githubIssueService._githubToken._execFileAsync).toBe(execFileAsync);
+    });
+
+    it('does not forward execFileAsync into an explicitly injected githubToken', () => {
+      const githubToken = { get: jasmine.createSpy() };
+      const execFileAsync = jasmine.createSpy('execFileAsync');
+      const context = new RepoContext({ repoPath: REPO_PATH, githubToken, execFileAsync });
+
+      expect(context._githubToken).toBe(githubToken);
+    });
+
+    it('does not forward execFileAsync into an explicitly injected githubIssueService', () => {
+      const githubIssueService = { create: jasmine.createSpy() };
+      const execFileAsync = jasmine.createSpy('execFileAsync');
+      const context = new RepoContext({ repoPath: REPO_PATH, githubIssueService, execFileAsync });
+
+      expect(context._githubIssueService).toBe(githubIssueService);
     });
   });
 });

@@ -29,7 +29,7 @@ describe('AutoFixAllGithub (wiring)', () => {
       // route through the same shared instances, so both are called more than once per #addTag call.
       await github.addTag('5', 'ready_for_work');
       expect(originWithRef).toHaveBeenCalledWith(REPO_PATH);
-      expect(tokenGet).toHaveBeenCalledWith(REPO_PATH);
+      expect(tokenGet).toHaveBeenCalledWith();
 
       const originWithRefAfterAddTag = originWithRef.calls.count();
       const tokenGetAfterAddTag = tokenGet.calls.count();

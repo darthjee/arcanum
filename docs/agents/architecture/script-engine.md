@@ -55,7 +55,7 @@ A single, central Node package at `core/` — not one Node package per skill. `c
 
 - `commands/` — CLI entrypoints, one per `core/bin/arcanum` dispatch-table module. May depend on `context/`, `services/`, and `utils/`.
 - `context/` — per-call-site bundles of a `repoPath` plus its resolved collaborators (e.g. `RepoContext`, built fresh per call since `repoPath` differs call to call). May depend on `services/` and `utils/`.
-- `services/` — stateful or I/O-owning logic shared by multiple commands/contexts, but not itself a CLI entrypoint (e.g. `IssueStateService`). May depend on `utils/`.
+- `services/` — stateful or I/O-owning logic shared by multiple commands/contexts, but not itself a CLI entrypoint (e.g. `IssueStateService`). May depend on `utils/`. A `services/` module may additionally accept a caller-supplied, context-shaped `{ repoPath }` object as a constructor/method parameter (duck-typed, never `import`ed from `context/`) — this keeps the import graph one-way while letting a service stop threading `repoPath` per call.
 - `utils/` — stateless or narrowly-scoped helpers with no knowledge of the CLI dispatch surface.
 
 Nothing under `context/`, `services/`, or `utils/` may import from `commands/` — a command is an entrypoint, not a library other layers should reach back into. This is lint-enforced, not just documented: `yarn lint` fails on any such import.
