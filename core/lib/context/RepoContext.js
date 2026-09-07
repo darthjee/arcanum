@@ -29,17 +29,23 @@ class RepoContext {
    *   path.
    * @param {Origin} [deps.origin] - git-origin resolver.
    * @param {GithubToken} [deps.githubToken] - GitHub token resolver;
-   *   defaults to a `GithubToken` built with `{ repoContext: this }`
-   *   when omitted, so `#getToken` can call `get()` arg-free.
+   *   defaults to a `GithubToken` built with
+   *   `{ repoContext: this, execFileAsync }` when omitted, so
+   *   `#getToken` can call `get()` arg-free.
    * @param {IssueStateService} [deps.issueStateService] - issue
    *   state-file reader/writer, bound to this context.
    * @param {ConfigChain} [deps.configChain] - 3-tier config reader.
    * @param {GithubIssueService} [deps.githubIssueService] - GitHub issue
    *   creator; defaults to a `GithubIssueService` built with
-   *   `{ repoContext: this }` when omitted.
+   *   `{ repoContext: this, execFileAsync }` when omitted.
    * @param {RepoPath} [deps.repoPathValidator] - `repoPath`
    *   present/directory/git-repo validator (distinct from the
    *   `repoPath` string param).
+   * @param {Function} [deps.execFileAsync] - promisified `execFile`,
+   *   forwarded into the self-built `GithubToken`/`GithubIssueService`
+   *   when `githubToken`/`githubIssueService` are omitted; ignored when
+   *   either is explicitly injected, since an injected collaborator must
+   *   not be silently overridden.
    */
   constructor({
     repoPath,
@@ -48,14 +54,15 @@ class RepoContext {
     issueStateService,
     configChain = new ConfigChain(),
     githubIssueService,
-    repoPathValidator = new RepoPath()
+    repoPathValidator = new RepoPath(),
+    execFileAsync
   } = {}) {
     this.repoPath = repoPath;
     this._origin = origin;
-    this._githubToken = githubToken ?? new GithubToken({ repoContext: this });
+    this._githubToken = githubToken ?? new GithubToken({ repoContext: this, execFileAsync });
     this._issueStateService = issueStateService ?? new IssueStateService({ context: this });
     this._configChain = configChain;
-    this._githubIssueService = githubIssueService ?? new GithubIssueService({ repoContext: this });
+    this._githubIssueService = githubIssueService ?? new GithubIssueService({ repoContext: this, execFileAsync });
     this._repoPathValidator = repoPathValidator;
   }
 

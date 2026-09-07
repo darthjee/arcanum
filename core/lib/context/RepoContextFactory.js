@@ -25,8 +25,10 @@ class RepoContextFactory {
    * `undefined`) into each `RepoContext`, which supplies its own
    * defaults when they are absent — as does `githubToken`: each
    * `RepoContext` now builds its own `GithubToken` bound to itself
-   * (`{ repoContext: this }`), so there is no shared instance for the
-   * factory to hold or forward.
+   * (`{ repoContext: this, execFileAsync: this._execFileAsync }`), so
+   * there is no shared instance for the factory to hold, but
+   * `execFileAsync` is still forwarded so that self-built `GithubToken`
+   * never falls through to its real default (shelling out to `gh`).
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Origin} [deps.origin] - shared git-origin resolver.
    * @param {object} [deps.issueStateService] - forwarded to each
@@ -34,7 +36,9 @@ class RepoContextFactory {
    * @param {object} [deps.configChain] - forwarded to each per-call
    *   `RepoContext`.
    * @param {Function} [deps.execFileAsync] - forwarded to each per-call
-   *   `GitClient`.
+   *   `GitClient`, and to each per-call `RepoContext` (which in turn
+   *   forwards it into its self-built `GithubToken`/`GithubIssueService`
+   *   when those are not otherwise injected).
    * @param {Function} [deps.fetchFn] - forwarded to both the per-call
    *   `GitHubClient` and the per-call `IssueClient`.
    * @param {number} [deps.timeoutMs] - forwarded to both the per-call
@@ -71,7 +75,8 @@ class RepoContextFactory {
       repoPath,
       origin: this._origin,
       issueStateService: this._issueStateService,
-      configChain: this._configChain
+      configChain: this._configChain,
+      execFileAsync: this._execFileAsync
     });
 
     return this.buildFromContext(context);

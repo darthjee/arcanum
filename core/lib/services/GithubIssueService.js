@@ -24,7 +24,9 @@ class GithubIssueService {
   /**
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Origin} [deps.origin] - git-origin resolver.
-   * @param {GithubToken} [deps.githubToken] - GitHub token resolver.
+   * @param {GithubToken} [deps.githubToken] - GitHub token resolver;
+   *   defaults to a `GithubToken` built with
+   *   `{ repoContext, execFileAsync }` when omitted.
    * @param {Function} [deps.fetchFn] - `fetch`-compatible implementation
    *   (global `fetch` by default).
    * @param {number} [deps.timeoutMs] - the REST call's abort timeout,
@@ -33,11 +35,17 @@ class GithubIssueService {
    *   duck-typed context object (not an actual `RepoContext`), supplying a
    *   `repoPath` fallback for `#issueClient`/`#create` when no explicit
    *   `repoPath` argument is passed.
+   * @param {Function} [deps.execFileAsync] - promisified `execFile`,
+   *   forwarded into the self-built default `GithubToken` when
+   *   `githubToken` is omitted; ignored when `githubToken` is explicitly
+   *   injected, since an injected collaborator must not be silently
+   *   overridden.
    */
   constructor({
     origin = new Origin(),
     repoContext,
-    githubToken = new GithubToken({ repoContext }),
+    execFileAsync,
+    githubToken = new GithubToken({ repoContext, execFileAsync }),
     fetchFn = fetch,
     timeoutMs = DEFAULT_TIMEOUT_MS
   } = {}) {

@@ -180,5 +180,51 @@ describe('RepoContext', () => {
       expect(context._githubIssueService).toBeInstanceOf(GithubIssueService);
       expect(context._githubIssueService._repoContext).toBe(context);
     });
+
+    it('forwards a constructor-injected execFileAsync into the self-built GithubToken\'s real get()', async () => {
+      const calls = [];
+      const execFileAsync = jasmine.createSpy('execFileAsync').and.callFake((file, args, options) => {
+        calls.push({ args, options });
+
+        if (args[0] === 'config' && args[1] === 'user.ghuser') {
+          return Promise.reject(new Error('not set'));
+        }
+
+        if (args.join(' ') === 'auth token') {
+          return Promise.resolve({ stdout: 'forwarded-token\n', stderr: '' });
+        }
+
+        return Promise.reject(new Error('unexpected call'));
+      });
+      const context = new RepoContext({ repoPath: REPO_PATH, execFileAsync });
+
+      await expectAsync(context.getToken()).toBeResolvedTo('forwarded-token');
+
+      const configCall = calls.find(({ args }) => args.join(' ') === 'config user.ghuser');
+      expect(configCall.options).toEqual({ cwd: REPO_PATH });
+    });
+
+    it('forwards a constructor-injected execFileAsync into the self-built GithubIssueService\'s default GithubToken', () => {
+      const execFileAsync = jasmine.createSpy('execFileAsync');
+      const context = new RepoContext({ repoPath: REPO_PATH, execFileAsync });
+
+      expect(context._githubIssueService._githubToken._execFileAsync).toBe(execFileAsync);
+    });
+
+    it('does not forward execFileAsync into an explicitly injected githubToken', () => {
+      const githubToken = { get: jasmine.createSpy() };
+      const execFileAsync = jasmine.createSpy('execFileAsync');
+      const context = new RepoContext({ repoPath: REPO_PATH, githubToken, execFileAsync });
+
+      expect(context._githubToken).toBe(githubToken);
+    });
+
+    it('does not forward execFileAsync into an explicitly injected githubIssueService', () => {
+      const githubIssueService = { create: jasmine.createSpy() };
+      const execFileAsync = jasmine.createSpy('execFileAsync');
+      const context = new RepoContext({ repoPath: REPO_PATH, githubIssueService, execFileAsync });
+
+      expect(context._githubIssueService).toBe(githubIssueService);
+    });
   });
 });

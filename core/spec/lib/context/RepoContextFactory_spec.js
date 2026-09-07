@@ -45,6 +45,29 @@ describe('RepoContextFactory', () => {
       expect(bundle.context._githubToken._repoContext).toBe(bundle.context);
     });
 
+    it('forwards the injected execFileAsync into the self-built GithubToken\'s real get()', async () => {
+      const calls = [];
+      const execFileAsync = jasmine.createSpy('execFileAsync').and.callFake((file, args, options) => {
+        calls.push({ args, options });
+
+        if (args[0] === 'config' && args[1] === 'user.ghuser') {
+          return Promise.reject(new Error('not set'));
+        }
+
+        if (args.join(' ') === 'auth token') {
+          return Promise.resolve({ stdout: 'factory-forwarded-token\n', stderr: '' });
+        }
+
+        return Promise.reject(new Error('unexpected call'));
+      });
+      const bundle = newFactory({ execFileAsync }).build(REPO_PATH);
+
+      await expectAsync(bundle.context.getToken()).toBeResolvedTo('factory-forwarded-token');
+
+      const configCall = calls.find(({ args }) => args.join(' ') === 'config user.ghuser');
+      expect(configCall.options).toEqual({ cwd: REPO_PATH });
+    });
+
     it('forwards the injected execFileAsync into the returned gitClient', async () => {
       const execFileAsync = jasmine.createSpy('execFileAsync').and.resolveTo({ stdout: 'feature\n', stderr: '' });
       const bundle = newFactory({ execFileAsync }).build(REPO_PATH);

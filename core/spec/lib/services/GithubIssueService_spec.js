@@ -1,6 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import GithubIssueService from '../../../lib/services/GithubIssueService.js';
+import GithubToken from '../../../lib/utils/github/GithubToken.js';
 import { loadFixture, stubDeps } from '../../support/factories/githubIssue.js';
 import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
 
@@ -176,6 +177,48 @@ describe('GithubIssueService#create', () => {
     } finally {
       await removeTempDir(otherRepoPath);
     }
+  });
+});
+
+describe('GithubIssueService defaults', () => {
+  it('self-builds a GithubToken carrying the constructor repoContext when none is injected', () => {
+    const repoContext = { repoPath: '/fake/repo' };
+    const service = new GithubIssueService({ repoContext });
+
+    expect(service._githubToken).toBeInstanceOf(GithubToken);
+    expect(service._githubToken._repoContext).toBe(repoContext);
+  });
+
+  it('forwards the injected execFileAsync into the self-built default GithubToken', async () => {
+    const calls = [];
+    const execFileAsync = jasmine.createSpy('execFileAsync').and.callFake((file, args, options) => {
+      calls.push({ args, options });
+
+      if (args[0] === 'config' && args[1] === 'user.ghuser') {
+        return Promise.reject(new Error('not set'));
+      }
+
+      if (args.join(' ') === 'auth token') {
+        return Promise.resolve({ stdout: 'self-built-token\n', stderr: '' });
+      }
+
+      return Promise.reject(new Error('unexpected call'));
+    });
+    const repoContext = { repoPath: '/fake/repo' };
+    const service = new GithubIssueService({ repoContext, execFileAsync });
+
+    await expectAsync(service._githubToken.get()).toBeResolvedTo('self-built-token');
+
+    const configCall = calls.find(({ args }) => args.join(' ') === 'config user.ghuser');
+    expect(configCall.options).toEqual({ cwd: '/fake/repo' });
+  });
+
+  it('does not forward execFileAsync into an explicitly injected githubToken', () => {
+    const githubToken = { get: jasmine.createSpy() };
+    const execFileAsync = jasmine.createSpy('execFileAsync');
+    const service = new GithubIssueService({ githubToken, execFileAsync });
+
+    expect(service._githubToken).toBe(githubToken);
   });
 });
 
