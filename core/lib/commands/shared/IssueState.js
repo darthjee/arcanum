@@ -42,7 +42,7 @@ class IssueState {
     jsonParser = new JsonParser(),
     jsonValueFormatter = new JsonValueFormatter(),
     jsonReader = new JsonReader(),
-    issueStatePaths = new IssueStatePaths()
+    issueStatePaths = new IssueStatePaths({ repoContext })
   } = {}) {
     this._repoContext = repoContext;
     this._lock = lock;
@@ -80,7 +80,7 @@ class IssueState {
       throw new Error(USAGE_MESSAGE);
     }
 
-    const { stateDir } = this._issueStatePaths.paths(repoPath, id);
+    const { stateDir } = this._issueStatePaths.paths(undefined, id);
 
     await mkdir(stateDir, { recursive: true });
 
