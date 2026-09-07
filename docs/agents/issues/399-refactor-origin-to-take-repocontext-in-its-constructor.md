@@ -47,16 +47,10 @@ keep being able to build it zero-arg, since no `RepoContext` exists yet at that 
   `resolveWithRef` — only when `GithubIssue` itself was constructed with a `repoContext`
   (its own zero-arg internal-collaborator path is unaffected).
 
-### Phase 3: Remove repoPath from method arguments — internal-use call sites only
-
-- `RepoContext.js`/`RepoContextFactory.js`'s zero-arg internal use of `Origin` must keep
-  working, so `resolve`/`resolveWithRef` cannot drop the `repoPath` parameter outright the
-  way a single-caller class like `QueueStore` can. This phase's scope needs re-deciding when
-  this issue gets split — options include leaving `repoPath` as a permanent optional
-  override on `Origin`, or having `RepoContext` construct its own `Origin` with itself as
-  `repoContext` once it exists (mirroring how `RepoContext` already does this for
-  `IssueStateService`).
-- Update JSDoc, and `GithubIssue.js`'s spec, accordingly once the above is settled.
+This issue's scope stops at Phase 2. `RepoContext.js`/`RepoContextFactory.js`'s zero-arg
+internal use of `Origin` must keep working, so `resolve`/`resolveWithRef` cannot drop the
+`repoPath` parameter outright the way a single-caller class like `QueueStore` can — deciding
+and implementing that removal is tracked separately in #409.
 
 ### Done when
 
@@ -74,7 +68,7 @@ keep being able to build it zero-arg, since no `RepoContext` exists yet at that 
   `RepoConfig.js`, `IssueStatePaths.js`, `BranchCleanup.js`, `GithubToken.js`,
   `ConfigChain.js`, and `IssueFile.js`, each carrying the same idea for its own file.
 - Resolving whether `Origin`'s zero-arg internal-use path can ever fully drop `repoPath` —
-  deferred to Phase 3, to be decided when this issue is split.
+  split off into #409.
 
 ## Benefits
 
