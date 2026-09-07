@@ -1,4 +1,5 @@
 import GithubToken from '../../../lib/utils/github/GithubToken.js';
+import Origin from '../../../lib/utils/git/Origin.js';
 import RepoContext from '../../../lib/context/RepoContext.js';
 import RepoContextFactory from '../../../lib/context/RepoContextFactory.js';
 
@@ -9,13 +10,15 @@ const REPO_PATH = '/fake/repo';
 describe('RepoContextFactory', () => {
   function newFactory(overrides = {}) {
     return new RepoContextFactory({
-      origin: {
-        resolve: async () => ({ domain: 'github.com', repo: REPO }),
-        resolveWithRef: async () => ({ domain: 'github.com', repo: REPO, repoRef: REPO })
-      },
       issueStateService: { get: async () => '' },
       configChain: { read: async () => undefined },
-      execFileAsync: jasmine.createSpy('execFileAsync').and.resolveTo({ stdout: 'main\n', stderr: '' }),
+      execFileAsync: jasmine.createSpy('execFileAsync').and.callFake((file, args) => {
+        if (args.includes('remote') && args.includes('get-url')) {
+          return Promise.resolve({ stdout: `git@github.com:${REPO}.git\n`, stderr: '' });
+        }
+
+        return Promise.resolve({ stdout: 'main\n', stderr: '' });
+      }),
       fetchFn: jasmine.createSpy('fetch').and.resolveTo({ ok: true, json: async () => ({}) }),
       timeoutMs: 5,
       ...overrides
@@ -43,6 +46,13 @@ describe('RepoContextFactory', () => {
 
       expect(bundle.context._githubToken).toBeInstanceOf(GithubToken);
       expect(bundle.context._githubToken._repoContext).toBe(bundle.context);
+    });
+
+    it('yields a context with a self-built origin bound to itself, rather than a shared origin', () => {
+      const bundle = newFactory().build(REPO_PATH);
+
+      expect(bundle.context._origin).toBeInstanceOf(Origin);
+      expect(bundle.context._origin._repoContext).toBe(bundle.context);
     });
 
     it('forwards the injected execFileAsync into the self-built GithubToken\'s real get()', async () => {
@@ -96,9 +106,7 @@ describe('RepoContextFactory', () => {
     });
 
     it('yields a usable context when issueStateService/configChain are omitted', () => {
-      const factory = new RepoContextFactory({
-        origin: { resolve: async () => ({}), resolveWithRef: async () => ({}) }
-      });
+      const factory = new RepoContextFactory();
 
       const bundle = factory.build(REPO_PATH);
 

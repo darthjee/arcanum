@@ -3,7 +3,6 @@ import GitBranch from '../utils/git/GitBranch.js';
 import GitClient from '../utils/git/GitClient.js';
 import GitHubClient from '../utils/github/GitHubClient.js';
 import IssueClient from '../utils/github/IssueClient.js';
-import Origin from '../utils/git/Origin.js';
 import RepoContext from './RepoContext.js';
 
 /**
@@ -19,40 +18,37 @@ import RepoContext from './RepoContext.js';
  */
 class RepoContextFactory {
   /**
-   * Holds one shared `origin` plus the `execFileAsync`/`fetchFn`/
-   * `timeoutMs` knobs, forwarding them into each per-call bundle.
-   * `issueStateService`/`configChain` are forwarded as-is (possibly
-   * `undefined`) into each `RepoContext`, which supplies its own
-   * defaults when they are absent — as does `githubToken`: each
-   * `RepoContext` now builds its own `GithubToken` bound to itself
-   * (`{ repoContext: this, execFileAsync: this._execFileAsync }`), so
-   * there is no shared instance for the factory to hold, but
-   * `execFileAsync` is still forwarded so that self-built `GithubToken`
-   * never falls through to its real default (shelling out to `gh`).
+   * Holds the `execFileAsync`/`fetchFn`/`timeoutMs` knobs, forwarding
+   * them into each per-call bundle. `issueStateService`/`configChain`
+   * are forwarded as-is (possibly `undefined`) into each `RepoContext`,
+   * which supplies its own defaults when they are absent — as do
+   * `origin`/`githubToken`: each `RepoContext` now builds its own
+   * `Origin`/`GithubToken` bound to itself (`{ repoContext: this,
+   * execFileAsync: this._execFileAsync }`), so there is no shared
+   * instance for the factory to hold, but `execFileAsync` is still
+   * forwarded so that self-built `Origin`/`GithubToken` never falls
+   * through to its real default (shelling out to `git`/`gh`).
    * @param {object} [deps] - injectable collaborators, for testing.
-   * @param {Origin} [deps.origin] - shared git-origin resolver.
    * @param {object} [deps.issueStateService] - forwarded to each
    *   per-call `RepoContext`.
    * @param {object} [deps.configChain] - forwarded to each per-call
    *   `RepoContext`.
    * @param {Function} [deps.execFileAsync] - forwarded to each per-call
    *   `GitClient`, and to each per-call `RepoContext` (which in turn
-   *   forwards it into its self-built `GithubToken`/`GithubIssueService`
-   *   when those are not otherwise injected).
+   *   forwards it into its self-built `Origin`/`GithubToken`/
+   *   `GithubIssueService` when those are not otherwise injected).
    * @param {Function} [deps.fetchFn] - forwarded to both the per-call
    *   `GitHubClient` and the per-call `IssueClient`.
    * @param {number} [deps.timeoutMs] - forwarded to both the per-call
    *   `GitHubClient` and the per-call `IssueClient`.
    */
   constructor({
-    origin = new Origin(),
     issueStateService,
     configChain,
     execFileAsync,
     fetchFn = fetch,
     timeoutMs
   } = {}) {
-    this._origin = origin;
     this._issueStateService = issueStateService;
     this._configChain = configChain;
     this._execFileAsync = execFileAsync;
@@ -65,15 +61,14 @@ class RepoContextFactory {
    * @returns {{context: RepoContext, gitClient: GitClient,
    *   gitBranch: GitBranch, git: Git, githubClient: GitHubClient,
    *   issueClient: IssueClient}} a fresh, flat bundle wrapping
-   *   `repoPath` (plus the shared `origin`/`issueStateService`/
-   *   `configChain`, and a `RepoContext`-self-built `githubToken`) into
-   *   a new `RepoContext`, with every context-bound client built right
+   *   `repoPath` (plus the forwarded `issueStateService`/`configChain`,
+   *   and a `RepoContext`-self-built `origin`/`githubToken`) into a new
+   *   `RepoContext`, with every context-bound client built right
    *   alongside it.
    */
   build(repoPath) {
     const context = new RepoContext({
       repoPath,
-      origin: this._origin,
       issueStateService: this._issueStateService,
       configChain: this._configChain,
       execFileAsync: this._execFileAsync
