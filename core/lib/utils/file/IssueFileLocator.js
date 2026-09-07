@@ -9,18 +9,27 @@ import path from 'node:path';
  * docs/agents/architecture/script-engine.md for the migration this
  * supports.
  */
-class IssueFile {
+class IssueFileLocator {
+  /**
+   * @param {import('../../context/RepoContext.js').default} repoContext -
+   *   the target repo's context, the sole source of `repoPath` for
+   *   `findExisting`.
+   */
+  constructor(repoContext) {
+    this._repoContext = repoContext;
+  }
+
   /**
    * Glob `<issuesFolder>/<id>_*`/`<id>-*` (first match wins — match
    * order is filesystem-dependent, mirroring `find ... | head -1`).
-   * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} issuesFolder - the folder to search, relative to `repoPath`.
    * @param {string} id - the issue id (numeric, once validated by the caller).
    * @returns {Promise<string|null>} the matched path (in the same
    *   `<issuesFolder>/<filename>` shape the shell prints), or null if
    *   no file matches.
    */
-  static async findExisting(repoPath, issuesFolder, id) {
+  async findExisting(issuesFolder, id) {
+    const { repoPath } = this._repoContext;
     let entries;
 
     try {
@@ -43,7 +52,7 @@ class IssueFile {
    * @param {string} filePath - the matched existing-file path.
    * @returns {string} the derived title.
    */
-  static titleFromFilename(filePath) {
+  titleFromFilename(filePath) {
     const base = path.basename(filePath, '.md');
     const underscoreIndex = base.indexOf('_');
 
@@ -67,4 +76,4 @@ class IssueFile {
   }
 }
 
-export default IssueFile;
+export default IssueFileLocator;
