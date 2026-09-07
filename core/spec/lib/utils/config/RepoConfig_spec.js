@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import RepoConfig from '../../../../lib/utils/config/RepoConfig.js';
+import { createRepoContextMock } from '../../../support/factories/repoContextFactory.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 describe('RepoConfig', () => {
@@ -49,6 +50,19 @@ describe('RepoConfig', () => {
       const repoConfig = new RepoConfig();
 
       await expectAsync(repoConfig.getSafeBranch(repoPath)).toBeResolvedTo('origin/main');
+    });
+
+    it('falls back to the constructor-injected repoContext.repoPath when repoPath is omitted', async () => {
+      await mkdir(path.join(repoPath, '.claude', 'state'), { recursive: true });
+      await writeFile(
+        path.join(repoPath, '.claude', 'state', 'arcanum-config.json'),
+        JSON.stringify({ git: { safe_branch: 'origin/develop' } })
+      );
+
+      const repoContext = createRepoContextMock({ repoPath });
+      const repoConfig = new RepoConfig(repoContext);
+
+      await expectAsync(repoConfig.getSafeBranch()).toBeResolvedTo('origin/develop');
     });
   });
 
@@ -123,6 +137,19 @@ describe('RepoConfig', () => {
       const repoConfig = new RepoConfig();
 
       await expectAsync(repoConfig.getIgnoredCheckPatterns(repoPath)).toBeResolvedTo([]);
+    });
+
+    it('falls back to the constructor-injected repoContext.repoPath when repoPath is omitted', async () => {
+      await mkdir(path.join(repoPath, '.claude', 'configuration'), { recursive: true });
+      await writeFile(
+        path.join(repoPath, '.claude', 'configuration', 'arcanum-repo-config.json'),
+        JSON.stringify({ 'auto-fix-all': { ignored_check_patterns: ['codacy', 'dependabot'] } })
+      );
+
+      const repoContext = createRepoContextMock({ repoPath });
+      const repoConfig = new RepoConfig(repoContext);
+
+      await expectAsync(repoConfig.getIgnoredCheckPatterns()).toBeResolvedTo(['codacy', 'dependabot']);
     });
   });
 });
