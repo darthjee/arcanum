@@ -12,23 +12,31 @@ class Origin {
   /**
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Function} [deps.execFileAsync] - promisified `execFile`.
+   * @param {import('../../context/RepoContext.js').default} [deps.repoContext] -
+   *   the target repo's context, supplying a `repoPath` fallback for
+   *   `resolve()`/`resolveWithRef()` when no explicit `repoPath` argument
+   *   is passed.
    */
-  constructor({ execFileAsync = defaultExecFileAsync } = {}) {
+  constructor({ execFileAsync = defaultExecFileAsync, repoContext } = {}) {
     this._execFileAsync = execFileAsync;
+    this._repoContext = repoContext;
   }
 
   /**
    * Resolve `<repoPath>`'s `origin` remote into `{ domain, repo }`.
-   * @param {string} repoPath - the target repo's local checkout path.
+   * @param {string} [repoPath] - the target repo's local checkout path;
+   *   falls back to `this._repoContext.repoPath` when omitted. An
+   *   explicitly passed `repoPath` wins over the constructor context.
    * @returns {Promise<{domain: string, repo: string}>} the parsed origin.
    */
   async resolve(repoPath) {
+    const path = repoPath ?? this._repoContext?.repoPath;
     let stdout;
 
     try {
-      ({ stdout } = await this._execFileAsync('git', ['-C', repoPath, 'remote', 'get-url', 'origin']));
+      ({ stdout } = await this._execFileAsync('git', ['-C', path, 'remote', 'get-url', 'origin']));
     } catch {
-      throw new Error(`Error: '${repoPath}' is not a git repository or has no 'origin' remote`);
+      throw new Error(`Error: '${path}' is not a git repository or has no 'origin' remote`);
     }
 
     const origin = stdout.trim();
@@ -70,7 +78,10 @@ class Origin {
    * repoRef }`, where `repoRef` is the (possibly domain-qualified) repo
    * reference used in error/success messages, mirroring `origin.sh`'s
    * `get_repo_ref`.
-   * @param {string} repoPath - the target repo's local checkout path.
+   * @param {string} [repoPath] - the target repo's local checkout path;
+   *   falls back to `this._repoContext.repoPath` when omitted (see
+   *   `resolve()`). An explicitly passed `repoPath` wins over the
+   *   constructor context.
    * @returns {Promise<{domain: string, repo: string, repoRef: string}>}
    *   the parsed origin, plus its derived `repoRef`.
    */
