@@ -48,8 +48,10 @@ class GithubIssue {
    *   to each per-call `IssueStateService`.
    * @param {JsonReader} [deps.jsonReader] - forwarded to each per-call
    *   `IssueStateService`.
-   * @param {IssueStatePaths} [deps.issueStatePaths] - forwarded to each
-   *   per-call `IssueStateService`.
+   * @param {IssueStatePaths} [deps.issueStatePaths] - retained as an
+   *   injection seam; no longer forwarded to the per-call
+   *   `IssueStateService`, which now builds its own instance bound to
+   *   the per-call `RepoContext`.
    * @param {GithubIssueService} [deps.githubIssueService] - the
    *   REST-call-plus-file-write logic shared by `#fetch`/`#create`,
    *   built from the collaborators above by default.
@@ -186,7 +188,7 @@ class GithubIssue {
       jsonParser: this._jsonParser,
       jsonValueFormatter: this._jsonValueFormatter,
       jsonReader: this._jsonReader,
-      issueStatePaths: this._issueStatePaths
+      issueStatePaths: new IssueStatePaths({ repoContext: context })
     });
   }
 }
