@@ -2,8 +2,7 @@ import {
   createAutoFixAllGithub,
   fakeGithubFetch,
   REPO,
-  TOKEN,
-  REPO_PATH
+  TOKEN
 } from '../../../support/factories/autoFixAllGithub.js';
 
 describe('AutoFixAllGithub (wiring)', () => {
@@ -28,7 +27,7 @@ describe('AutoFixAllGithub (wiring)', () => {
       // both `_mutateTag`'s own repoRef resolution and the per-call IssueClient's internal resolution
       // route through the same shared instances, so both are called more than once per #addTag call.
       await github.addTag('5', 'ready_for_work');
-      expect(originWithRef).toHaveBeenCalledWith(REPO_PATH);
+      expect(originWithRef).toHaveBeenCalledWith();
       expect(tokenGet).toHaveBeenCalledWith();
 
       const originWithRefAfterAddTag = originWithRef.calls.count();

@@ -1,5 +1,6 @@
 import GithubIssueService from '../../../lib/services/GithubIssueService.js';
 import GithubToken from '../../../lib/utils/github/GithubToken.js';
+import Origin from '../../../lib/utils/git/Origin.js';
 import RepoContext from '../../../lib/context/RepoContext.js';
 
 const REPO_PATH = '/fake/repo';
@@ -19,25 +20,25 @@ describe('RepoContext', () => {
   }
 
   describe('#resolveWithRef', () => {
-    it('delegates to origin.resolveWithRef with repoPath', async () => {
+    it('delegates to origin.resolveWithRef with no arguments', async () => {
       const resolveWithRef = jasmine.createSpy().and.resolveTo({ domain: 'github.com', repo: 'a/b', repoRef: 'a/b' });
       const context = newContext({ origin: { resolveWithRef, resolve: jasmine.createSpy() } });
 
       const result = await context.resolveWithRef();
 
-      expect(resolveWithRef).toHaveBeenCalledWith(REPO_PATH);
+      expect(resolveWithRef).toHaveBeenCalledWith();
       expect(result).toEqual({ domain: 'github.com', repo: 'a/b', repoRef: 'a/b' });
     });
   });
 
   describe('#resolve', () => {
-    it('delegates to origin.resolve with repoPath', async () => {
+    it('delegates to origin.resolve with no arguments', async () => {
       const resolve = jasmine.createSpy().and.resolveTo({ domain: 'github.com', repo: 'a/b' });
       const context = newContext({ origin: { resolve, resolveWithRef: jasmine.createSpy() } });
 
       const result = await context.resolve();
 
-      expect(resolve).toHaveBeenCalledWith(REPO_PATH);
+      expect(resolve).toHaveBeenCalledWith();
       expect(result).toEqual({ domain: 'github.com', repo: 'a/b' });
     });
   });
@@ -146,6 +147,13 @@ describe('RepoContext', () => {
 
       expect(context._githubToken).toBeInstanceOf(GithubToken);
       expect(context._githubToken._repoContext).toBe(context);
+    });
+
+    it('self-builds an Origin carrying itself as repoContext when none is injected', () => {
+      const context = new RepoContext({ repoPath: REPO_PATH });
+
+      expect(context._origin).toBeInstanceOf(Origin);
+      expect(context._origin._repoContext).toBe(context);
     });
 
     it('resolves getToken() against this.repoPath through the self-built GithubToken', async () => {
