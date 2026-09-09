@@ -50,6 +50,7 @@ source "${SCRIPT_DIR}/../../arcanum/_lib/origin.sh"
 
 _ensure_gh_user
 REPO_REF=$(get_repo_ref "$REPO_PATH")
+REPO_SLUG=$(get_repo_path "$REPO_PATH")
 
 branch=$(git branch --show-current)
 PR_NUMBER=$(gh pr view -R "$REPO_REF" "$branch" --json number -q '.number' 2>/dev/null) || {
@@ -66,7 +67,7 @@ while true; do
     sleep 5; continue
   }
 
-  checks=$(gh api "repos/${REPO_REF}/commits/${sha}/check-runs?per_page=100" 2>/dev/null) || {
+  checks=$(gh api "repos/${REPO_SLUG}/commits/${sha}/check-runs?per_page=100" 2>/dev/null) || {
     sleep 5; continue
   }
 
