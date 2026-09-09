@@ -1,10 +1,21 @@
 import { EventEmitter } from 'node:events';
 import path from 'node:path';
+import ClaudeContext from '../../../lib/context/ClaudeContext.js';
 
 export const REPO_PATH = '/repo/path';
 export const BOOTSTRAP_PATH = path.join(REPO_PATH, 'arcanum', 'update', 'bootstrap.sh');
 export const ARCANUM_JSON_PATH = path.join(REPO_PATH, 'arcanum.json');
 export const GIT_DIR_PATH = path.join(REPO_PATH, '.git');
+
+/**
+ * Build a `ClaudeContext` anchored at `REPO_PATH`, mirroring how
+ * `PermissionGrant_spec.js` builds `new ClaudeContext({ repoPath: dir })`
+ * — for injecting into `ArcanumUpdateRunUpdate`'s constructor.
+ * @returns {ClaudeContext} the context bound to `REPO_PATH`.
+ */
+export function claudeContext() {
+  return new ClaudeContext({ repoPath: REPO_PATH });
+}
 
 /**
  * Build a fake `existsSync` implementation answering only the paths

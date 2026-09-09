@@ -1,9 +1,9 @@
 import ArcanumUpdateRunUpdate from '../../../../lib/commands/arcanum-update/ArcanumUpdateRunUpdate.js';
 import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
 import {
-  REPO_PATH,
   BOOTSTRAP_PATH,
   ARCANUM_JSON_PATH,
+  claudeContext,
   fakeExistsSync,
   fakeReadFile,
   fakeSpawn,
@@ -15,6 +15,7 @@ describe('ArcanumUpdateRunUpdate#apply', () => {
   it('runs bootstrap.sh with stdio "inherit" and ARCANUM_ASSUME_YES=1, resolving RESULT=updated on a version change', async () => {
     const spawnFn = fakeSpawn(0);
     const runUpdate = new ArcanumUpdateRunUpdate(
+      claudeContext(),
       stubDeps({
         existsSync: fakeExistsSync([BOOTSTRAP_PATH, ARCANUM_JSON_PATH]),
         readFile: fakeReadFile([
@@ -26,7 +27,7 @@ describe('ArcanumUpdateRunUpdate#apply', () => {
       })
     );
 
-    await expectAsync(runUpdate.apply(REPO_PATH)).toBeResolvedTo('RESULT=updated FROM=1.0.0 TO=1.1.0\n');
+    await expectAsync(runUpdate.apply()).toBeResolvedTo('RESULT=updated FROM=1.0.0 TO=1.1.0\n');
 
     expect(spawnFn).toHaveBeenCalledTimes(1);
     const [file, spawnArgs, options] = spawnFn.calls.mostRecent().args;
@@ -39,6 +40,7 @@ describe('ArcanumUpdateRunUpdate#apply', () => {
 
   it('resolves RESULT=noop when the version is unchanged after bootstrap.sh runs', async () => {
     const runUpdate = new ArcanumUpdateRunUpdate(
+      claudeContext(),
       stubDeps({
         existsSync: fakeExistsSync([BOOTSTRAP_PATH, ARCANUM_JSON_PATH]),
         readFile: fakeReadFile([JSON.stringify({ repo: 'darthjee/arcanum', version: '1.0.0' })]),
@@ -46,11 +48,12 @@ describe('ArcanumUpdateRunUpdate#apply', () => {
       })
     );
 
-    await expectAsync(runUpdate.apply(REPO_PATH)).toBeResolvedTo('RESULT=noop VERSION=1.0.0\n');
+    await expectAsync(runUpdate.apply()).toBeResolvedTo('RESULT=noop VERSION=1.0.0\n');
   });
 
   it('rejects with a DispatchFailure (empty stdout, bootstrap.sh\'s exit code) when bootstrap.sh exits nonzero', async () => {
     const runUpdate = new ArcanumUpdateRunUpdate(
+      claudeContext(),
       stubDeps({
         existsSync: fakeExistsSync([BOOTSTRAP_PATH, ARCANUM_JSON_PATH]),
         readFile: fakeReadFile([JSON.stringify({ repo: 'darthjee/arcanum', version: '1.0.0' })]),
@@ -58,7 +61,7 @@ describe('ArcanumUpdateRunUpdate#apply', () => {
       })
     );
 
-    const thrown = await catchError(() => runUpdate.apply(REPO_PATH));
+    const thrown = await catchError(() => runUpdate.apply());
 
     expect(thrown).toBeInstanceOf(DispatchFailure);
     expect(thrown.stdout).toEqual('');
@@ -68,10 +71,11 @@ describe('ArcanumUpdateRunUpdate#apply', () => {
   it('rejects with a DispatchFailure (STATUS=missing_arcanum) without spawning bootstrap.sh at all', async () => {
     const spawnFn = fakeSpawn(0);
     const runUpdate = new ArcanumUpdateRunUpdate(
+      claudeContext(),
       stubDeps({ existsSync: fakeExistsSync([]), spawnFn })
     );
 
-    const thrown = await catchError(() => runUpdate.apply(REPO_PATH));
+    const thrown = await catchError(() => runUpdate.apply());
 
     expect(thrown).toBeInstanceOf(DispatchFailure);
     expect(thrown.stdout).toEqual('STATUS=missing_arcanum\n');
