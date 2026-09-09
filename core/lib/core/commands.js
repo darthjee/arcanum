@@ -24,10 +24,10 @@
  *     `repoPath` is only a queue-file path prefix).
  *   - `'claude'` — `new ModuleClass(claudeContext)` where `claudeContext` is a
  *     `ClaudeContext` built from the leading anchor argument; that leading
- *     argument is stripped from the method args. Only `permission-grant-add`.
+ *     argument is stripped from the method args. `permission-grant-add`
+ *     and `arcanum-update-run-update-*`.
  *   - `'none'` / absent — `new ModuleClass()`, method args untouched. Applies
- *     to `dispatch-fixture-crash`, `auto-fix-all-config-*`, and
- *     `arcanum-update-run-update-*`.
+ *     to `dispatch-fixture-crash` and `auto-fix-all-config-*`.
  * @property {boolean} [validateRepoPath] - defaults to `true` for
  *   `context: 'repo'`; set `false` to skip the Dispatcher-level
  *   `RepoContext#validate()` (e.g. entries with their own not-a-repo error
@@ -62,8 +62,16 @@ export const COMMANDS = {
     method: 'run',
     context: 'repo'
   },
-  'arcanum-update-run-update-check': { module: 'commands/arcanum-update/ArcanumUpdateRunUpdate.js', method: 'check' },
-  'arcanum-update-run-update-apply': { module: 'commands/arcanum-update/ArcanumUpdateRunUpdate.js', method: 'apply' },
+  'arcanum-update-run-update-check': {
+    module: 'commands/arcanum-update/ArcanumUpdateRunUpdate.js',
+    method: 'check',
+    context: 'claude'
+  },
+  'arcanum-update-run-update-apply': {
+    module: 'commands/arcanum-update/ArcanumUpdateRunUpdate.js',
+    method: 'apply',
+    context: 'claude'
+  },
   'auto-fix-all-checkout-from-main': {
     module: 'commands/auto-fix-all/AutoFixAllCheckoutFromMain.js',
     method: 'run',
