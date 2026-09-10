@@ -49,6 +49,13 @@ describe('COMMANDS', () => {
     expect(COMMANDS['permission-grant-add'].method).toBe('add');
   });
 
+  it('sets context: \'claude\' on arcanum-update-run-update-check and arcanum-update-run-update-apply', () => {
+    expect(COMMANDS['arcanum-update-run-update-check'].context).toBe('claude');
+    expect(COMMANDS['arcanum-update-run-update-check'].method).toBe('check');
+    expect(COMMANDS['arcanum-update-run-update-apply'].context).toBe('claude');
+    expect(COMMANDS['arcanum-update-run-update-apply'].method).toBe('apply');
+  });
+
   it('sets validateRepoPath: false on the file-only auto-fix-all-queue subcommands and github-issue-info', () => {
     const skipValidation = Object.keys(COMMANDS).filter((name) => COMMANDS[name].validateRepoPath === false);
 

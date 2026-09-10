@@ -88,4 +88,24 @@ describe('Dispatcher (context routing)', () => {
       expect(dispatcher.commandArgs()).toEqual(['/tmp/x.json', 'Bash(x)']);
     });
   });
+
+  describe('context: \'claude\' path (arcanum-update-run-update-check)', () => {
+    let dispatcher;
+
+    beforeEach(() => {
+      dispatcher = new Dispatcher('arcanum-update-run-update-check', ['/fake/anchor']);
+    });
+
+    it('constructs the module with a ClaudeContext built from args[0]', async () => {
+      const instance = await dispatcher.commandInstance();
+
+      expect(instance.constructor.name).toEqual('ArcanumUpdateRunUpdate');
+      expect(instance._claudeContext).toBeInstanceOf(ClaudeContext);
+      expect(instance._claudeContext.repoPath).toEqual('/fake/anchor');
+    });
+
+    it('strips the leading anchor arg from commandArgs()', () => {
+      expect(dispatcher.commandArgs()).toEqual([]);
+    });
+  });
 });
