@@ -7,9 +7,9 @@ services:
     build:
       context: .
     volumes:
-      - .:/home/node/app
-      - core_node_modules:/home/node/app/node_modules
-    working_dir: /home/node/app
+      - ../:/home/node/app
+      - core_node_modules:/home/node/app/core/node_modules
+    working_dir: /home/node/app/core
     command: sh -c "yarn install --frozen-lockfile && yarn test"
 
 volumes:
