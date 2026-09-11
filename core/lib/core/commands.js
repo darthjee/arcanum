@@ -18,8 +18,10 @@
  *     wait-ci-and-merge), on `spawn-issue`, on `auto-fix-issue-commit-change`,
  *     on `auto-fix-issue-create-branch`, on the `auto-fix-all-github-*`
  *     family (add-tag / cleanup-branch / has-shipit-label / pr-merge /
- *     pr-number / pr-state / remove-tag), and on the `auto-fix-all-queue-*`
- *     family (empty / list / next / pop / push / save / wait-next) — where
+ *     pr-number / pr-state / remove-tag), on the `auto-fix-issue-github-*`
+ *     family (info / pr-create / pr-view / pr-ready), and on the
+ *     `auto-fix-all-queue-*` family (empty / list / next / pop / push /
+ *     save / wait-next) — where
  *     `save` / `push` keep the Dispatcher `RepoContext#validate()` and the
  *     five file-only subcommands set `validateRepoPath: false` (their
  *     `repoPath` is only a queue-file path prefix).
@@ -185,6 +187,26 @@ export const COMMANDS = {
   'auto-fix-issue-create-branch': {
     module: 'commands/auto-fix-issue/AutoFixIssueCreateBranch.js',
     method: 'run',
+    context: 'repo'
+  },
+  'auto-fix-issue-github-info': {
+    module: 'commands/auto-fix-issue/AutoFixIssueGithub.js',
+    method: 'info',
+    context: 'repo'
+  },
+  'auto-fix-issue-github-pr-create': {
+    module: 'commands/auto-fix-issue/AutoFixIssueGithub.js',
+    method: 'prCreate',
+    context: 'repo'
+  },
+  'auto-fix-issue-github-pr-view': {
+    module: 'commands/auto-fix-issue/AutoFixIssueGithub.js',
+    method: 'prView',
+    context: 'repo'
+  },
+  'auto-fix-issue-github-pr-ready': {
+    module: 'commands/auto-fix-issue/AutoFixIssueGithub.js',
+    method: 'prReady',
     context: 'repo'
   },
   'checkout-safe-branch': {
