@@ -1,52 +1,29 @@
 #!/usr/bin/env bash
-# Resolve the PR number for an issue's branch
+# Thin engine_dispatch shim for the "auto-monitor-issue-pr-resolve-pr-number"
+# migrated entrypoint — see docs/agents/architecture/script-engine.md and
+# docs/agents/plans/435-migrate-auto-monitor-issue-pr-resolve-pr-number-entrypoint-to-native-node-js/plan.md
+# for the full design/shared contracts. Resolves the PR number for the
+# current branch, via either the shell implementation
+# (resolve_pr_number_shell.sh) or the native one (core/bin/arcanum), per
+# engine.mode / arcanum/_lib/migration-status.json.
+#
+# `HOME` is forwarded to the native path's explicit env-var allowlist —
+# needed for `gh`/token resolution once native's `env -i PATH="$PATH"`
+# strips the ambient environment down, same rationale as github.sh and
+# run_checks.sh.
+#
 # Usage: resolve_pr_number.sh <repo_path> <id>
 #
-# <id> must be the numeric GitHub issue id (used only for validation/usage
-# clarity); the actual lookup is driven by the current branch, which the
-# caller is expected to have already checked out as "issue-<id>". Prints
-# the PR number (no '#') for that branch on the configured origin repo.
+# Output and exit code: unchanged from before this migration — see
+# resolve_pr_number_shell.sh's own header for the full behavior contract.
 
 set -euo pipefail
 
+REPO_PATH="${1:-}"
+ID="${2:-}"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# shellcheck source=../../arcanum/_lib/origin.sh
-source "${SCRIPT_DIR}/../../arcanum/_lib/origin.sh"
-# shellcheck source=../../arcanum/_lib/repo_path.sh
-source "${SCRIPT_DIR}/../../arcanum/_lib/repo_path.sh"
-
-REPO_PATH="${1:?Usage: $0 <repo_path> <id>}"
-ID="${2:-}"
-ID="${ID#\#}"
-
-[[ "$ID" =~ ^[0-9]+$ ]] || {
-  echo "Usage: $0 <repo_path> <id>" >&2
-  exit 1
-}
-
-repo_path_enter "$REPO_PATH"
-
-# Try the local issue state first (avoids an extra GitHub API call)
-SCRIPT_DIR_SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cached_number=$("${SCRIPT_DIR_SELF}/../../arcanum/_lib/issue_state.sh" "$REPO_PATH" get "$ID" pr_id 2>/dev/null || true)
-if [[ -n "$cached_number" ]]; then
-  echo "$cached_number"
-  exit 0
-fi
-
-_ensure_gh_user
-repo_ref=$(get_repo_ref "$REPO_PATH")
-branch=$(git branch --show-current)
-
-number=$(gh pr view -R "$repo_ref" "$branch" --json number -q '.number' 2>/dev/null) || {
-  echo "Error: no pull request found for the current branch on $repo_ref" >&2
-  exit 1
-}
-
-[[ -n "$number" ]] || {
-  echo "Error: no pull request found for the current branch on $repo_ref" >&2
-  exit 1
-}
-
-echo "$number"
+# shellcheck source=../../arcanum/_lib/engine_dispatch.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/engine_dispatch.sh"
+engine_dispatch "$REPO_PATH" auto-monitor-issue-pr-resolve-pr-number "${SCRIPT_DIR}/resolve_pr_number_shell.sh" HOME -- "$@"
