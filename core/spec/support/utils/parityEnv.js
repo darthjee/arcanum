@@ -6,11 +6,14 @@
  * @param {object} [scenario] - the scenario's shell/native env var overrides.
  * @param {object} [scenario.ghVars] - `FAKE_GH_*` overrides, for the shell side.
  * @param {object} [scenario.fetchVars] - `FAKE_FETCH_*` overrides, for the native side.
+ * @param {string} [scenario.fakeFetchMode] - `fakeGithubApiFetchPreload.js`'s
+ *   `ARCANUM_TEST_FAKE_FETCH` mode, defaulting to `'github'`
+ *   (`AutoFixAllGithub.js`'s own scenario).
  * @returns {{shellEnv: object, nativeEnv: object}} the two env objects.
  */
-export function seedEnv(fakeGhEnv, { ghVars = {}, fetchVars = {} } = {}) {
+export function seedEnv(fakeGhEnv, { ghVars = {}, fetchVars = {}, fakeFetchMode = 'github' } = {}) {
   return {
     shellEnv: { ...fakeGhEnv, ...ghVars },
-    nativeEnv: { ...fakeGhEnv, ARCANUM_TEST_FAKE_FETCH: 'github', ...fetchVars }
+    nativeEnv: { ...fakeGhEnv, ARCANUM_TEST_FAKE_FETCH: fakeFetchMode, ...fetchVars }
   };
 }

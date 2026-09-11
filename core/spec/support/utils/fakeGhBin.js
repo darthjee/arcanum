@@ -137,6 +137,14 @@ case "\${1:-}" in
               "$FAKE_GH_PR_NUMBER" \\
               "\${FAKE_GH_PR_URL:-https://github.com/example/repo/pull/$FAKE_GH_PR_NUMBER}"
             ;;
+          url)
+            echo "\${FAKE_GH_PR_URL:-https://github.com/example/repo/pull/$FAKE_GH_PR_NUMBER}"
+            ;;
+          url,isDraft)
+            printf '{"url":"%s","isDraft":%s}\\n' \\
+              "\${FAKE_GH_PR_URL:-https://github.com/example/repo/pull/$FAKE_GH_PR_NUMBER}" \\
+              "\${FAKE_GH_PR_IS_DRAFT:-false}"
+            ;;
           commits)
             echo "{\\"commits\\": \${FAKE_GH_PR_COMMITS_JSON:-[]}}"
             ;;
@@ -158,6 +166,28 @@ case "\${1:-}" in
         cat >/dev/null
         if [[ "\${FAKE_GH_COMMENT_FAIL:-}" == "1" ]]; then
           echo "HTTP 422: Validation Failed" >&2
+          exit 1
+        fi
+        exit 0
+        ;;
+      create)
+        if [[ "\${FAKE_GH_PR_CREATE_FAIL:-}" == "1" ]]; then
+          echo "fake gh: pr create failed" >&2
+          exit 1
+        fi
+        echo "\${FAKE_GH_PR_CREATE_URL:-https://github.com/example/repo/pull/99}"
+        exit 0
+        ;;
+      ready)
+        if [[ "\${FAKE_GH_PR_READY_FAIL:-}" == "1" ]]; then
+          echo "fake gh: pr ready failed" >&2
+          exit 1
+        fi
+        exit 0
+        ;;
+      edit)
+        if [[ "\${FAKE_GH_PR_EDIT_FAIL:-}" == "1" ]]; then
+          echo "fake gh: pr edit failed" >&2
           exit 1
         fi
         exit 0

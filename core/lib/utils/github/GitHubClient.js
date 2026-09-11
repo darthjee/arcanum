@@ -1,4 +1,7 @@
+import Git from '../git/Git.js';
+
 const DEFAULT_TIMEOUT_MS = 30000;
+const GRAPHQL_URL = 'https://api.github.com/graphql';
 
 /**
  * All GitHub REST API communication shared by PR lifecycle flows —
@@ -19,11 +22,14 @@ class GitHubClient {
    *   (global `fetch` by default).
    * @param {number} [deps.timeoutMs] - each REST call's abort timeout,
    *   overridable for tests (defaults to the real 30s protocol value).
+   * @param {Git} [deps.git] - git facade, used by `createPr` to resolve
+   *   the current branch as the new pull request's `head`.
    */
-  constructor({ context, fetchFn = fetch, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+  constructor({ context, fetchFn = fetch, timeoutMs = DEFAULT_TIMEOUT_MS, git = new Git({ context }) } = {}) {
     this._context = context;
     this._fetch = fetchFn;
     this._timeoutMs = timeoutMs;
+    this._git = git;
   }
 
   /**
@@ -235,6 +241,141 @@ class GitHubClient {
     }
 
     return response.json();
+  }
+
+  /**
+   * Create a pull request for the current branch, replacing `gh pr
+   * create -R "$repo_ref" --title "$title" --body-file "$file"`. `gh pr
+   * create` infers `head` (current branch) and `base` (repo default
+   * branch) automatically; the REST endpoint requires both explicitly,
+   * so `head` is resolved via `this._git.currentBranch()` and `base` via
+   * a `GET /repos/{repo}` lookup of `.default_branch`.
+   * @param {string} title - the pull request title.
+   * @param {string} body - the pull request body.
+   * @returns {Promise<string>} the created pull request's `html_url` —
+   *   matching `gh pr create`'s own stdout (the created PR's web URL).
+   * @throws {Error} `could not create pull request on <repo>` on any
+   *   non-ok response (default-branch lookup or pull-request creation) —
+   *   a simple internal error for `AutoFixIssueGithub#prCreate` to catch
+   *   and re-wrap into the shell's exact `Error: could not create PR on
+   *   <repo_ref>` message.
+   */
+  async createPr(title, body) {
+    const { repo } = await this._context.resolveWithRef();
+    const token = await this._context.getToken();
+    const failure = () => new Error(`could not create pull request on ${repo}`);
+    const head = await this._git.currentBranch();
+    const base = await this._defaultBranch(repo, token, failure);
+
+    let response;
+
+    try {
+      response = await this._fetch(`https://api.github.com/repos/${repo}/pulls`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ title, body, head, base }),
+        signal: AbortSignal.timeout(this._timeoutMs)
+      });
+    } catch {
+      throw failure();
+    }
+
+    if (!response.ok) {
+      throw failure();
+    }
+
+    const pull = await response.json();
+
+    if (!pull || !pull.html_url) {
+      throw failure();
+    }
+
+    return pull.html_url;
+  }
+
+  /**
+   * Resolve `repo`'s default branch, used by `createPr` to fill in the
+   * new pull request's `base`.
+   * @param {string} repo - the `<owner>/<name>` repo slug.
+   * @param {string} token - the resolved GitHub token.
+   * @param {Function} failure - builds the error to throw on any
+   *   lookup failure, shared with `createPr`'s own caller-facing error.
+   * @returns {Promise<string>} the repo's default branch name.
+   * @throws {Error} whatever `failure()` builds, on any non-ok response
+   *   or a response with no `default_branch`.
+   */
+  async _defaultBranch(repo, token, failure) {
+    let response;
+
+    try {
+      response = await this._fetch(`https://api.github.com/repos/${repo}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(this._timeoutMs)
+      });
+    } catch {
+      throw failure();
+    }
+
+    if (!response.ok) {
+      throw failure();
+    }
+
+    const repoInfo = await response.json();
+
+    if (!repoInfo || !repoInfo.default_branch) {
+      throw failure();
+    }
+
+    return repoInfo.default_branch;
+  }
+
+  /**
+   * Mark pull request `nodeId` ready for review, replacing `gh pr ready
+   * -R "$repo_ref" "$branch"`. GitHub's REST API has no field to toggle
+   * a PR out of draft state, so this goes through the GraphQL
+   * `markPullRequestReadyForReview` mutation instead — the one GraphQL
+   * call this client makes, kept narrowly scoped to this need rather
+   * than growing into a general-purpose GraphQL client.
+   * @param {string} nodeId - the pull request's GraphQL node id
+   *   (`pull.node_id` from the REST pull object) — not its number.
+   * @returns {Promise<void>} resolves once the mutation succeeds.
+   * @throws {Error} `could not mark pull request ready for review` on
+   *   any non-ok response or GraphQL-reported error.
+   */
+  async markPrReady(nodeId) {
+    const token = await this._context.getToken();
+    const failure = () => new Error('could not mark pull request ready for review');
+    const query = 'mutation($id: ID!) { markPullRequestReadyForReview(input: { pullRequestId: $id }) ' +
+      '{ pullRequest { id } } }';
+
+    let response;
+
+    try {
+      response = await this._fetch(GRAPHQL_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ query, variables: { id: nodeId } }),
+        signal: AbortSignal.timeout(this._timeoutMs)
+      });
+    } catch {
+      throw failure();
+    }
+
+    if (!response.ok) {
+      throw failure();
+    }
+
+    const payload = await response.json();
+
+    if (payload && Array.isArray(payload.errors) && payload.errors.length > 0) {
+      throw failure();
+    }
   }
 }
 
