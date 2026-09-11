@@ -51,6 +51,14 @@ async function seedNoOp(repo) {
  *   `issue-1` checked out.
  */
 async function seedCleanMerge(repo) {
+  // `origin/main` and `issue-1` diverge below, so the eventual `git
+  // merge --no-edit origin/main` is a genuine non-fast-forward merge
+  // that creates a merge commit — same committer-identity precondition
+  // as `seedConflict` below (this repo has no ambient identity
+  // otherwise, unlike a real invocation environment).
+  await git(['config', 'user.name', 'Test'], repo.repoPath);
+  await git(['config', 'user.email', 't@example.com'], repo.repoPath);
+
   await git(['checkout', '-b', BRANCH, 'main'], repo.repoPath);
   await writeFile(path.join(repo.repoPath, 'branch-file.txt'), 'branch change\n');
   await git(['add', 'branch-file.txt'], repo.repoPath);
