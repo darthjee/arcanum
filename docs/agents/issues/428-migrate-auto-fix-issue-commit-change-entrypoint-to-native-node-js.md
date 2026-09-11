@@ -29,17 +29,18 @@ and commits it with `git commit -F -`. It does **not** run `git add` — the cal
 
 ## Solution
 
-Follow the standard migration process from `docs/agents/architecture/script-engine.md`:
+Follow the standard migration process from `docs/agents/architecture/script-engine.md` — see the `auto-fix-all-cleanup-artifacts` migration (#254) for the closest existing precedent (also a git-commit-and-push entrypoint):
 
 1. Read `auto-fix-issue/scripts/commit_change.sh` for its exact output/exit-code contract.
-2. Create `core/lib/commands/auto-fix-issue/AutoFixIssueCommitChange.js` — zero runtime npm deps, built-in Node APIs only.
-3. Register `'auto-fix-issue-commit-change': { module: 'commands/auto-fix-issue/AutoFixIssueCommitChange.js', method: 'run' }` in the `COMMANDS` map at `core/lib/core/commands.js`.
-4. Add `"auto-fix-issue-commit-change": true` to `arcanum/_lib/migration-status.json`.
-5. Write native unit tests in `core/spec/commands/auto-fix-issue/AutoFixIssueCommitChange_spec.js`.
-6. Write a parity test — shell vs. native, identical inputs, asserting identical stdout and exit code.
-7. Verify `arcanum/_lib/engine_dispatch.sh` routes correctly: `engine.mode=native` → native; `engine.mode=shell` (or missing) → shell fallback.
+2. Rename it to `auto-fix-issue/scripts/commit_change_shell.sh` (the shell implementation, unchanged), and create a new `auto-fix-issue/scripts/commit_change.sh` as a thin `engine_dispatch` shim (mirror `auto-fix-all/scripts/cleanup_artifacts.sh`'s shim exactly), forwarding `HOME` in its env allowlist — every existing shim wrapping a script that runs `git commit`/`git push` forwards `HOME` (`cleanup_artifacts.sh`, `reply_comment.sh`, `wait_ci_and_merge.sh`, `wait_ci.sh`, `create_sub_issue.sh`, `push_sub_issues.sh`, `finish.sh`), so git can resolve committer identity once native's `env -i` strips the ambient environment; no other env var (no `GH_TOKEN`/`SSH_AUTH_SOCK`) appears anywhere in that same list, so none should be added here either.
+3. Create `core/lib/commands/auto-fix-issue/AutoFixIssueCommitChange.js` — zero runtime npm deps, built-in Node APIs only.
+4. Register `'auto-fix-issue-commit-change': { module: 'commands/auto-fix-issue/AutoFixIssueCommitChange.js', method: 'run' }` in the `COMMANDS` map at `core/lib/core/commands.js`.
+5. Add `"auto-fix-issue-commit-change": true` to `arcanum/_lib/migration-status.json`.
+6. Write native unit tests in `core/spec/lib/commands/auto-fix-issue/AutoFixIssueCommitChange_spec.js` (mirrors `core/lib/` 1:1 under `core/spec/lib/`).
+7. Write a parity test in `core/spec/bin/autoFixIssueCommitChangeParity_spec.js` — shell vs. native, identical inputs, asserting identical stdout and exit code. Run the parity test directly against `commit_change_shell.sh` (never through the new `commit_change.sh` shim, which would make the test circular) versus `core/bin/arcanum auto-fix-issue-commit-change`, following `autoFixAllCleanupArtifactsParity_spec.js`'s structure (isolated fixture repos per side, `git config user.*` for a deterministic committer identity, normalizing the non-deterministic abbreviated commit hash out of `git commit`'s own stdout summary before comparing).
+8. Verify `arcanum/_lib/engine_dispatch.sh` routes correctly: `engine.mode=native` → native; `engine.mode=shell` (or missing) → shell fallback.
 
-`core/lib/utils/git/GitClient.js` already wraps `git` CLI calls via `execFile` (currently just `currentBranch()`) — extend it (or follow its pattern) for the new `git commit -F -` and `git push` calls needed here, rather than inventing a separate git-shelling approach.
+The `AutoFixAllCleanupArtifacts.js` precedent (#254, also `git commit -F -` + push) re-derives its own local `execFileAsync`-with-stdin helper and private `_commit`/`_pushCurrentBranch` methods directly on the command class, rather than reaching for a shared git wrapper — `core/lib/utils/git/GitClient.js` (currently just `currentBranch()`, extracted from PR-lifecycle flows) predates that choice and isn't used there. Follow `AutoFixAllCleanupArtifacts.js`'s inline pattern for consistency, unless extending `GitClient.js` turns out to fit better in practice — implementer's call, not a hard requirement either way.
 
 The native module needs to re-derive, rather than shell out to, the logic currently living in three shared bash helpers this script sources:
 - `arcanum/_lib/push.sh`'s `push_current_branch` (`git push -u origin <branch>:<branch>`), not yet migrated.
