@@ -13,9 +13,11 @@ import MergeBodyResolver from './MergeBodyResolver.js';
  * refs) is resolved by its context-bound collaborators (`GitClient`/
  * `GitHubClient`/`MergeBodyResolver`/`Git`/`GitBranch`, all bound to the
  * same `context` at construction — see
- * `docs/agents/plans/294-refactor-properations/`); this class only owns
- * `#_prStateLabel`, the one piece of pure derivation logic that stays
- * here.
+ * `docs/agents/plans/294-refactor-properations/`); the `MERGED`/`CLOSED`/
+ * `OPEN` derivation itself now lives on `GitHubClient.prStateLabel`
+ * (shared with `PrMonitor`'s `getPrState`-driven polling — see
+ * `docs/agents/plans/436-migrate-auto-monitor-pr-monitor-pr-entrypoint-to-native-node-js/`)
+ * rather than being forked into two places.
  */
 class PrOperations {
   /**
@@ -88,7 +90,7 @@ class PrOperations {
     const branch = await this._git.currentBranch();
     const pull = await this._github.getPr(branch);
 
-    return `STATE=${this._prStateLabel(pull)}\n`;
+    return `STATE=${GitHubClient.prStateLabel(pull)}\n`;
   }
 
   /**
@@ -157,23 +159,6 @@ class PrOperations {
    */
   async checkRuns(sha) {
     return this._github.getCheckRuns(sha);
-  }
-
-  /**
-   * Mirrors `gh pr view --json state`'s derivation of `OPEN`/`MERGED`/
-   * `CLOSED` from the REST API's `state`/`merged`/`merged_at` fields —
-   * a merged PR always reports `MERGED`, even though the REST `state`
-   * field itself is just `closed` for both a merged and a plain-closed
-   * PR.
-   * @param {object} pull - the pull request object.
-   * @returns {'OPEN'|'MERGED'|'CLOSED'} the derived state label.
-   */
-  _prStateLabel(pull) {
-    if (pull.merged || pull.merged_at) {
-      return 'MERGED';
-    }
-
-    return pull.state === 'closed' ? 'CLOSED' : 'OPEN';
   }
 }
 
