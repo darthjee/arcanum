@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Merge origin/main into the currently checked-out issue branch
+# Usage: merge_main.sh <repo_path>
+#
+# Assumes the target issue branch is already checked out — this just
+# brings it up to date with "origin/main" (fetches, then merges with
+# --no-edit; a missing "origin/main" ref is a no-op).
+#
+# Prints "STATUS=ok" or "STATUS=conflict" (with the conflicted-file list,
+# one path per line, printed after the STATUS line when there's a
+# conflict). Exits 0 on "ok", 2 on "conflict".
+
+set -euo pipefail
+
+REPO_PATH="${1:?Usage: $0 <repo_path>}"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../../arcanum/_lib/repo_path.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/repo_path.sh"
+repo_path_enter "$REPO_PATH"
+
+# shellcheck source=../../arcanum/_lib/git_branch.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/git_branch.sh"
+
+STATUS="ok"
+CONFLICTS=""
+
+if CONFLICTS=$(git_branch_merge_main); then
+  STATUS="ok"
+else
+  STATUS="conflict"
+fi
+
+echo "STATUS=${STATUS}"
+if [[ "$STATUS" == "conflict" ]]; then
+  echo "$CONFLICTS"
+fi
+
+if [[ "$STATUS" == "conflict" ]]; then
+  exit 2
+fi
+exit 0
