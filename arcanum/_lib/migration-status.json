@@ -41,7 +41,7 @@
   "auto-fix-issue-github-pr-view": true,
   "auto-fix-issue-github-pr-ready": true,
   "auto-fix-issue-list-plan-agents": true,
-  "auto-fix-issue-list-plan-steps": false,
+  "auto-fix-issue-list-plan-steps": true,
   "auto-fix-issue-merge-main": false,
   "auto-fix-issue-run-checks": false,
   "auto-monitor-issue-pr-resolve-pr-number": false,
