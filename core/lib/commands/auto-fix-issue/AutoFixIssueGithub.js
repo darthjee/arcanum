@@ -235,7 +235,14 @@ class AutoFixIssueGithub {
 
     const { repoRef } = await this._repoContext.resolveWithRef();
 
-    await this._issueTagger.mutateTag(issue.id, repoRef, 'add', 'pr');
+    try {
+      await this._issueTagger.mutateTag(issue.id, repoRef, 'add', 'pr');
+    } catch {
+      // best-effort — `IssueTagger#mutateTag` already handles/warns every
+      // failure internally and never rejects, but this extra guard keeps
+      // `_syncPrLabelsAndState` robust to a future change in that
+      // contract.
+    }
 
     let labelNames;
 

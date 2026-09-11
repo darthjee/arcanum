@@ -5,13 +5,13 @@ const REPO = 'darthjee/arcanum';
 const TOKEN = 'fake-token';
 
 describe('GitHubClient', () => {
-  function newClient(fetchFn) {
+  function newClient(fetchFn, git) {
     const context = createRepoContextMock({
       origin: { resolveWithRef: jasmine.createSpy().and.resolveTo({ domain: 'github.com', repo: REPO, repoRef: REPO }) },
       githubToken: { get: jasmine.createSpy().and.resolveTo(TOKEN) }
     });
 
-    return new GitHubClient({ context, fetchFn, timeoutMs: 5 });
+    return new GitHubClient({ context, fetchFn, timeoutMs: 5, git });
   }
 
   describe('#getPr', () => {
@@ -232,6 +232,121 @@ describe('GitHubClient', () => {
       const client = newClient(fetchFn);
 
       await expectAsync(client.getCurrentUser()).toBeRejectedWithError('could not fetch current user');
+    });
+  });
+
+  describe('#createPr', () => {
+    function fakeGit(branch = 'issue-5') {
+      return { currentBranch: jasmine.createSpy().and.resolveTo(branch) };
+    }
+
+    it('resolves the default branch, then POSTs head/base/title/body and returns html_url', async () => {
+      const fetchFn = jasmine.createSpy().and.callFake(async (url, options = {}) => {
+        if (options.method === undefined) {
+          return { ok: true, json: async () => ({ default_branch: 'main' }) };
+        }
+
+        return { ok: true, json: async () => ({ html_url: 'https://github.com/darthjee/arcanum/pull/9' }) };
+      });
+      const client = newClient(fetchFn, fakeGit('issue-5'));
+
+      const result = await client.createPr('My PR', 'body text');
+
+      expect(fetchFn).toHaveBeenCalledWith(
+        `https://api.github.com/repos/${REPO}`,
+        jasmine.objectContaining({ headers: { Authorization: `Bearer ${TOKEN}` } })
+      );
+
+      const postCall = fetchFn.calls.allArgs().find(([, options]) => options.method === 'POST');
+
+      expect(postCall[0]).toEqual(`https://api.github.com/repos/${REPO}/pulls`);
+      expect(JSON.parse(postCall[1].body)).toEqual({
+        title: 'My PR',
+        body: 'body text',
+        head: 'issue-5',
+        base: 'main'
+      });
+      expect(result).toEqual('https://github.com/darthjee/arcanum/pull/9');
+    });
+
+    it('throws when the default-branch lookup fails', async () => {
+      const fetchFn = jasmine.createSpy().and.resolveTo({ ok: false });
+      const client = newClient(fetchFn, fakeGit());
+
+      await expectAsync(client.createPr('My PR', 'body text')).toBeRejectedWithError(
+        `could not create pull request on ${REPO}`
+      );
+    });
+
+    it('throws when the pull-request creation POST fails', async () => {
+      const fetchFn = jasmine.createSpy().and.callFake(async (url, options = {}) => {
+        if (options.method === undefined) {
+          return { ok: true, json: async () => ({ default_branch: 'main' }) };
+        }
+
+        return { ok: false };
+      });
+      const client = newClient(fetchFn, fakeGit());
+
+      await expectAsync(client.createPr('My PR', 'body text')).toBeRejectedWithError(
+        `could not create pull request on ${REPO}`
+      );
+    });
+
+    it('throws when the created pull request has no html_url', async () => {
+      const fetchFn = jasmine.createSpy().and.callFake(async (url, options = {}) => {
+        if (options.method === undefined) {
+          return { ok: true, json: async () => ({ default_branch: 'main' }) };
+        }
+
+        return { ok: true, json: async () => ({}) };
+      });
+      const client = newClient(fetchFn, fakeGit());
+
+      await expectAsync(client.createPr('My PR', 'body text')).toBeRejectedWithError(
+        `could not create pull request on ${REPO}`
+      );
+    });
+  });
+
+  describe('#markPrReady', () => {
+    it('POSTs the markPullRequestReadyForReview mutation with the node id and the auth header', async () => {
+      const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true, json: async () => ({ data: {} }) });
+      const client = newClient(fetchFn);
+
+      await client.markPrReady('PR_kwABC');
+
+      expect(fetchFn).toHaveBeenCalledWith('https://api.github.com/graphql', jasmine.objectContaining({
+        method: 'POST',
+        headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' }
+      }));
+
+      const [, options] = fetchFn.calls.mostRecent().args;
+      const payload = JSON.parse(options.body);
+
+      expect(payload.variables).toEqual({ id: 'PR_kwABC' });
+      expect(payload.query).toContain('markPullRequestReadyForReview');
+    });
+
+    it('throws when the response is not ok', async () => {
+      const fetchFn = jasmine.createSpy().and.resolveTo({ ok: false });
+      const client = newClient(fetchFn);
+
+      await expectAsync(client.markPrReady('PR_kwABC')).toBeRejectedWithError(
+        'could not mark pull request ready for review'
+      );
+    });
+
+    it('throws when the GraphQL response reports errors', async () => {
+      const fetchFn = jasmine.createSpy().and.resolveTo({
+        ok: true,
+        json: async () => ({ errors: [{ message: 'not found' }] })
+      });
+      const client = newClient(fetchFn);
+
+      await expectAsync(client.markPrReady('PR_kwABC')).toBeRejectedWithError(
+        'could not mark pull request ready for review'
+      );
     });
   });
 });
