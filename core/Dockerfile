@@ -10,6 +10,14 @@
 # reusing the warm Yarn cache this base image already provides.
 FROM darthjee/node:latest
 
+# jq is a genuine runtime dependency of the shell scripts under
+# arcanum/_lib/ and auto-fix-all/scripts/ (e.g. repo_config.sh) that
+# native-invocation/parity specs shell out to, and that the
+# engine.mode=docker execution path shells out to as well — not just a
+# test-only tool. darthjee/node doesn't include it, so install it here.
+RUN apt-get update && apt-get install -y --no-install-recommends jq \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /home/node/app
 
 CMD ["sh", "-c", "yarn install --frozen-lockfile && yarn test"]
