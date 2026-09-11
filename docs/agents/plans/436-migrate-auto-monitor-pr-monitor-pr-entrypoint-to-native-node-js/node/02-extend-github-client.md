@@ -1,0 +1,15 @@
+# Extend GitHubClient with the PR-monitoring REST/GraphQL calls
+
+`core/lib/utils/github/GitHubClient.js` already resolves `repo`/`token` internally via its bound `context` (see `getPr`, `getPrHeadSha`, `getCheckRuns`, `markPrReady` for the exact request/error-handling style to match — timeout via `AbortSignal.timeout(this._timeoutMs)`, `Authorization: Bearer <token>`, a per-method thrown `Error` with a fixed message on any non-ok response). Add the methods `monitor_pr.sh` needs that don't exist yet:
+
+## Files to Change
+
+- `core/lib/utils/github/GitHubClient.js`:
+  - `getPrState(prNumber)` — `GET /repos/{repo}/pulls/{prNumber}`, returns the raw pull object (or just the derived `{state, merged, merged_at}` triple — reuse `PrOperations#_prStateLabel`'s `MERGED`/`CLOSED`/`OPEN` derivation logic rather than duplicating it; consider moving `_prStateLabel` to a shared static/utility if both `PrOperations` and this new path need it, or have the new `PrMonitor` service (Step 03) call `PrOperations` for state instead of duplicating a GitHubClient method — your call, but do not fork the MERGED-vs-CLOSED derivation logic into two places).
+  - `getPrReviews(prNumber)` — `GET /repos/{repo}/pulls/{prNumber}/reviews`, returns the array as-is (each entry has `user.login`, `state`, `submitted_at`, `body`, `node_id`).
+  - `getIssueComments(prNumber)` — `GET /repos/{repo}/issues/{prNumber}/comments` (a PR's "conversation" comments live on the issue endpoint — this is deliberate, not a typo, matching what `gh pr view --json comments` surfaces under the hood), returns the array as-is (`user.login`, `created_at`, `body`, `node_id`, `html_url`).
+  - `getPrReviewComments(prNumber)` — `GET /repos/{repo}/pulls/{prNumber}/comments` (inline review comments — note this already has a near-namesake, `getPrCommits`; pick a name that doesn't collide/confuse, e.g. `getPrReviewComments` or `getInlineReviewComments`), returns the array as-is (`user.login`, `created_at`, `body`, `node_id`, `html_url`).
+  - `addReaction(nodeId, content)` / `removeReaction(nodeId, content)` — GraphQL `addReaction`/`removeReaction` mutations, mirroring `markPrReady`'s existing GraphQL-call shape exactly (same `GRAPHQL_URL`, same error-swallowing expectations from the caller's side — but note `monitor_pr.sh`'s own `add_reaction`/`remove_reaction` shell functions already swallow all errors themselves via `|| true`; decide whether that tolerance belongs in `GitHubClient` (return `void`, never throw) or one layer up in `PrMonitor` — pick one and don't duplicate the try/catch in both places). `content` is `'EYES'` or `'THUMBS_UP'` (GitHub's `ReactionContent` enum — there is no check-mark reaction, which is why the shell script swaps to thumbs-up on "addressed").
+  - Per-page limits: none of these need pagination beyond `per_page=100`, matching the shell script's own single-page fetches (it never pages either).
+
+No changes needed to `getPr(branch)` (branch-keyed, used by `resolve_pr_number`/`createPr`/etc.) — the new methods above are number-keyed, a distinct lookup key already implicit in `getPrHeadSha(prNumber)`/`getCheckRuns(sha)`'s existing precedent.
