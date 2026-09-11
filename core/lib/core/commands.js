@@ -15,7 +15,8 @@
  *     argument is stripped from the method args. Set on the
  *     `arcanum-split-issue-*` and `auto-fix-all-*` lifecycle commands
  *     (checkout-from-main / cleanup-artifacts / reply-comment / wait-ci /
- *     wait-ci-and-merge), on `spawn-issue`, on the `auto-fix-all-github-*`
+ *     wait-ci-and-merge), on `spawn-issue`, on `auto-fix-issue-commit-change`,
+ *     on the `auto-fix-all-github-*`
  *     family (add-tag / cleanup-branch / has-shipit-label / pr-merge /
  *     pr-number / pr-state / remove-tag), and on the `auto-fix-all-queue-*`
  *     family (empty / list / next / pop / push / save / wait-next) — where
@@ -173,6 +174,11 @@ export const COMMANDS = {
   },
   'auto-fix-all-wait-ci-and-merge': {
     module: 'commands/auto-fix-all/AutoFixAllWaitCiAndMerge.js',
+    method: 'run',
+    context: 'repo'
+  },
+  'auto-fix-issue-commit-change': {
+    module: 'commands/auto-fix-issue/AutoFixIssueCommitChange.js',
     method: 'run',
     context: 'repo'
   },

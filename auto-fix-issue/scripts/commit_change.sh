@@ -1,26 +1,24 @@
 #!/usr/bin/env bash
-# Commit changes already staged by a specialist agent
+# Thin engine_dispatch shim for the "auto-fix-issue-commit-change"
+# migrated entrypoint — see docs/agents/architecture/script-engine.md and
+# docs/agents/plans/428-migrate-auto-fix-issue-commit-change-entrypoint-to-native-node-js/plan.md
+# for the full design/shared contracts. Commits changes already staged by
+# a specialist agent, via either the shell implementation
+# (commit_change_shell.sh) or the native one (core/bin/arcanum), per
+# engine.mode / arcanum/_lib/migration-status.json.
+#
+# `HOME` is forwarded to the native path's explicit env-var allowlist —
+# `git` (called throughout the shell implementation) needs it to resolve
+# identity/config once native's `env -i PATH="$PATH"` strips the ambient
+# environment down; without it, native-mode commits would fail in a way
+# shell-mode never does.
+#
 # Usage: commit_change.sh <repo_path> <type> <scope> <id> <subject> <agent> <model_name> <model_email> [body] [comment_url]
 #
-# Builds a commit message using the repo's commit message template
-# (.github/commit_message_template.md) and commits with `git commit -F -`.
-# Unlike commit_plan.sh/commit_issue.sh (which always commit on behalf of
-# the architect and stage a fixed path), this script is fully parameterized:
-# any specialist agent (backend, frontend, infra, ...) can call it with its
-# own type/scope/subject, and it does NOT run `git add` — the caller is
-# expected to have already staged the files it wants committed.
-#
-# [comment_url], when given, is the URL of the PR review/comment this
-# commit addresses; it is added as an "Addresses-Comment:" trailer. Omit it
-# for commits not tied to a specific comment (e.g. initial commits).
+# Output and exit code: unchanged from before this migration — see
+# commit_change_shell.sh's own header for the full behavior contract.
 
 set -euo pipefail
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../../arcanum/_lib/push.sh"
-source "${SCRIPT_DIR}/../../arcanum/_lib/repo_path.sh"
-source "${SCRIPT_DIR}/../../arcanum/_lib/commit_template.sh"
-source "${SCRIPT_DIR}/../../arcanum/_lib/agent_email.sh"
 
 REPO_PATH="${1:-}"
 TYPE="${2:-}"
@@ -30,36 +28,14 @@ SUBJECT="${5:-}"
 AGENT="${6:-}"
 MODEL_NAME="${7:-}"
 MODEL_EMAIL="${8:-}"
-BODY="${9:-}"
-COMMENT_URL="${10:-}"
 
 [[ -n "$REPO_PATH" && -n "$TYPE" && -n "$SCOPE" && -n "$ID" && -n "$SUBJECT" && -n "$AGENT" && -n "$MODEL_NAME" && -n "$MODEL_EMAIL" ]] || {
   echo "Usage: $0 <repo_path> <type> <scope> <id> <subject> <agent> <model_name> <model_email> [body] [comment_url]" >&2
   exit 1
 }
 
-repo_path_enter "$REPO_PATH"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-AGENT_EMAIL="$MODEL_EMAIL"
-if [[ "$(commit_template_engine_get)" == "new" ]]; then
-  AGENT_EMAIL="$(agent_email_get "$AGENT" "$MODEL_EMAIL")"
-fi
-
-{
-  echo "${TYPE}(${SCOPE}): ${SUBJECT} (issue #${ID})"
-  if [[ -n "$BODY" ]]; then
-    echo
-    echo "$BODY"
-  fi
-  if [[ -n "$COMMENT_URL" ]]; then
-    echo
-    echo "Addresses-Comment: ${COMMENT_URL}"
-  fi
-  echo
-  if [[ "$(model_coauthor_omitted)" != "true" ]]; then
-    echo "Co-Authored-By: ${MODEL_NAME} <${MODEL_EMAIL}>"
-  fi
-  echo "Co-Authored-By: ${AGENT} agent <${AGENT_EMAIL}>"
-} | git commit -F -
-
-push_current_branch
+# shellcheck source=../../arcanum/_lib/engine_dispatch.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/engine_dispatch.sh"
+engine_dispatch "$REPO_PATH" auto-fix-issue-commit-change "${SCRIPT_DIR}/commit_change_shell.sh" HOME -- "$@"
