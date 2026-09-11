@@ -39,8 +39,9 @@ class AutoFixIssueCreateBranch {
    *   target repo's root (or absolute).
    * @param {string} id - the issue's numeric id, used for the
    *   `issue-<id>` fallback branch name.
-   * @returns {Promise<string>} the resulting branch name — `dispatch()`
-   *   prints it to stdout with exit code 0.
+   * @returns {Promise<string>} the resulting branch name, followed by a
+   *   trailing newline (mirroring the shell script's `echo "$BRANCH"`) —
+   *   `dispatch()` prints it to stdout as-is, with exit code 0.
    */
   async run(planDir, id) {
     const repoPath = this._repoContext.repoPath;
@@ -53,7 +54,7 @@ class AutoFixIssueCreateBranch {
 
     await this._checkout(repoPath, branch);
 
-    return branch;
+    return `${branch}\n`;
   }
 
   /**

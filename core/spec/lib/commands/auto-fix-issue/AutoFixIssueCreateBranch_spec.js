@@ -102,7 +102,7 @@ describe('AutoFixIssueCreateBranch', () => {
 
         const result = await instance.run(PLAN_DIR, ID);
 
-        expect(result).toBe('my-branch');
+        expect(result).toBe('my-branch\n');
         expect(execFileAsync).toHaveBeenCalledWith(
           'git', ['show-ref', '--verify', '--quiet', 'refs/heads/my-branch'], { cwd: repoPath }
         );
@@ -116,7 +116,7 @@ describe('AutoFixIssueCreateBranch', () => {
 
         const result = await instance.run(PLAN_DIR, ID);
 
-        expect(result).toBe('my-branch');
+        expect(result).toBe('my-branch\n');
         expect(execFileAsync).toHaveBeenCalledWith('git', ['checkout', '-b', 'my-branch'], { cwd: repoPath });
       });
     });
@@ -128,7 +128,7 @@ describe('AutoFixIssueCreateBranch', () => {
 
         const result = await instance.run(PLAN_DIR, ID);
 
-        expect(result).toBe('issue-999');
+        expect(result).toBe('issue-999\n');
         expect(execFileAsync).toHaveBeenCalledWith('git', ['checkout', '-b', 'issue-999'], { cwd: repoPath });
       });
 
@@ -139,7 +139,7 @@ describe('AutoFixIssueCreateBranch', () => {
 
         const result = await instance.run(PLAN_DIR, ID);
 
-        expect(result).toBe('issue-999');
+        expect(result).toBe('issue-999\n');
       });
 
       it('extracts the branch name stripped of backticks and surrounding whitespace', async () => {
@@ -149,7 +149,7 @@ describe('AutoFixIssueCreateBranch', () => {
 
         const result = await instance.run(PLAN_DIR, ID);
 
-        expect(result).toBe('my-branch');
+        expect(result).toBe('my-branch\n');
       });
 
       it('falls back to issue-<id> when the extracted branch name is empty', async () => {
@@ -159,7 +159,7 @@ describe('AutoFixIssueCreateBranch', () => {
 
         const result = await instance.run(PLAN_DIR, ID);
 
-        expect(result).toBe('issue-999');
+        expect(result).toBe('issue-999\n');
       });
     });
 
