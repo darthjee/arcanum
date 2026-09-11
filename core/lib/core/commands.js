@@ -32,11 +32,13 @@
  *     and `arcanum-update-run-update-*`.
  *   - `'none'` / absent — `new ModuleClass()`, method args untouched. Applies
  *     to `dispatch-fixture-crash`, `auto-fix-all-config-*`,
- *     `auto-fix-issue-list-plan-agents`, and `auto-fix-issue-list-plan-steps`
+ *     `auto-fix-issue-list-plan-agents`, `auto-fix-issue-list-plan-steps`,
+ *     and `auto-fix-issue-run-checks`
  *     (their shims never thread a `repo_path` positional — see
- *     docs/agents/plans/431-migrate-auto-fix-issue-list-plan-agents-entrypoint-to-native-node-js/node.md
+ *     docs/agents/plans/431-migrate-auto-fix-issue-list-plan-agents-entrypoint-to-native-node-js/node.md,
+ *     docs/agents/plans/432-migrate-auto-fix-issue-list-plan-steps-entrypoint-to-native-node-js/node.md,
  *     and
- *     docs/agents/plans/432-migrate-auto-fix-issue-list-plan-steps-entrypoint-to-native-node-js/node.md).
+ *     docs/agents/plans/434-migrate-auto-fix-issue-run-checks-entrypoint-to-native-node-js/node.md).
  * @property {boolean} [validateRepoPath] - defaults to `true` for
  *   `context: 'repo'`; set `false` to skip the Dispatcher-level
  *   `RepoContext#validate()` (e.g. entries with their own not-a-repo error
@@ -227,6 +229,10 @@ export const COMMANDS = {
     module: 'commands/auto-fix-issue/AutoFixIssueMergeMain.js',
     method: 'run',
     context: 'repo'
+  },
+  'auto-fix-issue-run-checks': {
+    module: 'commands/auto-fix-issue/AutoFixIssueRunChecks.js',
+    method: 'run'
   },
   'checkout-safe-branch': {
     module: 'commands/shared/SafeBranch.js',
