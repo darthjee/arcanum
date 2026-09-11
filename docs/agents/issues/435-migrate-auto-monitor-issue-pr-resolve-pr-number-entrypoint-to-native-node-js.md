@@ -18,14 +18,14 @@ This sub-issue has no dependency on any of the other scripts in the #427 batch �
 
 ## Solution
 
-Follow the standard migration process from `docs/agents/architecture/script-engine.md`:
+Follow the standard migration process from `docs/agents/architecture/script-engine.md`, the same shape as every other entrypoint in the #427 batch (e.g. #428, #434):
 
-1. Read `auto-monitor-issue-pr/scripts/resolve_pr_number.sh` for its exact output/exit-code contract.
+1. Rename `auto-monitor-issue-pr/scripts/resolve_pr_number.sh` to `auto-monitor-issue-pr/scripts/resolve_pr_number_shell.sh` (content unchanged), and replace it with a thin `engine_dispatch` shim — mirroring `auto-fix-issue/scripts/run_checks.sh`'s shape, forwarding `HOME` (needed for `gh` to resolve auth config once native's `env -i PATH="$PATH"` strips the ambient environment down).
 2. Create `core/lib/commands/auto-monitor-issue-pr/AutoMonitorIssuePrResolvePrNumber.js` — zero runtime npm deps, built-in Node APIs only for anything not already covered by existing native utilities (see below).
 3. Register `'auto-monitor-issue-pr-resolve-pr-number': { module: 'commands/auto-monitor-issue-pr/AutoMonitorIssuePrResolvePrNumber.js', method: 'run' }` in the `COMMANDS` map at `core/lib/core/commands.js`.
 4. Add `"auto-monitor-issue-pr-resolve-pr-number": true` to `arcanum/_lib/migration-status.json`.
-5. Write native unit tests in `core/spec/commands/auto-monitor-issue-pr/AutoMonitorIssuePrResolvePrNumber_spec.js`, covering both the cache-hit and API-lookup paths, plus the not-found error path.
-6. Write a parity test — shell vs. native, identical inputs, asserting identical stdout and exit code.
+5. Write native unit tests in `core/spec/lib/commands/auto-monitor-issue-pr/AutoMonitorIssuePrResolvePrNumber_spec.js`, covering both the cache-hit and API-lookup paths, plus the not-found error path.
+6. Write a parity test against `resolve_pr_number_shell.sh` (the renamed shell implementation, never through the new shim) — shell vs. native, identical inputs, asserting identical stdout and exit code.
 7. Verify `arcanum/_lib/engine_dispatch.sh` routes correctly for `engine.mode=native` and `engine.mode=shell`.
 
 Do not shell out to `gh` or re-derive `origin.sh`'s `_ensure_gh_user`/`get_repo_ref` — this exact lookup is already covered natively:
