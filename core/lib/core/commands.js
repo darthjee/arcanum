@@ -16,7 +16,7 @@
  *     `arcanum-split-issue-*` and `auto-fix-all-*` lifecycle commands
  *     (checkout-from-main / cleanup-artifacts / reply-comment / wait-ci /
  *     wait-ci-and-merge), on `spawn-issue`, on `auto-fix-issue-commit-change`,
- *     on the `auto-fix-all-github-*`
+ *     on `auto-fix-issue-create-branch`, on the `auto-fix-all-github-*`
  *     family (add-tag / cleanup-branch / has-shipit-label / pr-merge /
  *     pr-number / pr-state / remove-tag), and on the `auto-fix-all-queue-*`
  *     family (empty / list / next / pop / push / save / wait-next) — where
@@ -179,6 +179,11 @@ export const COMMANDS = {
   },
   'auto-fix-issue-commit-change': {
     module: 'commands/auto-fix-issue/AutoFixIssueCommitChange.js',
+    method: 'run',
+    context: 'repo'
+  },
+  'auto-fix-issue-create-branch': {
+    module: 'commands/auto-fix-issue/AutoFixIssueCreateBranch.js',
     method: 'run',
     context: 'repo'
   },
