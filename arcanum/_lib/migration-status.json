@@ -44,7 +44,7 @@
   "auto-fix-issue-list-plan-steps": true,
   "auto-fix-issue-merge-main": true,
   "auto-fix-issue-run-checks": true,
-  "auto-monitor-issue-pr-resolve-pr-number": false,
+  "auto-monitor-issue-pr-resolve-pr-number": true,
   "auto-monitor-pr-monitor-pr": false,
   "auto-new-issue-commit-issue": false,
   "auto-plan-issue-commit-plan": false,
