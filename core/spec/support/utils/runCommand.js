@@ -12,6 +12,17 @@ export const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)),
 /** The `auto-fix-all-github` shell entrypoint's script path. */
 export const SHELL_SCRIPT = path.join(REPO_ROOT, 'auto-fix-all', 'scripts', 'github.sh');
 
+/**
+ * The `auto-fix-issue-github` shell entrypoint's script path — run
+ * directly (never through the `auto-fix-issue/scripts/github.sh`
+ * engine_dispatch router) by every parity spec under
+ * `core/spec/bin/autoFixIssueGithubParity/` except `engine_dispatch_spec.js`
+ * itself, which exercises the real router.
+ */
+export const AUTO_FIX_ISSUE_GITHUB_SHELL_SCRIPT = path.join(
+  REPO_ROOT, 'auto-fix-issue', 'scripts', 'github_shell.sh'
+);
+
 /** `core/bin/arcanum`'s own path — the native entrypoint dispatcher. */
 export const NATIVE_BIN = path.join(REPO_ROOT, 'core', 'bin', 'arcanum');
 
@@ -85,11 +96,15 @@ export async function seedOriginUrl(repoPath, url) {
  * @param {{repoPath: string}} nativeRepo - the native side's fixture repo.
  * @param {object} shellEnv - the shell invocation's environment.
  * @param {object} nativeEnv - the native invocation's environment.
+ * @param {string} [shellScript] - the shell script to invoke `subcommand`
+ *   on; defaults to `SHELL_SCRIPT` (`auto-fix-all-github`'s own).
  * @returns {Promise<{shell: object, native: object}>} both sides' results.
  */
-export async function runBoth(subcommand, nativeCommand, extraArgs, shellRepo, nativeRepo, shellEnv, nativeEnv) {
+export async function runBoth(
+  subcommand, nativeCommand, extraArgs, shellRepo, nativeRepo, shellEnv, nativeEnv, shellScript = SHELL_SCRIPT
+) {
   const shell = await runCommand(
-    [SHELL_SCRIPT, subcommand, shellRepo.repoPath, ...extraArgs],
+    [shellScript, subcommand, shellRepo.repoPath, ...extraArgs],
     shellRepo.repoPath,
     shellEnv
   );
@@ -122,10 +137,14 @@ export function expectParity(shell, native) {
  * @param {string[]} extraArgs - any arguments after `<repo_path>`.
  * @param {string} repoPath - the repo-path argument under test.
  * @param {string} cwd - a valid directory to run both commands in.
+ * @param {string} [shellScript] - the shell script to invoke `subcommand`
+ *   on; defaults to `SHELL_SCRIPT` (`auto-fix-all-github`'s own).
  * @returns {Promise<{shell: object, native: object}>} both sides' results.
  */
-export async function runBothWithRepoPath(subcommand, nativeCommand, extraArgs, repoPath, cwd) {
-  const shell = await runCommand([SHELL_SCRIPT, subcommand, repoPath, ...extraArgs], cwd);
+export async function runBothWithRepoPath(
+  subcommand, nativeCommand, extraArgs, repoPath, cwd, shellScript = SHELL_SCRIPT
+) {
+  const shell = await runCommand([shellScript, subcommand, repoPath, ...extraArgs], cwd);
   const native = await runCommand(
     [process.execPath, '--import', FAKE_FETCH_PRELOAD, NATIVE_BIN, nativeCommand, repoPath, ...extraArgs],
     cwd
@@ -142,14 +161,18 @@ export async function runBothWithRepoPath(subcommand, nativeCommand, extraArgs, 
  * @param {string} subcommand - `github.sh`'s subcommand name.
  * @param {string} nativeCommand - the matching `core/bin/arcanum` command.
  * @param {string[]} [extraArgs] - any arguments after `<repo_path>`.
+ * @param {string} [shellScript] - the shell script to invoke `subcommand`
+ *   on; defaults to `SHELL_SCRIPT` (`auto-fix-all-github`'s own).
  * @returns {Promise<void>} resolves once both cases have been asserted.
  */
-export async function expectInvalidRepoPathParity(subcommand, nativeCommand, extraArgs = []) {
+export async function expectInvalidRepoPathParity(
+  subcommand, nativeCommand, extraArgs = [], shellScript = SHELL_SCRIPT
+) {
   const cwd = await createTempDir('arcanum-core-afgh-parity-');
 
   try {
     const missingPath = path.join(cwd, 'no-such-dir');
-    const miss = await runBothWithRepoPath(subcommand, nativeCommand, extraArgs, missingPath, cwd);
+    const miss = await runBothWithRepoPath(subcommand, nativeCommand, extraArgs, missingPath, cwd, shellScript);
 
     expectParity(miss.shell, miss.native);
     expect(miss.shell.code).not.toEqual(0);
@@ -160,7 +183,7 @@ export async function expectInvalidRepoPathParity(subcommand, nativeCommand, ext
     const nonGit = await createTempDir('arcanum-core-afgh-parity-nongit-');
 
     try {
-      const ng = await runBothWithRepoPath(subcommand, nativeCommand, extraArgs, nonGit, cwd);
+      const ng = await runBothWithRepoPath(subcommand, nativeCommand, extraArgs, nonGit, cwd, shellScript);
 
       expectParity(ng.shell, ng.native);
       expect(ng.shell.code).not.toEqual(0);

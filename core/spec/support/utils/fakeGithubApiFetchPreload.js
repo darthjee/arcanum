@@ -211,4 +211,61 @@ if (mode === 'success') {
 
     return new Response(JSON.stringify({ message: 'not found' }), { status: 404 });
   };
+} else if (mode === 'auto-fix-issue-github') {
+  // Drives every REST/GraphQL call `AutoFixIssueGithub.js` makes (issue
+  // #430): `GET /repos/{repo}` (`GitHubClient#createPr`'s own
+  // default-branch lookup), `POST /repos/{repo}/pulls` (`createPr`
+  // itself), `GET /repos/{repo}/pulls?head=...&state=all` (`getPr`, used
+  // by `pr-view`/`pr-ready`), and `POST https://api.github.com/graphql`
+  // (`markPrReady`). Env vars mirror `fakeGhBin.js`'s own `FAKE_GH_*`
+  // names (as `FAKE_FETCH_*`) so the same scenario seeds both sides of a
+  // parity comparison identically.
+  const defaultBranch = process.env.FAKE_FETCH_DEFAULT_BRANCH || 'main';
+  const prCreateFail = process.env.FAKE_FETCH_PR_CREATE_FAIL === '1';
+  const prCreateUrl = process.env.FAKE_FETCH_PR_CREATE_URL || 'https://github.com/example/repo/pull/99';
+  const prNumber = process.env.FAKE_FETCH_PR_NUMBER || '';
+  const prUrl = process.env.FAKE_FETCH_PR_URL || `https://github.com/example/repo/pull/${prNumber}`;
+  const prNodeId = process.env.FAKE_FETCH_PR_NODE_ID || 'PR_fakeNodeId';
+  const prDraft = process.env.FAKE_FETCH_PR_DRAFT === '1';
+  const markReadyFail = process.env.FAKE_FETCH_MARK_READY_FAIL === '1';
+
+  globalThis.fetch = async (rawUrl, options = {}) => {
+    const url = typeof rawUrl === 'string' ? rawUrl : rawUrl.toString();
+
+    if (options.method === 'POST' && /\/pulls$/.test(url)) {
+      if (prCreateFail) {
+        return new Response(JSON.stringify({ message: 'Validation Failed' }), { status: 422 });
+      }
+
+      return new Response(JSON.stringify({ html_url: prCreateUrl }), { status: 201 });
+    }
+
+    if (url.includes('/pulls?head=')) {
+      if (!prNumber) {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+
+      return new Response(
+        JSON.stringify([{ number: Number(prNumber), html_url: prUrl, draft: prDraft, node_id: prNodeId }]),
+        { status: 200 }
+      );
+    }
+
+    if (options.method === 'POST' && url === 'https://api.github.com/graphql') {
+      if (markReadyFail) {
+        return new Response(JSON.stringify({ errors: [{ message: 'not found' }] }), { status: 200 });
+      }
+
+      return new Response(
+        JSON.stringify({ data: { markPullRequestReadyForReview: { pullRequest: { id: prNodeId } } } }),
+        { status: 200 }
+      );
+    }
+
+    if (options.method === undefined && /\/repos\/[^/]+\/[^/]+$/.test(url)) {
+      return new Response(JSON.stringify({ default_branch: defaultBranch }), { status: 200 });
+    }
+
+    return new Response(JSON.stringify({ message: 'not found' }), { status: 404 });
+  };
 }
