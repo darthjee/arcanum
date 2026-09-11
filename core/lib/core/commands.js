@@ -30,7 +30,10 @@
  *     argument is stripped from the method args. `permission-grant-add`
  *     and `arcanum-update-run-update-*`.
  *   - `'none'` / absent — `new ModuleClass()`, method args untouched. Applies
- *     to `dispatch-fixture-crash` and `auto-fix-all-config-*`.
+ *     to `dispatch-fixture-crash`, `auto-fix-all-config-*`, and
+ *     `auto-fix-issue-list-plan-agents` (its shim never threads a
+ *     `repo_path` positional — see
+ *     docs/agents/plans/431-migrate-auto-fix-issue-list-plan-agents-entrypoint-to-native-node-js/node.md).
  * @property {boolean} [validateRepoPath] - defaults to `true` for
  *   `context: 'repo'`; set `false` to skip the Dispatcher-level
  *   `RepoContext#validate()` (e.g. entries with their own not-a-repo error
@@ -208,6 +211,10 @@ export const COMMANDS = {
     module: 'commands/auto-fix-issue/AutoFixIssueGithub.js',
     method: 'prReady',
     context: 'repo'
+  },
+  'auto-fix-issue-list-plan-agents': {
+    module: 'commands/auto-fix-issue/AutoFixIssueListPlanAgents.js',
+    method: 'run'
   },
   'checkout-safe-branch': {
     module: 'commands/shared/SafeBranch.js',
