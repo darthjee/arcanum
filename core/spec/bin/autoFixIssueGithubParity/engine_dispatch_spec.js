@@ -9,36 +9,6 @@ import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
 const SHIM_SCRIPT = path.join(REPO_ROOT, 'auto-fix-issue', 'scripts', 'github.sh');
 const REPO_REF = 'darthjee/arcanum-github-fixture';
 
-// KNOWN BUG (out of this plan step's scope — auto-fix-issue/scripts/
-// github.sh is owned by the "scripter" agent, not "node"; see this
-// plan's node.md "Do not touch" note): every `engine.mode=native`
-// branch below is currently blocked by a real defect in the router
-// itself, confirmed by direct reproduction (not a flaky/environmental
-// issue). `github.sh`'s per-subcommand `case` arms each call
-// `engine_dispatch "$REPO_PATH" <command> "$SCRIPT_DIR/github_shell.sh"
-// [HOME] -- "$@"`, where `"$@"` is github.sh's OWN full argv —
-// `[<subcommand>, <repo_path>, ...]`. `engine_dispatch`'s shell branch
-// correctly reuses that array verbatim as `github_shell.sh`'s own argv
-// (which legitimately needs `<subcommand>` first), but its native
-// branch reuses the SAME array as `core/bin/arcanum <command>`'s
-// trailing args too — which must NOT include `<subcommand>` a second
-// time, since `<command>` (e.g. `auto-fix-issue-github-info`) already
-// encodes it. The result: native invocations receive `<subcommand>`
-// (e.g. the literal string `"info"`) as their leading arg instead of
-// `<repo_path>` — `Dispatcher#repoContext` binds THAT string as
-// `repoPath`, so `RepoContext#validate()` immediately rejects it
-// (`Error: not a directory: info`) before the command module ever
-// runs. Reproduced directly: `auto-fix-issue/scripts/github.sh info
-// <a-valid-repo-path-with-engine.mode=native>` exits 1 with `arcanum:
-// Error: not a directory: info` on stderr. This affects all four
-// subcommands identically (confirmed for `info`/`pr-create`/`pr-view`/
-// `pr-ready`) and needs a fix in `github.sh` (and/or a
-// `engine_dispatch.sh` contract change, since a multi-subcommand router
-// is the first of its kind to hit this — `arcanum/_lib/engine_dispatch.sh`
-// is shared and architect-owned) before these `pending()` specs can be
-// turned back into real assertions.
-const NATIVE_ROUTING_BUG = 'blocked by a confirmed github.sh engine_dispatch bug — see this file\'s header comment';
-
 /**
  * Seeds `.claude/state/arcanum-config.json`'s `engine.mode` under
  * `repo.repoPath`, the local-state (highest-precedence) tier
@@ -102,8 +72,6 @@ describe('auto-fix-issue-github engine_dispatch routing (via the real github.sh 
     });
 
     it('routes to the native implementation when engine.mode=native', async () => {
-      pending(NATIVE_ROUTING_BUG);
-
       const repo = await createGitFixtureRepo();
 
       try {
@@ -170,8 +138,6 @@ describe('auto-fix-issue-github engine_dispatch routing (via the real github.sh 
     });
 
     it('routes to the native implementation when engine.mode=native', async () => {
-      pending(NATIVE_ROUTING_BUG);
-
       const fakeGh = await createFakeGhBin({ authTokenAlwaysFails: true });
       const repo = await createGitFixtureRepo();
       const file = path.join(repo.repoPath, 'body.md');
@@ -222,8 +188,6 @@ describe('auto-fix-issue-github engine_dispatch routing (via the real github.sh 
     });
 
     it('routes to the native implementation when engine.mode=native', async () => {
-      pending(NATIVE_ROUTING_BUG);
-
       const fakeGh = await createFakeGhBin({ authTokenAlwaysFails: true });
       const repo = await createGitFixtureRepo();
 
@@ -268,8 +232,6 @@ describe('auto-fix-issue-github engine_dispatch routing (via the real github.sh 
     });
 
     it('routes to the native implementation when engine.mode=native', async () => {
-      pending(NATIVE_ROUTING_BUG);
-
       const fakeGh = await createFakeGhBin({ authTokenAlwaysFails: true });
       const repo = await createGitFixtureRepo();
 
