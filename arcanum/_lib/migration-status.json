@@ -49,7 +49,7 @@
   "auto-new-issue-commit-issue": false,
   "auto-plan-issue-commit-plan": false,
   "discuss-issue-confirm": true,
-  "discuss-issue-render-issue": false,
+  "discuss-issue-render-issue": true,
   "init-claude-set-ci-ignored-patterns": false,
   "init-claude-setup-docs-structure": false,
   "init-claude-setup-templates": false,

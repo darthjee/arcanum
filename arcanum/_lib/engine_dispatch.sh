@@ -39,7 +39,7 @@ _engine_dispatch_native_available() {
   [[ "$value" == "true" ]] && echo "true" || echo "false"
 }
 
-# engine_dispatch <repo_path> <command> <shell_script> [<env_var_name> ...] -- <args...>
+# engine_dispatch <repo_path> <command> <shell_script> [--prepend-repo-path] [<env_var_name> ...] -- <args...>
 #   The shared dispatch guard for one migrated-entrypoint call.
 #
 #   - <repo_path>: the target repo whose engine.mode config is
@@ -51,14 +51,33 @@ _engine_dispatch_native_available() {
 #   - <shell_script>: path to the existing shell implementation, run
 #     directly (engine.mode=shell) or as the fallback whenever native
 #     isn't actually used.
+#   - [--prepend-repo-path]: optional literal flag (recognized anywhere
+#     in the env-var-name segment below, since real env var names never
+#     contain `-`, so this can never collide with one) — when present,
+#     <repo_path> is prepended as a native-only leading positional
+#     argument, ahead of <args...>, to the `core/bin/arcanum` invocation
+#     ONLY (never to <shell_script>). For `context: 'repo'` commands
+#     whose own CLI never took a <repo_path> argument from its existing
+#     callers (e.g. discuss-issue/scripts/render_issue.sh) — the
+#     Dispatcher (core/lib/core/dispatcher.js) always consumes the
+#     native invocation's own leading positional as `repoPath` on that
+#     context, so it must be supplied somehow; for entrypoints whose
+#     <shell_script> takes the exact same leading argument itself
+#     (e.g. commit_change_shell.sh), just include <repo_path> as the
+#     first element of <args...> instead — this flag is only for the
+#     mismatched case where <shell_script>'s own CLI must NOT receive
+#     it.
 #   - [<env_var_name> ...]: zero or more names of environment variables
 #     (read from this process's own environment) to forward, by name,
 #     to a native invocation — the explicit per-command allowlist
 #     described in docs/agents/architecture/script-engine.md. Anything
 #     not named here is NOT forwarded (no ambient-env passthrough).
-#     This list is terminated by a literal `--`.
+#     This list (and the optional --prepend-repo-path flag above) is
+#     terminated by a literal `--`.
 #   - <args...>: this entrypoint's own arguments, passed through
-#     unchanged to whichever implementation actually runs.
+#     unchanged to whichever implementation actually runs (with
+#     <repo_path> prepended ahead of them for the native invocation only,
+#     when --prepend-repo-path is given).
 #
 #   Resolution (engine.mode via config_chain_read, default "shell"):
 #     1. shell: always runs <shell_script>.
@@ -68,13 +87,14 @@ _engine_dispatch_native_available() {
 #     3. native: consults migration-status.json for <command>.
 #        - Not available: falls back to <shell_script>, with a warning
 #          on stderr (not a hard error).
-#        - Available: invokes `core/bin/arcanum <command> <args...>`
-#          with the explicit env-var allowlist above (`env -i`, PATH
-#          and ARCANUM_REPO_PATH (infrastructure-level, always set to
-#          <repo_path>) plus only the named vars — never the full
-#          ambient environment). A non-zero exit here is a real
-#          native-side bug/crash and is propagated as-is, with NO
-#          fallback to <shell_script>.
+#        - Available: invokes `core/bin/arcanum <command> [<repo_path>] <args...>`
+#          (the leading `<repo_path>` present only when
+#          --prepend-repo-path was given) with the explicit env-var
+#          allowlist above (`env -i`, PATH and ARCANUM_REPO_PATH
+#          (infrastructure-level, always set to <repo_path>) plus only
+#          the named vars — never the full ambient environment). A
+#          non-zero exit here is a real native-side bug/crash and is
+#          propagated as-is, with NO fallback to <shell_script>.
 #
 #   Exit code: whichever branch actually ran (<shell_script> or
 #   core/bin/arcanum)'s own exit code.
@@ -82,9 +102,14 @@ engine_dispatch() {
   local repo_path="$1" command="$2" shell_script="$3"
   shift 3
 
+  local prepend_repo_path="false"
   local env_allowlist=()
   while [[ $# -gt 0 && "$1" != "--" ]]; do
-    env_allowlist+=("$1")
+    if [[ "$1" == "--prepend-repo-path" ]]; then
+      prepend_repo_path="true"
+    else
+      env_allowlist+=("$1")
+    fi
     shift
   done
   [[ "${1:-}" == "--" ]] && shift
@@ -127,6 +152,7 @@ engine_dispatch() {
   local native_cmd=(env -i PATH="$PATH" ARCANUM_REPO_PATH="$repo_path")
   [[ ${#env_args[@]} -gt 0 ]] && native_cmd+=("${env_args[@]}")
   native_cmd+=("$_ENGINE_DISPATCH_NATIVE_BIN" "$command")
+  [[ "$prepend_repo_path" == "true" ]] && native_cmd+=("$repo_path")
   [[ ${#args[@]} -gt 0 ]] && native_cmd+=("${args[@]}")
 
   "${native_cmd[@]}"

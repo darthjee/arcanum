@@ -21,9 +21,9 @@
  *     has-shipit-label / pr-merge / pr-number / pr-state / remove-tag), on
  *     the `auto-fix-issue-github-*` family (info / pr-create / pr-view /
  *     pr-ready), on `auto-monitor-issue-pr-resolve-pr-number`, on
- *     `auto-monitor-pr-monitor-pr`, and on the
- *     `auto-fix-all-queue-*` family (empty / list / next / pop / push /
- *     save / wait-next) — where
+ *     `auto-monitor-pr-monitor-pr`, on `discuss-issue-render-issue`, and
+ *     on the `auto-fix-all-queue-*` family (empty / list / next / pop /
+ *     push / save / wait-next) — where
  *     `save` / `push` keep the Dispatcher `RepoContext#validate()` and the
  *     five file-only subcommands set `validateRepoPath: false` (their
  *     `repoPath` is only a queue-file path prefix).
@@ -263,6 +263,11 @@ export const COMMANDS = {
   // so do not reintroduce a unit-level dependency on this entry.
   'dispatch-fixture-crash': { module: 'commands/shared/DispatchFixture.js', method: 'crash' },
   'discuss-issue-confirm': { module: 'commands/discuss-issue/DiscussIssueConfirm.js', method: 'run' },
+  'discuss-issue-render-issue': {
+    module: 'commands/discuss-issue/DiscussIssueRenderIssue.js',
+    method: 'run',
+    context: 'repo'
+  },
   'github-issue-create': {
     module: 'commands/shared/GithubIssue.js',
     method: 'create',
