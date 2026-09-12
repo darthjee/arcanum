@@ -1,28 +1,39 @@
 #!/usr/bin/env bash
-# Deterministically resolve a free-form yes/no-ish reply to a boolean.
+# Thin engine_dispatch shim for the "discuss-issue-confirm" migrated
+# entrypoint — see docs/agents/architecture/script-engine.md and
+# docs/agents/plans/447-migrate-discuss-issue-confirm-entrypoint-to-native-node-js/plan.md
+# for the full design/shared contracts. Deterministically resolves a
+# free-form yes/no-ish reply to a boolean (exit code only, no stdout),
+# via either the shell implementation (confirm_shell.sh) or the native
+# one (core/bin/arcanum), per engine.mode / arcanum/_lib/migration-status.json.
+#
+# No env vars are forwarded to the native path's allowlist — this
+# entrypoint does no git/GitHub/filesystem I/O, only string
+# normalization on its one argument.
+#
 # Usage: confirm.sh "<free-form reply>"
 #
-# Trims surrounding whitespace and trailing punctuation (. ! ?), lowercases
-# the reply, then matches it against a fixed affirmative word/phrase list
-# (case handled via the lowercasing above): yes, y, sim, correct,
-# "looks good", sure, ok, okay.
+# Unlike commit_change.sh/merge_main.sh, this entrypoint does not take
+# <repo_path> as its own argument — every existing caller invokes it as
+# `confirm.sh "<reply>"`. engine_dispatch() still needs a repo_path for
+# its config_chain_read call, so it is derived here from the ambient git
+# checkout, the same convention list_plan_agents.sh uses.
 #
-# Exit 0 when the (normalized) reply matches one of those affirmatives.
-# Exit 1 for everything else — including explicit negatives (no, n, não,
-# nao, nope), anything unrecognized, and a missing/empty argument — since
-# "not recognized as affirmative" already means "no" for this contract.
+# Output and exit code: unchanged from before this migration — see
+# confirm_shell.sh's own header for the full behavior contract. Note
+# there is deliberately NO argument-presence check here (unlike most
+# other shims): confirm_shell.sh itself never errors or prints anything
+# on a missing/empty reply, it just exits 1 the same as any other
+# non-affirmative reply — adding a validation block here would diverge
+# from that contract.
 
 set -euo pipefail
 
-REPLY="${1:-}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-NORMALIZED=$(printf '%s' "$REPLY" | tr '[:upper:]' '[:lower:]' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//; s/[.!?]+$//')
+# shellcheck source=../../arcanum/_lib/engine_dispatch.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/engine_dispatch.sh"
 
-case "$NORMALIZED" in
-  yes|y|sim|correct|"looks good"|sure|ok|okay)
-    exit 0
-    ;;
-  *)
-    exit 1
-    ;;
-esac
+REPO_PATH="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+
+engine_dispatch "$REPO_PATH" discuss-issue-confirm "${SCRIPT_DIR}/confirm_shell.sh" -- "$@"
