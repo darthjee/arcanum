@@ -268,4 +268,65 @@ if (mode === 'success') {
 
     return new Response(JSON.stringify({ message: 'not found' }), { status: 404 });
   };
+} else if (mode === 'monitor-pr') {
+  // Drives every REST/GraphQL call `PrMonitor.js`/`AutoMonitorPrMonitorPr.js`
+  // make (issue #436): `GET /repos/{repo}/pulls/{prNumber}` (`getPrState`,
+  // matching `monitor_pr_shell.sh`'s `gh pr view --json state,comments,reviews`'s
+  // `.state` field), `GET /repos/{repo}/pulls/{prNumber}/reviews`
+  // (`getPrReviews`, matching that same call's `.reviews` field), `GET
+  // /repos/{repo}/issues/{prNumber}/comments` (`getIssueComments`,
+  // matching that call's `.comments` field), `GET
+  // /repos/{repo}/pulls/{prNumber}/comments` (`getPrReviewComments`,
+  // matching `monitor_pr_shell.sh`'s separate inline-review-comments
+  // `gh api` call), and `POST https://api.github.com/graphql`
+  // (`addReaction`/`removeReaction`, always tolerated). Env vars mirror
+  // `fakeGhBin.js`'s own `FAKE_GH_*` names (as `FAKE_FETCH_*`) so the
+  // same scenario seeds both sides of a parity comparison identically —
+  // except `FAKE_FETCH_MONITOR_PR_FAIL`, which has no shell-side
+  // counterpart (the shell simulates a transient `gh` error by leaving
+  // `FAKE_GH_PR_NUMBER` unset, which already fails every `gh pr view`
+  // case unconditionally; native has no equivalent single point of
+  // failure, since `getPrState`/`getPrReviews`/`getIssueComments`/
+  // `getPrReviewComments` are 4 independent REST calls, so this flag
+  // fails all 4 at once instead).
+  const prState = process.env.FAKE_FETCH_PR_STATE || 'open';
+  const prMerged = process.env.FAKE_FETCH_PR_MERGED === '1';
+  const reviewsJson = process.env.FAKE_FETCH_PR_REVIEWS_JSON || '[]';
+  const commentsJson = process.env.FAKE_FETCH_PR_COMMENTS_JSON || '[]';
+  const reviewCommentsJson = process.env.FAKE_FETCH_PR_REVIEW_COMMENTS_JSON || '[]';
+  const fail = process.env.FAKE_FETCH_MONITOR_PR_FAIL === '1';
+
+  globalThis.fetch = async (rawUrl, options = {}) => {
+    const url = typeof rawUrl === 'string' ? rawUrl : rawUrl.toString();
+    const notFound = () => new Response(JSON.stringify({ message: 'not found' }), { status: 404 });
+
+    if (fail) {
+      return notFound();
+    }
+
+    if (options.method === 'POST' && url === 'https://api.github.com/graphql') {
+      return new Response('{}', { status: 200 });
+    }
+
+    if (/\/pulls\/\d+\/reviews/.test(url)) {
+      return new Response(reviewsJson, { status: 200 });
+    }
+
+    if (/\/pulls\/\d+\/comments/.test(url)) {
+      return new Response(reviewCommentsJson, { status: 200 });
+    }
+
+    if (/\/issues\/\d+\/comments/.test(url)) {
+      return new Response(commentsJson, { status: 200 });
+    }
+
+    if (/\/pulls\/\d+$/.test(url)) {
+      return new Response(
+        JSON.stringify({ state: prState, merged: prMerged, merged_at: prMerged ? '2024-01-01T00:00:00Z' : null }),
+        { status: 200 }
+      );
+    }
+
+    return notFound();
+  };
 }
