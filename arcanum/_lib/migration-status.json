@@ -46,7 +46,7 @@
   "auto-fix-issue-run-checks": true,
   "auto-monitor-issue-pr-resolve-pr-number": true,
   "auto-monitor-pr-monitor-pr": true,
-  "auto-new-issue-commit-issue": false,
+  "auto-new-issue-commit-issue": true,
   "auto-plan-issue-commit-plan": true,
   "discuss-issue-confirm": true,
   "discuss-issue-render-issue": true,
