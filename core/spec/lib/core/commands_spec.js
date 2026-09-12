@@ -5,7 +5,7 @@ describe('COMMANDS', () => {
     expect(Object.keys(COMMANDS).length).toBeGreaterThan(0);
   });
 
-  it('sets context: \'repo\' on the migrated arcanum-split-issue, auto-fix-all lifecycle, auto-fix-issue-commit-change, auto-fix-issue-create-branch, auto-fix-issue-merge-main, auto-fix-all-github, auto-fix-issue-github, auto-monitor-issue-pr-resolve-pr-number, auto-fix-all-queue and spawn-issue entries', () => {
+  it('sets context: \'repo\' on the migrated arcanum-split-issue, auto-fix-all lifecycle, auto-fix-issue-commit-change, auto-fix-issue-create-branch, auto-fix-issue-merge-main, auto-fix-all-github, auto-fix-issue-github, auto-monitor-issue-pr-resolve-pr-number, auto-monitor-pr-monitor-pr, auto-fix-all-queue and spawn-issue entries', () => {
     const withRepoContext = Object.keys(COMMANDS).filter((name) => COMMANDS[name].context === 'repo');
 
     expect(withRepoContext).toEqual([
@@ -40,6 +40,7 @@ describe('COMMANDS', () => {
       'auto-fix-issue-github-pr-ready',
       'auto-fix-issue-merge-main',
       'auto-monitor-issue-pr-resolve-pr-number',
+      'auto-monitor-pr-monitor-pr',
       'checkout-safe-branch',
       'github-issue-create',
       'github-issue-info',

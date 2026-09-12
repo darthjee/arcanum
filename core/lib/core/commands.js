@@ -20,7 +20,8 @@
  *     the `auto-fix-all-github-*` family (add-tag / cleanup-branch /
  *     has-shipit-label / pr-merge / pr-number / pr-state / remove-tag), on
  *     the `auto-fix-issue-github-*` family (info / pr-create / pr-view /
- *     pr-ready), on `auto-monitor-issue-pr-resolve-pr-number`, and on the
+ *     pr-ready), on `auto-monitor-issue-pr-resolve-pr-number`, on
+ *     `auto-monitor-pr-monitor-pr`, and on the
  *     `auto-fix-all-queue-*` family (empty / list / next / pop / push /
  *     save / wait-next) — where
  *     `save` / `push` keep the Dispatcher `RepoContext#validate()` and the
@@ -236,6 +237,11 @@ export const COMMANDS = {
   },
   'auto-monitor-issue-pr-resolve-pr-number': {
     module: 'commands/auto-monitor-issue-pr/AutoMonitorIssuePrResolvePrNumber.js',
+    method: 'run',
+    context: 'repo'
+  },
+  'auto-monitor-pr-monitor-pr': {
+    module: 'commands/auto-monitor-pr/AutoMonitorPrMonitorPr.js',
     method: 'run',
     context: 'repo'
   },

@@ -29,6 +29,26 @@ class GitClient {
 
     return stdout.trim();
   }
+
+  /**
+   * Best-effort push of the current branch to `origin`, replacing
+   * `arcanum/_lib/push.sh`'s `push_current_branch` — every caller of the
+   * shell function tolerates any failure (`push_current_branch 2>/dev/null
+   * || true`), so this never throws either. Native's `execFile` never
+   * forwards the child's stdout to this process's own stdout (unlike the
+   * shell's own stderr-only redirect), so there is no risk of `git
+   * push`'s own output leaking into a caller's stdout contract.
+   * @returns {Promise<void>} resolves regardless of outcome.
+   */
+  async pushCurrentBranch() {
+    try {
+      const branch = await this.currentBranch();
+
+      await this._execFileAsync('git', ['push', '-u', 'origin', `${branch}:${branch}`], { cwd: this._context.repoPath });
+    } catch {
+      // best-effort — tolerate any failure, matching push_current_branch's callers.
+    }
+  }
 }
 
 export default GitClient;

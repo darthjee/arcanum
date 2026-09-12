@@ -144,4 +144,61 @@ describe('GithubToken', () => {
       expect(configCall.options).toEqual({ cwd: '/other' });
     });
   });
+
+  describe('#ghUser', () => {
+    it('returns the local git config user.ghuser value, without switching or fetching a token', async () => {
+      const execFileSpy = jasmine.createSpy('execFileAsync').and.callFake((file, args) => {
+        if (args.join(' ') === 'config user.ghuser') {
+          return Promise.resolve({ stdout: 'octocat\n', stderr: '' });
+        }
+
+        return Promise.reject(new Error('unexpected call'));
+      });
+      const githubToken = new GithubToken({ execFileAsync: execFileSpy });
+
+      await expectAsync(githubToken.ghUser('/repo')).toBeResolvedTo('octocat');
+      expect(execFileSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('falls back to the global git config value when the local one is unset', async () => {
+      const execFileSpy = jasmine.createSpy('execFileAsync').and.callFake((file, args) => {
+        if (args.join(' ') === 'config user.ghuser') {
+          return Promise.reject(new Error('not set'));
+        }
+
+        if (args.join(' ') === 'config --global user.ghuser') {
+          return Promise.resolve({ stdout: 'global-user\n', stderr: '' });
+        }
+
+        return Promise.reject(new Error('unexpected call'));
+      });
+      const githubToken = new GithubToken({ execFileAsync: execFileSpy });
+
+      await expectAsync(githubToken.ghUser('/repo')).toBeResolvedTo('global-user');
+    });
+
+    it('resolves to an empty string when unset at both levels', async () => {
+      const execFileSpy = jasmine.createSpy('execFileAsync').and.returnValue(Promise.reject(new Error('not set')));
+      const githubToken = new GithubToken({ execFileAsync: execFileSpy });
+
+      await expectAsync(githubToken.ghUser('/repo')).toBeResolvedTo('');
+    });
+
+    it('falls back to `repoContext.repoPath` when no `repoPath` argument is passed', async () => {
+      const calls = [];
+      const execFileSpy = jasmine.createSpy('execFileAsync').and.callFake((file, args, options) => {
+        calls.push({ args, options });
+
+        if (args.join(' ') === 'config user.ghuser') {
+          return Promise.resolve({ stdout: 'octocat\n', stderr: '' });
+        }
+
+        return Promise.reject(new Error('unexpected call'));
+      });
+      const githubToken = new GithubToken({ execFileAsync: execFileSpy, repoContext: { repoPath: '/repo' } });
+
+      await expectAsync(githubToken.ghUser()).toBeResolvedTo('octocat');
+      expect(calls[0].options).toEqual({ cwd: '/repo' });
+    });
+  });
 });

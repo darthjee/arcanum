@@ -54,6 +54,26 @@ class GithubToken {
   }
 
   /**
+   * Native equivalent of `origin.sh`'s `get_gh_user`: the configured
+   * `user.ghuser` git config value (local, falling back to global), or
+   * `''` when unset at both levels. Deliberately NOT the currently
+   * authenticated `gh` account's login (`gh api user`) — `monitor_pr.sh`
+   * reads this raw git-config value directly for its `PR_OWNER`, so an
+   * unset `user.ghuser` means "watch nobody's comments", not "watch
+   * whichever account `gh auth token` currently resolves to". Exposed
+   * publicly (distinct from the private `_getGhUser` used internally by
+   * `_switchGhUser`) for `AutoMonitorPrMonitorPr` to resolve `PR_OWNER`.
+   * @param {string} [repoPath] - the target repo's local checkout path;
+   *   falls back to `this._repoContext.repoPath` when omitted.
+   * @returns {Promise<string>} the configured `user.ghuser`, or `''`.
+   */
+  async ghUser(repoPath) {
+    const path = repoPath ?? this._repoContext?.repoPath;
+
+    return this._getGhUser(path);
+  }
+
+  /**
    * Best-effort `gh auth switch --user <git config user.ghuser>`,
    * mirroring `origin.sh`'s `_ensure_gh_user`. Never fails the caller —
    * only warns on stderr.
