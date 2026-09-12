@@ -71,6 +71,19 @@ import { createTempDir, removeTempDir } from './tempDir.js';
 //   - `gh issue edit <id> -R <ref> --add-label <label>` /
 //     `gh issue edit <id> -R <ref> --remove-label <label>` -> succeeds
 //     (prints nothing) unless `$FAKE_GH_ISSUE_EDIT_FAIL` is `1`.
+//   - `gh pr view <number> -R <ref> --json state,comments,reviews` ->
+//     prints `{"state":..,"comments":..,"reviews":..}` built from
+//     `$FAKE_GH_PR_STATE` (default `OPEN`) / `$FAKE_GH_PR_COMMENTS_JSON`
+//     (default `[]`) / `$FAKE_GH_PR_REVIEWS_JSON` (default `[]`) — used
+//     by `monitor_pr_shell.sh`. Also fails, like every other `gh pr
+//     view` case, when `$FAKE_GH_PR_NUMBER` is unset/empty.
+//   - `gh api repos/<ref>/pulls/<number>/comments` -> prints
+//     `$FAKE_GH_PR_REVIEW_COMMENTS_JSON` (default `[]`) — `monitor_pr_shell.sh`'s
+//     inline-review-comments fetch.
+//   - `gh api graphql ...` -> always succeeds, printing nothing —
+//     `monitor_pr_shell.sh`'s `add_reaction`/`remove_reaction` GraphQL
+//     mutations, which already swallow any failure via `|| true` on the
+//     shell side, so there is no failure mode worth simulating here.
 /**
  * @param {boolean} authTokenAlwaysFails - whether `gh auth token` should
  *   unconditionally fail, baked in as a literal (not read from the
@@ -148,6 +161,12 @@ case "\${1:-}" in
           commits)
             echo "{\\"commits\\": \${FAKE_GH_PR_COMMITS_JSON:-[]}}"
             ;;
+          state,comments,reviews)
+            printf '{"state":"%s","comments":%s,"reviews":%s}\\n' \\
+              "\${FAKE_GH_PR_STATE:-OPEN}" \\
+              "\${FAKE_GH_PR_COMMENTS_JSON:-[]}" \\
+              "\${FAKE_GH_PR_REVIEWS_JSON:-[]}"
+            ;;
           *)
             echo "fake gh: unrecognized --json field: $json_field" >&2
             exit 1
@@ -206,6 +225,13 @@ case "\${1:-}" in
           exit 1
         fi
         echo "\${FAKE_GH_USER_LOGIN:-fake-merger}"
+        exit 0
+        ;;
+      repos/*/pulls/*/comments)
+        echo "\${FAKE_GH_PR_REVIEW_COMMENTS_JSON:-[]}"
+        exit 0
+        ;;
+      graphql)
         exit 0
         ;;
     esac

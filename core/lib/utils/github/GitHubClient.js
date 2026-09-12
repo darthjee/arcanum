@@ -333,6 +333,203 @@ class GitHubClient {
   }
 
   /**
+   * Resolve pull request `prNumber`'s raw pull object, replacing
+   * `monitor_pr.sh`'s `gh pr view --json state` piece (via `pr_data`,
+   * fetched once alongside `comments`/`reviews` there; here a dedicated
+   * REST call, number-keyed like `getPrHeadSha`/`getCheckRuns`). Pair
+   * with the static `GitHubClient.prStateLabel(pull)` to derive the
+   * `MERGED`/`CLOSED`/`OPEN` label `PrOperations#prState` also needs —
+   * kept as the one shared derivation so the two callers never fork it.
+   * @param {number|string} prNumber - the pull request number.
+   * @returns {Promise<object>} the raw pull request object (`state`,
+   *   `merged`, `merged_at`, etc.).
+   * @throws {Error} `Error: could not fetch pull request #<prNumber> from
+   *   <repo>` on a non-ok response.
+   */
+  async getPrState(prNumber) {
+    const { repo } = await this._context.resolveWithRef();
+    const token = await this._context.getToken();
+    const response = await this._fetch(`https://api.github.com/repos/${repo}/pulls/${prNumber}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(this._timeoutMs)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error: could not fetch pull request #${prNumber} from ${repo}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Derive the `gh pr view --json state`-equivalent label from a raw
+   * pull object — extracted from `PrOperations`'s own former
+   * `_prStateLabel` so `getPrState`'s caller (`PrMonitor`) and
+   * `PrOperations#prState` share one derivation instead of forking it. A
+   * merged PR always reports `MERGED`, even though the REST `state`
+   * field itself is just `closed` for both a merged and a plain-closed
+   * PR.
+   * @param {object} pull - the pull request object.
+   * @returns {'OPEN'|'MERGED'|'CLOSED'} the derived state label.
+   */
+  static prStateLabel(pull) {
+    if (pull.merged || pull.merged_at) {
+      return 'MERGED';
+    }
+
+    return pull.state === 'closed' ? 'CLOSED' : 'OPEN';
+  }
+
+  /**
+   * Resolve pull request `prNumber`'s reviews, replacing the `reviews`
+   * field of `monitor_pr.sh`'s `gh pr view --json ...,reviews` fetch.
+   * @param {number|string} prNumber - the pull request number.
+   * @returns {Promise<Array>} the pull request's reviews (first page
+   *   only, `per_page=100`), each with `user.login`, `state`,
+   *   `submitted_at`, `body`, `node_id` — or `[]` on a malformed
+   *   response.
+   * @throws {Error} `could not fetch reviews for pull request #<prNumber>
+   *   in <repo>` on a non-ok response.
+   */
+  async getPrReviews(prNumber) {
+    const { repo } = await this._context.resolveWithRef();
+    const token = await this._context.getToken();
+    const response = await this._fetch(`https://api.github.com/repos/${repo}/pulls/${prNumber}/reviews?per_page=100`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(this._timeoutMs)
+    });
+
+    if (!response.ok) {
+      throw new Error(`could not fetch reviews for pull request #${prNumber} in ${repo}`);
+    }
+
+    const reviews = await response.json();
+
+    return Array.isArray(reviews) ? reviews : [];
+  }
+
+  /**
+   * Resolve pull request `prNumber`'s conversation (issue-level)
+   * comments, replacing the `comments` field of `monitor_pr.sh`'s `gh pr
+   * view --json comments,...` fetch. Deliberately the `/issues/...`
+   * endpoint, not `/pulls/...` — a PR's "conversation" comments live on
+   * the issue endpoint under the REST API (matching what `gh pr view
+   * --json comments` surfaces under the hood).
+   * @param {number|string} prNumber - the pull request number.
+   * @returns {Promise<Array>} the comments (first page only,
+   *   `per_page=100`), each with `user.login`, `created_at`, `body`,
+   *   `node_id`, `html_url` — or `[]` on a malformed response.
+   * @throws {Error} `could not fetch comments for pull request
+   *   #<prNumber> in <repo>` on a non-ok response.
+   */
+  async getIssueComments(prNumber) {
+    const { repo } = await this._context.resolveWithRef();
+    const token = await this._context.getToken();
+    const response = await this._fetch(`https://api.github.com/repos/${repo}/issues/${prNumber}/comments?per_page=100`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(this._timeoutMs)
+    });
+
+    if (!response.ok) {
+      throw new Error(`could not fetch comments for pull request #${prNumber} in ${repo}`);
+    }
+
+    const comments = await response.json();
+
+    return Array.isArray(comments) ? comments : [];
+  }
+
+  /**
+   * Resolve pull request `prNumber`'s inline review comments, replacing
+   * `monitor_pr.sh`'s separate `gh api repos/.../pulls/.../comments`
+   * fetch. Distinct from `getPrCommits` (a pull request's commits, not
+   * its review comments) and from `getIssueComments` (conversation
+   * comments, not inline diff comments).
+   * @param {number|string} prNumber - the pull request number.
+   * @returns {Promise<Array>} the inline review comments (first page
+   *   only, `per_page=100`), each with `user.login`, `created_at`,
+   *   `body`, `node_id`, `html_url` — or `[]` on a malformed response.
+   * @throws {Error} `could not fetch review comments for pull request
+   *   #<prNumber> in <repo>` on a non-ok response.
+   */
+  async getPrReviewComments(prNumber) {
+    const { repo } = await this._context.resolveWithRef();
+    const token = await this._context.getToken();
+    const response = await this._fetch(`https://api.github.com/repos/${repo}/pulls/${prNumber}/comments?per_page=100`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(this._timeoutMs)
+    });
+
+    if (!response.ok) {
+      throw new Error(`could not fetch review comments for pull request #${prNumber} in ${repo}`);
+    }
+
+    const comments = await response.json();
+
+    return Array.isArray(comments) ? comments : [];
+  }
+
+  /**
+   * Best-effort `addReaction` GraphQL mutation, replacing
+   * `monitor_pr.sh`'s `add_reaction` shell function — which redirects
+   * all output and swallows any failure via `|| true`. Tolerance lives
+   * here (never throws) rather than in `PrMonitor`, so callers never
+   * need their own try/catch around it.
+   * @param {string} nodeId - the target's GraphQL node id.
+   * @param {'EYES'|'THUMBS_UP'} content - the `ReactionContent` enum
+   *   value to add.
+   * @returns {Promise<void>} resolves regardless of outcome.
+   */
+  async addReaction(nodeId, content) {
+    await this._mutateReaction('addReaction', 'reaction { id }', nodeId, content);
+  }
+
+  /**
+   * Best-effort `removeReaction` GraphQL mutation, replacing
+   * `monitor_pr.sh`'s `remove_reaction` shell function — same
+   * error-tolerance as `addReaction`.
+   * @param {string} nodeId - the target's GraphQL node id.
+   * @param {'EYES'|'THUMBS_UP'} content - the `ReactionContent` enum
+   *   value to remove.
+   * @returns {Promise<void>} resolves regardless of outcome.
+   */
+  async removeReaction(nodeId, content) {
+    await this._mutateReaction('removeReaction', 'subject { id }', nodeId, content);
+  }
+
+  /**
+   * Shared `addReaction`/`removeReaction` GraphQL mutation runner —
+   * mirrors `markPrReady`'s GraphQL-call shape, but never throws (both
+   * shell counterparts tolerate any failure).
+   * @param {'addReaction'|'removeReaction'} mutationName - the GraphQL
+   *   mutation to run.
+   * @param {string} selection - the mutation's result selection set.
+   * @param {string} nodeId - the target's GraphQL node id.
+   * @param {'EYES'|'THUMBS_UP'} content - the `ReactionContent` enum
+   *   value.
+   * @returns {Promise<void>} resolves regardless of outcome.
+   */
+  async _mutateReaction(mutationName, selection, nodeId, content) {
+    try {
+      const token = await this._context.getToken();
+      const query = `mutation($id:ID!,$content:ReactionContent!){${mutationName}(input:{subjectId:$id,content:$content})` +
+        `{${selection}}}`;
+
+      await this._fetch(GRAPHQL_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ query, variables: { id: nodeId, content } }),
+        signal: AbortSignal.timeout(this._timeoutMs)
+      });
+    } catch {
+      // best-effort — tolerate any failure, matching monitor_pr.sh's `|| true`.
+    }
+  }
+
+  /**
    * Mark pull request `nodeId` ready for review, replacing `gh pr ready
    * -R "$repo_ref" "$branch"`. GitHub's REST API has no field to toggle
    * a PR out of draft state, so this goes through the GraphQL
