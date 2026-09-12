@@ -102,6 +102,7 @@ repo_path_enter "$REPO_PATH"
 _ensure_gh_user
 PR_OWNER=$(get_gh_user)
 REPO_REF=$(get_repo_ref "$REPO_PATH")
+REPO_SLUG=$(get_repo_path "$REPO_PATH")
 COMMENTS_FILE=".claude/state/auto-monitor-pr-${PR_NUMBER}-comments.json"
 
 add_reaction() { # $1 = node id, $2 = ReactionContent (EYES|THUMBS_UP)
@@ -192,7 +193,8 @@ if [[ "$latest_review_state" == "APPROVED" ]]; then
 fi
 
 # Fetch inline review comments (different endpoint, different field names)
-review_comments=$(gh api "repos/${REPO_REF}/pulls/${PR_NUMBER}/comments" 2>/dev/null) || {
+review_comments=$(gh api "repos/${REPO_SLUG}/pulls/${PR_NUMBER}/comments" 2>/dev/null) || {
+  echo "Warning: gh api repos/${REPO_SLUG}/pulls/${PR_NUMBER}/comments failed" >&2
   echo "pending"
   exit 0
 }
