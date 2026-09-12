@@ -47,7 +47,7 @@
   "auto-monitor-issue-pr-resolve-pr-number": true,
   "auto-monitor-pr-monitor-pr": true,
   "auto-new-issue-commit-issue": false,
-  "auto-plan-issue-commit-plan": false,
+  "auto-plan-issue-commit-plan": true,
   "discuss-issue-confirm": true,
   "discuss-issue-render-issue": true,
   "init-claude-set-ci-ignored-patterns": false,
