@@ -262,6 +262,7 @@ export const COMMANDS = {
   // anchor on auto-fix-all-config-get plus a mocked commandInstance() —
   // so do not reintroduce a unit-level dependency on this entry.
   'dispatch-fixture-crash': { module: 'commands/shared/DispatchFixture.js', method: 'crash' },
+  'discuss-issue-confirm': { module: 'commands/discuss-issue/DiscussIssueConfirm.js', method: 'run' },
   'github-issue-create': {
     module: 'commands/shared/GithubIssue.js',
     method: 'create',
