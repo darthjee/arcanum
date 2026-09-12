@@ -120,4 +120,33 @@ rm -rf "$HTTPS_DIR" "$SCP_DIR" "$SSH_DIR"
 echo "OK: ssh://git@github.com/darthjee/arcanum.git resolves to the same domain/repo as the https:// and git@ forms"
 
 echo "PASS: arcanum/_lib/origin.sh parses ssh:// origins (issue #237 — CircleCI's insteadOf URL rewrite)"
+
+# --- Assertion 4 (issue #453): an ssh-proxy-style origin (domain != github.com,
+#     e.g. an SSH proxy host like ssh.github.com) must resolve get_repo_ref
+#     domain-qualified but get_repo_path bare, so REST-path callers (which
+#     require bare owner/repo) stay correct even when the origin's domain
+#     isn't github.com ---
+
+PROXY_DIR="$(mktemp -d)"
+git -C "$PROXY_DIR" init -q
+git -C "$PROXY_DIR" remote add origin "ssh://git@ssh.github.com:443/darthjee/arcanum.git"
+
+proxy_domain=$(get_domain "$PROXY_DIR") || fail "get_domain failed for ssh-proxy origin"
+proxy_ref=$(get_repo_ref "$PROXY_DIR") || fail "get_repo_ref failed for ssh-proxy origin"
+proxy_path=$(get_repo_path "$PROXY_DIR") || fail "get_repo_path failed for ssh-proxy origin"
+
+rm -rf "$PROXY_DIR"
+
+[[ "$proxy_domain" == "ssh.github.com" ]] || \
+  fail "ssh-proxy origin resolved domain '$proxy_domain', expected 'ssh.github.com'"
+
+[[ "$proxy_ref" == "ssh.github.com/darthjee/arcanum" ]] || \
+  fail "get_repo_ref for ssh-proxy origin resolved '$proxy_ref', expected 'ssh.github.com/darthjee/arcanum' (domain-qualified)"
+
+[[ "$proxy_path" == "darthjee/arcanum" ]] || \
+  fail "get_repo_path for ssh-proxy origin resolved '$proxy_path', expected bare 'darthjee/arcanum'"
+
+echo "OK: under an ssh-proxy-style origin (domain != github.com), get_repo_ref stays domain-qualified ('$proxy_ref') while get_repo_path stays bare ('$proxy_path')"
+
+echo "PASS: arcanum/_lib/origin.sh keeps get_repo_path bare under ssh-proxy-style origins (issue #453)"
 exit 0
