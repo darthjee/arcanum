@@ -12,19 +12,19 @@ Running as root unnecessarily widens the blast radius if a dependency (Yarn pack
 
 Switching to non-root is not a drop-in change, though: investigation found two concrete permission risks against the mounts `yarn install` writes to at container start:
 - The `core_node_modules` named volume (mounted at `/home/node/app/core/node_modules`) is created owned `root:root` by default, since that path does not already exist inside the image (`core/` is bind-mounted, not baked in) — writing to it as uid 1000 fails with a permission error, confirmed by direct testing. A companion issue has been filed upstream against the base image ([darthjee/docker#146](https://github.com/darthjee/docker/issues/146)) to make this friendlier by default for future consumers; this issue works around it locally in the meantime.
-- The bind-mounted repo root (`../:/home/node/app`) inherits host-side UID ownership on Linux (e.g. CircleCI's native Docker executor, which this repo's CI uses). If the CI checkout is owned by a UID other than 1000, writes under `/home/node/app` (e.g. `node_modules`, cache dirs, the lockfile) would hit `EACCES` there — even though this did not reproduce in local macOS/Docker Desktop testing, which does not enforce strict UID matching on bind mounts.
+- The bind-mounted repo root (`../:/home/node/app`) inherits host-side UID ownership on Linux, where bind mounts strictly enforce UID matching (unlike macOS/Docker Desktop, which did not reproduce this in local testing). This matters for any Linux-based local dev machine running `make core-*` — **not** CircleCI: `.circleci/config.yml`'s `test`/`checks` jobs bypass `core/Dockerfile`/`docker-compose` entirely, running `yarn install`/`yarn test` directly inside a separate `darthjee/circleci_node` image via a plain `checkout`, no bind mount involved. The only consumers of `core/Dockerfile` today are local dev (`make core-*` via `docker-compose`) and the documented-but-not-yet-configured `engine.mode=docker` execution path (no repo currently sets `engine.mode`, per `arcanum/_lib/migration-status.json` and a repo-wide config search).
 
 ## Expected Behavior
 The container should run its `CMD` (and any other steps that do not require root) as a non-root user (reusing the base image's built-in `node` user). Package installation (`apt-get install jq`) still runs as root, since that step requires root privileges — the `USER` switch happens after it, not before.
 
-`yarn install --frozen-lockfile && yarn test` continues to succeed as the non-root user, with no permission errors, both locally and in CI, against:
+`yarn install --frozen-lockfile && yarn test` continues to succeed as the non-root user, with no permission errors, on any host OS (including Linux), against:
 - the bind-mounted repo root (`../:/home/node/app` in `core/docker-compose.yml`)
 - the `core_node_modules` named volume (`core_node_modules:/home/node/app/core/node_modules`)
 
 ## Solution
 - Add an entrypoint step to `core/Dockerfile` that starts as root, `chown`s/fixes ownership of `core_node_modules` (and any other mount points that need it) to the `node` user, then drops privileges (e.g. via `gosu`/`su-exec` or `su`) to run the original `CMD` as `node` — reusing the base image's existing non-root `node` user (uid 1000/gid 1000) rather than creating a new one.
-- Verify the bind-mounted repo root stays writable as uid 1000 in CI (CircleCI's Docker executor on Linux), not just locally on macOS/Docker Desktop; adjust the CI checkout/workflow if a UID mismatch surfaces there.
-- Re-run the container (`make core-test` / `core-check` etc.) both locally and in CI to confirm `yarn install --frozen-lockfile && yarn test` still succeeds as the non-root user, with no permission errors.
+- Verify the bind-mounted repo root stays writable as uid 1000 on a Linux host (not just macOS/Docker Desktop, which doesn't enforce strict UID matching on bind mounts) — this does not require any `.circleci/config.yml` changes, since CircleCI's `test`/`checks` jobs don't invoke `core/Dockerfile`/`docker-compose` at all.
+- Re-run the container (`make core-test` / `core-check` etc.) on both macOS and a Linux host to confirm `yarn install --frozen-lockfile && yarn test` still succeeds as the non-root user, with no permission errors.
 - Update `docs/agents/architecture/script-engine.md` (or other relevant docs) if the non-root switch changes any assumption documented there about the `engine.mode=docker` execution path.
 
 ## Benefits
