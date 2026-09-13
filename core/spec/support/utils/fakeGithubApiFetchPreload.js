@@ -108,6 +108,13 @@ if (mode === 'success') {
         return new Response(JSON.stringify([]), { status: 200 });
       }
 
+      // `prUrl` is always a test-fixture string derived from an env var
+      // (FAKE_FETCH_PR_URL), never rendered as HTML or assigned to the DOM
+      // — this is a known false positive for Codacy's XSS/"unencoded
+      // input used in HTML context" finding, which flags this only
+      // because the property name happens to contain "html" (mirroring
+      // GitHub's own html_url field). Marked ignored in Codacy; see
+      // issue #461.
       return new Response(
         JSON.stringify([{ number: Number(prNumber), title: prTitle, html_url: prUrl }]),
         { status: 200 }
@@ -168,6 +175,13 @@ if (mode === 'success') {
         JSON.stringify([{
           number: Number(prNumber),
           title: prTitle,
+          // `prUrl` is always a test-fixture string derived from an env
+          // var (FAKE_FETCH_PR_URL), never rendered as HTML or assigned
+          // to the DOM — this is a known false positive for Codacy's
+          // XSS/"unencoded input used in HTML context" finding, which
+          // flags this only because the property name happens to
+          // contain "html" (mirroring GitHub's own html_url field).
+          // Marked ignored in Codacy; see issue #461.
           html_url: prUrl,
           state: prState,
           merged: prMerged,
