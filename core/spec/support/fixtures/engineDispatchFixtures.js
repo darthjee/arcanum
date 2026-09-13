@@ -19,6 +19,11 @@ export async function buildDispatchFixtures(dir) {
   const wrapperPath = path.join(dir, 'dispatch-wrapper.sh');
   const fixturePath = path.join(dir, 'fixture-shell-impl.sh');
 
+  // `dir` is always a trusted, test-controlled temporary directory
+  // created by the spec (never user/external input), so the path
+  // passed to `writeFile` here is not attacker-influenced — this is a
+  // known false positive for Codacy's `detect-non-literal-fs-filename`
+  // pattern (see issue #460).
   await writeFile(
     wrapperPath,
     [
@@ -33,6 +38,8 @@ export async function buildDispatchFixtures(dir) {
       ''
     ].join('\n')
   );
+  // Same trusted-`dir` rationale as above — `fixturePath` is derived
+  // from the same test-controlled temporary directory.
   await writeFile(fixturePath, ['#!/usr/bin/env bash', 'echo "SHELL: $*"', ''].join('\n'));
 
   return { wrapperPath, fixturePath };
