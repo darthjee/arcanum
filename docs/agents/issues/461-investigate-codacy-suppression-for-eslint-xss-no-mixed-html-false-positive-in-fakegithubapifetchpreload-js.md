@@ -1,18 +1,28 @@
-# Investigate Codacy suppression for ESLint xss/no-mixed-html false positive in fakeGithubApiFetchPreload.js
+# Issue: Investigate Codacy suppression for XSS false positive in fakeGithubApiFetchPreload.js
 
-## Context
+## Description
 
-`core/spec/support/utils/fakeGithubApiFetchPreload.js` builds fake GitHub REST API JSON responses for specs by constructing objects with properties such as `html_url` (e.g. `html_url: prUrl`, `html_url: prCreateUrl`), where the value is a plain string built from env-var-driven test fixtures rather than any untrusted or user-controlled input, and is never rendered as markup or assigned to the DOM. Codacy's ESLint analysis (via `eslint-plugin-xss`'s `no-mixed-html` rule) appears to flag these assignments because the property name contains `html` and its value is not a string literal, even though the rule cannot see that this is a JSON-serialized mock response body (mirroring GitHub's own `html_url` field naming) and not HTML markup subject to injection. This is a known class of false positive for the rule when a property merely happens to be named with an `html` substring, and it is currently producing noise in Codacy's findings without indicating a real risk.
+`core/spec/support/utils/fakeGithubApiFetchPreload.js` builds fake GitHub REST API JSON responses for specs, assigning plain strings built from env-var-driven test fixtures (e.g. `FAKE_FETCH_PR_URL`) to `html_url` properties — mirroring GitHub's own REST API field naming. These values are JSON-serialized mock response bodies; they are never rendered as markup or assigned to the DOM.
 
-## What needs to be done
+Querying Codacy's API directly for this repository confirms two currently open findings against this file, both titled "Unencoded input 'prUrl' used in HTML context" (security category XSS, priority High, status OnTrack, opened 2026-08-23, due 2026-10-22). This is a Security/Risk-Management (SRM) dashboard finding, not a `core/eslint.config.mjs`-configured ESLint rule: `eslint-plugin-xss` is not a dependency of this repo and is not referenced anywhere in `core/eslint.config.mjs`, so the finding is produced entirely by Codacy's own hosted analysis, independent of the repo's own local ESLint run. (Note: this differs from the original assumption that the finding comes from `eslint-plugin-xss`'s `no-mixed-html` ESLint rule — the actual Codacy tooling/rule name behind this SRM item isn't exposed by the API used here; only its title, category, and priority are.)
 
-- Confirm the exact Codacy finding (rule id, file, line numbers) currently reported against `fakeGithubApiFetchPreload.js` for `xss/no-mixed-html`, including every `html_url: <expr>` occurrence it flags (e.g. in the `wait-ci-and-merge`, `github`, and `auto-fix-issue-github` fake-fetch modes).
-- Investigate the available suppression mechanisms and pick the most appropriate one, weighing tradeoffs:
-  - Inline suppression scoped to the specific `html_url` assignments (e.g. an ESLint disable comment with a justification, if Codacy honors inline ESLint suppressions), local to `core/spec/support/utils/fakeGithubApiFetchPreload.js`.
-  - Codacy-level suppression (ignoring the specific finding via the Codacy UI/API, or a repository-level Codacy configuration file) if inline suppression is not honored or not desired.
-- Document the chosen approach and the reasoning (why it's a false positive here — a JSON field name coincidentally containing `html`, not actual markup) so future contributors understand why the suppression exists and don't remove it without checking.
-- Apply the suppression and confirm the Codacy finding no longer appears (or is properly marked as ignored/false positive) on subsequent analysis.
+Exact line numbers for the two open findings aren't exposed by the Codacy API calls available here, only each finding's dashboard URL (resultDataId 131530704297 and 131530705345, under `https://app.codacy.com/p/883699/issues/index`). By inspection, the file has four `html_url: <non-literal-expression>` assignments matching this shape: line ~112 (`wait-ci` mode, `html_url: prUrl`), line ~171 (`github` mode, `html_url: prUrl`), line ~240 (`auto-fix-issue-github` mode, `html_url: prCreateUrl`), and line ~249 (`auto-fix-issue-github` mode, `html_url: prUrl`) — plus one string-literal occurrence (line ~22, `success` mode) that isn't a candidate. Only two findings are currently open, both naming `prUrl` specifically (not `prCreateUrl`), so they most likely correspond to lines ~112 and ~171 — this should be confirmed against the two dashboard links above before making any change.
 
-## Acceptance criteria
+## Problem
 
-- [ ] TODO
+These two open, High-priority Codacy SRM findings are noise: `prUrl` here is always a test-fixture string derived from an env var read by a spec preload module, never rendered as HTML or assigned to the DOM, so there is no real XSS risk. Left open, they inflate the repo's security-issue count and due-date tracking on Codacy's SRM dashboard without indicating anything actionable.
+
+## Solution
+
+Scope is limited to the two currently-open findings only (not the two other look-alike, currently-unflagged `html_url: <non-literal>` sites at lines ~240 and ~249 — those are left untouched unless Codacy flags them in the future).
+
+- Open the two dashboard links above to confirm the exact flagged lines/snippets before making any change.
+- Suppress both findings via a two-part fix (not code-comment-only, since it's unconfirmed whether a source comment alone silences an SRM dashboard finding as opposed to a "quality issue" in Codacy's ordinary issues list, which #460 — the precedent this otherwise follows — was):
+  1. Mark both SRM findings "Ignored"/false-positive via Codacy's own dashboard or API (SRM items carry a dedicated ignore/dismiss status for exactly this).
+  2. Add a plain in-code explanatory comment above each of the two flagged assignments, referencing this issue, so future contributors understand why the suppression exists and don't remove it without checking — mirroring the comment style used for issue #460's `engineDispatchFixtures.js`/`gitFixtureRepo.js`/`autoFixAllCheckoutFromMainParitySetup.js` fix.
+- Document the reasoning in the comment: a JSON field name coincidentally containing `html`, not actual markup.
+- Confirm the two Codacy findings no longer appear as open (or are properly marked ignored/false positive) on the next analysis.
+
+## Benefits
+
+Removes two open, High-priority false-positive findings from Codacy's SRM dashboard, keeps the signal-to-noise ratio high for genuine XSS risks, and leaves a documented trail (referencing this issue) explaining the exception for future contributors.
