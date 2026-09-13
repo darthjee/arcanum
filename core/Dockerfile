@@ -15,7 +15,11 @@ FROM darthjee/node:0.2.1
 # native-invocation/parity specs shell out to, and that the
 # engine.mode=docker execution path shells out to as well — not just a
 # test-only tool. darthjee/node doesn't include it, so install it here.
-RUN apt-get update && apt-get install -y --no-install-recommends jq \
+#
+# The version is pinned for reproducible builds. To find the current
+# candidate version for this base image (e.g. when refreshing the pin):
+#   docker run --rm darthjee/node:0.2.1 sh -c "apt-get update -qq && apt-cache policy jq"
+RUN apt-get update && apt-get install -y --no-install-recommends jq=1.6-2.1+deb12u2 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /home/node/app
