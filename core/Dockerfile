@@ -8,7 +8,7 @@
 # at runtime (see docker-compose.yml), so local edits are picked up
 # without a rebuild. Dependency installation happens at container start,
 # reusing the warm Yarn cache this base image already provides.
-FROM darthjee/node:latest
+FROM darthjee/node:0.2.1
 
 # jq is a genuine runtime dependency of the shell scripts under
 # arcanum/_lib/ and auto-fix-all/scripts/ (e.g. repo_config.sh) that

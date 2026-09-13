@@ -79,6 +79,8 @@ An ESLint flat config enforces: 2-space indentation, single quotes, semicolons, 
 
 A Docker image based on `darthjee/node` (Node plus a warm Yarn cache) is used for running `core/`'s test suite. Source is bind-mounted at runtime rather than baked into the image, so local edits are picked up without a rebuild. The same image later doubles as the base for the `engine.mode=docker` execution path described above — one image serves both the CI/test use case and the eventual runtime `docker run` use case.
 
+`core/Dockerfile` pins `darthjee/node` to a specific version tag rather than tracking `latest`, so the image only changes when someone deliberately bumps it. Keep that pin in sync with any reference here if this doc is ever updated to name the version explicitly.
+
 ## Security requirements
 
 - No string-interpolated shell execution from native code. Any `child_process` call (e.g. shelling out to `gh auth token`, `git`) must use `execFile`/`spawn` with an argument array, never a string-interpolated `exec()` — these scripts process untrusted GitHub content (issue titles/bodies), so building a shell command by string concatenation is a command-injection risk.
