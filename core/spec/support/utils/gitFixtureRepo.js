@@ -38,6 +38,10 @@ export async function createGitFixtureRepo() {
   await mkdir(seedPath, { recursive: true });
   await git(['init', '--quiet', '-b', 'main', seedPath], root);
   await git(['config', 'commit.gpgsign', 'false'], seedPath);
+  // `seedPath` is always a trusted, test-controlled temporary directory
+  // created above (never user/external input), so this is a known
+  // false positive for Codacy's `detect-non-literal-fs-filename`
+  // pattern (see issue #460).
   await writeFile(path.join(seedPath, 'README.md'), '# fixture\n');
   await git(['add', 'README.md'], seedPath);
   await git(['commit', '--quiet', '-m', 'seed'], seedPath);

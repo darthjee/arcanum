@@ -94,6 +94,10 @@ export async function runPair(id, shellRepo, nativeRepo) {
  */
 export async function seedExistingLocalBranch(repo, id) {
   await git(['branch', `issue-${id}`, 'main'], repo.repoPath);
+  // `repo.repoPath` is always a trusted, test-controlled temporary
+  // directory (never user/external input), so the `writeFile` calls in
+  // this file are a known false positive for Codacy's
+  // `detect-non-literal-fs-filename` pattern (see issue #460).
   await writeFile(path.join(repo.repoPath, 'main-file.txt'), 'main update\n');
   await git(['add', 'main-file.txt'], repo.repoPath);
   await git(['commit', '--quiet', '-m', 'main update'], repo.repoPath);
