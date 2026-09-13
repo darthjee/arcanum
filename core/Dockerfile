@@ -20,4 +20,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends jq \
 
 WORKDIR /home/node/app
 
+# Starts as root to fix ownership of mount points the non-root `node`
+# user needs to write to, then drops privileges to `node` before
+# running CMD — see core/docker-entrypoint.sh for details.
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["sh", "-c", "yarn install --frozen-lockfile && yarn test"]

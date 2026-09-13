@@ -81,6 +81,8 @@ A Docker image based on `darthjee/node` (Node plus a warm Yarn cache) is used fo
 
 `core/Dockerfile` pins `darthjee/node` to a specific version tag rather than tracking `latest`, so the image only changes when someone deliberately bumps it. Keep that pin in sync with any reference here if this doc is ever updated to name the version explicitly.
 
+The image's `CMD` (and, by extension, whatever command the `engine.mode=docker` path runs) executes as the base image's built-in non-root `node` user, not `root`. `core/docker-entrypoint.sh` starts as root just long enough to fix ownership of the mount points `node` needs to write to (the bind-mounted repo root and the `core_node_modules` named volume), then drops privileges before handing off — see that script and `core/Dockerfile` for details.
+
 ## Security requirements
 
 - No string-interpolated shell execution from native code. Any `child_process` call (e.g. shelling out to `gh auth token`, `git`) must use `execFile`/`spawn` with an argument array, never a string-interpolated `exec()` — these scripts process untrusted GitHub content (issue titles/bodies), so building a shell command by string concatenation is a command-injection risk.
