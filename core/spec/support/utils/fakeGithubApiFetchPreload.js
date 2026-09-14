@@ -162,67 +162,86 @@ if (mode === 'success') {
   const issueViewFail = process.env.FAKE_FETCH_ISSUE_VIEW_FAIL === '1';
   const issueEditFail = process.env.FAKE_FETCH_ISSUE_EDIT_FAIL === '1';
 
+  // Ordered matcher/handler entries mirroring `fakeExecFileAsync`'s
+  // matcher-array-plus-`.find()` shape (see
+  // core/spec/support/factories/arcanumUpdateRunUpdate.js). Order matters:
+  // some matchers would otherwise overlap (e.g. the issue-view matcher's
+  // anchor is what stops it from also matching `.../issues/<id>/labels`).
+  const githubModeEntries = [
+    {
+      match: (url) => url.includes('/pulls?head='),
+      handler: () => {
+        if (!prNumber) {
+          return new Response(JSON.stringify([]), { status: 200 });
+        }
+
+        return new Response(
+          JSON.stringify([{
+            number: Number(prNumber),
+            title: prTitle,
+            // `prUrl` is always a test-fixture string derived from an env
+            // var (FAKE_FETCH_PR_URL), never rendered as HTML or assigned
+            // to the DOM — this is a known false positive for Codacy's
+            // XSS/"unencoded input used in HTML context" finding, which
+            // flags this only because the property name happens to
+            // contain "html" (mirroring GitHub's own html_url field). See
+            // issue #461.
+            html_url: prUrl,
+            state: prState,
+            merged: prMerged,
+            merged_at: prMerged ? '2024-01-01T00:00:00Z' : null
+          }]),
+          { status: 200 }
+        );
+      }
+    },
+    {
+      match: (url) => /\/pulls\/\d+\/commits/.test(url),
+      handler: () => new Response(prCommitsJson, { status: 200 })
+    },
+    {
+      match: (url, options) => options.method === 'PUT' && /\/pulls\/\d+\/merge$/.test(url),
+      handler: () => new Response('{}', { status: mergeFail ? 405 : 200 })
+    },
+    {
+      match: (url) => url === 'https://api.github.com/user',
+      handler: () => {
+        if (userFail) {
+          return new Response(JSON.stringify({ message: 'not found' }), { status: 404 });
+        }
+
+        return new Response(JSON.stringify({ login: userLogin }), { status: 200 });
+      }
+    },
+    {
+      match: (url, options) => options.method === 'DELETE' && url.includes('/git/refs/heads/'),
+      handler: () => new Response('', { status: 204 })
+    },
+    {
+      match: (url, options) => options.method === undefined && /\/issues\/[^/]+$/.test(url),
+      handler: () => {
+        if (issueViewFail) {
+          return new Response(JSON.stringify({ message: 'not found' }), { status: 404 });
+        }
+
+        return new Response(JSON.stringify({ labels: labels.map((name) => ({ name })) }), { status: 200 });
+      }
+    },
+    {
+      match: (url, options) => (options.method === 'POST' || options.method === 'DELETE') && url.includes('/labels'),
+      handler: () => new Response('{}', { status: issueEditFail ? 422 : 200 })
+    }
+  ];
+
   globalThis.fetch = async (rawUrl, options = {}) => {
     const url = typeof rawUrl === 'string' ? rawUrl : rawUrl.toString();
+    const entry = githubModeEntries.find((candidate) => candidate.match(url, options));
 
-    if (url.includes('/pulls?head=')) {
-      if (!prNumber) {
-        return new Response(JSON.stringify([]), { status: 200 });
-      }
-
-      return new Response(
-        JSON.stringify([{
-          number: Number(prNumber),
-          title: prTitle,
-          // `prUrl` is always a test-fixture string derived from an env
-          // var (FAKE_FETCH_PR_URL), never rendered as HTML or assigned
-          // to the DOM — this is a known false positive for Codacy's
-          // XSS/"unencoded input used in HTML context" finding, which
-          // flags this only because the property name happens to
-          // contain "html" (mirroring GitHub's own html_url field). See
-          // issue #461.
-          html_url: prUrl,
-          state: prState,
-          merged: prMerged,
-          merged_at: prMerged ? '2024-01-01T00:00:00Z' : null
-        }]),
-        { status: 200 }
-      );
+    if (!entry) {
+      return new Response(JSON.stringify({ message: 'not found' }), { status: 404 });
     }
 
-    if (/\/pulls\/\d+\/commits/.test(url)) {
-      return new Response(prCommitsJson, { status: 200 });
-    }
-
-    if (options.method === 'PUT' && /\/pulls\/\d+\/merge$/.test(url)) {
-      return new Response('{}', { status: mergeFail ? 405 : 200 });
-    }
-
-    if (url === 'https://api.github.com/user') {
-      if (userFail) {
-        return new Response(JSON.stringify({ message: 'not found' }), { status: 404 });
-      }
-
-      return new Response(JSON.stringify({ login: userLogin }), { status: 200 });
-    }
-
-    if (options.method === 'DELETE' && url.includes('/git/refs/heads/')) {
-      return new Response('', { status: 204 });
-    }
-
-    if (options.method === undefined && /\/issues\/[^/]+$/.test(url)) {
-      if (issueViewFail) {
-        return new Response(JSON.stringify({ message: 'not found' }), { status: 404 });
-      }
-
-      return new Response(JSON.stringify({ labels: labels.map((name) => ({ name })) }), { status: 200 });
-    }
-
-    if ((options.method === 'POST' || options.method === 'DELETE') && url.includes('/labels')) {
-      return new Response('{}', { status: issueEditFail ? 422 : 200 });
-    }
-
-    return new Response(JSON.stringify({ message: 'not found' }), { status: 404 });
+    return entry.handler(url, options);
   };
 } else if (mode === 'auto-fix-issue-github') {
   // Drives every REST/GraphQL call `AutoFixIssueGithub.js` makes (issue
