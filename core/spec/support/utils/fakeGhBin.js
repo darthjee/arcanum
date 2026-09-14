@@ -85,32 +85,11 @@ import { createTempDir, removeTempDir } from './tempDir.js';
 //     mutations, which already swallow any failure via `|| true` on the
 //     shell side, so there is no failure mode worth simulating here.
 /**
- * @param {boolean} authTokenAlwaysFails - whether `gh auth token` should
- *   unconditionally fail, baked in as a literal (not read from the
- *   runtime environment) at script-generation time.
- * @returns {string} the fake `gh` script's full source.
+ * Build the `gh auth` subcommand's case branches (`switch`, `token`).
+ * @returns {string} bash source for the `auth` subcommand's case body.
  */
-function buildGhScript(authTokenAlwaysFails) {
-  return `#!/usr/bin/env bash
-set -euo pipefail
-
-AUTH_TOKEN_ALWAYS_FAILS=${authTokenAlwaysFails ? '1' : '0'}
-
-_json_flag_value() {
-  local prev=""
-  for arg in "$@"; do
-    if [[ "$prev" == "--json" ]]; then
-      echo "$arg"
-      return 0
-    fi
-    prev="$arg"
-  done
-}
-
-case "\${1:-}" in
-  auth)
-    case "\${2:-}" in
-      switch)
+function buildAuthCase() {
+  return `      switch)
         exit 0
         ;;
       token)
@@ -121,17 +100,16 @@ case "\${1:-}" in
         echo "\${FAKE_GH_TOKEN:-fake-gh-token}"
         exit 0
         ;;
-    esac
-    ;;
-  pr)
-    case "\${2:-}" in
-      view)
-        if [[ -z "\${FAKE_GH_PR_NUMBER:-}" ]]; then
-          echo "no pull requests found for branch" >&2
-          exit 1
-        fi
-        json_field="$(_json_flag_value "$@")"
-        case "$json_field" in
+`;
+}
+
+/**
+ * Build the inner `case "$json_field" in ... esac` dispatch used by
+ * `buildPrViewCase()`, covering every `--json` field this fake supports.
+ * @returns {string} bash source for the `--json`-field case body.
+ */
+function buildPrViewJsonCase() {
+  return `        case "$json_field" in
           headRefOid)
             echo "\${FAKE_GH_HEAD_SHA:-fake-head-sha}"
             ;;
@@ -172,9 +150,34 @@ case "\${1:-}" in
             exit 1
             ;;
         esac
-        exit 0
+`;
+}
+
+/**
+ * Build the `gh pr view` case branch, covering every `--json` field this
+ * fake supports (delegating the field dispatch to
+ * `buildPrViewJsonCase()`).
+ * @returns {string} bash source for the `pr view` case branch.
+ */
+function buildPrViewCase() {
+  return `      view)
+        if [[ -z "\${FAKE_GH_PR_NUMBER:-}" ]]; then
+          echo "no pull requests found for branch" >&2
+          exit 1
+        fi
+        json_field="$(_json_flag_value "$@")"
+${buildPrViewJsonCase()}        exit 0
         ;;
-      merge)
+`;
+}
+
+/**
+ * Build the `gh pr` mutation case branches (`merge`, `comment`, `create`,
+ * `ready`, `edit`).
+ * @returns {string} bash source for the `pr` mutation case branches.
+ */
+function buildPrMutationCase() {
+  return `      merge)
         if [[ "\${FAKE_GH_PR_MERGE_FAIL:-}" == "1" ]]; then
           echo "fake gh: merge failed" >&2
           exit 1
@@ -211,11 +214,15 @@ case "\${1:-}" in
         fi
         exit 0
         ;;
-    esac
-    ;;
-  api)
-    case "\${2:-}" in
-      repos/*/commits/*/check-runs*)
+`;
+}
+
+/**
+ * Build the `gh api` subcommand's case branches.
+ * @returns {string} bash source for the `api` subcommand's case body.
+ */
+function buildApiCase() {
+  return `      repos/*/commits/*/check-runs*)
         echo "{\\"check_runs\\": \${FAKE_GH_CHECK_RUNS_JSON:-[]}}"
         exit 0
         ;;
@@ -234,11 +241,15 @@ case "\${1:-}" in
       graphql)
         exit 0
         ;;
-    esac
-    ;;
-  issue)
-    case "\${2:-}" in
-      view)
+`;
+}
+
+/**
+ * Build the `gh issue` subcommand's case branches (`view`, `edit`).
+ * @returns {string} bash source for the `issue` subcommand's case body.
+ */
+function buildIssueCase() {
+  return `      view)
         if [[ "\${FAKE_GH_ISSUE_VIEW_FAIL:-}" == "1" ]]; then
           echo "fake gh: issue view failed" >&2
           exit 1
@@ -255,7 +266,48 @@ case "\${1:-}" in
         fi
         exit 0
         ;;
-    esac
+`;
+}
+
+/**
+ * @param {boolean} authTokenAlwaysFails - whether `gh auth token` should
+ *   unconditionally fail, baked in as a literal (not read from the
+ *   runtime environment) at script-generation time.
+ * @returns {string} the fake `gh` script's full source.
+ */
+function buildGhScript(authTokenAlwaysFails) {
+  return `#!/usr/bin/env bash
+set -euo pipefail
+
+AUTH_TOKEN_ALWAYS_FAILS=${authTokenAlwaysFails ? '1' : '0'}
+
+_json_flag_value() {
+  local prev=""
+  for arg in "$@"; do
+    if [[ "$prev" == "--json" ]]; then
+      echo "$arg"
+      return 0
+    fi
+    prev="$arg"
+  done
+}
+
+case "\${1:-}" in
+  auth)
+    case "\${2:-}" in
+${buildAuthCase()}    esac
+    ;;
+  pr)
+    case "\${2:-}" in
+${buildPrViewCase()}${buildPrMutationCase()}    esac
+    ;;
+  api)
+    case "\${2:-}" in
+${buildApiCase()}    esac
+    ;;
+  issue)
+    case "\${2:-}" in
+${buildIssueCase()}    esac
     ;;
 esac
 
