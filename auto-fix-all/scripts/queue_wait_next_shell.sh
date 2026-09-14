@@ -10,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=queue_common.sh
 source "${SCRIPT_DIR}/queue_common.sh"
 
-REPO_PATH="${1:?Usage: $0 <repo_path>}"
+: "${1:?Usage: $0 <repo_path>}"
 while [[ "$(_read_queue | jq 'length')" -eq 0 ]]; do
   sleep 5
 done

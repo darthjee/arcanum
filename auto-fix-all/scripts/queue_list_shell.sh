@@ -9,7 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=queue_common.sh
 source "${SCRIPT_DIR}/queue_common.sh"
 
-REPO_PATH="${1:?Usage: $0 <repo_path>}"
+: "${1:?Usage: $0 <repo_path>}"
 IDS=$(_read_queue | jq -r '.[].id')
 if [[ -n "$IDS" ]]; then
   echo "$IDS"
