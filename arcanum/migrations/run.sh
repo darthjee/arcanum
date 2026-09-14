@@ -191,6 +191,9 @@ _resolve_current_global_version() {
 
 _reset_errors_file() {
   mkdir -p "$(dirname "$ERRORS_FILE")"
+  # shellcheck disable=SC2034
+  # Read by _acquire_lock/_release_lock (lock.sh, sourced above), called
+  # later in this function
   LOCK_FILE="${ERRORS_FILE}.lock"
   _acquire_lock
   echo "[]" > "$ERRORS_FILE"

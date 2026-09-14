@@ -58,6 +58,9 @@ _ledger_mark_complete() {
   local ledger_file="${repo_path}/.claude/state/arcanum-migrations-ledger.json"
 
   mkdir -p "$(dirname "$ledger_file")"
+  # shellcheck disable=SC2034
+  # Read by _acquire_lock/_release_lock (lock.sh), sourced by this function's
+  # caller ledger.sh alongside _ledger.sh
   LOCK_FILE="${ledger_file}.lock"
   _acquire_lock
 

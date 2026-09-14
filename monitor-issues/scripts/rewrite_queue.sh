@@ -33,6 +33,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STATE_DIR=".claude/state"
 QUEUE_FILE="${STATE_DIR}/monitor-issues-rewrite-queue.json"
+# shellcheck disable=SC2034
+# Read by _acquire_lock/_release_lock (lock.sh, sourced above), called later
+# in this file
 LOCK_FILE="${STATE_DIR}/monitor-issues-rewrite-queue.lock"
 
 mkdir -p "$STATE_DIR"

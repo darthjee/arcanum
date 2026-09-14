@@ -109,6 +109,9 @@ global_config_write() {
     return 0
   fi
 
+  # shellcheck disable=SC2034
+  # Read by _acquire_lock/_release_lock (lock.sh, sourced above), called
+  # later in this function
   LOCK_FILE="${file}.lock"
   _acquire_lock
 

@@ -31,6 +31,9 @@ ISSUE_STATE_SCRIPT="${SCRIPT_DIR}/../../auto-fix-issue/scripts/issue_state.sh"
 
 STATE_DIR=".claude/state"
 LAST_CHECKED_FILE="${STATE_DIR}/issue-monitor-last-checked.txt"
+# shellcheck disable=SC2034
+# Read by _release_lock (lock.sh, sourced above) via the
+# "trap '_release_lock' EXIT" cleanup below
 LOCK_FILE="${STATE_DIR}/issue-monitor.lock"
 
 mkdir -p "$STATE_DIR"
