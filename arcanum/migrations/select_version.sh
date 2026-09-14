@@ -35,6 +35,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC2034
+# Read by _pending_versions.sh (sourced below), which sources
+# _manifest.sh via this path and loops over "${MIGRATIONS_SCRIPT_DIR}"/repos/*/
 MIGRATIONS_SCRIPT_DIR="$SCRIPT_DIR"
 
 # shellcheck source=../_lib/repo_config.sh
