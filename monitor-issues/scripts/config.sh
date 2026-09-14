@@ -9,6 +9,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE=".claude/configuration/monitor-issues.json"
 STATE_CONFIG_FILE=".claude/state/monitor-issues-config.json"
+# shellcheck disable=SC2034
+# Read by _acquire_lock/_release_lock (lock.sh, sourced above), called later
+# in this file
 LOCK_FILE=".claude/state/monitor-issues-config.lock"
 STATE_DIR=".claude/state"
 

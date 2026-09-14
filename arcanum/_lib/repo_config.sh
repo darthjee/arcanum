@@ -157,6 +157,9 @@ repo_config_get_version() {
 repo_config_set_version() {
   local file="$1" version="$2" namespace="${3:-}"
   mkdir -p "$(dirname "$file")"
+  # shellcheck disable=SC2034
+  # Read by _acquire_lock/_release_lock (lock.sh, sourced above), called
+  # later in this function
   LOCK_FILE="${file}.lock"
   _acquire_lock
 

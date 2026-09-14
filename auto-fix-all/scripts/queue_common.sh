@@ -10,6 +10,9 @@
 QUEUE_COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STATE_DIR=".claude/state"
 QUEUE_FILE="${STATE_DIR}/auto-fix-all-queue.json"
+# shellcheck disable=SC2034
+# Read by _acquire_lock/_release_lock (lock.sh) in queue_pop_shell.sh and
+# queue_push_shell.sh, which source this file
 LOCK_FILE="${STATE_DIR}/auto-fix-all-queue.lock"
 
 mkdir -p "$STATE_DIR"
