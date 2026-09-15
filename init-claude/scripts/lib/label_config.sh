@@ -183,7 +183,7 @@ label_config_remove() {
   done < <(label_config_read_pairs "$config_path")
 
   local remaining_pairs=()
-  local pair existing_name skip found
+  local pair existing_name found
   for pair in "${existing_pairs[@]+"${existing_pairs[@]}"}"; do
     existing_name="${pair%%:*}"
     found=0
