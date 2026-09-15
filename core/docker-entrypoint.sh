@@ -29,4 +29,5 @@ if [ -d "$CORE_DIR" ] && ! su node -s /bin/sh -c "[ -w \"$CORE_DIR\" ]"; then
     chown node:node "$CORE_DIR"
 fi
 
+# shellcheck disable=SC2016 # $0/$@ meant to expand inside the su'd subshell, not here
 exec su node -s /bin/sh -c 'exec "$0" "$@"' -- "$@"
