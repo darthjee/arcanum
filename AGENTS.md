@@ -10,8 +10,8 @@ Markdown files drive every skill — there is no build step and no application r
 
 - Each skill is a folder at the project root containing a `SKILL.md` as entrypoint (loaded when `/skill-name` is invoked) and optional auxiliary markdown files, referenced from `SKILL.md`.
 - `SKILL.md` requires frontmatter with `name` and `description`.
-- Paths referenced in instructions (e.g. "look for file X") must be relative, never absolute.
-- When an absolute path is required (e.g. inside a script), it must be extracted into a variable instead of repeated inline.
+- Paths referenced in instructions (e.g. "look for file X") must be relative, never absolute — except when substituting a resolved value like `REPO_PATH` as literal text into a spawned agent's prose instructions, since that agent has no shell variable of its own to resolve it (see [Repo Path Threading](docs/agents/architecture/repo-path-threading.md)).
+- When an absolute path is required (e.g. inside a script), it must be extracted into a variable instead of repeated inline, with no exceptions.
 - Whenever possible, extract skill logic into scripts (instead of natural-language instructions), to make behavior deterministic and reduce token consumption.
 - For skills that need user confirmation/selection, prefer the single-script pattern driving the interaction via `/dev/tty` — see [Per-Repo Migrations](docs/agents/architecture/per-repo-migrations.md) and [Repo Path Threading](docs/agents/architecture/repo-path-threading.md).
 
