@@ -71,6 +71,7 @@ merge_body_mode() {
 #   agent_email.sh) — an always-applied, purely opt-in exclusion list
 #   independent of the merger/model_email filters above.
 merge_body_coauthors_list() {
+  # shellcheck disable=SC2034 # repo_path kept for repo-path-first-arg signature consistency (see docstring above); not read
   local repo_path="$1" repo_ref="$2" number="$3" model_email="${4:-}"
 
   local authors_json
