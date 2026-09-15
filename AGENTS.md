@@ -28,6 +28,17 @@ Specialist agents are defined in `.claude/agents/`. Each has a specific scope wi
 | `node` | `core/`'s Node.js source/config (`core/lib/`, `core/spec/`, `core/bin/`, `core/package.json`, `core/eslint.config.mjs`) — the native counterpart of scripts migrating from bash. |
 | `infra` | Docker, docker-compose, and Makefile files repo-wide — e.g. `core/Dockerfile`, `core/docker-compose.yml`, the root `Makefile`'s `core-*` targets. |
 
+## Boundaries
+
+Concrete off-limits actions for any agent working in this repo:
+
+- **Never hand-edit an auto-generated file.** `docs/agents/tag-mutations.md` and `docs/agents/architecture/entrypoint-migration-status.md` are marked `AUTO-GENERATED, DO NOT EDIT BY HAND`; regenerate them via their `scripts/generate_*.sh` instead.
+- **Never embed deterministic logic in skill markdown.** Extract it into `<skill>/scripts/*.sh` or `arcanum/_lib/` instead of prose relying on AI judgment (see [Script Preference](docs/agents/architecture/script-preference.md)).
+- **Never touch another specialist agent's owned scope directly.** Route cross-scope work through the `architect` agent instead of reaching into it directly (see [Agent Roster and Architect Delegation](docs/agents/architecture/agent-roster-and-delegation.md)).
+- **Never run a bare git-mutating command trusting ambient cwd.** `git add`/`commit`/`checkout`/`merge`/`push`/`fetch`/`rm`/`branch` must always be scoped explicitly to the resolved `REPO_PATH`, never re-derived from `pwd` partway through a run (see [Repo Path Threading](docs/agents/architecture/repo-path-threading.md)).
+- **Never mutate shared JSON state without the lock sequence.** Files like the `auto-fix-all` queue must go through the write/mutate/release lock sequence, never a direct write (see [Lock System](docs/agents/architecture/lock-system.md)).
+- **Never preapprove broad or ad hoc destructive commands.** Only narrow, fixed, low-risk scripts common to most specialist dispatches are candidates for a permission-grant allowlist entry; agent-specific or ad hoc commands rely on the blocked-dispatch escalation path instead (see [Dispatch Permissions](docs/agents/architecture/dispatch-permissions.md)).
+
 ## Documentation
 
 All project documentation lives under [`docs/agents/`](docs/agents/):
