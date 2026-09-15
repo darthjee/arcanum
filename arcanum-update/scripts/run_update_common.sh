@@ -39,6 +39,7 @@ resolve_target() {
     REPO="$(jq -r '.repo // empty' "${TARGET_PATH}/arcanum.json" 2>/dev/null || true)"
   elif [[ -d "${TARGET_PATH}/.git" ]]; then
     METHOD="git"
+    # shellcheck disable=SC2034 # consumed by run_update_check_shell.sh
     REPO="$(parse_github_owner_repo "$TARGET_PATH" || true)"
   else
     return 1

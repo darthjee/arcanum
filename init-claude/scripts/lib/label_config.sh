@@ -64,6 +64,7 @@
 #   writes the merged list back via label_config_write. Returns 0 on
 #   success.
 
+# shellcheck disable=SC2034 # consumed by sync_labels.sh
 DEFAULT_LABEL_CONFIG_PATH=".claude/state/init-claude-config.json"
 
 DEFAULT_LABEL_PAIRS=(
@@ -182,7 +183,7 @@ label_config_remove() {
   done < <(label_config_read_pairs "$config_path")
 
   local remaining_pairs=()
-  local pair existing_name skip found
+  local pair existing_name found
   for pair in "${existing_pairs[@]+"${existing_pairs[@]}"}"; do
     existing_name="${pair%%:*}"
     found=0
