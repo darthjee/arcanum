@@ -225,7 +225,7 @@ label_config_add() {
     for i in "${!existing_pairs[@]}"; do
       existing_name="${existing_pairs[$i]%%:*}"
       if [[ "$existing_name" == "$new_name" ]]; then
-        existing_pairs[$i]="${new_name}:${new_color}"
+        existing_pairs[i]="${new_name}:${new_color}"
         replaced=1
         break
       fi
