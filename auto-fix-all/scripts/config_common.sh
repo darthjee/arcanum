@@ -10,6 +10,7 @@ CONFIG_COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE=".claude/configuration/auto-fix-all.json"
 NEW_CONFIG_FILE=".claude/configuration/arcanum-repo-config.json"
 NEW_STATE_FILE=".claude/state/arcanum-config.json"
+# shellcheck disable=SC2034 # consumed by config_{toggle,is_enabled,get,set}_shell.sh
 NAMESPACE="auto-fix-all"
 
 # shellcheck source=../../arcanum/_lib/repo_config.sh
