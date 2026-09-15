@@ -64,6 +64,7 @@
 #   writes the merged list back via label_config_write. Returns 0 on
 #   success.
 
+# shellcheck disable=SC2034 # consumed by sync_labels.sh
 DEFAULT_LABEL_CONFIG_PATH=".claude/state/init-claude-config.json"
 
 DEFAULT_LABEL_PAIRS=(
