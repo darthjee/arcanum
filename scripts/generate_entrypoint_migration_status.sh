@@ -83,6 +83,8 @@ issue_for_key() {
     issue_display="-"
     [[ -n "$issue" ]] && issue_display="#${issue}"
 
+    # Literal printf format string, not a shell expansion
+    # shellcheck disable=SC2016
     printf '| `%s` | %s | %s |\n' "$key" "$migrated" "$issue_display"
   done
 } > "$OUTPUT_FILE"

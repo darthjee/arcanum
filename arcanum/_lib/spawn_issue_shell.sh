@@ -178,6 +178,8 @@ if [[ "$AS_SUBISSUE" -eq 1 ]]; then
   parent_node_id=$(gh issue view "$PARENT_ID" -R "$repo_ref" --json id -q .id 2>/dev/null || true)
   sub_node_id=$(gh issue view "$new_id" -R "$repo_ref" --json id -q .id 2>/dev/null || true)
 
+  # GraphQL variables, resolved server-side via -F, not shell variables
+  # shellcheck disable=SC2016
   if [[ -n "$parent_node_id" && -n "$sub_node_id" ]] && gh api graphql -f query='mutation($issueId:ID!,$subIssueId:ID!){addSubIssue(input:{issueId:$issueId,subIssueId:$subIssueId}){subIssue{id}}}' -F issueId="$parent_node_id" -F subIssueId="$sub_node_id" >/dev/null 2>&1; then
     :
   else

@@ -366,6 +366,8 @@ done < "$CANDIDATES_FILE"
   echo "|-------|------|------------|------------|--------------|"
 
   sort -s -t "$FS_CHAR" -k1,1 -k2,2 "$FILTERED_FILE" | while IFS="$FS_CHAR" read -r skill _sort_key step_display entrypoint added removed; do
+    # Literal printf format string, not a shell expansion
+    # shellcheck disable=SC2016
     printf '| %s | %s | `%s` | %s | %s |\n' "$skill" "$step_display" "$entrypoint" "$added" "$removed"
   done
 } > "$OUTPUT_TABLE"

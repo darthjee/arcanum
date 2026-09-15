@@ -106,10 +106,14 @@ REPO_SLUG=$(get_repo_path "$REPO_PATH")
 COMMENTS_FILE=".claude/state/auto-monitor-pr-${PR_NUMBER}-comments.json"
 
 add_reaction() { # $1 = node id, $2 = ReactionContent (EYES|THUMBS_UP)
+  # GraphQL variables, resolved server-side via -F, not shell variables
+  # shellcheck disable=SC2016
   gh api graphql -f query='mutation($id:ID!,$content:ReactionContent!){addReaction(input:{subjectId:$id,content:$content}){reaction{id}}}' -F id="$1" -F content="$2" >/dev/null 2>&1 || true
 }
 
 remove_reaction() { # $1 = node id, $2 = ReactionContent
+  # GraphQL variables, resolved server-side via -F, not shell variables
+  # shellcheck disable=SC2016
   gh api graphql -f query='mutation($id:ID!,$content:ReactionContent!){removeReaction(input:{subjectId:$id,content:$content}){subject{id}}}' -F id="$1" -F content="$2" >/dev/null 2>&1 || true
 }
 
