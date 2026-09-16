@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared tag-parsing library for Arcanum skills.
 #
 # This file is meant to be SOURCED, not executed directly.

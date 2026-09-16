@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Global, cross-project, per-Claude-Code-account/profile configuration
 # helpers — the third and outermost tier in arcanum's config resolution
 # chain (local repo state -> repo config -> global user config ->

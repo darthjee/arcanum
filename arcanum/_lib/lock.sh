@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared lock helpers for scripts that mutate shared JSON state files.
 #
 # Usage: source this file, then call _acquire_lock / _release_lock around

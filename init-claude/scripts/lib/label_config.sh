@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared label-config helpers for init-claude's setup_labels step.
 #
 # This file is meant to be SOURCED, not executed directly — it defines

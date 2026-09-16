@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared per-repo, namespaced configuration helpers, with legacy-file
 # fallback.
 #
