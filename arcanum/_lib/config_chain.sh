@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Composing 3-tier config chain reader — the single place that owns the
 # full "local repo state -> repo config -> global user config" lookup,
 # instead of every caller manually re-chaining

@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared helper: computes which arcanum/migrations/repos/<version>/
 # folders are pending, sorted ascending, under the three-pointer scheme
 # (committed version + local-only version + global version — see

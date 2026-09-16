@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared tag-to-action mapping for Arcanum skills.
 #
 # This file is meant to be SOURCED, not executed directly. It depends on

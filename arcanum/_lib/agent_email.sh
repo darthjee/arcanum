@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared "agent commit-author email" helper.
 #
 # This file is meant to be SOURCED, not executed directly — it defines

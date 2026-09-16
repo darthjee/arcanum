@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared helper: tracks per-entry completion of "instructions"-type
 # per-repo migrations, so resuming a version whose manifest hands off to
 # the AI never re-triggers an already-completed entry.

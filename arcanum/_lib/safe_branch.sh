@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared "safe branch" checkout helpers.
 #
 # This file is meant to be SOURCED, not executed directly — it defines

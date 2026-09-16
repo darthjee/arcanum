@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared helper: reads a per-repo-migration version folder's ordered
 # entries, either from its migrations.json manifest (preferred, every
 # version folder after 0.12.0) or, when that file is absent, by

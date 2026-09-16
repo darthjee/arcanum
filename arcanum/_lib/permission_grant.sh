@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Thin engine_dispatch shim for the "permission-grant-add" migrated
 # entrypoint — see docs/agents/architecture/script-engine.md and
 # docs/agents/plans/236-migrate-permission-grant-entrypoint-to-native-node-js/plan.md
