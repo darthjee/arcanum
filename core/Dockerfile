@@ -26,9 +26,15 @@ WORKDIR /home/node/app
 
 # Starts as root to fix ownership of mount points the non-root `node`
 # user needs to write to, then drops privileges to `node` before
-# running CMD — see core/docker-entrypoint.sh for details.
+# running CMD — see core/docker-entrypoint.sh for the full rationale.
+# No USER directive is added here: that would make docker-entrypoint.sh
+# itself run as `node`, breaking its `chown -R node:node` calls against
+# the root-owned `core_node_modules` volume and (when needed) the
+# bind-mounted repo root. The findings below are suppressed accordingly.
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
+# nosemgrep: Semgrep_dockerfile.security.missing-user-entrypoint.missing-user-entrypoint
 ENTRYPOINT ["docker-entrypoint.sh"]
+# nosemgrep: Semgrep_dockerfile.security.missing-user.missing-user
 CMD ["sh", "-c", "yarn install --frozen-lockfile && yarn test"]
