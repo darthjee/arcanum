@@ -1,0 +1,7 @@
+# Excludes test-support helpers (fixtures/factories/utils) that build
+# throwaway files under a trusted, test-controlled temp directory —
+# Codacy's detect-non-literal-fs-filename (and similar) rules can't see
+# that the directory is trusted and flag it as a false positive on every
+# writeFile/mkdir/chmod call here. See issues #460 and #496.
+exclude_paths:
+  - "core/spec/support/**"
