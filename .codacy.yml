@@ -3,5 +3,15 @@
 # Codacy's detect-non-literal-fs-filename (and similar) rules can't see
 # that the directory is trusted and flag it as a false positive on every
 # writeFile/mkdir/chmod call here. See issues #460 and #496.
+#
+# Excludes CLAUDE.md and .github/copilot-instructions.md, which the
+# `init-claude` skill deliberately generates as thin 1-line redirects to
+# AGENTS.md (the single source of truth) across every init-claude
+# scenario. Agentlinter analyzes each file in isolation without
+# following the redirect, so it flags these as incomplete standalone
+# agent-instruction files (missing boundaries/tools/identity/sections/
+# version) — false positives. See issue #498.
 exclude_paths:
   - "core/spec/support/**"
+  - "CLAUDE.md"
+  - ".github/copilot-instructions.md"
