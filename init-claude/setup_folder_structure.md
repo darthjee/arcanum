@@ -44,7 +44,7 @@ Only add expanded sections for directories whose subdirectories are meaningfully
 
 Show the drafted content to the user and ask:
 
-```
+```text
 This is the proposed docs/agents/folder-structure.md. Shall I write it, or would you like to make changes?
 ```
 

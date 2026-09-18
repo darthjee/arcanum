@@ -32,7 +32,7 @@ Interpret its output:
 
 - **`STATUS=synced` (exit 0)** — report the created/updated labels (the `CREATED=<name>`/`UPDATED=<name>` lines) back to the user, and finish this step.
 - **`STATUS=discuss` (exit 1)** — the user answered "no" to the script's prompt. Ask them directly:
-  ```
+  ```text
   Would you like to change the label list, or skip label syncing for this run?
   ```
   - **Skip**: finish this step with no further action and no GitHub calls.

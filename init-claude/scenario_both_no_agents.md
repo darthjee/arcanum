@@ -6,7 +6,7 @@ Both `CLAUDE.md` and `.github/copilot-instructions.md` exist but `AGENTS.md` doe
 
 Tell the user:
 
-```
+```text
 Found CLAUDE.md and .github/copilot-instructions.md. Their contents will be consolidated into AGENTS.md.
 The following changes will be made:
 - AGENTS.md                          (created with consolidated content)

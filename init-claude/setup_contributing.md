@@ -17,7 +17,7 @@ Infer the main language from the project files (e.g. `package.json` → JavaScri
 
 If the language cannot be confidently determined, ask the user:
 
-```
+```text
 What is the main programming language of this project? (needed to write the contributing guide with relevant code examples)
 ```
 

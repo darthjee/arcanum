@@ -6,7 +6,7 @@
 
 Tell the user:
 
-```
+```text
 Found AGENTS.md and CLAUDE.md. Their contents will be consolidated into AGENTS.md.
 The following changes will be made:
 - AGENTS.md                          (updated with consolidated content)

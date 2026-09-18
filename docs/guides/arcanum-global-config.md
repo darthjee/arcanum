@@ -7,7 +7,7 @@ account/profile rather than to any one repo.
 
 ## Where it lives
 
-```
+```text
 ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/arcanum-config.json
 ```
 

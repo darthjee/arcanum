@@ -16,6 +16,6 @@ The script creates `.github/` if needed, then copies each template from [templat
 
 Relay the script's output to the user, then tell them:
 
-```
+```text
 GitHub will pick up pull_request_template.md automatically when opening PRs. The commit message template is a reference for the format agents and contributors should follow. Adapt either file to the project's conventions as needed.
 ```

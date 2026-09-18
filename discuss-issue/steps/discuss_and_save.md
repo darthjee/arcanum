@@ -49,7 +49,7 @@ If the dialogue surfaces something that deserves its own GitHub issue instead of
 
 After updating the draft, summarize your current understanding in 2–3 sentences and ask:
 
-```
+```text
 Did I comprehend the issue?
 ```
 

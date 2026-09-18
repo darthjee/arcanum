@@ -6,7 +6,7 @@
 
 Tell the user:
 
-```
+```text
 Found CLAUDE.md. Its content will be migrated to AGENTS.md.
 The following changes will be made:
 - AGENTS.md                          (created with current CLAUDE.md content)

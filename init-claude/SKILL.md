@@ -35,7 +35,7 @@ Based on what exists, read and follow the appropriate scenario file:
 
 If the detected scenario is marked as "not yet defined", inform the user:
 
-```
+```text
 This scenario is not yet implemented. Please open an issue or contribute a scenario file.
 ```
 

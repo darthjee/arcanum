@@ -2,7 +2,7 @@
 
 If you see a warning like:
 
-```
+```text
 Warning: reading '<key>' from legacy config file <legacy-file> — this configuration has moved to <new-file>. See docs/guides/arcanum-repo-config.md.
 ```
 

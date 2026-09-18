@@ -6,7 +6,7 @@ Neither `CLAUDE.md` nor `.github/copilot-instructions.md` exist. Both will be cr
 
 Tell the user:
 
-```
+```text
 No configuration files found. The following files will be created:
 - AGENTS.md       (shared project instructions)
 - CLAUDE.md       (points to AGENTS.md)

@@ -60,7 +60,7 @@ All project documentation lives under [`docs/agents/`](docs/agents/):
 
 Each file documents an issue in detail. Naming convention:
 
-```
+```text
 docs/agents/issues/<issue_id>_<issue_name>.md
 ```
 

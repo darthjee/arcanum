@@ -20,7 +20,7 @@ The script guarantees `FILE` exists on disk once it exits `STATUS=ok` — the sc
 
 Tell the user `<ERROR>`, then ask:
 
-```
+```text
 What is the GitHub issue number to discuss?
 ```
 
