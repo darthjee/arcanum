@@ -76,7 +76,7 @@ Present a high-level overview of the plan to the user. Include:
 
 End with:
 
-```
+```text
 Does this approach look correct? Anything to add or correct?
 ```
 

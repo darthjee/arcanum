@@ -18,7 +18,7 @@ If exactly one strong candidate is found, use it.
 
 If ambiguous, ask the user:
 
-```
+```text
 Which folder contains the main application source code?
 ```
 

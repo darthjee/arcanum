@@ -37,7 +37,7 @@ Then check whether this issue already has tracked sub-issues:
 
 Tell the user `<ERROR>`, then ask:
 
-```
+```text
 What is the GitHub issue number to split?
 ```
 

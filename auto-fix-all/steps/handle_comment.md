@@ -59,7 +59,7 @@ This is a *different* condition from "Choosing the responsible agent(s)" step 4 
 
 If any `Agent(...)` call launched above is denied/blocked by Claude Code's own permission classifier (a tool-permission denial on the dispatch itself, not anything the dispatched agent said once running), do **not** fall back to performing that agent's action yourself. Stop dispatching immediately — abandon any other in-flight dispatches from the same batch, including ones already launched in the same parallel message — and report:
 
-```
+```text
 OUTCOME=blocked AGENT=<agent-name> ACTION="<one-line description of what was being dispatched>"
 ```
 

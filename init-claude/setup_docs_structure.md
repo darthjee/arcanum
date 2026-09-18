@@ -23,6 +23,6 @@ And appends the standard `## Documentation` section to `AGENTS.md` if that secti
 
 Relay the script's output to the user, then tell them:
 
-```
+```text
 Fill in architecture.md and flow.md with your project details.
 ```

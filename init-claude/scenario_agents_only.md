@@ -6,7 +6,7 @@
 
 Tell the user:
 
-```
+```text
 Found AGENTS.md. The following files will be created pointing to it:
 - CLAUDE.md                          (created, pointing to AGENTS.md)
 - .github/copilot-instructions.md    (created, pointing to AGENTS.md)

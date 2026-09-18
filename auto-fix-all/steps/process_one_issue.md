@@ -2,7 +2,7 @@
 
 You are the **architect**, processing a single issue id (`<id>`, given in `ARGUMENTS`) for the `auto-fix-all` pipeline. Run this entire file to completion and then report one of:
 
-```
+```text
 OUTCOME=merged
 ```
 

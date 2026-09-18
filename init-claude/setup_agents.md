@@ -13,7 +13,7 @@ Check whether `.claude/agents/` already exists and list its contents.
 
 Tell the user:
 
-```
+```text
 Now let's set up .claude/agents/. Each agent is a specialist Claude Code sub-agent scoped to part of the codebase, plus an `architect` agent that coordinates them.
 ```
 

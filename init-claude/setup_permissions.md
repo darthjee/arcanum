@@ -4,7 +4,7 @@ Optionally seed the `shipit`-preapproved merge permission exemption into this fr
 
 ## Step 1 — Ask the user
 
-```
+```text
 Would you like to grant auto-fix-all/scripts/wait_ci_and_merge.sh permission to run without confirmation, for shipit-preapproved issues, in this repo's shared .claude/settings.json (committed, visible to all contributors)? [y/n]
 ```
 

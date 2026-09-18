@@ -10,7 +10,7 @@ By this point, [setup_docs_structure.md](setup_docs_structure.md) has already se
 
 Show the current concern items to the user and ask:
 
-```
+```text
 Here is the current arcanum-split-issue checklist. Would you like to add, remove, or reword any items? [y/n]
 ```
 

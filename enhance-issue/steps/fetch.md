@@ -28,7 +28,7 @@ Proceed straight to [explore.md](explore.md) using `FILE` as the starting materi
 
 Tell the user `<ERROR>`, then ask:
 
-```
+```text
 What is the GitHub issue number to enhance?
 ```
 

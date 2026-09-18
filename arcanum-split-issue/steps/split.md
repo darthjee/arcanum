@@ -16,7 +16,7 @@ For each agreed sub-issue, write its body to a temporary file, then run:
 
 Once every sub-issue file has been generated, show the user a summary: the count of sub-issues and each one's title. Ask for explicit confirmation, e.g.:
 
-```
+```text
 About to create <N> GitHub issues, linked to #<id>:
 - <title 1>
 - <title 2>
