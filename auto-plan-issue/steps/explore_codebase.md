@@ -5,6 +5,7 @@ The goal is to understand the current state of the project well enough to write 
 ## Read the architecture docs
 
 Look for architecture or structure documentation in the project. Common locations:
+
 - `AGENTS.md` or `CLAUDE.md` — may reference an architecture doc
 - `docs/architecture.md`, `docs/agents/architecture.md`, or similar
 

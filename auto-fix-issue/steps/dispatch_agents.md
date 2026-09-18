@@ -22,17 +22,22 @@ Before drafting the instruction, determine whether this agent's plan is split in
 > The target project's root is `<repo_path>` (substitute the literal `REPO_PATH` value here). Read your plan file at `<path>`. Implement everything described in it.
 >
 > Follow the development cycle:
+>
 > 1. Implement the changes.
 > 2. Run your checks:
+>
 >    ```bash
 >    scripts/run_checks.sh <agent-name>
 >    ```
+>
 >    (resolved relative to the `auto-fix-issue` skill folder, where `<agent-name>` is your own agent name). This runs `.claude/scripts/check_<agent-name>.sh` if the target project defines one, or reports cleanly that no checks are configured. Use the plan's `## CI Checks` section, when present, as context for investigating any failure it reports. If it exits non-zero, fix the issue and re-run before continuing.
 > 3. Analyze whether refactoring is needed — if so, refactor and repeat from step 2.
 > 4. When clean: `git add` your changes, then commit them by running the helper script — never write the commit message or run `git commit` by hand:
+>
 >    ```bash
 >    scripts/commit_change.sh <repo_path> <type> <scope> <id> "<subject>" <agent> "<AI model name>" "<AI model email>" "<optional body>" "<optional comment_url>"
 >    ```
+>
 >    - `<repo_path>`: the target project's root, already substituted with its literal value in this instruction (see the top of this prompt) — use it verbatim, do not treat it as a shell variable.
 >    - `<type>`: `feat`, `fix`, `refactor`, `docs`, `test`, or `chore` — whichever best matches this commit.
 >    - `<scope>`: your layer/area (e.g. `backend`, `frontend`, `infra` — match your own agent name unless the plan's `## Files to Change` clearly points to a different scope).
@@ -54,9 +59,11 @@ Before drafting the instruction, determine whether this agent's plan is split in
 >    - Read only that step file.
 >    - Implement it.
 >    - `git add` your changes for this step, then commit them immediately, before moving to the next step, by running the helper script — never write the commit message or run `git commit` by hand:
+>
 >      ```bash
 >      scripts/commit_change.sh <repo_path> <type> <scope> <id> "<subject>" <agent> "<AI model name>" "<AI model email>" "<optional body>" "<optional comment_url>"
 >      ```
+>
 >      (same argument meanings as below; one commit per step, committed inside this loop — this happens before checks are run, not after.)
 >
 >    Step files, in order:
@@ -65,9 +72,11 @@ Before drafting the instruction, determine whether this agent's plan is split in
 >    - ...
 >
 > 3. Once every step above is implemented and committed, run checks once for the whole plan:
+>
 >    ```bash
 >    scripts/run_checks.sh <agent-name>
 >    ```
+>
 >    (resolved relative to the `auto-fix-issue` skill folder, where `<agent-name>` is your own agent name). This runs `.claude/scripts/check_<agent-name>.sh` if the target project defines one, or reports cleanly that no checks are configured. Use the index file's `## CI Checks` section, when present, as context for investigating any failure it reports.
 > 4. If checks fail: fix the issue, then commit the fix(es) as additional commits via `scripts/commit_change.sh` — never amend the per-step commits from step 2. Repeat from step 3 until clean.
 > 5. `scripts/commit_change.sh` argument meanings:

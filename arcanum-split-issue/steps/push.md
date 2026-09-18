@@ -25,6 +25,7 @@ Tell the user the split is complete: parent issue `#<id>` is now labeled `Split`
 ### STATUS=failed
 
 Report clearly, from `CREATED` and `FAILED`:
+
 - Which sub-issues were created successfully (file + new issue number).
 - Which sub-issue file failed after exhausting its retry budget.
 

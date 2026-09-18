@@ -11,6 +11,7 @@ scripts/setup_docs_structure.sh
 ```
 
 The script creates (skipping anything that already exists):
+
 - `docs/agents/issues/.gitkeep`
 - `docs/agents/plans/.gitkeep`
 - `docs/agents/architecture.md` (placeholder)

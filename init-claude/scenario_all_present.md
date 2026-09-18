@@ -30,6 +30,7 @@ Wait for the user's response.
 ## Step 3 — Read all three files
 
 Read the full content of:
+
 - `AGENTS.md`
 - `CLAUDE.md`
 - `.github/copilot-instructions.md`
@@ -37,6 +38,7 @@ Read the full content of:
 ## Step 4 — Consolidate into AGENTS.md
 
 Merge all three contents into a single coherent document. Follow these rules:
+
 - Remove duplicate information, keeping only one copy
 - Preserve all unique information from all files
 - Use the structure and headings that best represent the combined content

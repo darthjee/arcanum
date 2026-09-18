@@ -40,6 +40,7 @@ For each candidate agent, read its `description` and judge — based on the issu
 ## Identify shared contracts (only when AGENT_SPLIT=true)
 
 When two or more agents are involved, identify what crosses the boundary between them: any interface, data shape, contract, or dependency that one agent's work produces and another agent's work consumes. Examples (generalize to whatever applies to this project and these agents — do not assume a fixed set of pairs):
+
 - An API surface one agent exposes and another calls (endpoint, method, payload shape, field names and types)
 - A shared schema, config key, or environment variable
 - A build, deployment, or infrastructure change one agent depends on another to provide

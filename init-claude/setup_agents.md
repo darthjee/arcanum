@@ -28,6 +28,7 @@ Which agents should this project have, and what is each one's scope (which folde
 Wait for the user's answer. Clarify with follow-up questions if a scope is ambiguous or overlaps with another agent's scope. Two agents should not own the same files.
 
 There is always exactly one coordinator agent, conventionally named `architect`. If the user didn't mention it, confirm that `architect` will be created as the coordinator, owning:
+
 - `docs/agents/`
 - root-level files (`README.md`, `AGENTS.md`, `CLAUDE.md`, and similar)
 - cross-cutting decisions spanning more than one specialist agent's scope
