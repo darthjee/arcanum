@@ -30,12 +30,14 @@ Wait for the user's response.
 ## Step 3 — Read both files
 
 Read the full content of:
+
 - `CLAUDE.md`
 - `.github/copilot-instructions.md`
 
 ## Step 4 — Consolidate into AGENTS.md
 
 Merge the two contents into a single coherent document. Follow these rules:
+
 - Remove duplicate information, keeping only one copy
 - Preserve all unique information from both files
 - Use the structure and headings that best represent the combined content

@@ -14,6 +14,7 @@ Read and follow [setup_templates.md](setup_templates.md).
 ## Step 2 — Detect existing files
 
 Check which of these files exist in the current working directory:
+
 - `AGENTS.md`
 - `CLAUDE.md`
 - `.github/copilot-instructions.md`

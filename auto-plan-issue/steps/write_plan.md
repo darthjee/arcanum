@@ -7,6 +7,7 @@ Write all plan content in English, regardless of the language used in the issue.
 **Step file naming**: `<agent-name>/<NN>-<slug>.md` — a two-digit zero-padded step number plus a short descriptive slug (e.g. `backend/01-add-users-endpoint.md`). Case A1 (no owner) uses `plan/<NN>-<slug>.md` instead, rooted at `plan.md` in the same way.
 
 **Split threshold**: after drafting an agent's (or, for Case A1, the whole plan's) steps, count them.
+
 - **1–2 steps**: keep them inline under `## Implementation Steps` in the single file — no subfolder, no separate step files. This is today's shape, unchanged.
 - **3 or more steps**: move the steps out into per-step files, and turn the file that would have held them into an index instead. See "Index and step-file shape" below.
 

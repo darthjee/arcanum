@@ -27,6 +27,7 @@ A PR is considered complete when:
   - If a class or method is taking on too many responsibilities, refactor to simplify.
   - Methods should be small and do exactly one thing. If a method is growing, extract parts into private helper methods or separate classes.
   - *Example (pseudo-code):*
+
     ```js
     // Good: Each method does one thing
     class Worker {
@@ -44,6 +45,7 @@ A PR is considered complete when:
       }
     }
     ```
+
   - This requirement applies primarily to source code. For specs, refactor only if there is excessive duplication.
 
 ### CI Checks
@@ -76,6 +78,7 @@ The only exceptions are **entrypoints**:
 `dev/app/app.js` is the application module (exports the configured Express app) and is imported by both `server.js` and the test suite. It is not a script.
 
 *Example:*
+
 ```js
 // Good: class declarer — defines and exports a class
 class Router {
@@ -103,6 +106,7 @@ Files that define and export a class must use **CamelCase** naming, matching the
 - `DataNavigator.js` for `class DataNavigator`
 
 This applies to both source files and their corresponding spec files:
+
 - `Router.js` → spec: `Router_spec.js`
 - `DataNavigator.js` → spec: `DataNavigator_spec.js`
 - `Router.js` â spec: `Router_spec.js`
@@ -113,6 +117,7 @@ Non-class files (e.g., utility modules that export functions) use lowercase or c
 Within a class, **public methods must be declared before private methods**. Private methods (prefixed with `#`) serve as implementation helpers and should appear at the end of the class body.
 
 *Example:*
+
 ```js
 // Good: public methods first, private methods last
 class Worker {
@@ -146,6 +151,7 @@ Classes must receive their dependencies (data, configuration, collaborators) as 
 This makes every class independently testable: tests simply instantiate the class with the data they need, without touching the filesystem or environment.
 
 *Example:*
+
 ```js
 // Good: class receives data as an argument — easy to test
 class Router {
@@ -176,6 +182,7 @@ When refactoring, aim to:
 
 - **Reduce Code Duplication:**
   *Example:* Move repeated setup code in specs to a factory function.
+
   ```js
   // Good
   function buildCategory(attrs = {}) {

@@ -66,13 +66,16 @@ scripts/config.sh is-enabled "$REPO_PATH" clear_context
 This is one of the two points in the whole pipeline where you ask the user something — the spawned architect agent cannot, so it stopped and handed this back to you.
 
 > PR #`<n>` for issue `<id>` was closed without merging. What would you like to do?
+>
 > 1. Reimplement from scratch (start over from a clean `main` for this issue)
 > 2. Skip this issue and move on to the next one
 
 - **Reimplement** — the rejected branch must be discarded first, since `process_one_issue.md`'s branch bootstrap now reuses an existing `issue-<id>` branch instead of always recreating it:
+
   ```bash
   scripts/github.sh cleanup-branch "$REPO_PATH" <id>
   ```
+
   Then go back to Step 2 (the id stays at the front of the queue; a fresh `architect` agent will find no existing `issue-<id>` branch and create a genuinely clean one from `main` via `process_one_issue.md`).
 - **Skip** — `scripts/queue.sh pop "$REPO_PATH"`, then go back to Step 2.
 
@@ -81,6 +84,7 @@ This is one of the two points in the whole pipeline where you ask the user somet
 This is the other point in the pipeline where you ask the user something — a specialist dispatch was denied by Claude Code's own permission classifier, so the spawned architect agent stopped instead of silently doing the work itself.
 
 > A specialist dispatch to `<agent>` was blocked while processing issue `<id>` (action: `<description>`). What would you like to do?
+>
 > 1. Retry (e.g. after granting the needed permission out-of-band)
 > 2. Skip this issue and move on to the next one
 

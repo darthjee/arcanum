@@ -32,9 +32,11 @@ Interpret its output:
 
 - **`STATUS=synced` (exit 0)** — report the created/updated labels (the `CREATED=<name>`/`UPDATED=<name>` lines) back to the user, and finish this step.
 - **`STATUS=discuss` (exit 1)** — the user answered "no" to the script's prompt. Ask them directly:
+
   ```text
   Would you like to change the label list, or skip label syncing for this run?
   ```
+
   - **Skip**: finish this step with no further action and no GitHub calls.
   - **Change the list**: go to Step 3 (the refinement loop) below, then come back and re-invoke the script.
 
@@ -53,6 +55,7 @@ scripts/write_label_config.sh add     <config_path> <Label1>:<color1> [<Label2>:
 `<config_path>` is `.claude/state/init-claude-config.json`. `replace` overwrites the whole `labels` array wholesale; `remove` deletes the named labels (by name) from the array, leaving the rest untouched; `add` upserts each `<name>:<color>` pair — updating the color if the name already exists, appending it otherwise.
 
 Read the current table from `.claude/state/init-claude-config.json` (`jq '.labels'`) and show it to the user. Let them, in a loop, do any of the following until they say they're satisfied — apply each action to the file as soon as it's decided, using the matching subcommand:
+
 - **Add a label** — ask for its color now (the `add` subcommand requires one per pair), then run `write_label_config.sh add <config_path> <name>:<color>`.
 - **Remove a label** — run `write_label_config.sh remove <config_path> <name>`.
 - **Update a label's color** — run `write_label_config.sh add <config_path> <name>:<new color>` (upsert overwrites the existing entry).

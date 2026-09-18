@@ -41,6 +41,7 @@ This mirrors `auto-plan-issue/steps/write_plan.md` exactly, so `plan-issue` and 
 **Step file naming**: `<agent-name>/<NN>-<slug>.md` — two-digit zero-padded step number plus a short descriptive slug (e.g. `backend/01-add-users-endpoint.md`). When there is no agent split, use `plan/<NN>-<slug>.md` instead, rooted at `plan.md`.
 
 **Split threshold**: after drafting the steps, count them.
+
 - **1–2 steps**: keep them inline under `## Implementation Steps` in the single file, as in the template above — no subfolder, no separate step files.
 - **3 or more steps**: move the steps out into per-step files, and turn the file that held them into an index instead:
 
@@ -69,6 +70,7 @@ Each step file, `plan/<NN>-<slug>.md` (or `<agent-name>/<NN>-<slug>.md` when the
 ## Present an overview and ask for confirmation
 
 Present a high-level overview of the plan to the user. Include:
+
 - A summary of what will be implemented
 - The main steps or phases
 - Any notable design decisions or trade-offs
@@ -113,6 +115,7 @@ When the user asks you to look at the code (e.g., "check the code", "look at the
    - Which top-level folders will contain changes — then read `.circleci/config.yml` (if present) to identify which CI jobs apply to those folders and what local commands run them
 
 3. Update the plan with findings (your own, or the dispatched agent's report) and add a `## CI Checks` section if applicable:
+
    ```markdown
    ## CI Checks
    Before opening a PR, run the following checks for the folders being modified:
@@ -122,6 +125,7 @@ When the user asks you to look at the code (e.g., "check the code", "look at the
    `## CI Checks` always belongs on the index file, never on a per-step file, even when the plan is split into per-step files: `plan.md` when there is no agent split (or when it wasn't split into steps at all), or the relevant `<agent-name>.md` when there is an agent split. Never add `## CI Checks` to a `plan/<NN>-<slug>.md` or `<agent-name>/<NN>-<slug>.md` step file.
 
 4. Present the updated overview and ask again:
+
    ```
    Does this approach look correct? Anything to add or correct?
    ```
