@@ -100,7 +100,7 @@ A `git clone` install with uncommitted local changes fails fast with a message t
 
 Each skill is a folder containing a `SKILL.md` entry point and optional auxiliary markdown files:
 
-```
+```text
 skill-name/
 ├── SKILL.md          ← entry point, loaded when /skill-name is invoked
 ├── step-one.md       ← auxiliary instructions, referenced from SKILL.md

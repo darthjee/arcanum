@@ -62,7 +62,7 @@ section already directs.
 Three new permission patterns, provisioned identically to the `wait_ci_and_merge.sh`
 precedent (see [Issue Tags](issue-tags.md)'s `shipit` paragraph):
 
-```
+```text
 Bash(auto-fix-issue/scripts/commit_change.sh *)
 Bash(auto-fix-issue/scripts/run_checks.sh *)
 Bash(git add *)

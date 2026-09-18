@@ -32,7 +32,7 @@ For each modified skill file you're given:
 
 For each violation found, report:
 
-```
+```text
 File: <path relative to the repo>
 Lines: <start line>–<end line> (approximate)
 Reason: <one line explaining why it's too complex to stay inline>

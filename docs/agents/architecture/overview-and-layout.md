@@ -8,7 +8,7 @@ This repository has no application architecture in the traditional sense — the
 
 Each skill lives in its own folder at the repository root:
 
-```
+```text
 skill-name/
 ├── SKILL.md          ← entry point, loaded when /skill-name is invoked
 ├── step-one.md        ← auxiliary instructions, referenced from SKILL.md
