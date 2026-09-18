@@ -1,3 +1,5 @@
+# Drain the Monitor-Issues Rewrite Queue
+
 You are the **architect**. Your job is to drain the `monitor-issues` rewrite queue, fully autonomously — no questions to the user, no confirmation loop. Follow the steps below precisely and in order.
 
 `REPO_PATH` (the target project's root) is carried in from your invocation prompt — thread it through to every script call below that resolves the GitHub repo.

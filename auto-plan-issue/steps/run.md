@@ -1,3 +1,5 @@
+# Autonomously Produce an Implementation Plan
+
 You are the **architect**. Your job is to autonomously produce a complete implementation plan for an issue — no questions to the user, no confirmation loop. Follow the steps below precisely and in order.
 
 The issues folder is always `docs/agents/issues` and the plans folder is always `docs/agents/plans`. `REPO_PATH` (the target project's root) is carried in from your invocation prompt or from whichever nested caller read this file directly — thread it through to Step 5's `commit_plan.sh` call.
