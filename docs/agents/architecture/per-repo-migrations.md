@@ -20,6 +20,7 @@ Complementing `/arcanum-update` (which updates the arcanum *install* itself), `a
 **Manifest vs. legacy discovery** — `arcanum/migrations/_manifest.sh`'s `_manifest_entries <version_dir>` is the single place this decision is made: it reads `migrations.json` when present, or falls back to globbing `NNN.sh` (sorted by filename, implicit `applies_to: "repo"`, `type: "script"`, `skippable` sourced live from `<file> config`) when it's absent. Every other script in the chain below goes through this helper (which normalizes both types into a shared 6-column TSV shape — `id`/`type`/`primary_file`/`instructions_file`/`skippable`/`applies_to`, `instructions_file` sentinel-valued `"-"` for `script`/legacy entries, never a truly empty field, since bash's `read` would otherwise silently collapse it and shift every later column) rather than re-implementing either path itself.
 
 **The `NNN.sh` contract** (checked by `arcanum/migrations/update_per_file.sh` before/while running a `script` entry):
+
 - `NNN.sh config` → prints `{"skippable": true|false}`. Only actually called for legacy, glob-discovered entries (see above) — manifest-driven entries' `skippable` comes from `migrations.json` instead, resolved once by `update_per_version.sh` via `_manifest_entries` before `update_per_file.sh` is ever invoked.
 - `NNN.sh run` → performs the migration; must be idempotent (safe to re-run), since a non-skippable failure leaves the recorded version frozen so the same migration is retried on the next run.
 

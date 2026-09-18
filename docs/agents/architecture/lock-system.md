@@ -5,6 +5,7 @@ The lock system prevents concurrent mutations of shared JSON state files. Curren
 **Lock file:** `.claude/state/auto-fix-all-queue.lock`
 
 **Mechanism:**
+
 1. Write a unique instance ID (hostname + PID + timestamp) into the lock file.
 2. Sleep 1 second.
 3. Re-read the lock file — if it still contains this instance's ID, the lock is held; otherwise another writer won the race, so retry from step 1.
@@ -12,6 +13,7 @@ The lock system prevents concurrent mutations of shared JSON state files. Curren
 5. Delete the lock file to release.
 
 **Properties:**
+
 - Never gives up — retries indefinitely.
 - After 10 consecutive failed attempts, prints a warning once suggesting manual inspection and removal of a potentially stale lock file.
 - If a process crashes while holding the lock, the lock file can be removed by hand to unblock other writers.

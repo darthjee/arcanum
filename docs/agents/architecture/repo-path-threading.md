@@ -7,6 +7,7 @@ The same convention applies to every script that **mutates local git state** (`g
 This is a distinct, broader pattern from `arcanum-migrate`'s optional `--repo <path>` flag (see [Per-Repo Migrations](per-repo-migrations.md)): that flag exists specifically because `arcanum-migrate` is a directly-terminal-invocable master script a human runs by hand, with cwd defaulting sensibly when the flag is omitted. The `repo_path`/`REPO_PATH` convention described here is the general one — required, no default, no cwd fallback — for every script/skill in the agent-driven `auto-*`/`discuss-issue`/`enhance-issue` chains.
 
 The convention: `REPO_PATH` is resolved exactly **once**, at the very top of a skill's run, the one moment ambient cwd can be trusted —
+
 - for a skill that runs entirely inline as the architect (no subagent spawn — e.g. `discuss-issue`, `enhance-issue`, `arcanum-split-issue`, `monitor-issues`, `init-claude`, `push-issue-to-queue`), that's the first step of its own `SKILL.md`;
 - for a skill using the coordinator/architect-subagent split described above, that's the coordinator-layer `SKILL.md`, right before it spawns.
 

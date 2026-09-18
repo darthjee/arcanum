@@ -7,6 +7,7 @@ The `/auto-monitor-pr` skill is no longer needed. The `/auto-fix-all` skill has 
 ## Context
 
 Previously, users had to:
+
 1. Run `/auto-fix-all` to fix issues
 2. Then separately run `/auto-monitor-pr` to monitor the created PR
 
