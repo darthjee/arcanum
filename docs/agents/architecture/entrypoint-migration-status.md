@@ -5,7 +5,7 @@
 One row per entry point tracked in [`arcanum/_lib/migration-status.json`](../../../arcanum/_lib/migration-status.json) — see [Script Engine](script-engine.md) for the shell → Node.js migration this tracks. `Migrated` reflects the map's current boolean value; `Issue` is the issue that migrated it, resolved from the file's own git history where knowable, blank otherwise (never a guess).
 
 | Command | Migrated | Issue |
-|---------|----------|-------|
+| --- | --- | --- |
 | `arcanum-split-issue-create-sub-issue` | Yes | #230 |
 | `arcanum-split-issue-create-sub-issue-file` | Yes | #230 |
 | `arcanum-split-issue-finish` | Yes | #230 |
@@ -29,20 +29,23 @@ One row per entry point tracked in [`arcanum/_lib/migration-status.json`](../../
 | `auto-fix-all-reply-comment` | Yes | #230 |
 | `auto-fix-all-wait-ci` | Yes | #230 |
 | `auto-fix-all-wait-ci-and-merge` | Yes | #230 |
-| `auto-fix-issue-commit-change` | No | #230 |
-| `auto-fix-issue-create-branch` | No | #230 |
-| `auto-fix-issue-github` | No | #230 |
-| `auto-fix-issue-list-plan-agents` | No | #230 |
-| `auto-fix-issue-list-plan-steps` | No | #230 |
-| `auto-fix-issue-merge-main` | No | #230 |
-| `auto-fix-issue-run-checks` | No | #230 |
-| `auto-monitor-issue-pr-resolve-pr-number` | No | #230 |
-| `auto-monitor-pr-monitor-pr` | No | #230 |
-| `auto-new-issue-commit-issue` | No | #230 |
-| `auto-plan-issue-commit-plan` | No | #230 |
+| `auto-fix-issue-commit-change` | Yes | #230 |
+| `auto-fix-issue-create-branch` | Yes | #230 |
+| `auto-fix-issue-github-info` | Yes | #430 |
+| `auto-fix-issue-github-pr-create` | Yes | #430 |
+| `auto-fix-issue-github-pr-ready` | Yes | #430 |
+| `auto-fix-issue-github-pr-view` | Yes | #430 |
+| `auto-fix-issue-list-plan-agents` | Yes | #230 |
+| `auto-fix-issue-list-plan-steps` | Yes | #230 |
+| `auto-fix-issue-merge-main` | Yes | #230 |
+| `auto-fix-issue-run-checks` | Yes | #230 |
+| `auto-monitor-issue-pr-resolve-pr-number` | Yes | #230 |
+| `auto-monitor-pr-monitor-pr` | Yes | #230 |
+| `auto-new-issue-commit-issue` | Yes | #230 |
+| `auto-plan-issue-commit-plan` | Yes | #230 |
 | `checkout-safe-branch` | Yes | #230 |
-| `discuss-issue-confirm` | No | #230 |
-| `discuss-issue-render-issue` | No | #230 |
+| `discuss-issue-confirm` | Yes | #230 |
+| `discuss-issue-render-issue` | Yes | #230 |
 | `dispatch-fixture-crash` | Yes | #192 |
 | `github-issue` | No | #230 |
 | `github-issue-create` | Yes | #237 |
