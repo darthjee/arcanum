@@ -14,9 +14,11 @@ scripts/github.sh pr-view "$REPO_PATH"
 
 - **Exit code 0** — a PR already exists for the current branch. Parse `URL=` and `IS_DRAFT=` from the output.
   - If `IS_DRAFT=true`, mark it ready:
+
     ```bash
     scripts/github.sh pr-ready "$REPO_PATH"
     ```
+
   - If `IS_DRAFT=false`, the PR is already open and ready — nothing more to do.
 - **Exit code 1, no error message** — no PR exists yet for this branch. Proceed to "Create the PR" below.
 - **Exit code 1, with an error message on stderr** — a real GitHub/`gh` error occurred. Report it; do not silently continue.

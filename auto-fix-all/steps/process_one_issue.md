@@ -132,14 +132,18 @@ Report `OUTCOME=closed PR_NUMBER=<pr_number>`. Done — stop here. Do not ask th
 Reached only from "Monitor the PR" → `approved` — a human approved the PR via GitHub review. Claude Code's own permission classifier still confirms the merge call below; that confirmation is a separate, deliberate gate from GitHub review and is untouched by `shipit` (see "If pre-approved via shipit" below for the pre-approved path).
 
 1. Remove planning artifacts and commit (never commit this by hand):
+
    ```bash
    scripts/cleanup_artifacts.sh "$REPO_PATH" <issue_file> <plan_dir> <id> "<your AI model name>" "<your AI model noreply email>"
    ```
+
    `<issue_file>` and `<plan_dir>` are the same paths resolved by `../auto-plan-issue/scripts/resolve_plan_paths.sh "$REPO_PATH" docs/agents/issues docs/agents/plans <id>` (re-run it here, resolved relative to the `auto-plan-issue` skill folder, if you no longer have them at hand).
 2. Wait for CI:
+
    ```bash
    scripts/wait_ci.sh "$REPO_PATH"
    ```
+
    > **NEVER use `ScheduleWakeup`, a self-waking loop, or any other polling mechanism to wait for CI.** Always call `scripts/wait_ci.sh` directly and let it block. When invoking it via the Bash tool, set `timeout: 600000` (10 minutes — the tool's maximum) so the call cannot time out before CI finishes.
 
    This blocks until every check-run registered on the PR's head commit completes, regardless of which CI provider runs them. The first output line is `passed` or `failed`; on `failed`, subsequent lines are the names of the failed check-runs.
@@ -175,20 +179,26 @@ After all agents commit, go back to step 3 above (`wait_ci.sh`) to re-check.
 Reached only from "Check for pre-approval" above, when `has-shipit-label` exits 0. Unlike the review-approved path above, the wait-then-merge call below is a single, distinctly-named Bash invocation (`wait_ci_and_merge.sh`) that Claude Code's own permission classifier can be allowlisted to run without confirmation — see `docs/agents/architecture/issue-tags.md`'s `shipit` paragraph and `arcanum/migrations/repos/0.16.0/001.sh`/`002.sh`/`003.sh` (the release that shipped them — no longer under `repos/next/`, which now holds unrelated, later migrations) for how that allowlist entry gets provisioned. It never touches `wait_ci.sh`/`scripts/github.sh pr-merge` directly, and the review-approved path above stays exactly as it was, still classifier-confirmed either way.
 
 1. Remove planning artifacts and commit (never commit this by hand):
+
    ```bash
    scripts/cleanup_artifacts.sh "$REPO_PATH" <issue_file> <plan_dir> <id> "<your AI model name>" "<your AI model noreply email>"
    ```
+
    `<issue_file>` and `<plan_dir>` are the same paths resolved by `../auto-plan-issue/scripts/resolve_plan_paths.sh "$REPO_PATH" docs/agents/issues docs/agents/plans <id>` (re-run it here, resolved relative to the `auto-plan-issue` skill folder, if you no longer have them at hand).
 2. Wait for CI, then merge if it passes — one combined call:
+
    ```bash
    scripts/wait_ci_and_merge.sh "$REPO_PATH" "<your AI model noreply email>"
    ```
+
    > Resolve `scripts/wait_ci_and_merge.sh` relative to the `auto-fix-all` skill folder. Same **NEVER poll** rule as `wait_ci.sh` above — call it directly and let it block, with `timeout: 600000` when invoking it via the Bash tool. The trailing `<your AI model noreply email>` argument is optional and passed straight through to `github.sh pr-merge` — see the note on that call above.
 
    First output line `passed`: the merge already happened internally (second line is the merged PR's URL) — nothing left to call. Run cleanup (the script infers the branch name from the issue ID):
+
    ```bash
    scripts/github.sh cleanup-branch "$REPO_PATH" <id>
    ```
+
    > Resolve `scripts/github.sh` relative to the `auto-fix-all` skill folder.
 
    Report `OUTCOME=merged`. Done — stop here.

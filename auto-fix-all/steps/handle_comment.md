@@ -46,9 +46,11 @@ Launch the responsible agent(s) in parallel (single message, multiple Agent tool
 - The full comment body (or failed check-run name plus instruction to inspect the CI logs for it) as the task.
 - The relevant plan file path(s) under `docs/agents/plans/<issue_dir>/` for context.
 - The instruction to implement the feedback (or fix the failure), run the full local dev/test/lint cycle, and commit via:
+
   ```bash
   ../../auto-fix-issue/scripts/commit_change.sh "$REPO_PATH" <type> <scope> <id> "<subject>" <agent> "<AI model name>" "<AI model email>" "<optional body>" "<comment_url>"
   ```
+
   (resolved relative to the `auto-fix-issue` skill folder, same script and conventions used during the original implementation step). Pass the comment's `url` (from its header line) as `<comment_url>` when this dispatch is for a specific PR comment; omit it entirely (no trailing argument) when handling a failed check-run, since that isn't tied to any one comment.
 
 If you (architect) are handling a comment/failure yourself, follow the same cycle and commit through the same script with `<agent>` set to `architect`.
@@ -79,9 +81,11 @@ For each comment judged a question/clarification above:
 1. Decide which agent should answer, using the same reasoning as "Choosing the responsible agent(s)" — compare the comment against each candidate agent's `description`; fall back to `architect` if none seems responsible.
 2. Draft the reply body addressing the question. This is a judgment call, not scripted — the responsible agent (or you, as architect) writes the actual answer.
 3. Post it:
+
    ```bash
    ../scripts/reply_comment.sh "$REPO_PATH" <id> <agent> "<your AI model name>" "<your AI model noreply email>" "<reply body>"
    ```
+
    (resolved relative to the `auto-fix-all` skill folder).
 4. No commit, no push, and no CI wait for a question reply — nothing changed in the working tree.
 

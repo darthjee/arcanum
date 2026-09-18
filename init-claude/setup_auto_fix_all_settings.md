@@ -39,22 +39,28 @@ Once the user confirms the final table, write only the rows that were actually e
 
 - **CI check-ignore patterns row**, if edited:
   - One or more patterns given: run
+
     ```bash
     scripts/set_ci_ignored_patterns.sh "<pattern-1>" ["<pattern-2>" ...]
     ```
+
   - Explicitly cleared (a "none" answer on a row that had a value, or explicitly clearing an already-empty row): run
+
     ```bash
     scripts/set_ci_ignored_patterns.sh --clear
     ```
+
   - Not edited this pass: don't run the script at all.
 
   > Resolve `scripts/set_ci_ignored_patterns.sh` relative to the `init-claude` skill folder. This writes `ignored_check_patterns` into `.claude/configuration/arcanum-repo-config.json`'s `auto-fix-all` namespace (creating the file, and `.claude/configuration/`, if needed) — see `docs/guides/arcanum-repo-config.md` for the config-file layout. It never touches the legacy `.claude/configuration/auto-fix-all.json` file.
 
 - **`clear_context` / `finish_on_empty_queue` rows**, for each one edited this pass:
+
   ```bash
   ../auto-fix-all/scripts/config.sh set "$REPO_PATH" clear_context true|false
   ../auto-fix-all/scripts/config.sh set "$REPO_PATH" finish_on_empty_queue true|false
   ```
+
   > Resolve `../auto-fix-all/scripts/config.sh` relative to the `init-claude` skill folder. Both keys are routed to `.claude/state/arcanum-config.json`'s `auto-fix-all` namespace (gitignored, not committed). Not edited this pass: don't run the script for that key.
 
 ## Step 5 — Report
