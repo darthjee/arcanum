@@ -19,7 +19,7 @@ If the file `.claude/state/issue-<id>.json` does not exist or the `step` field i
 If a step name is returned, skip all steps up to and including the recorded one and resume from the next step. The canonical step names and their corresponding steps are:
 
 | Recorded value | Step completed | Resume from |
-|---------------|---------------|-------------|
+|---|---|---|
 | `plan_located` | Step 1 | Step 2 |
 | `branch_created` | Step 2 | Step 3 |
 | `agents_listed` | Step 3 | Step 4 |
