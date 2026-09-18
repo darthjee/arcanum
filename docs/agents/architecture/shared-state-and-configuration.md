@@ -3,7 +3,7 @@
 Skills store runtime state and configuration under `.claude/`:
 
 | File | Purpose | Schema |
-|------|---------|--------|
+| --- | --- | --- |
 | `.claude/state/auto-fix-all-queue.json` | Queue of issue IDs to be processed by `auto-fix-all`. The first element is always the currently in-progress entry. | `[{"id": "<issue_id>"}, ...]` |
 | `.claude/state/auto-fix-all-queue.lock` | Lock file used during `push`/`pop` mutations to prevent concurrent writes. Contains the acquiring instance's unique ID. | Plain text (instance ID string) |
 | `.claude/state/issue-<id>.json` | Unified per-issue state file used by `auto-fix-issue`, `monitor-issues`, and `auto-monitor-pr`. `auto-fix-issue` writes the `step` field after each completed step so the skill can resume on re-invocation. `monitor-issues` stores per-issue `updated_at` and `tags` here (replacing its own `issues.json` entry). `auto-monitor-pr` stores `pr_comments` and `last_comment_time` here when called with an issue id (replacing the legacy per-PR file). | `{"step": "<step_name>", "updated_at": "<ISO8601>", "tags": ["<tag>", ...], "pr_comments": [{"id": "<node_id>", "user": "<login>", "url": "<html_url>", "state": "fetched\|processing\|addressed", "emojis": ["<:emoji_name:>"]}], "last_comment_time": "<ISO8601>"}` — all fields optional |

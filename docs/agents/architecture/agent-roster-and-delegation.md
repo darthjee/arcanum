@@ -5,7 +5,7 @@
 Specialist agents are defined in `.claude/agents/`. The architect coordinates them; each specialist owns a clearly bounded scope.
 
 | Agent | Scope | When the architect dispatches it |
-|-------|-------|----------------------------------|
+| --- | --- | --- |
 | `scripter` | `<skill-name>/scripts/` and `arcanum/_lib/` — writes and edits bash scripts | Whenever a skill needs deterministic logic extracted into a new or updated script |
 | `skill-writer` | `SKILL.md` and auxiliary `steps/*.md` files of any skill — writes and edits skill files | Whenever a skill's `SKILL.md` or step files need to be created or edited |
 | `skill-reviewer` | Reads skill files (SKILL.md + step `.md` files) changed in a PR and reports complex inline bash that violates the script-extraction rule | During PR review, after implementation, to validate that no complex logic was left inline |

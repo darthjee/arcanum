@@ -71,7 +71,7 @@ issue_for_key() {
   echo "One row per entry point tracked in [\`arcanum/_lib/migration-status.json\`](../../../arcanum/_lib/migration-status.json) — see [Script Engine](script-engine.md) for the shell → Node.js migration this tracks. \`Migrated\` reflects the map's current boolean value; \`Issue\` is the issue that migrated it, resolved from the file's own git history where knowable, blank otherwise (never a guess)."
   echo
   echo "| Command | Migrated | Issue |"
-  echo "|---------|----------|-------|"
+  echo "| --- | --- | --- |"
 
   jq -r 'keys[]' "$STATUS_FILE" | while IFS= read -r key; do
     migrated="No"

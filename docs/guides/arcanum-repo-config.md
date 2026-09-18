@@ -13,7 +13,7 @@ Warning: reading '<key>' from legacy config file <legacy-file> — this configur
 Arcanum configuration used to live in files named after the one feature that used them:
 
 | Old (legacy) file | New file |
-|---|---|
+| --- | --- |
 | `.claude/configuration/auto-fix-all.json` | `.claude/configuration/arcanum-repo-config.json` |
 | `.claude/state/auto-fix-all-config.json` | `.claude/state/arcanum-config.json` |
 
@@ -55,7 +55,7 @@ some of them, the global tier described below), control commit
 behavior directly:
 
 | Key | Type | Default | Chain | Notes |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | `git.agents` | object (map of agent name -> email) | — | local → repo → global | Per-agent explicit `agent name -> concrete email` mapping, consulted before `git.email` at each tier (see `arcanum/_lib/agent_email.sh`). Lets multiple agent names share a single GitHub identity instead of requiring one dedicated account per agent name. See [`arcanum-global-config.md`](arcanum-global-config.md). |
 | `git.email` | string (`{agent}` template) | — | local → repo → global | Per-agent commit-author email pattern used by `commit_change.sh`/`commit_issue.sh`/`commit_plan.sh` (see `arcanum/_lib/agent_email.sh`). See [`arcanum-global-config.md`](arcanum-global-config.md). |
 | `git.safe_branch` | string | `origin/main` | local state only | The ref `arcanum/_lib/safe_branch.sh` checks out via `enhance-issue`/`discuss-issue`/`arcanum-split-issue`. See [Branch Bootstrap and Merge Conflicts](../agents/architecture/branch-bootstrap-and-merge-conflicts.md). |

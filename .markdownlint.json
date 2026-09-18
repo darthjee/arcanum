@@ -3,6 +3,9 @@
     "siblings_only": true
   },
   "MD013": false,
+  "MD060": {
+    "style": "compact"
+  },
   "MD041": {
     "front_matter_title": "^\\s*(title|name)\\s*[:=]"
   }

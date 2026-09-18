@@ -20,7 +20,7 @@ Markdown files drive every skill — there is no build step and no application r
 Specialist agents are defined in `.claude/agents/`. Each has a specific scope within the repository.
 
 | Agent | Scope |
-|-------|-------|
+| --- | --- |
 | `architect` | Project documentation, root-level files, and decisions that span more than one agent. Coordinates the other specialists. |
 | `scripter` | `<skill-name>/scripts/` and `arcanum/_lib/` — bash scripts that extract deterministic logic out of skills. |
 | `skill-writer` | `SKILL.md` and auxiliary `steps/*.md` files of any skill — writes or edits skill files. |
@@ -49,7 +49,7 @@ Concrete off-limits actions for any agent working in this repo:
 All project documentation lives under [`docs/agents/`](docs/agents/):
 
 | File | Contents |
-|------|----------|
+| --- | --- |
 | [Folder Structure](docs/agents/folder-structure.md) | Top-level directory layout and the role of each folder. |
 | [Architecture](docs/agents/architecture.md) | Hub linking to `docs/agents/architecture/` — arcanum's internals by topic: source layout and overview, agent roster and delegation, repo path threading, shared state and configuration, per-repo migrations, the script engine, script preference guidelines, dispatch permissions, the lock system, issue tags, branch bootstrap and merge conflicts, install and release, cross-skill references, and entrypoint migration status. |
 | [Flow](docs/agents/flow.md) | Main runtime flow of the application. |

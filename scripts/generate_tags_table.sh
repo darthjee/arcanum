@@ -363,7 +363,7 @@ done < "$CANDIDATES_FILE"
   echo "One row per call site, across all skills, that mutates a GitHub issue tag/label — both the semantic \`mark-*\` wrappers and the generic \`add-tag\`/\`remove-tag\` calls. Both mechanisms bottom out in the shared \`arcanum/_lib/tag_mutate.sh\` helpers (not repeated per row below). \`shipit\` is out of scope — it is human-only and never mutated by any script. See [architecture/issue-tags.md](architecture/issue-tags.md) for the narrative version."
   echo
   echo "| Skill | Step | Entrypoint | Tags Added | Tags Removed |"
-  echo "|-------|------|------------|------------|--------------|"
+  echo "| --- | --- | --- | --- | --- |"
 
   sort -s -t "$FS_CHAR" -k1,1 -k2,2 "$FILTERED_FILE" | while IFS="$FS_CHAR" read -r skill _sort_key step_display entrypoint added removed; do
     # Literal printf format string, not a shell expansion

@@ -16,7 +16,7 @@ You are the architect and coordinator of Arcanum — a collection of Claude Code
 ## Specialist agents
 
 | Agent | Scope |
-|-------|-------|
+| --- | --- |
 | `scripter` | `<skill-name>/scripts/` and `arcanum/_lib/` — bash scripts that extract deterministic logic out of skills |
 | `skill-writer` | `SKILL.md` and auxiliary `steps/*.md` files of any skill — writes or edits skill files |
 | `skill-reviewer` | Reviews skill files modified in a PR — identifies violations of the deterministic-logic-extraction-to-scripts rule |
@@ -46,7 +46,7 @@ Orchestration skills (`auto-fix-all`, `auto-fix-issue`, `auto-plan-issue`, `auto
 ## Documentation (`docs/agents/`)
 
 | File | Contents |
-|------|----------|
+| --- | --- |
 | `folder-structure.md` | Repository folder layout |
 | `architecture.md` | Hub for `docs/agents/architecture/` — arcanum's internal architecture, by topic |
 | `flow.md` | Lifecycle of a skill being invoked |

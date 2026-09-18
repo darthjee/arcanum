@@ -3,7 +3,7 @@
 ## Project Root
 
 | Directory / File | Description |
-|-----------------|-------------|
+| --- | --- |
 | `auto-new-issue/` | Skill `/auto-new-issue` — autonomously creates a new issue file (no user interaction), committing and syncing with GitHub automatically. |
 | `auto-plan-issue/` | Skill `/auto-plan-issue` — autonomously writes an issue's implementation plan, splitting across specialist agents when there are any. |
 | `auto-fix-issue/` | Skill `/auto-fix-issue` — autonomously implements a planned issue, dispatching specialist agents in parallel and opening/marking the PR ready. |
