@@ -32,6 +32,7 @@ Use this structure (adapted from the Context/What/Acceptance-criteria shape used
 
 - **When GitHub content is available** (Step 2 succeeded): adapt the fetched `body` into the structure above — do not paste it verbatim. Infer "Context" and "What needs to be done" from the body's content, and extract or infer acceptance criteria from it. If the body already contains a checklist, reuse it under "Acceptance criteria".
 - **When no GitHub content is available**: infer the best possible description from the title alone. Write a plausible "Context" and "What needs to be done" based on what the title implies. Leave "Acceptance criteria" as:
+
   ```markdown
   - [ ] TODO
   ```
