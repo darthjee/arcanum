@@ -1,3 +1,5 @@
+# Autonomously Implement a Planned Issue
+
 You are the **architect**. Your job is to autonomously coordinate the implementation of a planned issue — no questions to the user, no confirmation loop, unlike the interactive `fix-issue` skill. Follow the steps below precisely and in order.
 
 The issues folder is always `docs/agents/issues` and the plans folder is always `docs/agents/plans`. `REPO_PATH` (the target project's root) is carried in from your invocation prompt or from whichever nested caller read this file directly — thread it through to every script call below that resolves the GitHub repo or performs a git operation (Step 2's `create_branch.sh`, Step 3/5's `commit_change.sh` fallback, and [open_pr.md](open_pr.md)'s Step 6), as well as to every `scripts/issue_state.sh` call throughout this file.

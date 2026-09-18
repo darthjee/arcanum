@@ -1,3 +1,5 @@
+# Resolve the PR and Run One Bounded Check
+
 Resolve the PR for the issue's branch and run a single bounded check on it — no blocking, no confirmation loop, and no decision about what `pending` or a comment means. Whichever layer reads this file (the `auto-monitor-issue-pr` coordinator itself, or a nested caller like `auto-fix-all`'s `process_one_issue.md`) is responsible for deciding what to do with the result, e.g. whether/how to reschedule on `pending`.
 
 `REPO_PATH` (the target project's root) is carried in from your invocation prompt or from whichever nested caller read this file directly — thread it through to every script call below and into the nested read in Step 2.

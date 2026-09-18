@@ -1,3 +1,5 @@
+# Run One Bounded Check on a PR
+
 Run a single bounded check on the given PR and report the result verbatim — no blocking, no confirmation loop, and no decision about what `pending` or a comment means. Whichever layer reads this file (the `auto-monitor-pr` coordinator itself, or a nested caller like `auto-monitor-issue-pr`) is responsible for deciding what to do with the result, e.g. whether/how to reschedule on `pending`.
 
 `REPO_PATH` (the target project's root) is carried in from your invocation prompt or from whichever nested caller read this file directly — thread it through to the script call below.
