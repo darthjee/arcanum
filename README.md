@@ -20,7 +20,7 @@ Skills are prompt files that Claude Code loads as slash commands. Each skill liv
 ## Available skills
 
 | Skill | Description |
-|-------|-------------|
+| --- | --- |
 | [`/init-claude`](init-claude/) | Initializes a project's AI configuration: creates or consolidates `CLAUDE.md`, `.github/copilot-instructions.md`, and `AGENTS.md`, then scaffolds `docs/agents/` with architecture, folder structure, and contributing guides. |
 | [`/arcanum-split-issue`](arcanum-split-issue/) | Breaks a single GitHub issue into several sub-issues through interactive dialogue, generating one local draft file per sub-issue, then pushing each as a real GitHub issue linked to the parent via GitHub's native sub-issue relationship. |
 | [`/enhance-issue`](enhance-issue/) | Iteratively flesh out a still-vague GitHub issue idea (tagged `Idea`/`Writting`) through checklist-driven dialogue, before it's mature enough for `/discuss-issue`. |
@@ -127,7 +127,7 @@ Arcanum configuration keys are resolved through a 3-tier chain, in order of prec
 3. **Global** — `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/arcanum-config.json` (cross-project, scoped to your Claude Code account)
 
 | Key | Description |
-|-----|-------------|
+| --- | --- |
 | `git.merge_body_mode` | Controls the squash-merge commit body (`empty`, `full`, or `coauthors`). |
 | `git.omit_model_coauthor` | When `true`, removes the model's email from the coauthors list during merge. |
 | `git.remove_coauthors` | List of emails to remove from the coauthors list during merge. |

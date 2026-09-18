@@ -33,7 +33,7 @@ every dispatched specialist, and `auto-fix-all/steps/handle_comment.md`'s "Dispa
 section, which reuses the same commit call:
 
 | Script | Risk |
-|--------|------|
+| --- | --- |
 | `auto-fix-issue/scripts/run_checks.sh <agent-name>` | Read-only; runs `.claude/scripts/check_<agent>.sh` if the target project defines one, otherwise a no-op. Zero mutation risk. |
 | `auto-fix-issue/scripts/commit_change.sh <repo_path> <type> <scope> <id> <subject> <agent> <model> <email> [body] [comment_url]` | Commits *and pushes* (`git commit -F -` then `push_current_branch`), but only through this fixed, reviewed script — never raw `git commit`/`git push`. Every specialist's commit, on every dispatch, goes through this single call. |
 | `git add <files>` (raw, run immediately before `commit_change.sh`, per `dispatch_agents.md` step 4) | Staging only, fully reversible, no network/history effect. |

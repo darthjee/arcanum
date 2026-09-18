@@ -3,7 +3,7 @@
 This is a hub into arcanum's internals, split by topic into `docs/agents/architecture/*.md`. Start with whichever file below matches what you need — each one reads standalone.
 
 | File | Covers |
-|------|--------|
+| --- | --- |
 | [Overview and Source Code Layout](architecture/overview-and-layout.md) | What this repo is (a set of markdown-driven skills, no runtime), and how a skill folder is laid out. |
 | [Install & Release Pipeline](architecture/install-and-release.md) | The `curl \| bash` bootstrap/installer two-stage install flow, the release zip, and the `update` flow that brings an existing install current. |
 | [Script Preference](architecture/script-preference.md) | Why deterministic logic belongs in `<skill>/scripts/`, not in markdown prose. |
