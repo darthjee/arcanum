@@ -102,6 +102,7 @@ Two ways:
    `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/arcanum-config.json` directly,
    nesting whatever you're adding under the right namespace's key, same
    shape as the per-repo files:
+
    ```json
    {
      "git": { "email": "you+{agent}@example.com" }
