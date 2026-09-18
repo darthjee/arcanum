@@ -2,5 +2,8 @@
   "MD024": {
     "siblings_only": true
   },
-  "MD013": false
+  "MD013": false,
+  "MD041": {
+    "front_matter_title": "^\\s*(title|name)\\s*[:=]"
+  }
 }

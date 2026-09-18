@@ -1,0 +1,18 @@
+# Excludes literal template files whose content is substituted verbatim
+# into real commit messages, PR bodies, and GitHub reply comments. Adding
+# a `# Title` line to satisfy MD041 would inject unwanted heading text
+# into that generated output. See issue #502.
+.github/pull_request_template.md
+.github/commit_message_template.md
+.github/commit_message_template-2.0.md
+init-claude/templates/pull_request_template.md
+init-claude/templates/commit_message_template.md
+init-claude/templates/commit_message_template-2.0.md
+auto-fix-all/templates/reply.tmpl.md
+
+# Excludes CLAUDE.md and .github/copilot-instructions.md, deliberate
+# 1-line redirect stubs to AGENTS.md (see issue #498). Already excluded
+# from Codacy analysis via .codacy.yml's exclude_paths; mirrored here so
+# local/non-Codacy markdownlint runs don't flag them either. See #502.
+CLAUDE.md
+.github/copilot-instructions.md
