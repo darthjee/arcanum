@@ -21,9 +21,10 @@
 #     unconditional `source` of this file) and call
 #     `permission_grant_add` directly, in-process — never through
 #     engine_dispatch/native.
-#   - init-claude/setup_permissions.md's onboarding step, which calls
-#     permission_grant.sh's CLI dispatcher (the engine_dispatch shim),
-#     not this file directly.
+#   - init-claude/setup_permissions.md's and
+#     init-claude/setup_specialist_dispatch_permissions.md's onboarding
+#     steps, which call permission_grant.sh's CLI dispatcher (the
+#     engine_dispatch shim), not this file directly.
 #
 # This file is meant to be SOURCED for its `permission_grant_add`
 # function; the CLI dispatcher at the bottom is both the

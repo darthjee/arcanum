@@ -14,11 +14,12 @@
 #     working unchanged as pure shell, via the unconditional `source`
 #     of permission_grant_shell.sh below) and call it directly,
 #     in-process — never through engine_dispatch/native.
-#   - init-claude/setup_permissions.md's onboarding step, which calls
-#     this file's own CLI dispatcher directly (below), since it runs
-#     as an agent issuing Bash-tool commands rather than a script that
-#     can `source` a lib. Only THIS direct-invocation CLI path is
-#     engine_dispatch-routed.
+#   - init-claude/setup_permissions.md's and
+#     init-claude/setup_specialist_dispatch_permissions.md's onboarding
+#     steps, which call this file's own CLI dispatcher directly
+#     (below), since they run as an agent issuing Bash-tool commands
+#     rather than a script that can `source` a lib. Only THIS direct-
+#     invocation CLI path is engine_dispatch-routed.
 #
 # Direct-invocation CLI usage:
 #   permission_grant.sh <anchor> add <file> <pattern>
