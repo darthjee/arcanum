@@ -2,7 +2,6 @@
 
 A collection of Claude Code skills — reusable slash commands that extend Claude Code with project workflows.
 
-
 [![Build Status](https://circleci.com/gh/darthjee/arcanum.svg?style=shield)](https://circleci.com/gh/darthjee/arcanum)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/9749726787d24c7cadc8bf82f0dd1d53)](https://app.codacy.com/gh/darthjee/arcanum/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 [![Codacy Badge](https://app.codacy.com/project/badge/Coverage/9749726787d24c7cadc8bf82f0dd1d53)](https://app.codacy.com/gh/darthjee/arcanum/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_coverage)

@@ -72,7 +72,7 @@ Provisioned across all three config tiers by `arcanum/migrations/repos/next/002.
 (local, `.claude/settings.local.json`), `003.sh` (repo, shared/committed
 `.claude/settings.json`), and `004.sh` (global, Claude Code's own cross-project
 `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json`), plus a second onboarding step in
-`init-claude/setup_permissions.md` for freshly onboarded repos — the same three-tier +
+`init-claude/setup_specialist_dispatch_permissions.md` for freshly onboarded repos — the same three-tier +
 onboarding shape `shipit`'s `wait_ci_and_merge.sh` exemption used (issues #167/#170).
 
 ## Policy for future specialists/dispatch paths
@@ -82,7 +82,8 @@ When a new specialist or dispatch path is added:
 - If it introduces a **new common, fixed, narrow, low-risk script used by most or all
   specialist dispatches** (the same shape as `run_checks.sh`/`commit_change.sh`/`git add`
   above), it's a candidate for its own `permission_grant.sh` allowlist entry: three
-  tier-scoped migration scripts (local/repo/global) plus an `init-claude/setup_permissions.md`
+  tier-scoped migration scripts (local/repo/global) plus an
+  `init-claude/setup_specialist_dispatch_permissions.md`
   onboarding step, mirroring this issue and the `shipit` precedent it generalizes.
 - If it's an **agent-specific, ad hoc, or broad/destructive command** (build/test
   tooling, arbitrary `git`/`gh` writes, anything a specialist decides for itself rather
