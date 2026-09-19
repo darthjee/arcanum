@@ -31,7 +31,7 @@ scripts/queue.sh wait-next "$REPO_PATH"
 
 Call this id `<id>`. Spawn:
 
-> Agent(subagent_type: "architect", prompt: "Read steps/process_one_issue.md (resolved relative to the `auto-fix-all` skill folder) and follow it for issue <id>. REPO_PATH: <resolved_path>. Report OUTCOME=merged, OUTCOME=closed PR_NUMBER=<n>, OUTCOME=blocked AGENT=<agent-name> ACTION=<description>, or OUTCOME=pending PR_NUMBER=<n>.")
+> Agent(subagent_type: "architect", prompt: "Read steps/process_one_issue.md (resolved relative to the `auto-fix-all` skill folder) and follow it for issue `<id>`. REPO_PATH: `<resolved_path>`. Report OUTCOME=merged, OUTCOME=closed PR_NUMBER=`<n>`, OUTCOME=blocked AGENT=`<agent-name>` ACTION=`<description>`, or OUTCOME=pending PR_NUMBER=`<n>`.")
 
 Wait for the agent to finish, then parse `OUTCOME` from its report, and proceed to Step 3.
 

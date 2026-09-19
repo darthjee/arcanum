@@ -20,7 +20,7 @@ A skill that's meant to run autonomously, with no user interaction (the `auto-*`
 
 - **`SKILL.md` (coordinator layer)** — thin. Parses arguments, resolves `REPO_PATH="$(pwd)"` (the one moment the target project's root can be trusted from ambient cwd — see [Repo Path Threading](repo-path-threading.md)), then spawns a real subagent:
 
-  > Agent(subagent_type: "architect", prompt: "Read steps/run.md (resolved relative to the `<skill-name>` skill folder) and follow it. ARGUMENTS: <raw skill arguments> REPO_PATH: <resolved_path>")
+  > Agent(subagent_type: "architect", prompt: "Read steps/run.md (resolved relative to the `<skill-name>` skill folder) and follow it. ARGUMENTS: `<raw skill arguments>` REPO_PATH: <resolved_path>")
 
   Waits for it, then relays its final report verbatim. Keep in the coordinator only what the `architect` agent's tool set (`Read, Edit, Write, Bash, Agent` — no `ScheduleWakeup`, no `AskUserQuestion`) genuinely cannot do itself — e.g. `auto-fix-all`'s `ScheduleWakeup`-based context clearing between issues, and its one user-facing question when a PR is closed without merging.
 - **`steps/run.md` (architect layer)** — the actual step-by-step instructions (what used to be the `SKILL.md` body). This is what the spawned `architect` agent reads and follows. It parses `REPO_PATH` out of its own invocation prompt and threads it through every script call it makes.

@@ -9,6 +9,6 @@ Resolve `REPO_PATH="$(pwd)"` — the one moment the target project's root can be
 
 Spawn:
 
-> Agent(subagent_type: "architect", prompt: "Read steps/run.md (resolved relative to the `auto-new-issue` skill folder) and follow it. ARGUMENTS: <raw skill arguments> REPO_PATH: <resolved_path>")
+> Agent(subagent_type: "architect", prompt: "Read steps/run.md (resolved relative to the `auto-new-issue` skill folder) and follow it. ARGUMENTS: `<raw skill arguments>` REPO_PATH: `<resolved_path>`")
 
 Wait for the agent to finish, then relay its final report to the user verbatim — do not summarize or reinterpret it.

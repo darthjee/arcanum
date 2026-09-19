@@ -75,6 +75,9 @@ jobs:
       - run:
           name: Dependency audit (non-blocking)
           command: yarn audit || true
+      - run:
+          name: Commit-message template sync check (non-blocking)
+          command: ../scripts/check_commit_template_sync.sh || true
 
 workflows:
   release:
