@@ -103,3 +103,35 @@ export async function runPair(shellRepo, nativeRepo, shellEnv = process.env, nat
 
   return { shell, native };
 }
+
+/**
+ * Registers an `it()` that builds a parity scenario via `setupParityTest`,
+ * runs both sides via `runPair`, and asserts byte-identical stdout/exit
+ * code plus the scenario's expected stdout. Replaces the
+ * `setupParityTest` → `runPair` → 4-`expect`s → `cleanup` block
+ * previously re-authored per spec file.
+ * @param {string} description - the `it()` description.
+ * @param {object} scenario - the scenario.
+ * @param {object} [scenario.ghVars] - `FAKE_GH_*` overrides, for the shell side.
+ * @param {object} [scenario.fetchVars] - `FAKE_FETCH_*` overrides, for the native side.
+ * @param {string} [scenario.issueId] - the `--issue-id` value, omitted for the legacy per-PR-file shape.
+ * @param {string} scenario.expectedStdout - the expected shared stdout value.
+ * @param {number} [scenario.timeout] - Jasmine's per-spec timeout override, when the scenario needs longer than the default (e.g. lock-contention scenarios).
+ * @returns {void}
+ */
+export function itMatchesShellForState(description, { ghVars, fetchVars, issueId, expectedStdout, timeout } = {}) {
+  it(description, async () => {
+    const ctx = await setupParityTest({ ghVars, fetchVars });
+
+    try {
+      const { shell, native } = await runPair(ctx.shellRepo, ctx.nativeRepo, ctx.shellEnv, ctx.nativeEnv, issueId);
+
+      expect(native.stdout).toEqual(shell.stdout);
+      expect(native.code).toEqual(shell.code);
+      expect(shell.code).toEqual(0);
+      expect(shell.stdout).toEqual(expectedStdout);
+    } finally {
+      await ctx.cleanup();
+    }
+  }, timeout);
+}

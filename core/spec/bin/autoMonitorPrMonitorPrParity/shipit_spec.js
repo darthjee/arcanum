@@ -1,4 +1,4 @@
-import { OWNER, setupParityTest, runPair } from '../../support/factories/autoMonitorPrMonitorPrParitySetup.js';
+import { OWNER, itMatchesShellForState } from '../../support/factories/autoMonitorPrMonitorPrParitySetup.js';
 
 // Parity test for the "auto-monitor-pr-monitor-pr" migrated entrypoint
 // (issue #436) — see this suite's `pending_spec.js` header for the full
@@ -6,51 +6,29 @@ import { OWNER, setupParityTest, runPair } from '../../support/factories/autoMon
 // path: a brand-new owner comment whose body is exactly ":shipit:"
 // reports "approved" without ever reaching the "commented" phase.
 describe('auto-monitor-pr-monitor-pr parity (shell vs. native) — approved via ":shipit:"', () => {
-  it('prints "approved\\n" when a new owner comment is exactly ":shipit:"', async () => {
-    const shellComments = JSON.stringify([
-      { author: { login: OWNER }, createdAt: '2024-06-01T00:00:00Z', body: ':shipit:', id: 'IC_1', url: 'https://example.com/pr/7#issuecomment-1' }
-    ]);
-    const nativeComments = JSON.stringify([
-      { user: { login: OWNER }, created_at: '2024-06-01T00:00:00Z', body: ':shipit:', node_id: 'IC_1', html_url: 'https://example.com/pr/7#issuecomment-1' }
-    ]);
-    const ctx = await setupParityTest({
-      ghVars: { FAKE_GH_PR_COMMENTS_JSON: shellComments },
-      fetchVars: { FAKE_FETCH_PR_COMMENTS_JSON: nativeComments }
-    });
+  const shellShipitComments = JSON.stringify([
+    { author: { login: OWNER }, createdAt: '2024-06-01T00:00:00Z', body: ':shipit:', id: 'IC_1', url: 'https://example.com/pr/7#issuecomment-1' }
+  ]);
+  const nativeShipitComments = JSON.stringify([
+    { user: { login: OWNER }, created_at: '2024-06-01T00:00:00Z', body: ':shipit:', node_id: 'IC_1', html_url: 'https://example.com/pr/7#issuecomment-1' }
+  ]);
 
-    try {
-      const { shell, native } = await runPair(ctx.shellRepo, ctx.nativeRepo, ctx.shellEnv, ctx.nativeEnv);
-
-      expect(native.stdout).toEqual(shell.stdout);
-      expect(native.code).toEqual(shell.code);
-      expect(shell.code).toEqual(0);
-      expect(shell.stdout).toEqual('approved\n');
-    } finally {
-      await ctx.cleanup();
-    }
+  itMatchesShellForState('prints "approved\\n" when a new owner comment is exactly ":shipit:"', {
+    ghVars: { FAKE_GH_PR_COMMENTS_JSON: shellShipitComments },
+    fetchVars: { FAKE_FETCH_PR_COMMENTS_JSON: nativeShipitComments },
+    expectedStdout: 'approved\n'
   });
 
-  it('tolerates surrounding whitespace around ":shipit:"', async () => {
-    const shellComments = JSON.stringify([
-      { author: { login: OWNER }, createdAt: '2024-06-01T00:00:00Z', body: '  :shipit:  ', id: 'IC_1', url: 'https://example.com/pr/7#issuecomment-1' }
-    ]);
-    const nativeComments = JSON.stringify([
-      { user: { login: OWNER }, created_at: '2024-06-01T00:00:00Z', body: '  :shipit:  ', node_id: 'IC_1', html_url: 'https://example.com/pr/7#issuecomment-1' }
-    ]);
-    const ctx = await setupParityTest({
-      ghVars: { FAKE_GH_PR_COMMENTS_JSON: shellComments },
-      fetchVars: { FAKE_FETCH_PR_COMMENTS_JSON: nativeComments }
-    });
+  const shellPaddedShipitComments = JSON.stringify([
+    { author: { login: OWNER }, createdAt: '2024-06-01T00:00:00Z', body: '  :shipit:  ', id: 'IC_1', url: 'https://example.com/pr/7#issuecomment-1' }
+  ]);
+  const nativePaddedShipitComments = JSON.stringify([
+    { user: { login: OWNER }, created_at: '2024-06-01T00:00:00Z', body: '  :shipit:  ', node_id: 'IC_1', html_url: 'https://example.com/pr/7#issuecomment-1' }
+  ]);
 
-    try {
-      const { shell, native } = await runPair(ctx.shellRepo, ctx.nativeRepo, ctx.shellEnv, ctx.nativeEnv);
-
-      expect(native.stdout).toEqual(shell.stdout);
-      expect(native.code).toEqual(shell.code);
-      expect(shell.code).toEqual(0);
-      expect(shell.stdout).toEqual('approved\n');
-    } finally {
-      await ctx.cleanup();
-    }
+  itMatchesShellForState('tolerates surrounding whitespace around ":shipit:"', {
+    ghVars: { FAKE_GH_PR_COMMENTS_JSON: shellPaddedShipitComments },
+    fetchVars: { FAKE_FETCH_PR_COMMENTS_JSON: nativePaddedShipitComments },
+    expectedStdout: 'approved\n'
   });
 });

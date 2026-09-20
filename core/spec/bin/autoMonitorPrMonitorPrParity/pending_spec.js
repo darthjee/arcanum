@@ -1,4 +1,4 @@
-import { setupParityTest, runPair } from '../../support/factories/autoMonitorPrMonitorPrParitySetup.js';
+import { itMatchesShellForState } from '../../support/factories/autoMonitorPrMonitorPrParitySetup.js';
 
 // Parity test for the "auto-monitor-pr-monitor-pr" migrated entrypoint
 // (issue #436) — see docs/agents/architecture/script-engine.md's
@@ -21,36 +21,13 @@ import { setupParityTest, runPair } from '../../support/factories/autoMonitorPrM
 // approved-by-":shipit:"`, and `commented_spec.js` for the "commented"
 // outcome (both state-file shapes).
 describe('auto-monitor-pr-monitor-pr parity (shell vs. native) — pending', () => {
-  it('prints "pending\\n" when there is nothing new this pass', async () => {
-    const ctx = await setupParityTest();
-
-    try {
-      const { shell, native } = await runPair(ctx.shellRepo, ctx.nativeRepo, ctx.shellEnv, ctx.nativeEnv);
-
-      expect(native.stdout).toEqual(shell.stdout);
-      expect(native.code).toEqual(shell.code);
-      expect(shell.code).toEqual(0);
-      expect(shell.stdout).toEqual('pending\n');
-    } finally {
-      await ctx.cleanup();
-    }
+  itMatchesShellForState('prints "pending\\n" when there is nothing new this pass', {
+    expectedStdout: 'pending\n'
   });
 
-  it('prints "pending\\n" on a transient gh/API error', async () => {
-    const ctx = await setupParityTest({
-      ghVars: { FAKE_GH_PR_NUMBER: '' },
-      fetchVars: { FAKE_FETCH_MONITOR_PR_FAIL: '1' }
-    });
-
-    try {
-      const { shell, native } = await runPair(ctx.shellRepo, ctx.nativeRepo, ctx.shellEnv, ctx.nativeEnv);
-
-      expect(native.stdout).toEqual(shell.stdout);
-      expect(native.code).toEqual(shell.code);
-      expect(shell.code).toEqual(0);
-      expect(shell.stdout).toEqual('pending\n');
-    } finally {
-      await ctx.cleanup();
-    }
+  itMatchesShellForState('prints "pending\\n" on a transient gh/API error', {
+    ghVars: { FAKE_GH_PR_NUMBER: '' },
+    fetchVars: { FAKE_FETCH_MONITOR_PR_FAIL: '1' },
+    expectedStdout: 'pending\n'
   });
 });
