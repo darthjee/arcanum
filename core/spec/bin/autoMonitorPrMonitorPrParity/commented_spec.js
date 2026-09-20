@@ -1,4 +1,4 @@
-import { OWNER, setupParityTest, runPair } from '../../support/factories/autoMonitorPrMonitorPrParitySetup.js';
+import { OWNER, itMatchesShellForState } from '../../support/factories/autoMonitorPrMonitorPrParitySetup.js';
 
 // Parity test for the "auto-monitor-pr-monitor-pr" migrated entrypoint
 // (issue #436) — see this suite's `pending_spec.js` header for the full
@@ -29,56 +29,27 @@ describe('auto-monitor-pr-monitor-pr parity (shell vs. native) — commented', (
   const COMMENT_BODY = 'Please fix the typo';
   const COMMENT_URL = 'https://example.com/pr/7#issuecomment-1';
 
-  /**
-   * @param {object} ctx - the built parity fixtures.
-   * @param {string} [issueId] - the `--issue-id` value, omitted for the
-   *   legacy per-PR-file shape.
-   * @returns {Promise<void>} resolves once asserted.
-   */
-  async function expectCommentedParity(ctx, issueId) {
-    const { shell, native } = await runPair(ctx.shellRepo, ctx.nativeRepo, ctx.shellEnv, ctx.nativeEnv, issueId);
+  const shellComments = JSON.stringify([
+    { author: { login: OWNER }, createdAt: '2024-06-01T00:00:00Z', body: COMMENT_BODY, id: 'IC_1', url: COMMENT_URL }
+  ]);
+  const nativeComments = JSON.stringify([
+    { user: { login: OWNER }, created_at: '2024-06-01T00:00:00Z', body: COMMENT_BODY, node_id: 'IC_1', html_url: COMMENT_URL }
+  ]);
+  const commentScenario = {
+    ghVars: { FAKE_GH_PR_COMMENTS_JSON: shellComments },
+    fetchVars: { FAKE_FETCH_PR_COMMENTS_JSON: nativeComments }
+  };
+  const expectedStdout = `commented\n---\nid: IC_1\nurl: ${COMMENT_URL}\n${COMMENT_BODY}\n`;
 
-    expect(native.stdout).toEqual(shell.stdout);
-    expect(native.code).toEqual(shell.code);
-    expect(shell.code).toEqual(0);
-    expect(shell.stdout).toEqual(`commented\n---\nid: IC_1\nurl: ${COMMENT_URL}\n${COMMENT_BODY}\n`);
-  }
+  itMatchesShellForState('matches shell exit code and stdout (--issue-id state-file shape)', {
+    ...commentScenario,
+    issueId: '5',
+    expectedStdout,
+    timeout: ISSUE_ID_SCENARIO_TIMEOUT_MS
+  });
 
-  /**
-   * @returns {Promise<object>} the built parity fixtures for a single
-   *   new owner comment scenario (shared by both state-file shapes).
-   */
-  async function setupCommentScenario() {
-    const shellComments = JSON.stringify([
-      { author: { login: OWNER }, createdAt: '2024-06-01T00:00:00Z', body: COMMENT_BODY, id: 'IC_1', url: COMMENT_URL }
-    ]);
-    const nativeComments = JSON.stringify([
-      { user: { login: OWNER }, created_at: '2024-06-01T00:00:00Z', body: COMMENT_BODY, node_id: 'IC_1', html_url: COMMENT_URL }
-    ]);
-
-    return setupParityTest({
-      ghVars: { FAKE_GH_PR_COMMENTS_JSON: shellComments },
-      fetchVars: { FAKE_FETCH_PR_COMMENTS_JSON: nativeComments }
-    });
-  }
-
-  it('matches shell exit code and stdout (--issue-id state-file shape)', async () => {
-    const ctx = await setupCommentScenario();
-
-    try {
-      await expectCommentedParity(ctx, '5');
-    } finally {
-      await ctx.cleanup();
-    }
-  }, ISSUE_ID_SCENARIO_TIMEOUT_MS);
-
-  it('matches shell exit code and stdout (legacy per-PR-file state-file shape)', async () => {
-    const ctx = await setupCommentScenario();
-
-    try {
-      await expectCommentedParity(ctx);
-    } finally {
-      await ctx.cleanup();
-    }
+  itMatchesShellForState('matches shell exit code and stdout (legacy per-PR-file state-file shape)', {
+    ...commentScenario,
+    expectedStdout
   });
 });
