@@ -1,7 +1,6 @@
-import { mkdir } from 'node:fs/promises';
-import path from 'node:path';
 import AutoFixAllCleanupArtifacts from '../../../../lib/commands/auto-fix-all/AutoFixAllCleanupArtifacts.js';
-import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
+import { createCommitCommandRepo, fakeGitExecFileAsync } from '../../../support/factories/commitCommandFixtures.js';
+import { removeTempDir } from '../../../support/utils/tempDir.js';
 
 const ISSUE_FILE = 'docs/agents/issues/999-test.md';
 const PLAN_DIR = 'docs/agents/plans/999-test';
@@ -9,69 +8,11 @@ const ID = '999';
 const MODEL_NAME = 'Node Agent';
 const MODEL_EMAIL = 'node@example.com';
 
-/**
- * Build a fake `execFileAsync` implementation that answers each `git`
- * subcommand `AutoFixAllCleanupArtifacts` may issue, tracking which
- * targets are "tracked" and whether anything ends up staged, so tests
- * never shell out to real `git`.
- * @param {object} [opts] - behavior overrides.
- * @param {string[]} [opts.tracked] - the paths `git ls-files` reports as
- *   tracked.
- * @returns {Function} a jasmine spy usable as `execFileAsync`.
- */
-function fakeExecFileAsync({ tracked = [] } = {}) {
-  let staged = false;
-
-  return jasmine.createSpy('execFileAsync').and.callFake(async (cmd, args, options = {}) => {
-    if (cmd !== 'git') {
-      throw new Error(`unexpected command: ${cmd}`);
-    }
-
-    if (args[0] === 'ls-files') {
-      const target = args[1];
-
-      return { stdout: tracked.includes(target) ? `${target}\n` : '' };
-    }
-
-    if (args[0] === 'rm') {
-      staged = true;
-
-      return { stdout: '' };
-    }
-
-    if (args[0] === 'diff') {
-      if (staged) {
-        const error = new Error('diff reported changes');
-
-        error.code = 1;
-        throw error;
-      }
-
-      return { stdout: '' };
-    }
-
-    if (args[0] === 'commit') {
-      return { stdout: '', __input: options.input };
-    }
-
-    if (args[0] === 'branch') {
-      return { stdout: 'my-branch\n' };
-    }
-
-    if (args[0] === 'push') {
-      return { stdout: '' };
-    }
-
-    throw new Error(`unexpected git invocation: ${JSON.stringify(args)}`);
-  });
-}
-
 describe('AutoFixAllCleanupArtifacts', () => {
   let repoPath;
 
   beforeEach(async () => {
-    repoPath = await createTempDir();
-    await mkdir(path.join(repoPath, PLAN_DIR), { recursive: true });
+    ({ repoPath } = await createCommitCommandRepo({ dirPath: PLAN_DIR }));
   });
 
   afterEach(async () => {
@@ -81,7 +22,7 @@ describe('AutoFixAllCleanupArtifacts', () => {
   describe('#run', () => {
     describe('when neither the issue file nor the plan dir is tracked', () => {
       it('does nothing, resolving with empty stdout and issuing no commit/push', async () => {
-        const execFileAsync = fakeExecFileAsync({ tracked: [] });
+        const execFileAsync = fakeGitExecFileAsync({ tracked: [] });
         const instance = new AutoFixAllCleanupArtifacts({ repoPath }, { execFileAsync });
 
         const result = await instance.run(ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, MODEL_EMAIL);
@@ -96,7 +37,7 @@ describe('AutoFixAllCleanupArtifacts', () => {
 
     describe('when only the issue file is tracked', () => {
       it('stages only the issue file removal', async () => {
-        const execFileAsync = fakeExecFileAsync({ tracked: [ISSUE_FILE] });
+        const execFileAsync = fakeGitExecFileAsync({ tracked: [ISSUE_FILE] });
         const instance = new AutoFixAllCleanupArtifacts({ repoPath }, { execFileAsync });
 
         await instance.run(ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, MODEL_EMAIL);
@@ -108,7 +49,7 @@ describe('AutoFixAllCleanupArtifacts', () => {
 
     describe('when only the plan dir is tracked', () => {
       it('stages only the plan dir removal', async () => {
-        const execFileAsync = fakeExecFileAsync({ tracked: [PLAN_DIR] });
+        const execFileAsync = fakeGitExecFileAsync({ tracked: [PLAN_DIR] });
         const instance = new AutoFixAllCleanupArtifacts({ repoPath }, { execFileAsync });
 
         await instance.run(ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, MODEL_EMAIL);
@@ -120,7 +61,7 @@ describe('AutoFixAllCleanupArtifacts', () => {
 
     describe('when both the issue file and the plan dir are tracked', () => {
       it('stages both removals, commits with the hardcoded message, and pushes the current branch', async () => {
-        const execFileAsync = fakeExecFileAsync({ tracked: [ISSUE_FILE, PLAN_DIR] });
+        const execFileAsync = fakeGitExecFileAsync({ tracked: [ISSUE_FILE, PLAN_DIR] });
         const instance = new AutoFixAllCleanupArtifacts({ repoPath }, { execFileAsync });
 
         const result = await instance.run(ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, MODEL_EMAIL);
@@ -147,7 +88,7 @@ describe('AutoFixAllCleanupArtifacts', () => {
 
     describe('argument validation', () => {
       it('throws the usage message when a required argument is missing', async () => {
-        const execFileAsync = fakeExecFileAsync();
+        const execFileAsync = fakeGitExecFileAsync({ tracked: [] });
         const instance = new AutoFixAllCleanupArtifacts({ repoPath }, { execFileAsync });
 
         await expectAsync(
