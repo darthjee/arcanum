@@ -1,5 +1,5 @@
-import path from 'node:path';
 import { SHELL_SCRIPT } from '../../support/factories/autoFixAllWaitCiAndMergeParitySetup.js';
+import { itRejectsInvalidRepoPath } from '../../support/sharedExamples/cliParityValidation.js';
 import { NATIVE_BIN, runCommand } from '../../support/utils/runCommand.js';
 import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
 
@@ -46,49 +46,23 @@ describe('auto-fix-all-wait-ci-and-merge parity (shell vs. native) — precondit
   // itself, so its own stderr wording for a bad `repo_path` isn't
   // byte-identical to the native dispatcher's — only the stdout /
   // exit-code contract (empty stdout, non-zero exit, matching codes) is,
-  // which is what's asserted here.
-  describe('a present-but-non-directory repo_path', () => {
-    it('matches shell exit code, with no stdout on either side', async () => {
-      const cwd = await createTempDir('arcanum-core-afawcam-parity-');
+  // which is what's asserted here (`assertShellStderr: false`).
+  itRejectsInvalidRepoPath(
+    async (repoPath, cwd) => {
+      const shell = await runCommand([SHELL_SCRIPT, repoPath, MODEL_EMAIL], cwd);
+      const native = await runCommand(
+        [process.execPath, NATIVE_BIN, 'auto-fix-all-wait-ci-and-merge', repoPath, MODEL_EMAIL],
+        cwd
+      );
 
-      try {
-        const missingPath = path.join(cwd, 'no-such-dir');
-        const shell = await runCommand([SHELL_SCRIPT, missingPath, MODEL_EMAIL], cwd);
-        const native = await runCommand(
-          [process.execPath, NATIVE_BIN, 'auto-fix-all-wait-ci-and-merge', missingPath, MODEL_EMAIL],
-          cwd
-        );
-
-        expect(native.stdout).toEqual(shell.stdout);
-        expect(native.code).toEqual(shell.code);
-        expect(shell.code).not.toEqual(0);
-        expect(shell.stdout).toEqual('');
-        expect(native.stderr.trim()).toContain(`Error: not a directory: ${missingPath}`);
-      } finally {
-        await removeTempDir(cwd);
-      }
-    });
-  });
-
-  describe('a non-git repo_path', () => {
-    it('matches shell exit code, with no stdout on either side', async () => {
-      const cwd = await createTempDir('arcanum-core-afawcam-parity-');
-
-      try {
-        const shell = await runCommand([SHELL_SCRIPT, cwd, MODEL_EMAIL], cwd);
-        const native = await runCommand(
-          [process.execPath, NATIVE_BIN, 'auto-fix-all-wait-ci-and-merge', cwd, MODEL_EMAIL],
-          cwd
-        );
-
-        expect(native.stdout).toEqual(shell.stdout);
-        expect(native.code).toEqual(shell.code);
-        expect(shell.code).not.toEqual(0);
-        expect(shell.stdout).toEqual('');
-        expect(native.stderr.trim()).toContain(`Error: not a git repository: ${cwd}`);
-      } finally {
-        await removeTempDir(cwd);
-      }
-    });
-  });
+      return { shell, native };
+    },
+    {
+      notDirectoryDescribe: 'a present-but-non-directory repo_path',
+      notGitRepoDescribe: 'a non-git repo_path',
+      itDescription: 'matches shell exit code, with no stdout on either side',
+      assertShellStderr: false,
+      cwdPrefix: 'arcanum-core-afawcam-parity-'
+    }
+  );
 });

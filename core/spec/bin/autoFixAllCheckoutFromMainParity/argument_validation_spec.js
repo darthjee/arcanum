@@ -1,9 +1,9 @@
-import path from 'node:path';
 import {
   NATIVE_BIN,
   runCommand,
   SHELL_SCRIPT
 } from '../../support/factories/autoFixAllCheckoutFromMainParitySetup.js';
+import { itRejectsInvalidRepoPath } from '../../support/sharedExamples/cliParityValidation.js';
 import { createGitFixtureRepo } from '../../support/utils/gitFixtureRepo.js';
 import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
 
@@ -91,50 +91,21 @@ describe('auto-fix-all-checkout-from-main parity (shell vs. native) — argument
     });
   });
 
-  describe('a present-but-non-directory repo_path', () => {
-    it('matches shell exit code and stderr message, with no stdout on either side', async () => {
-      const cwd = await createTempDir('arcanum-core-afacfm-parity-');
+  itRejectsInvalidRepoPath(
+    async (repoPath, cwd) => {
+      const shell = await runCommand([SHELL_SCRIPT, repoPath, '42'], cwd);
+      const native = await runCommand(
+        [process.execPath, NATIVE_BIN, 'auto-fix-all-checkout-from-main', repoPath, '42'],
+        cwd
+      );
 
-      try {
-        const missingPath = path.join(cwd, 'no-such-dir');
-        const shell = await runCommand([SHELL_SCRIPT, missingPath, '42'], cwd);
-        const native = await runCommand(
-          [process.execPath, NATIVE_BIN, 'auto-fix-all-checkout-from-main', missingPath, '42'],
-          cwd
-        );
-
-        expect(native.stdout).toEqual(shell.stdout);
-        expect(native.code).toEqual(shell.code);
-        expect(shell.code).not.toEqual(0);
-        expect(shell.stdout).toEqual('');
-        expect(shell.stderr.trim()).toEqual(`Error: not a directory: ${missingPath}`);
-        expect(native.stderr.trim()).toContain(`Error: not a directory: ${missingPath}`);
-      } finally {
-        await removeTempDir(cwd);
-      }
-    });
-  });
-
-  describe('a non-git repo_path', () => {
-    it('matches shell exit code and stderr message, with no stdout on either side', async () => {
-      const cwd = await createTempDir('arcanum-core-afacfm-parity-');
-
-      try {
-        const shell = await runCommand([SHELL_SCRIPT, cwd, '42'], cwd);
-        const native = await runCommand(
-          [process.execPath, NATIVE_BIN, 'auto-fix-all-checkout-from-main', cwd, '42'],
-          cwd
-        );
-
-        expect(native.stdout).toEqual(shell.stdout);
-        expect(native.code).toEqual(shell.code);
-        expect(shell.code).not.toEqual(0);
-        expect(shell.stdout).toEqual('');
-        expect(shell.stderr.trim()).toEqual(`Error: not a git repository: ${cwd}`);
-        expect(native.stderr.trim()).toContain(`Error: not a git repository: ${cwd}`);
-      } finally {
-        await removeTempDir(cwd);
-      }
-    });
-  });
+      return { shell, native };
+    },
+    {
+      notDirectoryDescribe: 'a present-but-non-directory repo_path',
+      notGitRepoDescribe: 'a non-git repo_path',
+      itDescription: 'matches shell exit code and stderr message, with no stdout on either side',
+      cwdPrefix: 'arcanum-core-afacfm-parity-'
+    }
+  );
 });

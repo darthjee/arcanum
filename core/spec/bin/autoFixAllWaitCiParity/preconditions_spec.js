@@ -1,5 +1,5 @@
-import path from 'node:path';
 import { seedGithubLikeRepo, SHELL_SCRIPT } from '../../support/factories/autoFixAllWaitCiParitySetup.js';
+import { itRejectsInvalidRepoPath } from '../../support/sharedExamples/cliParityValidation.js';
 import { createFakeGhBin } from '../../support/utils/fakeGhBin.js';
 import { createGitFixtureRepo } from '../../support/utils/gitFixtureRepo.js';
 import { FAKE_FETCH_PRELOAD, NATIVE_BIN, runCommand } from '../../support/utils/runCommand.js';
@@ -39,52 +39,23 @@ describe('auto-fix-all-wait-ci parity (shell vs. native) — preconditions', () 
     });
   });
 
-  describe('a present-but-non-directory repo_path', () => {
-    it('matches shell exit code and stderr message, with no stdout on either side', async () => {
-      const cwd = await createTempDir('arcanum-core-afawc-parity-');
+  itRejectsInvalidRepoPath(
+    async (repoPath, cwd) => {
+      const shell = await runCommand([SHELL_SCRIPT, repoPath], cwd);
+      const native = await runCommand(
+        [process.execPath, NATIVE_BIN, 'auto-fix-all-wait-ci', repoPath],
+        cwd
+      );
 
-      try {
-        const missingPath = path.join(cwd, 'no-such-dir');
-        const shell = await runCommand([SHELL_SCRIPT, missingPath], cwd);
-        const native = await runCommand(
-          [process.execPath, NATIVE_BIN, 'auto-fix-all-wait-ci', missingPath],
-          cwd
-        );
-
-        expect(native.stdout).toEqual(shell.stdout);
-        expect(native.code).toEqual(shell.code);
-        expect(shell.code).not.toEqual(0);
-        expect(shell.stdout).toEqual('');
-        expect(shell.stderr.trim()).toEqual(`Error: not a directory: ${missingPath}`);
-        expect(native.stderr.trim()).toContain(`Error: not a directory: ${missingPath}`);
-      } finally {
-        await removeTempDir(cwd);
-      }
-    });
-  });
-
-  describe('a non-git repo_path', () => {
-    it('matches shell exit code and stderr message, with no stdout on either side', async () => {
-      const cwd = await createTempDir('arcanum-core-afawc-parity-');
-
-      try {
-        const shell = await runCommand([SHELL_SCRIPT, cwd], cwd);
-        const native = await runCommand(
-          [process.execPath, NATIVE_BIN, 'auto-fix-all-wait-ci', cwd],
-          cwd
-        );
-
-        expect(native.stdout).toEqual(shell.stdout);
-        expect(native.code).toEqual(shell.code);
-        expect(shell.code).not.toEqual(0);
-        expect(shell.stdout).toEqual('');
-        expect(shell.stderr.trim()).toEqual(`Error: not a git repository: ${cwd}`);
-        expect(native.stderr.trim()).toContain(`Error: not a git repository: ${cwd}`);
-      } finally {
-        await removeTempDir(cwd);
-      }
-    });
-  });
+      return { shell, native };
+    },
+    {
+      notDirectoryDescribe: 'a present-but-non-directory repo_path',
+      notGitRepoDescribe: 'a non-git repo_path',
+      itDescription: 'matches shell exit code and stderr message, with no stdout on either side',
+      cwdPrefix: 'arcanum-core-afawc-parity-'
+    }
+  );
 
   describe('no pull request found for the current branch', () => {
     it('matches shell exit code and stdout', async () => {
