@@ -1,19 +1,22 @@
 import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import RepoContext from '../../../lib/context/RepoContext.js';
 import IssueStateService from '../../../lib/services/IssueStateService.js';
 import Lock from '../../../lib/utils/file/Lock.js';
-import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
+import {
+  itAcquiresAndReleasesTheLock,
+  itDoesNotCorruptStateUnderConcurrentMutations,
+  itMergesIntoExistingState,
+  setUpIssueStateFixture
+} from '../../support/sharedExamples/issueStateWriteSharedExamples.js';
+import { removeTempDir } from '../../support/utils/tempDir.js';
 
 describe('IssueStateService (write & read)', () => {
   let repoPath;
   let context;
   let stateFile;
+  let lockFile;
 
   beforeEach(async () => {
-    repoPath = await createTempDir();
-    context = new RepoContext({ repoPath });
-    stateFile = path.join(repoPath, '.claude', 'state', 'issue-42.json');
+    ({ repoPath, context, stateFile, lockFile } = await setUpIssueStateFixture());
   });
 
   afterEach(async () => {
@@ -41,31 +44,17 @@ describe('IssueStateService (write & read)', () => {
       });
     });
 
-    it('merges into (rather than replaces) any pre-existing state', async () => {
-      const issueStateService = new IssueStateService({ context, lock: new Lock({ sleepMs: 5 }) });
+    itMergesIntoExistingState(
+      () => ({ context, stateFile }),
+      (issueStateService) => issueStateService.write('42', { title: 'First' }),
+      (issueStateService) => issueStateService.write('42', { state: 'closed' }),
+      { title: 'First', state: 'closed' }
+    );
 
-      await issueStateService.write('42', { title: 'First' });
-      await issueStateService.write('42', { state: 'closed' });
-
-      const written = JSON.parse(await readFile(stateFile, 'utf8'));
-
-      expect(written).toEqual({ title: 'First', state: 'closed' });
-    });
-
-    it('acquires and releases the lock file around the write (the lock/mutate/release protocol)', async () => {
-      const lock = new Lock({ sleepMs: 5 });
-      spyOn(lock, 'acquire').and.callThrough();
-      spyOn(lock, 'release').and.callThrough();
-
-      const issueStateService = new IssueStateService({ context, lock });
-
-      await issueStateService.write('42', { title: 'A Title' });
-
-      const lockFile = path.join(repoPath, '.claude', 'state', 'issue-42.lock');
-
-      expect(lock.acquire).toHaveBeenCalledWith(lockFile);
-      expect(lock.release).toHaveBeenCalledWith(lockFile);
-    });
+    itAcquiresAndReleasesTheLock(
+      () => ({ context, lockFile }),
+      (issueStateService) => issueStateService.write('42', { title: 'A Title' })
+    );
 
     it('releases the lock even if the mutation itself fails', async () => {
       const lock = new Lock({ sleepMs: 5 });
@@ -80,22 +69,17 @@ describe('IssueStateService (write & read)', () => {
       expect(lock.release).toHaveBeenCalled();
     });
 
-    it('does not corrupt state under two near-simultaneous writes to the same issue', async () => {
-      const issueStateServiceA = new IssueStateService({ context, lock: new Lock({ sleepMs: 5 }) });
-      const issueStateServiceB = new IssueStateService({ context, lock: new Lock({ sleepMs: 5 }) });
-
-      await Promise.all([
-        issueStateServiceA.write('42', { title: 'From A' }),
-        issueStateServiceB.write('42', { state: 'open' })
-      ]);
-
-      const written = JSON.parse(await readFile(stateFile, 'utf8'));
-
-      // Both concurrent writers' fields must be present — a corrupted/
-      // interleaved write would leave one or both incomplete/invalid JSON.
-      expect(written.title === 'From A' || written.state === 'open').toBeTrue();
-      expect(typeof written).toEqual('object');
-    });
+    itDoesNotCorruptStateUnderConcurrentMutations(
+      () => ({ context, stateFile }),
+      (issueStateServiceA) => issueStateServiceA.write('42', { title: 'From A' }),
+      (issueStateServiceB) => issueStateServiceB.write('42', { state: 'open' }),
+      (written) => {
+        // Both concurrent writers' fields must be present — a corrupted/
+        // interleaved write would leave one or both incomplete/invalid JSON.
+        expect(written.title === 'From A' || written.state === 'open').toBeTrue();
+        expect(typeof written).toEqual('object');
+      }
+    );
   });
 
   describe('#get', () => {
