@@ -1,6 +1,6 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import { buildDispatchFixtures } from '../../support/fixtures/engineDispatchFixtures.js';
+import { buildDispatchFixtures, seedEngineMode } from '../../support/fixtures/engineDispatchFixtures.js';
 import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
 import { runCommand } from '../../support/utils/runCommand.js';
 
@@ -30,19 +30,6 @@ import { runCommand } from '../../support/utils/runCommand.js';
 // `setupParityTest`/`expectParity`.
 describe('auto-fix-all-github engine_dispatch routing (via a throwaway shim standing in for github.sh)', () => {
   const COMMAND = 'auto-fix-all-github';
-
-  /**
-   * @param {string} repoDir - the (plain, non-git) directory
-   *   `engine_dispatch` resolves `engine.mode` against.
-   * @param {string} mode - `"shell"` or `"native"`.
-   * @returns {Promise<void>} resolves once written.
-   */
-  async function seedEngineMode(repoDir, mode) {
-    const dir = path.join(repoDir, '.claude', 'state');
-
-    await mkdir(dir, { recursive: true });
-    await writeFile(path.join(dir, 'arcanum-config.json'), JSON.stringify({ engine: { mode } }));
-  }
 
   it('routes to the shell fixture when engine.mode=shell', async () => {
     const dir = await createTempDir('arcanum-core-afag-dispatch-');

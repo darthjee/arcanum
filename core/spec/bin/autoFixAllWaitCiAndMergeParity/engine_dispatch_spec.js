@@ -3,9 +3,8 @@ import {
   seedLocalState,
   SHIM_SCRIPT
 } from '../../support/factories/autoFixAllWaitCiAndMergeParitySetup.js';
+import { itRoutesEngineDispatch } from '../../support/sharedExamples/engineDispatchRouting.js';
 import { createFakeGhBin } from '../../support/utils/fakeGhBin.js';
-import { createGitFixtureRepo } from '../../support/utils/gitFixtureRepo.js';
-import { runCommand } from '../../support/utils/runCommand.js';
 
 const MODEL_EMAIL = 'model@example.com';
 
@@ -23,43 +22,30 @@ const MODEL_EMAIL = 'model@example.com';
 // engine.mode=native, proving the shim really does select the intended
 // implementation.
 describe('auto-fix-all-wait-ci-and-merge parity (shell vs. native) — engine_dispatch routing', () => {
-  describe('engine_dispatch routing (via the real wait_ci_and_merge.sh shim)', () => {
-    it('routes to the shell implementation when engine.mode=shell', async () => {
-      const fakeGh = await createFakeGhBin();
-      const repo = await createGitFixtureRepo();
+  itRoutesEngineDispatch(
+    'engine_dispatch routing (via the real wait_ci_and_merge.sh shim)',
+    SHIM_SCRIPT,
+    async (repo, mode) => {
+      const fakeGh = await createFakeGhBin(mode === 'native' ? { authTokenAlwaysFails: true } : undefined);
 
-      try {
-        await seedGithubLikeRepo(repo);
-        await seedLocalState(repo, { engine: { mode: 'shell' } });
+      await seedGithubLikeRepo(repo);
+      await seedLocalState(repo, { engine: { mode } });
 
-        const env = { ...process.env, PATH: `${fakeGh.binDir}:${process.env.PATH}` };
-        const result = await runCommand([SHIM_SCRIPT, repo.repoPath, MODEL_EMAIL], repo.repoPath, env);
+      const env = { ...process.env, PATH: `${fakeGh.binDir}:${process.env.PATH}` };
 
+      return { args: [repo.repoPath, MODEL_EMAIL], env, cleanup: fakeGh.cleanup };
+    },
+    {
+      shell: (result) => {
         expect(result.code).toEqual(1);
         expect(result.stdout).toEqual('');
         expect(result.stderr).toContain('no pull request found for the current branch');
-      } finally {
-        await Promise.all([repo.cleanup(), fakeGh.cleanup()]);
-      }
-    });
-
-    it('routes to the native implementation when engine.mode=native', async () => {
-      const fakeGh = await createFakeGhBin({ authTokenAlwaysFails: true });
-      const repo = await createGitFixtureRepo();
-
-      try {
-        await seedGithubLikeRepo(repo);
-        await seedLocalState(repo, { engine: { mode: 'native' } });
-
-        const env = { ...process.env, PATH: `${fakeGh.binDir}:${process.env.PATH}` };
-        const result = await runCommand([SHIM_SCRIPT, repo.repoPath, MODEL_EMAIL], repo.repoPath, env);
-
+      },
+      native: (result) => {
         expect(result.code).toEqual(1);
         expect(result.stdout).toEqual('');
         expect(result.stderr).toContain('could not obtain GitHub token via gh auth token');
-      } finally {
-        await Promise.all([repo.cleanup(), fakeGh.cleanup()]);
       }
-    });
-  });
+    }
+  );
 });

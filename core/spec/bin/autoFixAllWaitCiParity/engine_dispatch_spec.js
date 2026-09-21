@@ -1,26 +1,11 @@
-import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { seedGithubLikeRepo } from '../../support/factories/autoFixAllWaitCiParitySetup.js';
+import { itRoutesEngineDispatch } from '../../support/sharedExamples/engineDispatchRouting.js';
+import { seedEngineMode } from '../../support/utils/engineMode.js';
 import { createFakeGhBin } from '../../support/utils/fakeGhBin.js';
-import { createGitFixtureRepo } from '../../support/utils/gitFixtureRepo.js';
-import { REPO_ROOT, runCommand } from '../../support/utils/runCommand.js';
+import { REPO_ROOT } from '../../support/utils/runCommand.js';
 
 const SHIM_SCRIPT = path.join(REPO_ROOT, 'auto-fix-all', 'scripts', 'wait_ci.sh');
-
-/**
- * Seeds `.claude/state/arcanum-config.json`'s `engine.mode` under
- * `repo.repoPath`, the local-state (highest-precedence) tier
- * `config_chain_read`/`engine_dispatch.sh` consult.
- * @param {{repoPath: string}} repo - the fixture repo.
- * @param {string} mode - `"shell"` or `"native"`.
- * @returns {Promise<void>} resolves once written.
- */
-async function seedEngineMode(repo, mode) {
-  const dir = path.join(repo.repoPath, '.claude', 'state');
-
-  await mkdir(dir, { recursive: true });
-  await writeFile(path.join(dir, 'arcanum-config.json'), JSON.stringify({ engine: { mode } }));
-}
 
 // Parity test for the "auto-fix-all-wait-ci" migrated entrypoint (issue
 // #262) — see docs/agents/architecture/script-engine.md's
@@ -57,43 +42,30 @@ describe('auto-fix-all-wait-ci parity (shell vs. native) — engine_dispatch', (
   // distinct, native-only failure message that only reaches native's
   // own code path, proving real native execution (not a silent shell
   // fallback) occurred.
-  describe('engine_dispatch routing (via the real wait_ci.sh shim)', () => {
-    it('routes to the shell implementation when engine.mode=shell', async () => {
-      const fakeGh = await createFakeGhBin();
-      const repo = await createGitFixtureRepo();
+  itRoutesEngineDispatch(
+    'engine_dispatch routing (via the real wait_ci.sh shim)',
+    SHIM_SCRIPT,
+    async (repo, mode) => {
+      const fakeGh = await createFakeGhBin(mode === 'native' ? { authTokenAlwaysFails: true } : undefined);
 
-      try {
-        await seedGithubLikeRepo(repo);
-        await seedEngineMode(repo, 'shell');
+      await seedGithubLikeRepo(repo);
+      await seedEngineMode(repo, mode);
 
-        const env = { ...process.env, PATH: `${fakeGh.binDir}:${process.env.PATH}` };
-        const result = await runCommand([SHIM_SCRIPT, repo.repoPath], repo.repoPath, env);
+      const env = { ...process.env, PATH: `${fakeGh.binDir}:${process.env.PATH}` };
 
+      return { args: [repo.repoPath], env, cleanup: fakeGh.cleanup };
+    },
+    {
+      shell: (result) => {
         expect(result.code).toEqual(1);
         expect(result.stdout).toEqual('');
         expect(result.stderr).toContain('no pull request found for the current branch');
-      } finally {
-        await Promise.all([repo.cleanup(), fakeGh.cleanup()]);
-      }
-    });
-
-    it('routes to the native implementation when engine.mode=native', async () => {
-      const fakeGh = await createFakeGhBin({ authTokenAlwaysFails: true });
-      const repo = await createGitFixtureRepo();
-
-      try {
-        await seedGithubLikeRepo(repo);
-        await seedEngineMode(repo, 'native');
-
-        const env = { ...process.env, PATH: `${fakeGh.binDir}:${process.env.PATH}` };
-        const result = await runCommand([SHIM_SCRIPT, repo.repoPath], repo.repoPath, env);
-
+      },
+      native: (result) => {
         expect(result.code).toEqual(1);
         expect(result.stdout).toEqual('');
         expect(result.stderr).toContain('could not obtain GitHub token via gh auth token');
-      } finally {
-        await Promise.all([repo.cleanup(), fakeGh.cleanup()]);
       }
-    });
-  });
+    }
+  );
 });

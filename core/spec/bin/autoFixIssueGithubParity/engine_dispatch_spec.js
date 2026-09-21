@@ -1,6 +1,8 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { seedGithubLikeRepo } from '../../support/factories/autoFixIssueGithubParitySetup.js';
+import { itRoutesEngineDispatch } from '../../support/sharedExamples/engineDispatchRouting.js';
+import { seedEngineMode } from '../../support/utils/engineMode.js';
 import { createFakeGhBin } from '../../support/utils/fakeGhBin.js';
 import { createGitFixtureRepo } from '../../support/utils/gitFixtureRepo.js';
 import { REPO_ROOT, runCommand } from '../../support/utils/runCommand.js';
@@ -8,21 +10,6 @@ import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
 
 const SHIM_SCRIPT = path.join(REPO_ROOT, 'auto-fix-issue', 'scripts', 'github.sh');
 const REPO_REF = 'darthjee/arcanum-github-fixture';
-
-/**
- * Seeds `.claude/state/arcanum-config.json`'s `engine.mode` under
- * `repo.repoPath`, the local-state (highest-precedence) tier
- * `config_chain_read`/`engine_dispatch.sh` consult.
- * @param {{repoPath: string}} repo - the fixture repo.
- * @param {string} mode - `"shell"` or `"native"`.
- * @returns {Promise<void>} resolves once written.
- */
-async function seedEngineMode(repo, mode) {
-  const dir = path.join(repo.repoPath, '.claude', 'state');
-
-  await mkdir(dir, { recursive: true });
-  await writeFile(path.join(dir, 'arcanum-config.json'), JSON.stringify({ engine: { mode } }));
-}
 
 // Parity/routing test for the real auto-fix-issue/scripts/github.sh
 // engine_dispatch router (issue #430) — unlike the sibling
@@ -54,39 +41,28 @@ async function seedEngineMode(repo, mode) {
 // That success-vs-failure split proves which implementation actually
 // ran.
 describe('auto-fix-issue-github engine_dispatch routing (via the real github.sh shim)', () => {
-  describe('info', () => {
-    it('routes to the shell implementation when engine.mode=shell', async () => {
-      const repo = await createGitFixtureRepo();
+  itRoutesEngineDispatch(
+    'info',
+    SHIM_SCRIPT,
+    async (repo, mode) => {
+      await seedGithubLikeRepo(repo);
+      await seedEngineMode(repo, mode);
 
-      try {
-        await seedGithubLikeRepo(repo);
-        await seedEngineMode(repo, 'shell');
-
-        const result = await runCommand([SHIM_SCRIPT, 'info', repo.repoPath], repo.repoPath);
-
+      return { args: ['info', repo.repoPath] };
+    },
+    {
+      shell: (result) => {
         expect(result.code).toEqual(0);
         expect(result.stdout).toEqual(`DOMAIN=github.com\nREPO=${REPO_REF}\n`);
-      } finally {
-        await repo.cleanup();
-      }
-    });
-
-    it('routes to the native implementation when engine.mode=native', async () => {
-      const repo = await createGitFixtureRepo();
-
-      try {
-        await seedGithubLikeRepo(repo);
-        await seedEngineMode(repo, 'native');
-
-        const result = await runCommand([SHIM_SCRIPT, 'info', repo.repoPath], repo.repoPath);
-
+      },
+      native: (result) => {
         expect(result.code).toEqual(0);
         expect(result.stdout).toEqual(`DOMAIN=github.com\nREPO=${REPO_REF}\n`);
-      } finally {
-        await repo.cleanup();
       }
-    });
+    }
+  );
 
+  describe('info (engine.mode unset)', () => {
     it('defaults to the shell implementation when engine.mode is unset', async () => {
       const repo = await createGitFixtureRepo();
       // Neutralizes this machine's own ambient global
@@ -112,142 +88,92 @@ describe('auto-fix-issue-github engine_dispatch routing (via the real github.sh 
     });
   });
 
-  describe('pr-create', () => {
-    it('routes to the shell implementation when engine.mode=shell', async () => {
-      const fakeGh = await createFakeGhBin();
-      const repo = await createGitFixtureRepo();
+  itRoutesEngineDispatch(
+    'pr-create',
+    SHIM_SCRIPT,
+    async (repo, mode) => {
+      const fakeGh = await createFakeGhBin(mode === 'native' ? { authTokenAlwaysFails: true } : undefined);
       const file = path.join(repo.repoPath, 'body.md');
 
-      try {
-        await seedGithubLikeRepo(repo);
-        await seedEngineMode(repo, 'shell');
-        await writeFile(file, 'body text\n');
+      await seedGithubLikeRepo(repo);
+      await seedEngineMode(repo, mode);
+      await writeFile(file, 'body text\n');
 
-        const env = {
-          ...process.env,
-          PATH: `${fakeGh.binDir}:${process.env.PATH}`,
-          FAKE_GH_PR_CREATE_URL: 'https://github.com/example/repo/pull/77'
-        };
-        const result = await runCommand([SHIM_SCRIPT, 'pr-create', repo.repoPath, 'My PR', file], repo.repoPath, env);
+      const env = {
+        ...process.env,
+        PATH: `${fakeGh.binDir}:${process.env.PATH}`,
+        FAKE_GH_PR_CREATE_URL: 'https://github.com/example/repo/pull/77'
+      };
 
+      return { args: ['pr-create', repo.repoPath, 'My PR', file], env, cleanup: fakeGh.cleanup };
+    },
+    {
+      shell: (result) => {
         expect(result.code).toEqual(0);
         expect(result.stdout).toEqual('https://github.com/example/repo/pull/77\n');
-      } finally {
-        await Promise.all([repo.cleanup(), fakeGh.cleanup()]);
-      }
-    });
-
-    it('routes to the native implementation when engine.mode=native', async () => {
-      const fakeGh = await createFakeGhBin({ authTokenAlwaysFails: true });
-      const repo = await createGitFixtureRepo();
-      const file = path.join(repo.repoPath, 'body.md');
-
-      try {
-        await seedGithubLikeRepo(repo);
-        await seedEngineMode(repo, 'native');
-        await writeFile(file, 'body text\n');
-
-        const env = {
-          ...process.env,
-          PATH: `${fakeGh.binDir}:${process.env.PATH}`,
-          FAKE_GH_PR_CREATE_URL: 'https://github.com/example/repo/pull/77'
-        };
-        const result = await runCommand([SHIM_SCRIPT, 'pr-create', repo.repoPath, 'My PR', file], repo.repoPath, env);
-
+      },
+      native: (result) => {
         expect(result.code).not.toEqual(0);
         expect(result.stdout).toEqual('');
         expect(result.stderr).toContain(`Error: could not create PR on ${REPO_REF}`);
-      } finally {
-        await Promise.all([repo.cleanup(), fakeGh.cleanup()]);
       }
-    });
-  });
+    }
+  );
 
-  describe('pr-view', () => {
-    it('routes to the shell implementation when engine.mode=shell', async () => {
-      const fakeGh = await createFakeGhBin();
-      const repo = await createGitFixtureRepo();
+  itRoutesEngineDispatch(
+    'pr-view',
+    SHIM_SCRIPT,
+    async (repo, mode) => {
+      const fakeGh = await createFakeGhBin(mode === 'native' ? { authTokenAlwaysFails: true } : undefined);
 
-      try {
-        await seedGithubLikeRepo(repo);
-        await seedEngineMode(repo, 'shell');
+      await seedGithubLikeRepo(repo);
+      await seedEngineMode(repo, mode);
 
-        const env = {
-          ...process.env,
-          PATH: `${fakeGh.binDir}:${process.env.PATH}`,
-          FAKE_GH_PR_NUMBER: '42',
-          FAKE_GH_PR_URL: 'https://github.com/example/repo/pull/42'
-        };
-        const result = await runCommand([SHIM_SCRIPT, 'pr-view', repo.repoPath], repo.repoPath, env);
+      const env = {
+        ...process.env,
+        PATH: `${fakeGh.binDir}:${process.env.PATH}`,
+        FAKE_GH_PR_NUMBER: '42',
+        FAKE_GH_PR_URL: 'https://github.com/example/repo/pull/42'
+      };
 
+      return { args: ['pr-view', repo.repoPath], env, cleanup: fakeGh.cleanup };
+    },
+    {
+      shell: (result) => {
         expect(result.code).toEqual(0);
         expect(result.stdout).toEqual('URL=https://github.com/example/repo/pull/42\nIS_DRAFT=false\n');
-      } finally {
-        await Promise.all([repo.cleanup(), fakeGh.cleanup()]);
-      }
-    });
-
-    it('routes to the native implementation when engine.mode=native', async () => {
-      const fakeGh = await createFakeGhBin({ authTokenAlwaysFails: true });
-      const repo = await createGitFixtureRepo();
-
-      try {
-        await seedGithubLikeRepo(repo);
-        await seedEngineMode(repo, 'native');
-
-        const env = {
-          ...process.env,
-          PATH: `${fakeGh.binDir}:${process.env.PATH}`,
-          FAKE_GH_PR_NUMBER: '42',
-          FAKE_GH_PR_URL: 'https://github.com/example/repo/pull/42'
-        };
-        const result = await runCommand([SHIM_SCRIPT, 'pr-view', repo.repoPath], repo.repoPath, env);
-
+      },
+      native: (result) => {
         expect(result.code).not.toEqual(0);
         expect(result.stdout).toEqual('');
         expect(result.stderr).toEqual('');
-      } finally {
-        await Promise.all([repo.cleanup(), fakeGh.cleanup()]);
       }
-    });
-  });
+    }
+  );
 
-  describe('pr-ready', () => {
-    it('routes to the shell implementation when engine.mode=shell', async () => {
-      const fakeGh = await createFakeGhBin();
-      const repo = await createGitFixtureRepo();
+  itRoutesEngineDispatch(
+    'pr-ready',
+    SHIM_SCRIPT,
+    async (repo, mode) => {
+      const fakeGh = await createFakeGhBin(mode === 'native' ? { authTokenAlwaysFails: true } : undefined);
 
-      try {
-        await seedGithubLikeRepo(repo);
-        await seedEngineMode(repo, 'shell');
+      await seedGithubLikeRepo(repo);
+      await seedEngineMode(repo, mode);
 
-        const env = { ...process.env, PATH: `${fakeGh.binDir}:${process.env.PATH}` };
-        const result = await runCommand([SHIM_SCRIPT, 'pr-ready', repo.repoPath], repo.repoPath, env);
+      const env = { ...process.env, PATH: `${fakeGh.binDir}:${process.env.PATH}` };
 
+      return { args: ['pr-ready', repo.repoPath], env, cleanup: fakeGh.cleanup };
+    },
+    {
+      shell: (result) => {
         expect(result.code).toEqual(0);
         expect(result.stdout).toEqual('OK\n');
-      } finally {
-        await Promise.all([repo.cleanup(), fakeGh.cleanup()]);
-      }
-    });
-
-    it('routes to the native implementation when engine.mode=native', async () => {
-      const fakeGh = await createFakeGhBin({ authTokenAlwaysFails: true });
-      const repo = await createGitFixtureRepo();
-
-      try {
-        await seedGithubLikeRepo(repo);
-        await seedEngineMode(repo, 'native');
-
-        const env = { ...process.env, PATH: `${fakeGh.binDir}:${process.env.PATH}` };
-        const result = await runCommand([SHIM_SCRIPT, 'pr-ready', repo.repoPath], repo.repoPath, env);
-
+      },
+      native: (result) => {
         expect(result.code).not.toEqual(0);
         expect(result.stdout).toEqual('');
         expect(result.stderr).toContain(`Error: could not mark PR ready on ${REPO_REF}`);
-      } finally {
-        await Promise.all([repo.cleanup(), fakeGh.cleanup()]);
       }
-    });
-  });
+    }
+  );
 });
