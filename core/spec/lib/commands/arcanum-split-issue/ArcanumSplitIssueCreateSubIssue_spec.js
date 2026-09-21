@@ -3,6 +3,7 @@ import path from 'node:path';
 import ArcanumSplitIssueCreateSubIssue from '../../../../lib/commands/arcanum-split-issue/ArcanumSplitIssueCreateSubIssue.js';
 import RepoContext from '../../../../lib/context/RepoContext.js';
 import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
+import { captureRejection } from '../../../support/utils/captureRejection.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 const ISSUE_ID = '999';
@@ -191,13 +192,7 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
         });
         const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath }), deps);
 
-        let thrown;
-
-        try {
-          await instance.run(ISSUE_ID, subIssueFile);
-        } catch (error) {
-          thrown = error;
-        }
+        const thrown = await captureRejection(instance.run(ISSUE_ID, subIssueFile));
 
         expect(thrown).toBeInstanceOf(DispatchFailure);
         // STATUS=failed legitimately appears twice: SpawnIssue#run's own

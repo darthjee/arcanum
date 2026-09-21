@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import ArcanumSplitIssuePushSubIssues from '../../../../lib/commands/arcanum-split-issue/ArcanumSplitIssuePushSubIssues.js';
 import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
+import { captureRejection } from '../../../support/utils/captureRejection.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 const ISSUE_ID = '999';
@@ -166,13 +167,7 @@ describe('ArcanumSplitIssuePushSubIssues', () => {
         });
         const instance = new ArcanumSplitIssuePushSubIssues({ repoPath }, deps);
 
-        let thrown;
-
-        try {
-          await instance.run(ISSUE_ID);
-        } catch (thrownError) {
-          thrown = thrownError;
-        }
+        const thrown = await captureRejection(instance.run(ISSUE_ID));
 
         return { deps, instance, thrown };
       }
@@ -214,13 +209,7 @@ describe('ArcanumSplitIssuePushSubIssues', () => {
         });
         const instance = new ArcanumSplitIssuePushSubIssues({ repoPath }, deps);
 
-        let thrown;
-
-        try {
-          await instance.run(ISSUE_ID);
-        } catch (error) {
-          thrown = error;
-        }
+        const thrown = await captureRejection(instance.run(ISSUE_ID));
 
         expect(deps.createSubIssue.run.calls.count()).toEqual(1);
         expect(thrown).toBeInstanceOf(DispatchFailure);

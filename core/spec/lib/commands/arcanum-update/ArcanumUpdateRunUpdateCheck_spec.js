@@ -8,9 +8,9 @@ import {
   fakeExistsSync,
   fakeReadFile,
   fakeExecFileAsync,
-  stubDeps,
-  catchError
+  stubDeps
 } from '../../../support/factories/arcanumUpdateRunUpdate.js';
+import { captureRejection } from '../../../support/utils/captureRejection.js';
 
 describe('ArcanumUpdateRunUpdate#check', () => {
   it('resolves METHOD=zip output, reading .repo/.version from arcanum.json', async () => {
@@ -82,7 +82,7 @@ describe('ArcanumUpdateRunUpdate#check', () => {
   it('rejects with a DispatchFailure (STATUS=missing_arcanum, exit 1) when bootstrap.sh is absent', async () => {
     const runUpdate = new ArcanumUpdateRunUpdate(claudeContext(), stubDeps({ existsSync: fakeExistsSync([]) }));
 
-    const thrown = await catchError(() => runUpdate.check());
+    const thrown = await captureRejection(runUpdate.check());
 
     expect(thrown).toBeInstanceOf(DispatchFailure);
     expect(thrown.stdout).toEqual('STATUS=missing_arcanum\n');
@@ -95,7 +95,7 @@ describe('ArcanumUpdateRunUpdate#check', () => {
       stubDeps({ existsSync: fakeExistsSync([BOOTSTRAP_PATH]) })
     );
 
-    const thrown = await catchError(() => runUpdate.check());
+    const thrown = await captureRejection(runUpdate.check());
 
     expect(thrown).toBeInstanceOf(DispatchFailure);
     expect(thrown.stdout).toEqual('STATUS=missing_arcanum\n');
