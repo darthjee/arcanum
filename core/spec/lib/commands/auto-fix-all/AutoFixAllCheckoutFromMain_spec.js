@@ -4,6 +4,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import AutoFixAllCheckoutFromMain from '../../../../lib/commands/auto-fix-all/AutoFixAllCheckoutFromMain.js';
 import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
+import { captureRejection } from '../../../support/utils/captureRejection.js';
 import { createGitFixtureRepo } from '../../../support/utils/gitFixtureRepo.js';
 
 const execFileAsync = promisify(execFile);
@@ -218,13 +219,7 @@ describe('AutoFixAllCheckoutFromMain', () => {
 
       const checkoutFromMain = new AutoFixAllCheckoutFromMain({ repoPath: repo.repoPath });
 
-      let thrown;
-
-      try {
-        await checkoutFromMain.run('99');
-      } catch (error) {
-        thrown = error;
-      }
+      const thrown = await captureRejection(checkoutFromMain.run('99'));
 
       expect(thrown).toBeInstanceOf(DispatchFailure);
       expect(thrown.exitCode).toEqual(2);

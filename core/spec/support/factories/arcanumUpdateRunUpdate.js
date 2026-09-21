@@ -105,18 +105,3 @@ export function stubDeps(overrides = {}) {
     ...overrides
   };
 }
-
-/**
- * @param {Function} fn - a zero-argument async function to invoke.
- * @returns {Promise<Error|undefined>} whatever `fn` threw/rejected
- *   with, or `undefined` if `fn` didn't throw.
- */
-export async function catchError(fn) {
-  try {
-    await fn();
-
-    return undefined;
-  } catch (error) {
-    return error;
-  }
-}

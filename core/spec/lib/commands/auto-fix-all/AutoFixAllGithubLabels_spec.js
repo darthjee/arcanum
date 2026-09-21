@@ -4,6 +4,7 @@ import {
   fakeGithubFetch,
   REPO
 } from '../../../support/factories/autoFixAllGithub.js';
+import { captureRejection } from '../../../support/utils/captureRejection.js';
 
 describe('AutoFixAllGithub (label subcommands)', () => {
   describe('#hasShipitLabel', () => {
@@ -31,13 +32,7 @@ describe('AutoFixAllGithub (label subcommands)', () => {
 
     it('rejects with an empty-stdout DispatchFailure (exit 1) when the label is absent', async () => {
       const github = createAutoFixAllGithub({ fetchFn: fakeGithubFetch({ labels: ['Other'] }) });
-      let thrown;
-
-      try {
-        await github.hasShipitLabel('5');
-      } catch (error) {
-        thrown = error;
-      }
+      const thrown = await captureRejection(github.hasShipitLabel('5'));
 
       expect(thrown).toBeInstanceOf(DispatchFailure);
       expect(thrown.stdout).toEqual('');
@@ -46,13 +41,7 @@ describe('AutoFixAllGithub (label subcommands)', () => {
 
     it('rejects with an empty-stdout DispatchFailure (exit 1) when the labels fetch fails', async () => {
       const github = createAutoFixAllGithub({ fetchFn: fakeGithubFetch({ issueViewFails: true }) });
-      let thrown;
-
-      try {
-        await github.hasShipitLabel('5');
-      } catch (error) {
-        thrown = error;
-      }
+      const thrown = await captureRejection(github.hasShipitLabel('5'));
 
       expect(thrown).toBeInstanceOf(DispatchFailure);
       expect(thrown.stdout).toEqual('');

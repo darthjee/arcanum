@@ -1,5 +1,6 @@
 import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
 import { createAutoFixIssueGithub } from '../../../support/factories/autoFixIssueGithub.js';
+import { captureRejection } from '../../../support/utils/captureRejection.js';
 
 describe('AutoFixIssueGithub#prView', () => {
   it('prints URL/IS_DRAFT and persists pr_url when on an issue-<id> branch', async () => {
@@ -36,13 +37,7 @@ describe('AutoFixIssueGithub#prView', () => {
       )
     };
     const github = createAutoFixIssueGithub({ githubClient });
-    let thrown;
-
-    try {
-      await github.prView();
-    } catch (error) {
-      thrown = error;
-    }
+    const thrown = await captureRejection(github.prView());
 
     expect(thrown).toBeInstanceOf(DispatchFailure);
     expect(thrown.stdout).toEqual('');

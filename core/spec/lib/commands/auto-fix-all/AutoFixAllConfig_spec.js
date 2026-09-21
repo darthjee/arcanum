@@ -3,6 +3,7 @@ import path from 'node:path';
 import AutoFixAllConfig from '../../../../lib/commands/auto-fix-all/AutoFixAllConfig.js';
 import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
 import Lock from '../../../../lib/utils/file/Lock.js';
+import { captureRejection } from '../../../support/utils/captureRejection.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 describe('AutoFixAllConfig', () => {
@@ -84,13 +85,7 @@ describe('AutoFixAllConfig', () => {
       await writeJson(newFile, { 'auto-fix-all': { auto_merge: false } });
 
       const config = newConfig();
-      let thrown;
-
-      try {
-        await config.isEnabled(dir, 'auto_merge');
-      } catch (error) {
-        thrown = error;
-      }
+      const thrown = await captureRejection(config.isEnabled(dir, 'auto_merge'));
 
       expect(thrown).toBeInstanceOf(DispatchFailure);
       expect(thrown.stdout).toEqual('');
@@ -99,13 +94,7 @@ describe('AutoFixAllConfig', () => {
 
     it('rejects with a DispatchFailure when the value is absent everywhere', async () => {
       const config = newConfig();
-      let thrown;
-
-      try {
-        await config.isEnabled(dir, 'auto_merge');
-      } catch (error) {
-        thrown = error;
-      }
+      const thrown = await captureRejection(config.isEnabled(dir, 'auto_merge'));
 
       expect(thrown).toBeInstanceOf(DispatchFailure);
       expect(thrown.stdout).toEqual('');

@@ -1,5 +1,6 @@
 import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
 import { fakeIssueClient, newTagger, REPO } from '../../../support/factories/issueTagger.js';
+import { captureRejection } from '../../../support/utils/captureRejection.js';
 
 describe('IssueTagger (label operations)', () => {
   describe('#fetchLabels', () => {
@@ -59,13 +60,7 @@ describe('IssueTagger (label operations)', () => {
 
     it('rejects with a plain Error (not DispatchFailure) when the labels fetch fails', async () => {
       const tagger = newTagger({ issueClient: fakeIssueClient({ getFails: true }) });
-      let thrown;
-
-      try {
-        await tagger.hasLabel('10', 'shipit');
-      } catch (error) {
-        thrown = error;
-      }
+      const thrown = await captureRejection(tagger.hasLabel('10', 'shipit'));
 
       expect(thrown).toBeInstanceOf(Error);
       expect(thrown).not.toBeInstanceOf(DispatchFailure);

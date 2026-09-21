@@ -7,9 +7,9 @@ import {
   fakeExistsSync,
   fakeReadFile,
   fakeSpawn,
-  stubDeps,
-  catchError
+  stubDeps
 } from '../../../support/factories/arcanumUpdateRunUpdate.js';
+import { captureRejection } from '../../../support/utils/captureRejection.js';
 
 describe('ArcanumUpdateRunUpdate#apply', () => {
   it('runs bootstrap.sh with stdio "inherit" and ARCANUM_ASSUME_YES=1, resolving RESULT=updated on a version change', async () => {
@@ -61,7 +61,7 @@ describe('ArcanumUpdateRunUpdate#apply', () => {
       })
     );
 
-    const thrown = await catchError(() => runUpdate.apply());
+    const thrown = await captureRejection(runUpdate.apply());
 
     expect(thrown).toBeInstanceOf(DispatchFailure);
     expect(thrown.stdout).toEqual('');
@@ -75,7 +75,7 @@ describe('ArcanumUpdateRunUpdate#apply', () => {
       stubDeps({ existsSync: fakeExistsSync([]), spawnFn })
     );
 
-    const thrown = await catchError(() => runUpdate.apply());
+    const thrown = await captureRejection(runUpdate.apply());
 
     expect(thrown).toBeInstanceOf(DispatchFailure);
     expect(thrown.stdout).toEqual('STATUS=missing_arcanum\n');

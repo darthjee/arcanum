@@ -1,6 +1,7 @@
 import path from 'node:path';
 import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
 import Lock from '../../../../lib/utils/file/Lock.js';
+import { captureRejection } from '../../../support/utils/captureRejection.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 import { createAutoFixAllQueue, writeQueueFile, readQueueFile } from '../../../support/factories/autoFixAllQueue.js';
 
@@ -75,13 +76,7 @@ describe('AutoFixAllQueue (pop & empty)', () => {
       await writeQueueFile(queueFile, [{ id: 'a' }]);
 
       const queue = createAutoFixAllQueue(dir);
-      let thrown;
-
-      try {
-        await queue.empty();
-      } catch (error) {
-        thrown = error;
-      }
+      const thrown = await captureRejection(queue.empty());
 
       expect(thrown).toBeInstanceOf(DispatchFailure);
       expect(thrown.stdout).toEqual('');
