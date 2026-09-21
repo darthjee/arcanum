@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { seedGithubLikeRepo } from '../../support/factories/autoFixAllWaitCiParitySetup.js';
 import { itRoutesEngineDispatch } from '../../support/sharedExamples/engineDispatchRouting.js';
+import { seedEngineMode } from '../../support/utils/engineMode.js';
 import { createFakeGhBin } from '../../support/utils/fakeGhBin.js';
 import { REPO_ROOT } from '../../support/utils/runCommand.js';
 
@@ -48,6 +49,7 @@ describe('auto-fix-all-wait-ci parity (shell vs. native) — engine_dispatch', (
       const fakeGh = await createFakeGhBin(mode === 'native' ? { authTokenAlwaysFails: true } : undefined);
 
       await seedGithubLikeRepo(repo);
+      await seedEngineMode(repo, mode);
 
       const env = { ...process.env, PATH: `${fakeGh.binDir}:${process.env.PATH}` };
 

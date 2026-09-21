@@ -2,6 +2,7 @@ import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { seedGithubLikeRepo } from '../../support/factories/autoFixIssueGithubParitySetup.js';
 import { itRoutesEngineDispatch } from '../../support/sharedExamples/engineDispatchRouting.js';
+import { seedEngineMode } from '../../support/utils/engineMode.js';
 import { createFakeGhBin } from '../../support/utils/fakeGhBin.js';
 import { createGitFixtureRepo } from '../../support/utils/gitFixtureRepo.js';
 import { REPO_ROOT, runCommand } from '../../support/utils/runCommand.js';
@@ -43,8 +44,9 @@ describe('auto-fix-issue-github engine_dispatch routing (via the real github.sh 
   itRoutesEngineDispatch(
     'info',
     SHIM_SCRIPT,
-    async (repo) => {
+    async (repo, mode) => {
       await seedGithubLikeRepo(repo);
+      await seedEngineMode(repo, mode);
 
       return { args: ['info', repo.repoPath] };
     },
@@ -94,6 +96,7 @@ describe('auto-fix-issue-github engine_dispatch routing (via the real github.sh 
       const file = path.join(repo.repoPath, 'body.md');
 
       await seedGithubLikeRepo(repo);
+      await seedEngineMode(repo, mode);
       await writeFile(file, 'body text\n');
 
       const env = {
@@ -124,6 +127,7 @@ describe('auto-fix-issue-github engine_dispatch routing (via the real github.sh 
       const fakeGh = await createFakeGhBin(mode === 'native' ? { authTokenAlwaysFails: true } : undefined);
 
       await seedGithubLikeRepo(repo);
+      await seedEngineMode(repo, mode);
 
       const env = {
         ...process.env,
@@ -154,6 +158,7 @@ describe('auto-fix-issue-github engine_dispatch routing (via the real github.sh 
       const fakeGh = await createFakeGhBin(mode === 'native' ? { authTokenAlwaysFails: true } : undefined);
 
       await seedGithubLikeRepo(repo);
+      await seedEngineMode(repo, mode);
 
       const env = { ...process.env, PATH: `${fakeGh.binDir}:${process.env.PATH}` };
 
