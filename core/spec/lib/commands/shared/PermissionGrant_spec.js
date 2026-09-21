@@ -21,24 +21,48 @@ describe('PermissionGrant', () => {
   });
 
   describe('#add', () => {
-    it('creates the file (starting from {}) when it does not exist yet', async () => {
-      const permissionGrant = new PermissionGrant(claudeContext, { lock: new Lock({ sleepMs: 5 }) });
+    [
+      {
+        description: 'creates the file (starting from {}) when it does not exist yet',
+        content: null,
+        targetsFile: true
+      },
+      {
+        description: 'resolves a repo-relative file against the context anchor, not process.cwd()',
+        content: null,
+        targetsFile: false
+      },
+      {
+        description: 'dedupes when the pattern is already present',
+        content: JSON.stringify({ permissions: { allow: ['Bash(git push:*)'] } }),
+        targetsFile: true
+      },
+      {
+        description: 'treats missing/invalid JSON in an existing file as {}',
+        content: 'not json',
+        targetsFile: true
+      },
+      {
+        description: 'treats an existing but empty file as {}',
+        content: '',
+        targetsFile: true
+      }
+    ].forEach(({ description, content, targetsFile }) => {
+      it(description, async () => {
+        if (content !== null) {
+          await mkdir(path.dirname(file), { recursive: true });
+          await writeFile(file, content);
+        }
 
-      await permissionGrant.add(file, 'Bash(git push:*)');
+        const target = targetsFile ? file : '.claude/settings.json';
+        const permissionGrant = new PermissionGrant(claudeContext, { lock: new Lock({ sleepMs: 5 }) });
 
-      const written = JSON.parse(await readFile(file, 'utf8'));
+        await permissionGrant.add(target, 'Bash(git push:*)');
 
-      expect(written).toEqual({ permissions: { allow: ['Bash(git push:*)'] } });
-    });
+        const written = JSON.parse(await readFile(file, 'utf8'));
 
-    it('resolves a repo-relative file against the context anchor, not process.cwd()', async () => {
-      const permissionGrant = new PermissionGrant(claudeContext, { lock: new Lock({ sleepMs: 5 }) });
-
-      await permissionGrant.add('.claude/settings.json', 'Bash(git push:*)');
-
-      const written = JSON.parse(await readFile(file, 'utf8'));
-
-      expect(written).toEqual({ permissions: { allow: ['Bash(git push:*)'] } });
+        expect(written).toEqual({ permissions: { allow: ['Bash(git push:*)'] } });
+      });
     });
 
     it('leaves every other top-level key (and other permissions.* keys) untouched', async () => {
@@ -64,45 +88,6 @@ describe('PermissionGrant', () => {
           allow: ['Bash(git push:*)', 'Bash(git status:*)']
         }
       });
-    });
-
-    it('dedupes when the pattern is already present', async () => {
-      await mkdir(path.dirname(file), { recursive: true });
-      await writeFile(file, JSON.stringify({ permissions: { allow: ['Bash(git push:*)'] } }));
-
-      const permissionGrant = new PermissionGrant(claudeContext, { lock: new Lock({ sleepMs: 5 }) });
-
-      await permissionGrant.add(file, 'Bash(git push:*)');
-
-      const written = JSON.parse(await readFile(file, 'utf8'));
-
-      expect(written).toEqual({ permissions: { allow: ['Bash(git push:*)'] } });
-    });
-
-    it('treats missing/invalid JSON in an existing file as {}', async () => {
-      await mkdir(path.dirname(file), { recursive: true });
-      await writeFile(file, 'not json');
-
-      const permissionGrant = new PermissionGrant(claudeContext, { lock: new Lock({ sleepMs: 5 }) });
-
-      await permissionGrant.add(file, 'Bash(git push:*)');
-
-      const written = JSON.parse(await readFile(file, 'utf8'));
-
-      expect(written).toEqual({ permissions: { allow: ['Bash(git push:*)'] } });
-    });
-
-    it('treats an existing but empty file as {}', async () => {
-      await mkdir(path.dirname(file), { recursive: true });
-      await writeFile(file, '');
-
-      const permissionGrant = new PermissionGrant(claudeContext, { lock: new Lock({ sleepMs: 5 }) });
-
-      await permissionGrant.add(file, 'Bash(git push:*)');
-
-      const written = JSON.parse(await readFile(file, 'utf8'));
-
-      expect(written).toEqual({ permissions: { allow: ['Bash(git push:*)'] } });
     });
 
     it('degrades silently (stderr warning, no throw) when the parent directory cannot be created', async () => {
