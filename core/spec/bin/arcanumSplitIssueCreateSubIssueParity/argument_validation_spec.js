@@ -1,4 +1,8 @@
 import path from 'node:path';
+import {
+  itRejectsInvalidRepoPath,
+  itRejectsMissingArgument
+} from '../../support/sharedExamples/cliParityValidation.js';
 import { createGitFixtureRepo } from '../../support/utils/gitFixtureRepo.js';
 import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
 import { ISSUE_ID, runBoth } from '../../support/factories/arcanumSplitIssueCreateSubIssueParitySetup.js';
@@ -32,96 +36,40 @@ import { ISSUE_ID, runBoth } from '../../support/factories/arcanumSplitIssueCrea
 // tests (node/03).
 
 describe('arcanum-split-issue-create-sub-issue parity (shell vs. native) — argument validation', () => {
-  describe('a missing <repo_path> argument', () => {
-    it('matches shell exit code and stdout', async () => {
+  itRejectsMissingArgument(
+    'a missing <repo_path> argument',
+    (cwd) => runBoth(['', ISSUE_ID, '/dev/null'], cwd),
+    async () => {
       const cwd = await createTempDir('arcanum-core-ascsi-parity-');
 
-      try {
-        const { shell, native } = await runBoth(['', ISSUE_ID, '/dev/null'], cwd);
+      return { cwd, cleanup: () => removeTempDir(cwd) };
+    }
+  );
 
-        expect(native.stdout).toEqual(shell.stdout);
-        expect(native.code).toEqual(shell.code);
-        expect(shell.code).not.toEqual(0);
-        expect(shell.stdout).toEqual('');
-      } finally {
-        await removeTempDir(cwd);
-      }
-    });
-  });
-
-  describe('a missing <issue_id> argument', () => {
-    it('matches shell exit code and stdout', async () => {
+  itRejectsMissingArgument(
+    'a missing <issue_id> argument',
+    (cwd) => runBoth([cwd, '', '/dev/null'], cwd),
+    async () => {
       const repo = await createGitFixtureRepo();
 
-      try {
-        const { shell, native } = await runBoth([repo.repoPath, '', '/dev/null'], repo.repoPath);
+      return { cwd: repo.repoPath, cleanup: repo.cleanup };
+    }
+  );
 
-        expect(native.stdout).toEqual(shell.stdout);
-        expect(native.code).toEqual(shell.code);
-        expect(shell.code).not.toEqual(0);
-        expect(shell.stdout).toEqual('');
-      } finally {
-        await repo.cleanup();
-      }
-    });
-  });
-
-  describe('a missing <sub_issue_file> argument', () => {
-    it('matches shell exit code and stdout', async () => {
+  itRejectsMissingArgument(
+    'a missing <sub_issue_file> argument',
+    (cwd) => runBoth([cwd, ISSUE_ID, ''], cwd),
+    async () => {
       const repo = await createGitFixtureRepo();
 
-      try {
-        const { shell, native } = await runBoth([repo.repoPath, ISSUE_ID, ''], repo.repoPath);
+      return { cwd: repo.repoPath, cleanup: repo.cleanup };
+    }
+  );
 
-        expect(native.stdout).toEqual(shell.stdout);
-        expect(native.code).toEqual(shell.code);
-        expect(shell.code).not.toEqual(0);
-        expect(shell.stdout).toEqual('');
-      } finally {
-        await repo.cleanup();
-      }
-    });
-  });
-
-  describe('a repo_path that is not a directory', () => {
-    it('matches shell exit code, stdout, and stderr message', async () => {
-      const cwd = await createTempDir('arcanum-core-ascsi-parity-');
-
-      try {
-        const missingPath = path.join(cwd, 'no-such-dir');
-
-        const { shell, native } = await runBoth([missingPath, ISSUE_ID, '/dev/null'], cwd);
-
-        expect(native.stdout).toEqual(shell.stdout);
-        expect(native.code).toEqual(shell.code);
-        expect(shell.code).not.toEqual(0);
-        expect(shell.stdout).toEqual('');
-        expect(shell.stderr.trim()).toEqual(`Error: not a directory: ${missingPath}`);
-        expect(native.stderr.trim()).toContain(`Error: not a directory: ${missingPath}`);
-      } finally {
-        await removeTempDir(cwd);
-      }
-    });
-  });
-
-  describe('a repo_path that is not a git repository', () => {
-    it('matches shell exit code, stdout, and stderr message', async () => {
-      const cwd = await createTempDir('arcanum-core-ascsi-parity-');
-
-      try {
-        const { shell, native } = await runBoth([cwd, ISSUE_ID, '/dev/null'], cwd);
-
-        expect(native.stdout).toEqual(shell.stdout);
-        expect(native.code).toEqual(shell.code);
-        expect(shell.code).not.toEqual(0);
-        expect(shell.stdout).toEqual('');
-        expect(shell.stderr.trim()).toEqual(`Error: not a git repository: ${cwd}`);
-        expect(native.stderr.trim()).toContain(`Error: not a git repository: ${cwd}`);
-      } finally {
-        await removeTempDir(cwd);
-      }
-    });
-  });
+  itRejectsInvalidRepoPath(
+    (repoPath, cwd) => runBoth([repoPath, ISSUE_ID, '/dev/null'], cwd),
+    { cwdPrefix: 'arcanum-core-ascsi-parity-' }
+  );
 
   describe('a sub_issue_file that does not exist', () => {
     it('matches shell exit code, stdout, and stderr message', async () => {
