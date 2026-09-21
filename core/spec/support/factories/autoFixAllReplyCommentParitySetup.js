@@ -3,6 +3,8 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { REPO_ROOT, seedOriginUrl } from '../utils/runCommand.js';
+import { createFakeGhBin } from '../utils/fakeGhBin.js';
+import { createGitFixtureRepo } from '../utils/gitFixtureRepo.js';
 
 // Shared setup for the "auto-fix-all-reply-comment" migrated entrypoint
 // parity specs (issue #256) — see
@@ -97,4 +99,52 @@ export async function seedGithubLikeRepo(repo) {
 
   await seedOriginUrl(repo.repoPath, fakeUrl);
   await git(['config', `url.${repo.remotePath}.pushInsteadOf`, fakeUrl], repo.repoPath);
+}
+
+/**
+ * Runs a single "auto-fix-all-reply-comment" shell-vs-native parity case
+ * end to end: builds a fake `gh` binary and a pair of independent
+ * github.com-shaped fixture repos (one per side), runs both
+ * implementations against `ARGS_TAIL`, asserts the shared byte-identical
+ * stdout/exit-code contract, hands off to `assert` for the case-specific
+ * checks, and tears every fixture down — replacing the setup/run/assert/
+ * cleanup block previously re-authored per spec file (issue #538).
+ * @param {object} [options] - the case's options.
+ * @param {object} [options.extraEnv] - extra environment variables merged
+ *   into both sides' shared `env` (e.g. `FAKE_GH_PR_NUMBER`,
+ *   `ARCANUM_TEST_FAKE_FETCH`).
+ * @param {boolean} [options.useFakeFetchPreload] - whether the native
+ *   invocation should preload `FAKE_FETCH_PRELOAD` (only needed by cases
+ *   that reach the native `fetch` call).
+ * @param {Function} options.assert - called with `{shell, native}` once
+ *   the shared parity checks pass, for the case-specific assertions.
+ * @returns {Promise<void>} resolves once the case has run and all
+ *   fixtures have been cleaned up.
+ */
+export async function runReplyCommentParityCase({ extraEnv = {}, useFakeFetchPreload = false, assert }) {
+  const fakeGh = await createFakeGhBin();
+  const shellRepo = await createGitFixtureRepo();
+  const nativeRepo = await createGitFixtureRepo();
+
+  try {
+    await Promise.all([seedGithubLikeRepo(shellRepo), seedGithubLikeRepo(nativeRepo)]);
+
+    const env = { ...process.env, PATH: `${fakeGh.binDir}:${process.env.PATH}`, ...extraEnv };
+    const nativeCommand = useFakeFetchPreload
+      ? [process.execPath, '--import', FAKE_FETCH_PRELOAD, NATIVE_BIN]
+      : [process.execPath, NATIVE_BIN];
+
+    const shell = await runCommand([SHELL_SCRIPT, shellRepo.repoPath, ...ARGS_TAIL], shellRepo.repoPath, env);
+    const native = await runCommand(
+      [...nativeCommand, 'auto-fix-all-reply-comment', nativeRepo.repoPath, ...ARGS_TAIL],
+      nativeRepo.repoPath,
+      env
+    );
+
+    expect(native.stdout).toEqual(shell.stdout);
+    expect(native.code).toEqual(shell.code);
+    assert({ shell, native });
+  } finally {
+    await Promise.all([shellRepo.cleanup(), nativeRepo.cleanup(), fakeGh.cleanup()]);
+  }
 }
