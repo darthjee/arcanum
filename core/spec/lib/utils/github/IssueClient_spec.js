@@ -72,24 +72,6 @@ describe('IssueClient', () => {
         signal: jasmine.anything()
       });
     });
-
-    it('throws a descriptive error when the response is not ok', async () => {
-      const fetchFn = jasmine.createSpy().and.resolveTo({ ok: false });
-      const client = newClient(fetchFn);
-
-      await expectAsync(client.addLabel('10', 'Enqueued')).toBeRejectedWithError(
-        `could not add label 'Enqueued' to issue #10 on ${REPO}`
-      );
-    });
-
-    it('throws a descriptive error when fetch itself rejects', async () => {
-      const fetchFn = jasmine.createSpy().and.rejectWith(new Error('network error'));
-      const client = newClient(fetchFn);
-
-      await expectAsync(client.addLabel('10', 'Enqueued')).toBeRejectedWithError(
-        `could not add label 'Enqueued' to issue #10 on ${REPO}`
-      );
-    });
   });
 
   describe('#removeLabel', () => {
@@ -106,24 +88,6 @@ describe('IssueClient', () => {
           headers: { Authorization: `Bearer ${TOKEN}` },
           signal: jasmine.anything()
         }
-      );
-    });
-
-    it('throws a descriptive error when the response is not ok', async () => {
-      const fetchFn = jasmine.createSpy().and.resolveTo({ ok: false });
-      const client = newClient(fetchFn);
-
-      await expectAsync(client.removeLabel('10', 'Ready for Work')).toBeRejectedWithError(
-        `could not remove label 'Ready for Work' from issue #10 on ${REPO}`
-      );
-    });
-
-    it('throws a descriptive error when fetch itself rejects', async () => {
-      const fetchFn = jasmine.createSpy().and.rejectWith(new Error('network error'));
-      const client = newClient(fetchFn);
-
-      await expectAsync(client.removeLabel('10', 'Ready for Work')).toBeRejectedWithError(
-        `could not remove label 'Ready for Work' from issue #10 on ${REPO}`
       );
     });
   });
@@ -144,24 +108,6 @@ describe('IssueClient', () => {
       });
       expect(result).toEqual(created);
     });
-
-    it('throws a descriptive error when the response is not ok', async () => {
-      const fetchFn = jasmine.createSpy().and.resolveTo({ ok: false });
-      const client = newClient(fetchFn);
-
-      await expectAsync(client.createIssue('My title', 'My body')).toBeRejectedWithError(
-        `Error: could not create issue on ${REPO}`
-      );
-    });
-
-    it('throws a descriptive error when fetch itself rejects', async () => {
-      const fetchFn = jasmine.createSpy().and.rejectWith(new Error('network error'));
-      const client = newClient(fetchFn);
-
-      await expectAsync(client.createIssue('My title', 'My body')).toBeRejectedWithError(
-        `Error: could not create issue on ${REPO}`
-      );
-    });
   });
 
   describe('#postComment', () => {
@@ -178,23 +124,52 @@ describe('IssueClient', () => {
         signal: jasmine.anything()
       });
     });
+  });
 
-    it('throws a descriptive error when the response is not ok', async () => {
-      const fetchFn = jasmine.createSpy().and.resolveTo({ ok: false });
-      const client = newClient(fetchFn);
+  describe('write operation error handling', () => {
+    // One entry per write operation (`#addLabel`, `#removeLabel`, `#createIssue`,
+    // `#postComment`), each carrying the call to make and the exact error
+    // message it must raise. Shared by both scenario loops below, mirroring
+    // the case-table pattern used in `GithubToken_spec.js` (issue #541).
+    const cases = [
+      {
+        operation: '#addLabel',
+        call: (client) => client.addLabel('10', 'Enqueued'),
+        error: `could not add label 'Enqueued' to issue #10 on ${REPO}`
+      },
+      {
+        operation: '#removeLabel',
+        call: (client) => client.removeLabel('10', 'Ready for Work'),
+        error: `could not remove label 'Ready for Work' from issue #10 on ${REPO}`
+      },
+      {
+        operation: '#createIssue',
+        call: (client) => client.createIssue('My title', 'My body'),
+        error: `Error: could not create issue on ${REPO}`
+      },
+      {
+        operation: '#postComment',
+        call: (client) => client.postComment('7', 'Great work!'),
+        error: `Error: could not post comment on pull request #7 in ${REPO}`
+      }
+    ];
 
-      await expectAsync(client.postComment('7', 'Great work!')).toBeRejectedWithError(
-        `Error: could not post comment on pull request #7 in ${REPO}`
-      );
-    });
+    for (const { operation, call, error } of cases) {
+      it(`${operation} throws a descriptive error when the response is not ok`, async () => {
+        const fetchFn = jasmine.createSpy().and.resolveTo({ ok: false });
+        const client = newClient(fetchFn);
 
-    it('throws a descriptive error when fetch itself rejects', async () => {
-      const fetchFn = jasmine.createSpy().and.rejectWith(new Error('network error'));
-      const client = newClient(fetchFn);
+        await expectAsync(call(client)).toBeRejectedWithError(error);
+      });
+    }
 
-      await expectAsync(client.postComment('7', 'Great work!')).toBeRejectedWithError(
-        `Error: could not post comment on pull request #7 in ${REPO}`
-      );
-    });
+    for (const { operation, call, error } of cases) {
+      it(`${operation} throws a descriptive error when fetch itself rejects`, async () => {
+        const fetchFn = jasmine.createSpy().and.rejectWith(new Error('network error'));
+        const client = newClient(fetchFn);
+
+        await expectAsync(call(client)).toBeRejectedWithError(error);
+      });
+    }
   });
 });
