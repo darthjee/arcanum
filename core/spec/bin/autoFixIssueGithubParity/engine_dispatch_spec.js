@@ -62,7 +62,7 @@ describe('auto-fix-issue-github engine_dispatch routing (via the real github.sh 
     }
   );
 
-  describe('info', () => {
+  describe('info (engine.mode unset)', () => {
     it('defaults to the shell implementation when engine.mode is unset', async () => {
       const repo = await createGitFixtureRepo();
       // Neutralizes this machine's own ambient global
