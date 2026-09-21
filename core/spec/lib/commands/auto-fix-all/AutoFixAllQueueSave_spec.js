@@ -1,5 +1,6 @@
 import path from 'node:path';
 import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
+import { captureRejection } from '../../../support/utils/captureRejection.js';
 import { captureStdout } from '../../../support/utils/captureStdout.js';
 import { fakeFetch } from '../../../support/utils/fakeFetch.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
@@ -80,11 +81,7 @@ describe('AutoFixAllQueue (save)', () => {
       let thrown;
 
       const { stdout } = await captureStdout(async () => {
-        try {
-          await queue.save('10');
-        } catch (error) {
-          thrown = error;
-        }
+        thrown = await captureRejection(queue.save('10'));
       });
 
       expect(stdout).toEqual('Queue saved: 10\n');
