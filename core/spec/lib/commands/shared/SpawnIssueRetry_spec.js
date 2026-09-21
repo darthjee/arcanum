@@ -2,6 +2,7 @@ import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
 import SpawnIssue from '../../../../lib/commands/shared/SpawnIssue.js';
+import { captureRejection } from '../../../support/utils/captureRejection.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 import { stubDeps, buildContext, CREATE_OUTPUT } from '../../../support/factories/spawnIssue.js';
 
@@ -26,13 +27,7 @@ describe('SpawnIssue#run (retry behavior)', () => {
 
     spyOn(process.stderr, 'write');
 
-    let thrown;
-
-    try {
-      await spawnIssue.run('1', 'New issue', bodyFile);
-    } catch (error) {
-      thrown = error;
-    }
+    const thrown = await captureRejection(spawnIssue.run('1', 'New issue', bodyFile));
 
     expect(thrown).toBeInstanceOf(DispatchFailure);
     expect(thrown.stdout).toEqual('STATUS=failed\n');
@@ -60,13 +55,7 @@ describe('SpawnIssue#run (retry behavior)', () => {
 
     spyOn(process.stderr, 'write');
 
-    let thrown;
-
-    try {
-      await spawnIssue.run('1', 'New issue', bodyFile);
-    } catch (error) {
-      thrown = error;
-    }
+    const thrown = await captureRejection(spawnIssue.run('1', 'New issue', bodyFile));
 
     expect(thrown).toBeInstanceOf(DispatchFailure);
     expect(githubIssueService.create).toHaveBeenCalledTimes(3);
@@ -82,13 +71,7 @@ describe('SpawnIssue#run (retry behavior)', () => {
 
     spyOn(process.stderr, 'write');
 
-    let thrown;
-
-    try {
-      await spawnIssue.run('1', 'New issue', bodyFile);
-    } catch (error) {
-      thrown = error;
-    }
+    const thrown = await captureRejection(spawnIssue.run('1', 'New issue', bodyFile));
 
     expect(thrown).toBeInstanceOf(DispatchFailure);
     expect(githubIssueService.create).toHaveBeenCalledTimes(5);

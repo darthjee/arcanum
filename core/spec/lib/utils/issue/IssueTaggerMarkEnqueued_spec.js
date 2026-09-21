@@ -1,5 +1,6 @@
 import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
 import { fakeIssueClient, newTagger, REPO } from '../../../support/factories/issueTagger.js';
+import { captureRejection } from '../../../support/utils/captureRejection.js';
 import { captureStdout } from '../../../support/utils/captureStdout.js';
 
 describe('IssueTagger#markEnqueued', () => {
@@ -40,13 +41,7 @@ describe('IssueTagger#markEnqueued', () => {
 
   it('rejects with a DispatchFailure (stdout "", exit code 1) when resolving the origin fails', async () => {
     const tagger = newTagger({ origin: { resolveWithRef: async () => { throw new Error('no origin'); } } });
-    let thrown;
-
-    try {
-      await tagger.markEnqueued(['10']);
-    } catch (error) {
-      thrown = error;
-    }
+    const thrown = await captureRejection(tagger.markEnqueued(['10']));
 
     expect(thrown).toBeInstanceOf(DispatchFailure);
     expect(thrown.stdout).toEqual('');
@@ -55,13 +50,7 @@ describe('IssueTagger#markEnqueued', () => {
 
   it('rejects with a DispatchFailure (stdout "", exit code 1) when resolving the github token fails', async () => {
     const tagger = newTagger({ githubToken: { get: async () => { throw new Error('no token'); } } });
-    let thrown;
-
-    try {
-      await tagger.markEnqueued(['10']);
-    } catch (error) {
-      thrown = error;
-    }
+    const thrown = await captureRejection(tagger.markEnqueued(['10']));
 
     expect(thrown).toBeInstanceOf(DispatchFailure);
     expect(thrown.stdout).toEqual('');

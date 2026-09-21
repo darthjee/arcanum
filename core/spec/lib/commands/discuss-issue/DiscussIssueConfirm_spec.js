@@ -1,21 +1,6 @@
 import DiscussIssueConfirm from '../../../../lib/commands/discuss-issue/DiscussIssueConfirm.js';
 import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
-
-/**
- * @param {Promise} promise - the promise to await and capture a
- *   rejection from.
- * @returns {Promise<Error|undefined>} the rejection, or `undefined` if
- *   the promise resolved.
- */
-async function captureRejection(promise) {
-  try {
-    await promise;
-
-    return undefined;
-  } catch (error) {
-    return error;
-  }
-}
+import { captureRejection } from '../../../support/utils/captureRejection.js';
 
 describe('DiscussIssueConfirm', () => {
   let confirm;
