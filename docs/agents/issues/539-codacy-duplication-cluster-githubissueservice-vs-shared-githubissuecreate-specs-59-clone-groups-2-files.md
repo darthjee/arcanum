@@ -6,12 +6,12 @@
 
 ## What needs to be done
 
-- Move the shared "create issue" request/response fixtures and assertion helpers into a single `githubIssueCreateSharedExamples.js` support file.
-- Have both `GithubIssueService_spec.js` and `GithubIssueCreate_spec.js` include the shared examples, leaving each file only its wrapper-specific test logic.
+- Move the shared "create issue" request/response fixtures and assertion helpers into a single `githubIssueCreateSharedExamples.js` file under `core/spec/support/sharedExamples/`, following the existing shared-example convention (e.g. `core/spec/support/sharedExamples/cliParityValidation.js`), which registers `describe`/`it` blocks via an exported function that takes a factory for building the instance under test — needed here since `GithubIssueService` and `GithubIssue` (the command wrapper) have different constructors.
+- Have both `GithubIssueService_spec.js` and `GithubIssueCreate_spec.js` include the shared examples, leaving each file only its wrapper-specific test logic (e.g. `GithubIssueService_spec.js` keeps its `repoContext`-fallback tests and its `issueClient`/`rawString`/`normalizeTitle` describes).
 
 ## Acceptance criteria
 
-- [ ] A `githubIssueCreateSharedExamples.js` file (or equivalent) exists under `core/spec/support` and is included by both specs.
+- [ ] A `githubIssueCreateSharedExamples.js` file (or equivalent) exists under `core/spec/support/sharedExamples/` and is included by both specs.
 - [ ] The duplicated fixture/assertion blocks are removed from both files in favor of the shared examples.
 - [ ] Both specs pass with unchanged coverage after the refactor.
 - [ ] Codacy's duplication score for these two files drops substantially after the fix lands.
