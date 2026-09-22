@@ -2,12 +2,12 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import IssueState from '../../../../lib/commands/shared/IssueState.js';
 import RepoContext from '../../../../lib/context/RepoContext.js';
-import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
+import { splitIssueCommandFixture } from '../../../support/factories/splitIssueCommandFixture.js';
 
 const USAGE_SNIPPET = 'Usage: issue_state.sh <repo_path> get <id> <field>';
 
 describe('IssueState', () => {
-  let repoPath;
+  const fixture = splitIssueCommandFixture({ prefix: 'arcanum-core-issue-state-spec-' });
 
   /**
    * Build a real `RepoContext` bound to the per-test temp dir — mirrors
@@ -17,7 +17,7 @@ describe('IssueState', () => {
    *   to the per-test temp dir).
    * @returns {RepoContext} the assembled context.
    */
-  function buildContext({ repoPath: contextRepoPath = repoPath } = {}) {
+  function buildContext({ repoPath: contextRepoPath = fixture.repoPath } = {}) {
     return new RepoContext({ repoPath: contextRepoPath });
   }
 
@@ -30,14 +30,6 @@ describe('IssueState', () => {
       ...overrides
     };
   }
-
-  beforeEach(async () => {
-    repoPath = await createTempDir('arcanum-core-issue-state-spec-');
-  });
-
-  afterEach(async () => {
-    await removeTempDir(repoPath);
-  });
 
   describe('#run', () => {
     describe('argument validation', () => {
@@ -87,9 +79,9 @@ describe('IssueState', () => {
         pathsSpy = jasmine
           .createSpy('paths')
           .and.callFake((id) => ({
-            stateDir: path.join(repoPath, '.claude', 'state'),
-            stateFile: path.join(repoPath, '.claude', 'state', `issue-${id}.json`),
-            lockFile: path.join(repoPath, '.claude', 'state', `issue-${id}.lock`)
+            stateDir: path.join(fixture.repoPath, '.claude', 'state'),
+            stateFile: path.join(fixture.repoPath, '.claude', 'state', `issue-${id}.json`),
+            lockFile: path.join(fixture.repoPath, '.claude', 'state', `issue-${id}.lock`)
           }));
         issueState = new IssueState(buildContext(), stubDeps({ issueStatePaths: { paths: pathsSpy } }));
         spyOn(issueState, '_issueStateService').and.returnValue(service);
@@ -153,7 +145,7 @@ describe('IssueState', () => {
 
         expect(output).toEqual('Round Trip\n');
 
-        const stateFile = path.join(repoPath, '.claude', 'state', 'issue-7.json');
+        const stateFile = path.join(fixture.repoPath, '.claude', 'state', 'issue-7.json');
         const written = JSON.parse(await readFile(stateFile, 'utf8'));
         expect(written).toEqual({ title: 'Round Trip' });
       });
@@ -164,7 +156,7 @@ describe('IssueState', () => {
         await issueState.run('append-json', '7', 'tags', '"a"');
         await issueState.run('append-json', '7', 'tags', '"b"');
 
-        const stateFile = path.join(repoPath, '.claude', 'state', 'issue-7.json');
+        const stateFile = path.join(fixture.repoPath, '.claude', 'state', 'issue-7.json');
         const written = JSON.parse(await readFile(stateFile, 'utf8'));
         expect(written).toEqual({ tags: ['a', 'b'] });
       });
@@ -180,7 +172,7 @@ describe('IssueState', () => {
 
       await service.set('9', 'state', 'open');
 
-      const stateFile = path.join(repoPath, '.claude', 'state', 'issue-9.json');
+      const stateFile = path.join(fixture.repoPath, '.claude', 'state', 'issue-9.json');
       const written = JSON.parse(await readFile(stateFile, 'utf8'));
       expect(written).toEqual({ state: 'open' });
     });

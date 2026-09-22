@@ -2,8 +2,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import ArcanumSplitIssuePushSubIssues from '../../../../lib/commands/arcanum-split-issue/ArcanumSplitIssuePushSubIssues.js';
 import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
+import { splitIssueCommandFixture } from '../../../support/factories/splitIssueCommandFixture.js';
 import { captureRejection } from '../../../support/utils/captureRejection.js';
-import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 const ISSUE_ID = '999';
 const USAGE = 'Usage: push_sub_issues.sh <repo_path> <issue_id>';
@@ -36,15 +36,7 @@ async function writeIssueFile(repoPath, name) {
 }
 
 describe('ArcanumSplitIssuePushSubIssues', () => {
-  let repoPath;
-
-  beforeEach(async () => {
-    repoPath = await createTempDir();
-  });
-
-  afterEach(async () => {
-    await removeTempDir(repoPath);
-  });
+  const fixture = splitIssueCommandFixture();
 
   describe('#run', () => {
     describe('argument validation', () => {
@@ -57,7 +49,7 @@ describe('ArcanumSplitIssuePushSubIssues', () => {
 
       it('throws the usage message when issueId is missing', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssuePushSubIssues({ repoPath }, deps);
+        const instance = new ArcanumSplitIssuePushSubIssues({ repoPath: fixture.repoPath }, deps);
 
         await expectAsync(instance.run('')).toBeRejectedWithError(USAGE);
       });
@@ -66,7 +58,7 @@ describe('ArcanumSplitIssuePushSubIssues', () => {
     describe('zero matching files', () => {
       it('resolves STATUS=ok with an empty CREATED= when the issues directory does not exist', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssuePushSubIssues({ repoPath }, deps);
+        const instance = new ArcanumSplitIssuePushSubIssues({ repoPath: fixture.repoPath }, deps);
 
         const result = await instance.run(ISSUE_ID);
 
@@ -75,9 +67,9 @@ describe('ArcanumSplitIssuePushSubIssues', () => {
       });
 
       it('resolves STATUS=ok with an empty CREATED= when the directory only has unrelated files', async () => {
-        await writeIssueFile(repoPath, 'unrelated.md');
+        await writeIssueFile(fixture.repoPath, 'unrelated.md');
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssuePushSubIssues({ repoPath }, deps);
+        const instance = new ArcanumSplitIssuePushSubIssues({ repoPath: fixture.repoPath }, deps);
 
         const result = await instance.run(ISSUE_ID);
 
@@ -90,8 +82,8 @@ describe('ArcanumSplitIssuePushSubIssues', () => {
       it('dispatches in ascending sorted order regardless of creation order on disk', async () => {
         // Create the "02" file before the "01" file, to prove sorting
         // (not disk/readdir order) drives dispatch order.
-        await writeIssueFile(repoPath, `${ISSUE_ID}_02_second.md`);
-        await writeIssueFile(repoPath, `${ISSUE_ID}_01_first.md`);
+        await writeIssueFile(fixture.repoPath, `${ISSUE_ID}_02_second.md`);
+        await writeIssueFile(fixture.repoPath, `${ISSUE_ID}_01_first.md`);
 
         const deps = stubDeps({
           createSubIssue: {
@@ -102,7 +94,7 @@ describe('ArcanumSplitIssuePushSubIssues', () => {
             })
           }
         });
-        const instance = new ArcanumSplitIssuePushSubIssues({ repoPath }, deps);
+        const instance = new ArcanumSplitIssuePushSubIssues({ repoPath: fixture.repoPath }, deps);
 
         const result = await instance.run(ISSUE_ID);
 
@@ -123,13 +115,13 @@ describe('ArcanumSplitIssuePushSubIssues', () => {
 
     describe('glob selectivity', () => {
       it('excludes files that do not match <issueId>_[0-9][0-9]*_* from calls and CREATED=', async () => {
-        await writeIssueFile(repoPath, `${ISSUE_ID}_01_matches.md`);
-        await writeIssueFile(repoPath, '1234_01_wrong_issue_id.md');
-        await writeIssueFile(repoPath, `${ISSUE_ID}_1_single_digit_count.md`);
-        await writeIssueFile(repoPath, `${ISSUE_ID}_01nounderscore.md`);
+        await writeIssueFile(fixture.repoPath, `${ISSUE_ID}_01_matches.md`);
+        await writeIssueFile(fixture.repoPath, '1234_01_wrong_issue_id.md');
+        await writeIssueFile(fixture.repoPath, `${ISSUE_ID}_1_single_digit_count.md`);
+        await writeIssueFile(fixture.repoPath, `${ISSUE_ID}_01nounderscore.md`);
 
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssuePushSubIssues({ repoPath }, deps);
+        const instance = new ArcanumSplitIssuePushSubIssues({ repoPath: fixture.repoPath }, deps);
 
         const result = await instance.run(ISSUE_ID);
 
@@ -150,9 +142,9 @@ describe('ArcanumSplitIssuePushSubIssues', () => {
        *   2nd file fails.
        */
       async function runThreeFileBatchFailingOnSecond(error) {
-        await writeIssueFile(repoPath, `${ISSUE_ID}_01_first.md`);
-        await writeIssueFile(repoPath, `${ISSUE_ID}_02_second.md`);
-        await writeIssueFile(repoPath, `${ISSUE_ID}_03_third.md`);
+        await writeIssueFile(fixture.repoPath, `${ISSUE_ID}_01_first.md`);
+        await writeIssueFile(fixture.repoPath, `${ISSUE_ID}_02_second.md`);
+        await writeIssueFile(fixture.repoPath, `${ISSUE_ID}_03_third.md`);
 
         const deps = stubDeps({
           createSubIssue: {
@@ -165,7 +157,7 @@ describe('ArcanumSplitIssuePushSubIssues', () => {
             })
           }
         });
-        const instance = new ArcanumSplitIssuePushSubIssues({ repoPath }, deps);
+        const instance = new ArcanumSplitIssuePushSubIssues({ repoPath: fixture.repoPath }, deps);
 
         const thrown = await captureRejection(instance.run(ISSUE_ID));
 
@@ -201,13 +193,13 @@ describe('ArcanumSplitIssuePushSubIssues', () => {
 
     describe('first file fails immediately', () => {
       it('produces an empty CREATED= and FAILED= set to the first file', async () => {
-        await writeIssueFile(repoPath, `${ISSUE_ID}_01_first.md`);
-        await writeIssueFile(repoPath, `${ISSUE_ID}_02_second.md`);
+        await writeIssueFile(fixture.repoPath, `${ISSUE_ID}_01_first.md`);
+        await writeIssueFile(fixture.repoPath, `${ISSUE_ID}_02_second.md`);
 
         const deps = stubDeps({
           createSubIssue: { run: jasmine.createSpy('run').and.rejectWith(new DispatchFailure('STATUS=failed\n')) }
         });
-        const instance = new ArcanumSplitIssuePushSubIssues({ repoPath }, deps);
+        const instance = new ArcanumSplitIssuePushSubIssues({ repoPath: fixture.repoPath }, deps);
 
         const thrown = await captureRejection(instance.run(ISSUE_ID));
 
