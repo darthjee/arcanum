@@ -1,33 +1,27 @@
 import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
 import { createAutoFixIssueGithub } from '../../../support/factories/autoFixIssueGithub.js';
+import { registerSyncsGithubStateSharedExamples } from '../../../support/sharedExamples/githubStateSyncSharedExamples.js';
 import { captureRejection } from '../../../support/utils/captureRejection.js';
 
 describe('AutoFixIssueGithub#prView', () => {
-  it('prints URL/IS_DRAFT and persists pr_url when on an issue-<id> branch', async () => {
-    const pull = { html_url: 'https://github.com/darthjee/arcanum/pull/9', draft: true };
+  const pull = { html_url: 'https://github.com/darthjee/arcanum/pull/9', draft: true };
+
+  it('prints URL/IS_DRAFT when on an issue-<id> branch', async () => {
     const githubClient = { getPr: jasmine.createSpy('getPr').and.resolveTo(pull) };
-    const issueStateService = {
-      set: jasmine.createSpy('set').and.resolveTo(),
-      setJson: jasmine.createSpy('setJson').and.resolveTo()
-    };
-    const github = createAutoFixIssueGithub({ branch: 'issue-5', githubClient, issueStateService });
+    const github = createAutoFixIssueGithub({ branch: 'issue-5', githubClient });
 
     await expectAsync(github.prView()).toBeResolvedTo(
       `URL=${pull.html_url}\nIS_DRAFT=true\n`
     );
-    expect(issueStateService.set).toHaveBeenCalledWith('5', 'pr_url', pull.html_url);
-    expect(issueStateService.set).toHaveBeenCalledWith('5', 'pr_id', '9');
   });
 
-  it('does not persist pr state off an issue-<id> branch', async () => {
-    const pull = { html_url: 'https://github.com/darthjee/arcanum/pull/9', draft: false };
-    const githubClient = { getPr: jasmine.createSpy('getPr').and.resolveTo(pull) };
-    const issueStateService = { set: jasmine.createSpy('set').and.resolveTo() };
-    const github = createAutoFixIssueGithub({ branch: 'main', githubClient, issueStateService });
-
-    await github.prView();
-
-    expect(issueStateService.set).not.toHaveBeenCalled();
+  registerSyncsGithubStateSharedExamples((github) => github.prView(), {
+    prUrl: pull.html_url,
+    prId: '9',
+    tag: false,
+    buildFixture: () => ({
+      githubClient: { getPr: jasmine.createSpy('getPr').and.resolveTo(pull) }
+    })
   });
 
   it('rejects with an empty-stdout DispatchFailure (exit 1) when no pull request is found', async () => {

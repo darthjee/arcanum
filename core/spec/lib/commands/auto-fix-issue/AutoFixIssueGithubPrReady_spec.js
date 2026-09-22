@@ -1,4 +1,5 @@
 import { createAutoFixIssueGithub, REPO } from '../../../support/factories/autoFixIssueGithub.js';
+import { registerSyncsGithubStateSharedExamples } from '../../../support/sharedExamples/githubStateSyncSharedExamples.js';
 
 describe('AutoFixIssueGithub#prReady', () => {
   const pull = { number: 9, node_id: 'PR_kwABC', html_url: 'https://github.com/darthjee/arcanum/pull/9' };
@@ -34,41 +35,14 @@ describe('AutoFixIssueGithub#prReady', () => {
     await expectAsync(github.prReady()).toBeRejectedWithError(`Error: could not mark PR ready on ${REPO}`);
   });
 
-  it('persists pr state and syncs labels when on an issue-<id> branch', async () => {
-    const githubClient = {
-      getPr: jasmine.createSpy('getPr').and.resolveTo(pull),
-      markPrReady: jasmine.createSpy('markPrReady').and.resolveTo()
-    };
-    const issueStateService = {
-      set: jasmine.createSpy('set').and.resolveTo(),
-      setJson: jasmine.createSpy('setJson').and.resolveTo()
-    };
-    const issueTagger = {
-      mutateTag: jasmine.createSpy('mutateTag').and.resolveTo(),
-      fetchLabels: jasmine.createSpy('fetchLabels').and.resolveTo([]),
-      addLabel: jasmine.createSpy('addLabel').and.resolveTo()
-    };
-    const github = createAutoFixIssueGithub({ branch: 'issue-5', githubClient, issueStateService, issueTagger });
-
-    await github.prReady();
-
-    expect(issueStateService.set).toHaveBeenCalledWith('5', 'pr_url', pull.html_url);
-    expect(issueTagger.mutateTag).toHaveBeenCalledWith('5', REPO, 'add', 'pr');
-  });
-
-  it('is a no-op for state persistence/sync off an issue-<id> branch', async () => {
-    const githubClient = {
-      getPr: jasmine.createSpy('getPr').and.resolveTo(pull),
-      markPrReady: jasmine.createSpy('markPrReady').and.resolveTo()
-    };
-    const issueStateService = { set: jasmine.createSpy('set').and.resolveTo() };
-    const issueTagger = { mutateTag: jasmine.createSpy('mutateTag').and.resolveTo() };
-    const github = createAutoFixIssueGithub({ branch: 'main', githubClient, issueStateService, issueTagger });
-
-    await github.prReady();
-
-    expect(issueStateService.set).not.toHaveBeenCalled();
-    expect(issueTagger.mutateTag).not.toHaveBeenCalled();
+  registerSyncsGithubStateSharedExamples((github) => github.prReady(), {
+    prUrl: pull.html_url,
+    buildFixture: () => ({
+      githubClient: {
+        getPr: jasmine.createSpy('getPr').and.resolveTo(pull),
+        markPrReady: jasmine.createSpy('markPrReady').and.resolveTo()
+      }
+    })
   });
 
   it('tolerates a failed best-effort re-fetch of the PR url after marking ready', async () => {
