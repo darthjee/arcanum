@@ -21,44 +21,34 @@ describe('IssueState', () => {
     return new RepoContext({ repoPath: contextRepoPath });
   }
 
-  /**
-   * @param {object} [overrides] - collaborator overrides for `IssueState`.
-   * @returns {object} the deps object passed to `new IssueState(context, deps)`.
-   */
-  function stubDeps(overrides = {}) {
-    return {
-      ...overrides
-    };
-  }
-
   describe('#run', () => {
     describe('argument validation', () => {
       it('throws the usage message when the subcommand is missing', async () => {
-        const issueState = new IssueState(buildContext(), stubDeps());
+        const issueState = new IssueState(buildContext());
 
         await expectAsync(issueState.run()).toBeRejectedWithError(new RegExp(USAGE_SNIPPET));
       });
 
       it('throws the usage message when the id is missing', async () => {
-        const issueState = new IssueState(buildContext(), stubDeps());
+        const issueState = new IssueState(buildContext());
 
         await expectAsync(issueState.run('get', undefined, 'title')).toBeRejectedWithError(new RegExp(USAGE_SNIPPET));
       });
 
       it('throws the usage message when the field is missing', async () => {
-        const issueState = new IssueState(buildContext(), stubDeps());
+        const issueState = new IssueState(buildContext());
 
         await expectAsync(issueState.run('get', '42')).toBeRejectedWithError(new RegExp(USAGE_SNIPPET));
       });
 
       it('throws when the injected context has no repoPath', async () => {
-        const issueState = new IssueState(buildContext({ repoPath: '' }), stubDeps());
+        const issueState = new IssueState(buildContext({ repoPath: '' }));
 
         await expectAsync(issueState.run('get', '42', 'title')).toBeRejectedWithError(new RegExp(USAGE_SNIPPET));
       });
 
       it('throws Unknown command for an unrecognized subcommand', async () => {
-        const issueState = new IssueState(buildContext(), stubDeps());
+        const issueState = new IssueState(buildContext());
 
         await expectAsync(issueState.run('bogus', '42', 'title')).toBeRejectedWithError(/Unknown command: bogus/);
       });
@@ -83,7 +73,7 @@ describe('IssueState', () => {
             stateFile: path.join(fixture.repoPath, '.claude', 'state', `issue-${id}.json`),
             lockFile: path.join(fixture.repoPath, '.claude', 'state', `issue-${id}.lock`)
           }));
-        issueState = new IssueState(buildContext(), stubDeps({ issueStatePaths: { paths: pathsSpy } }));
+        issueState = new IssueState(buildContext(), { issueStatePaths: { paths: pathsSpy } });
         spyOn(issueState, '_issueStateService').and.returnValue(service);
       });
 
@@ -138,7 +128,7 @@ describe('IssueState', () => {
 
     describe('end to end against a real state file', () => {
       it('round-trips a set then get through the default IssueStateService', async () => {
-        const issueState = new IssueState(buildContext(), stubDeps());
+        const issueState = new IssueState(buildContext());
 
         await issueState.run('set', '7', 'title', 'Round Trip');
         const output = await issueState.run('get', '7', 'title');
@@ -151,7 +141,7 @@ describe('IssueState', () => {
       });
 
       it('append-json builds up an array field', async () => {
-        const issueState = new IssueState(buildContext(), stubDeps());
+        const issueState = new IssueState(buildContext());
 
         await issueState.run('append-json', '7', 'tags', '"a"');
         await issueState.run('append-json', '7', 'tags', '"b"');
@@ -166,7 +156,7 @@ describe('IssueState', () => {
   describe('#_issueStateService', () => {
     it('binds the built service to the injected RepoContext', async () => {
       const context = buildContext();
-      const issueState = new IssueState(context, stubDeps());
+      const issueState = new IssueState(context);
 
       const service = issueState._issueStateService();
 

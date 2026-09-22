@@ -6,17 +6,6 @@ import { splitIssueCommandFixture } from '../../../support/factories/splitIssueC
 const ISSUE_ID = '999';
 const ISSUES_DIR = 'docs/agents/issues';
 
-/**
- * @param {object} [overrides] - collaborator overrides.
- * @returns {object} a set of stub collaborators for
- *   ArcanumSplitIssueCreateSubIssueFile.
- */
-function stubDeps(overrides = {}) {
-  return {
-    ...overrides
-  };
-}
-
 describe('ArcanumSplitIssueCreateSubIssueFile', () => {
   const fixture = splitIssueCommandFixture({ seedFile: { name: 'body.md', content: '' } });
 
@@ -25,29 +14,25 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
       const USAGE = 'Usage: create_sub_issue_file.sh <repo_path> <issue_id> <title> <body_file>';
 
       it('throws the usage message when repoPath is missing', async () => {
-        const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: '' }, deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: '' });
 
         await expectAsync(instance.run(ISSUE_ID, 'Title', fixture.seedFilePath)).toBeRejectedWithError(USAGE);
       });
 
       it('throws the usage message when issueId is missing', async () => {
-        const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath }, deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath });
 
         await expectAsync(instance.run('', 'Title', fixture.seedFilePath)).toBeRejectedWithError(USAGE);
       });
 
       it('throws the usage message when title is missing', async () => {
-        const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath }, deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath });
 
         await expectAsync(instance.run(ISSUE_ID, '', fixture.seedFilePath)).toBeRejectedWithError(USAGE);
       });
 
       it('throws the usage message when bodyFile is missing', async () => {
-        const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath }, deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath });
 
         await expectAsync(instance.run(ISSUE_ID, 'Title', '')).toBeRejectedWithError(USAGE);
       });
@@ -55,8 +40,7 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
 
     describe('when bodyFile does not exist', () => {
       it('throws "Error: file not found: <bodyFile>" using the raw argument in the message', async () => {
-        const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath }, deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath });
         const missingBodyFile = path.join(fixture.repoPath, 'missing.md');
 
         await expectAsync(instance.run(ISSUE_ID, 'Title', missingBodyFile)).toBeRejectedWithError(
@@ -65,8 +49,7 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
       });
 
       it('resolves a relative bodyFile against repoPath, mirroring the shell cd', async () => {
-        const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath }, deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath });
 
         await expectAsync(instance.run(ISSUE_ID, 'Title', 'missing.md')).toBeRejectedWithError(
           'Error: file not found: missing.md'
@@ -76,8 +59,7 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
 
     describe('sub-issue counting', () => {
       it('starts a fresh id at count 01', async () => {
-        const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath }, deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath });
 
         const result = await instance.run(ISSUE_ID, 'First Sub Issue', fixture.seedFilePath);
 
@@ -88,8 +70,7 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
       });
 
       it('increments the count on a second call', async () => {
-        const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath }, deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath });
 
         await instance.run(ISSUE_ID, 'First Sub Issue', fixture.seedFilePath);
         const result = await instance.run(ISSUE_ID, 'Second Sub Issue', fixture.seedFilePath);
@@ -98,8 +79,7 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
       });
 
       it('picks up an out-of-band file created outside the tool', async () => {
-        const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath }, deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath });
         const issuesDir = path.join(fixture.repoPath, ISSUES_DIR);
 
         await mkdir(issuesDir, { recursive: true });
@@ -111,8 +91,7 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
       });
 
       it('never reuses a count freed by a deleted file (gap-tolerant)', async () => {
-        const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath }, deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath });
         const issuesDir = path.join(fixture.repoPath, ISSUES_DIR);
 
         await mkdir(issuesDir, { recursive: true });
@@ -127,8 +106,7 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
       });
 
       it('skips filenames whose count segment is not numeric', async () => {
-        const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath }, deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath });
         const issuesDir = path.join(fixture.repoPath, ISSUES_DIR);
 
         await mkdir(issuesDir, { recursive: true });
@@ -143,8 +121,7 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
       });
 
       it('ignores filenames with fewer than 2 leading digits', async () => {
-        const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath }, deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath });
         const issuesDir = path.join(fixture.repoPath, ISSUES_DIR);
 
         await mkdir(issuesDir, { recursive: true });
@@ -158,8 +135,7 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
       });
 
       it('creates docs/agents/issues/ when missing', async () => {
-        const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath }, deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath });
 
         const result = await instance.run(ISSUE_ID, 'First Sub Issue', fixture.seedFilePath);
 
@@ -169,8 +145,7 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
 
     describe('title-to-snake_case transform', () => {
       it('lowercases, replaces punctuation, collapses repeated separators, and trims ends', async () => {
-        const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath }, deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath });
 
         const result = await instance.run(ISSUE_ID, 'Hello, World! Foo-Bar', fixture.seedFilePath);
 
@@ -178,8 +153,7 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
       });
 
       it('strips leading/trailing separators produced by leading/trailing punctuation', async () => {
-        const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath }, deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath });
 
         const result = await instance.run(ISSUE_ID, '__Weird__  Title__', fixture.seedFilePath);
 
@@ -190,8 +164,7 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
     describe('success output contract', () => {
       it('writes "# <title>\\n\\n<body>" and returns FILE=<path>\\n', async () => {
         await writeFile(fixture.seedFilePath, 'body content here\nsecond line\n');
-        const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath }, deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath });
 
         const result = await instance.run(ISSUE_ID, 'My Title', fixture.seedFilePath);
         const expectedFile = `${ISSUES_DIR}/${ISSUE_ID}_01_my_title.md`;
@@ -205,8 +178,7 @@ describe('ArcanumSplitIssueCreateSubIssueFile', () => {
 
       it('copies the body file bytes verbatim, without trailing-newline normalization', async () => {
         await writeFile(fixture.seedFilePath, 'no trailing newline');
-        const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath }, deps);
+        const instance = new ArcanumSplitIssueCreateSubIssueFile({ repoPath: fixture.repoPath });
 
         await instance.run(ISSUE_ID, 'My Title', fixture.seedFilePath);
 
