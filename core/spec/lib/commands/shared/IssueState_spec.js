@@ -2,12 +2,12 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import IssueState from '../../../../lib/commands/shared/IssueState.js';
 import RepoContext from '../../../../lib/context/RepoContext.js';
-import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
+import { splitIssueCommandFixture } from '../../../support/factories/splitIssueCommandFixture.js';
 
 const USAGE_SNIPPET = 'Usage: issue_state.sh <repo_path> get <id> <field>';
 
 describe('IssueState', () => {
-  let repoPath;
+  const fixture = splitIssueCommandFixture({ prefix: 'arcanum-core-issue-state-spec-' });
 
   /**
    * Build a real `RepoContext` bound to the per-test temp dir — mirrors
@@ -17,56 +17,38 @@ describe('IssueState', () => {
    *   to the per-test temp dir).
    * @returns {RepoContext} the assembled context.
    */
-  function buildContext({ repoPath: contextRepoPath = repoPath } = {}) {
+  function buildContext({ repoPath: contextRepoPath = fixture.repoPath } = {}) {
     return new RepoContext({ repoPath: contextRepoPath });
   }
-
-  /**
-   * @param {object} [overrides] - collaborator overrides for `IssueState`.
-   * @returns {object} the deps object passed to `new IssueState(context, deps)`.
-   */
-  function stubDeps(overrides = {}) {
-    return {
-      ...overrides
-    };
-  }
-
-  beforeEach(async () => {
-    repoPath = await createTempDir('arcanum-core-issue-state-spec-');
-  });
-
-  afterEach(async () => {
-    await removeTempDir(repoPath);
-  });
 
   describe('#run', () => {
     describe('argument validation', () => {
       it('throws the usage message when the subcommand is missing', async () => {
-        const issueState = new IssueState(buildContext(), stubDeps());
+        const issueState = new IssueState(buildContext());
 
         await expectAsync(issueState.run()).toBeRejectedWithError(new RegExp(USAGE_SNIPPET));
       });
 
       it('throws the usage message when the id is missing', async () => {
-        const issueState = new IssueState(buildContext(), stubDeps());
+        const issueState = new IssueState(buildContext());
 
         await expectAsync(issueState.run('get', undefined, 'title')).toBeRejectedWithError(new RegExp(USAGE_SNIPPET));
       });
 
       it('throws the usage message when the field is missing', async () => {
-        const issueState = new IssueState(buildContext(), stubDeps());
+        const issueState = new IssueState(buildContext());
 
         await expectAsync(issueState.run('get', '42')).toBeRejectedWithError(new RegExp(USAGE_SNIPPET));
       });
 
       it('throws when the injected context has no repoPath', async () => {
-        const issueState = new IssueState(buildContext({ repoPath: '' }), stubDeps());
+        const issueState = new IssueState(buildContext({ repoPath: '' }));
 
         await expectAsync(issueState.run('get', '42', 'title')).toBeRejectedWithError(new RegExp(USAGE_SNIPPET));
       });
 
       it('throws Unknown command for an unrecognized subcommand', async () => {
-        const issueState = new IssueState(buildContext(), stubDeps());
+        const issueState = new IssueState(buildContext());
 
         await expectAsync(issueState.run('bogus', '42', 'title')).toBeRejectedWithError(/Unknown command: bogus/);
       });
@@ -87,11 +69,11 @@ describe('IssueState', () => {
         pathsSpy = jasmine
           .createSpy('paths')
           .and.callFake((id) => ({
-            stateDir: path.join(repoPath, '.claude', 'state'),
-            stateFile: path.join(repoPath, '.claude', 'state', `issue-${id}.json`),
-            lockFile: path.join(repoPath, '.claude', 'state', `issue-${id}.lock`)
+            stateDir: path.join(fixture.repoPath, '.claude', 'state'),
+            stateFile: path.join(fixture.repoPath, '.claude', 'state', `issue-${id}.json`),
+            lockFile: path.join(fixture.repoPath, '.claude', 'state', `issue-${id}.lock`)
           }));
-        issueState = new IssueState(buildContext(), stubDeps({ issueStatePaths: { paths: pathsSpy } }));
+        issueState = new IssueState(buildContext(), { issueStatePaths: { paths: pathsSpy } });
         spyOn(issueState, '_issueStateService').and.returnValue(service);
       });
 
@@ -146,25 +128,25 @@ describe('IssueState', () => {
 
     describe('end to end against a real state file', () => {
       it('round-trips a set then get through the default IssueStateService', async () => {
-        const issueState = new IssueState(buildContext(), stubDeps());
+        const issueState = new IssueState(buildContext());
 
         await issueState.run('set', '7', 'title', 'Round Trip');
         const output = await issueState.run('get', '7', 'title');
 
         expect(output).toEqual('Round Trip\n');
 
-        const stateFile = path.join(repoPath, '.claude', 'state', 'issue-7.json');
+        const stateFile = path.join(fixture.repoPath, '.claude', 'state', 'issue-7.json');
         const written = JSON.parse(await readFile(stateFile, 'utf8'));
         expect(written).toEqual({ title: 'Round Trip' });
       });
 
       it('append-json builds up an array field', async () => {
-        const issueState = new IssueState(buildContext(), stubDeps());
+        const issueState = new IssueState(buildContext());
 
         await issueState.run('append-json', '7', 'tags', '"a"');
         await issueState.run('append-json', '7', 'tags', '"b"');
 
-        const stateFile = path.join(repoPath, '.claude', 'state', 'issue-7.json');
+        const stateFile = path.join(fixture.repoPath, '.claude', 'state', 'issue-7.json');
         const written = JSON.parse(await readFile(stateFile, 'utf8'));
         expect(written).toEqual({ tags: ['a', 'b'] });
       });
@@ -174,13 +156,13 @@ describe('IssueState', () => {
   describe('#_issueStateService', () => {
     it('binds the built service to the injected RepoContext', async () => {
       const context = buildContext();
-      const issueState = new IssueState(context, stubDeps());
+      const issueState = new IssueState(context);
 
       const service = issueState._issueStateService();
 
       await service.set('9', 'state', 'open');
 
-      const stateFile = path.join(repoPath, '.claude', 'state', 'issue-9.json');
+      const stateFile = path.join(fixture.repoPath, '.claude', 'state', 'issue-9.json');
       const written = JSON.parse(await readFile(stateFile, 'utf8'));
       expect(written).toEqual({ state: 'open' });
     });

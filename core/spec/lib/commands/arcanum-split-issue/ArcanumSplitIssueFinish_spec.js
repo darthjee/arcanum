@@ -2,7 +2,7 @@ import { access, mkdir, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ArcanumSplitIssueFinish from '../../../../lib/commands/arcanum-split-issue/ArcanumSplitIssueFinish.js';
-import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
+import { splitIssueCommandFixture } from '../../../support/factories/splitIssueCommandFixture.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..');
 
@@ -22,15 +22,7 @@ function stubDeps(overrides = {}) {
 }
 
 describe('ArcanumSplitIssueFinish', () => {
-  let repoPath;
-
-  beforeEach(async () => {
-    repoPath = await createTempDir();
-  });
-
-  afterEach(async () => {
-    await removeTempDir(repoPath);
-  });
+  const fixture = splitIssueCommandFixture();
 
   describe('#run', () => {
     describe('argument validation', () => {
@@ -45,7 +37,7 @@ describe('ArcanumSplitIssueFinish', () => {
 
       it('throws the usage message when issueId is missing', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueFinish({ repoPath }, deps);
+        const instance = new ArcanumSplitIssueFinish({ repoPath: fixture.repoPath }, deps);
 
         await expectAsync(instance.run('')).toBeRejectedWithError(
           'Usage: finish.sh <repo_path> <issue_id>'
@@ -56,26 +48,26 @@ describe('ArcanumSplitIssueFinish', () => {
     describe('relabeling via github.sh mark-split', () => {
       it('invokes execFileAsync with the script path and array args', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueFinish({ repoPath }, deps);
+        const instance = new ArcanumSplitIssueFinish({ repoPath: fixture.repoPath }, deps);
 
         await instance.run(ISSUE_ID);
 
         expect(deps.execFileAsync).toHaveBeenCalledWith(
           jasmine.stringMatching(/arcanum-split-issue[/\\]scripts[/\\]github\.sh$/),
-          ['mark-split', repoPath, ISSUE_ID]
+          ['mark-split', fixture.repoPath, ISSUE_ID]
         );
       });
 
       it('resolves github.sh from the skill install root, not repoPath, and that path exists on disk', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueFinish({ repoPath }, deps);
+        const instance = new ArcanumSplitIssueFinish({ repoPath: fixture.repoPath }, deps);
 
         await instance.run(ISSUE_ID);
 
         const [scriptPath] = deps.execFileAsync.calls.mostRecent().args;
 
         expect(scriptPath).toEqual(path.join(REPO_ROOT, 'arcanum-split-issue', 'scripts', 'github.sh'));
-        expect(scriptPath.startsWith(repoPath)).toBeFalse();
+        expect(scriptPath.startsWith(fixture.repoPath)).toBeFalse();
         await expectAsync(access(scriptPath)).toBeResolved();
       });
 
@@ -84,7 +76,7 @@ describe('ArcanumSplitIssueFinish', () => {
           const deps = stubDeps({
             execFileAsync: jasmine.createSpy('execFileAsync').and.rejectWith(new Error('gh: boom'))
           });
-          const instance = new ArcanumSplitIssueFinish({ repoPath }, deps);
+          const instance = new ArcanumSplitIssueFinish({ repoPath: fixture.repoPath }, deps);
 
           await expectAsync(instance.run(ISSUE_ID)).toBeRejectedWithError('gh: boom');
           expect(deps.safeBranch.checkout).not.toHaveBeenCalled();
@@ -93,62 +85,68 @@ describe('ArcanumSplitIssueFinish', () => {
     });
 
     describe('file cleanup', () => {
-      it('deletes only matching <id>-*/<id>_* files, in that order, listing them relative to repoPath', async () => {
-        const issuesDir = path.join(repoPath, ISSUES_DIR);
-
-        await mkdir(issuesDir, { recursive: true });
-        await writeFile(path.join(issuesDir, `${ISSUE_ID}-first.md`), 'a');
-        await writeFile(path.join(issuesDir, `${ISSUE_ID}-second.md`), 'b');
-        await writeFile(path.join(issuesDir, `${ISSUE_ID}_third.md`), 'c');
-        await writeFile(path.join(issuesDir, 'unrelated.md'), 'd');
-        await writeFile(path.join(issuesDir, `1${ISSUE_ID}-not-matching.md`), 'e');
-
-        const deps = stubDeps();
-        const instance = new ArcanumSplitIssueFinish({ repoPath }, deps);
-
-        const result = await instance.run(ISSUE_ID);
-
-        expect(result).toEqual(
-          'Deleted:\n' +
+      const rows = [
+        {
+          description: 'deletes only matching <id>-*/<id>_* files, in that order, listing them relative to repoPath',
+          filesToSeed: {
+            [`${ISSUE_ID}-first.md`]: 'a',
+            [`${ISSUE_ID}-second.md`]: 'b',
+            [`${ISSUE_ID}_third.md`]: 'c',
+            'unrelated.md': 'd',
+            [`1${ISSUE_ID}-not-matching.md`]: 'e'
+          },
+          expectedResult:
+            'Deleted:\n' +
             `  ${ISSUES_DIR}/${ISSUE_ID}-first.md\n` +
             `  ${ISSUES_DIR}/${ISSUE_ID}-second.md\n` +
             `  ${ISSUES_DIR}/${ISSUE_ID}_third.md\n` +
-            'BRANCH=main\n'
-        );
+            'BRANCH=main\n',
+          expectedRemaining: ['1999-not-matching.md', 'unrelated.md']
+        },
+        {
+          description: 'returns "Deleted: (nothing to clean up)\\n" when no files match',
+          filesToSeed: { 'unrelated.md': 'd' },
+          expectedResult: 'Deleted: (nothing to clean up)\nBRANCH=main\n'
+        },
+        {
+          description: 'returns "Deleted: (nothing to clean up)\\n" when the issues directory does not exist',
+          filesToSeed: null,
+          expectedResult: 'Deleted: (nothing to clean up)\nBRANCH=main\n'
+        }
+      ];
 
-        const remaining = await readdir(issuesDir);
+      for (const { description, filesToSeed, expectedResult, expectedRemaining } of rows) {
+        it(description, async () => {
+          const issuesDir = path.join(fixture.repoPath, ISSUES_DIR);
 
-        expect(remaining.sort()).toEqual(['1999-not-matching.md', 'unrelated.md'].sort());
-      });
+          if (filesToSeed) {
+            await mkdir(issuesDir, { recursive: true });
 
-      it('returns "Deleted: (nothing to clean up)\\n" when no files match', async () => {
-        const issuesDir = path.join(repoPath, ISSUES_DIR);
+            for (const [name, content] of Object.entries(filesToSeed)) {
+              await writeFile(path.join(issuesDir, name), content);
+            }
+          }
 
-        await mkdir(issuesDir, { recursive: true });
-        await writeFile(path.join(issuesDir, 'unrelated.md'), 'd');
+          const deps = stubDeps();
+          const instance = new ArcanumSplitIssueFinish({ repoPath: fixture.repoPath }, deps);
 
-        const deps = stubDeps();
-        const instance = new ArcanumSplitIssueFinish({ repoPath }, deps);
+          const result = await instance.run(ISSUE_ID);
 
-        const result = await instance.run(ISSUE_ID);
+          expect(result).toEqual(expectedResult);
 
-        expect(result).toEqual('Deleted: (nothing to clean up)\nBRANCH=main\n');
-      });
+          if (expectedRemaining) {
+            const remaining = await readdir(issuesDir);
 
-      it('returns "Deleted: (nothing to clean up)\\n" when the issues directory does not exist', async () => {
-        const deps = stubDeps();
-        const instance = new ArcanumSplitIssueFinish({ repoPath }, deps);
-
-        const result = await instance.run(ISSUE_ID);
-
-        expect(result).toEqual('Deleted: (nothing to clean up)\nBRANCH=main\n');
-      });
+            expect(remaining.sort()).toEqual(expectedRemaining.sort());
+          }
+        });
+      }
     });
 
     describe('safe-branch release', () => {
       it('calls checkout() (context-bound), not run, and formats the resolved branch as BRANCH=<branch>\\n', async () => {
         const deps = stubDeps({ safeBranch: { checkout: jasmine.createSpy('checkout').and.resolveTo('feature-x') } });
-        const instance = new ArcanumSplitIssueFinish({ repoPath }, deps);
+        const instance = new ArcanumSplitIssueFinish({ repoPath: fixture.repoPath }, deps);
 
         const result = await instance.run(ISSUE_ID);
 
@@ -162,7 +160,7 @@ describe('ArcanumSplitIssueFinish', () => {
           const deps = stubDeps({
             safeBranch: { checkout: jasmine.createSpy('checkout').and.rejectWith(new Error('dirty tree')) }
           });
-          const instance = new ArcanumSplitIssueFinish({ repoPath }, deps);
+          const instance = new ArcanumSplitIssueFinish({ repoPath: fixture.repoPath }, deps);
 
           await expectAsync(instance.run(ISSUE_ID)).toBeRejectedWithError('dirty tree');
         });
@@ -171,13 +169,13 @@ describe('ArcanumSplitIssueFinish', () => {
 
     describe('full success path', () => {
       it('resolves the Deleted: block immediately followed by BRANCH=<branch>\\n', async () => {
-        const issuesDir = path.join(repoPath, ISSUES_DIR);
+        const issuesDir = path.join(fixture.repoPath, ISSUES_DIR);
 
         await mkdir(issuesDir, { recursive: true });
         await writeFile(path.join(issuesDir, `${ISSUE_ID}-split.md`), 'a');
 
         const deps = stubDeps({ safeBranch: { checkout: jasmine.createSpy('checkout').and.resolveTo('main') } });
-        const instance = new ArcanumSplitIssueFinish({ repoPath }, deps);
+        const instance = new ArcanumSplitIssueFinish({ repoPath: fixture.repoPath }, deps);
 
         const result = await instance.run(ISSUE_ID);
 

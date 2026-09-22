@@ -3,8 +3,8 @@ import path from 'node:path';
 import ArcanumSplitIssueCreateSubIssue from '../../../../lib/commands/arcanum-split-issue/ArcanumSplitIssueCreateSubIssue.js';
 import RepoContext from '../../../../lib/context/RepoContext.js';
 import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
+import { splitIssueCommandFixture } from '../../../support/factories/splitIssueCommandFixture.js';
 import { captureRejection } from '../../../support/utils/captureRejection.js';
-import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 const ISSUE_ID = '999';
 const USAGE = 'Usage: create_sub_issue.sh <repo_path> <issue_id> <sub_issue_file>';
@@ -24,17 +24,8 @@ function stubDeps(overrides = {}) {
 }
 
 describe('ArcanumSplitIssueCreateSubIssue', () => {
-  let repoPath;
-  let subIssueFile;
-
-  beforeEach(async () => {
-    repoPath = await createTempDir();
-    subIssueFile = path.join(repoPath, 'draft.md');
-    await writeFile(subIssueFile, '# My Sub Issue\n\nFirst line of body.\n');
-  });
-
-  afterEach(async () => {
-    await removeTempDir(repoPath);
+  const fixture = splitIssueCommandFixture({
+    seedFile: { name: 'draft.md', content: '# My Sub Issue\n\nFirst line of body.\n' }
   });
 
   describe('#run', () => {
@@ -43,19 +34,19 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
         const deps = stubDeps();
         const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath: '' }), deps);
 
-        await expectAsync(instance.run(ISSUE_ID, subIssueFile)).toBeRejectedWithError(USAGE);
+        await expectAsync(instance.run(ISSUE_ID, fixture.seedFilePath)).toBeRejectedWithError(USAGE);
       });
 
       it('throws the usage message when issueId is missing', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath }), deps);
+        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath: fixture.repoPath }), deps);
 
-        await expectAsync(instance.run('', subIssueFile)).toBeRejectedWithError(USAGE);
+        await expectAsync(instance.run('', fixture.seedFilePath)).toBeRejectedWithError(USAGE);
       });
 
       it('throws the usage message when subIssueFile is missing', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath }), deps);
+        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath: fixture.repoPath }), deps);
 
         await expectAsync(instance.run(ISSUE_ID, '')).toBeRejectedWithError(USAGE);
       });
@@ -64,8 +55,8 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
     describe('when subIssueFile does not exist', () => {
       it('throws "Error: file not found: <path>" using the raw argument in the message', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath }), deps);
-        const missingFile = path.join(repoPath, 'missing.md');
+        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath: fixture.repoPath }), deps);
+        const missingFile = path.join(fixture.repoPath, 'missing.md');
 
         await expectAsync(instance.run(ISSUE_ID, missingFile)).toBeRejectedWithError(
           `Error: file not found: ${missingFile}`
@@ -74,7 +65,7 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
 
       it('resolves a relative subIssueFile against repoPath, mirroring the shell cd', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath }), deps);
+        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath: fixture.repoPath }), deps);
 
         await expectAsync(instance.run(ISSUE_ID, 'missing.md')).toBeRejectedWithError(
           'Error: file not found: missing.md'
@@ -85,7 +76,7 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
     describe('title/body parsing', () => {
       it('splits the title (leading "# " stripped) from the body, including blank lines inside the body', async () => {
         await writeFile(
-          subIssueFile,
+          fixture.seedFilePath,
           '# My Sub Issue\n\nFirst line of body.\n\nSecond paragraph.\n'
         );
         let capturedBody;
@@ -98,9 +89,9 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
             })
           }
         });
-        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath }), deps);
+        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath: fixture.repoPath }), deps);
 
-        await instance.run(ISSUE_ID, subIssueFile);
+        await instance.run(ISSUE_ID, fixture.seedFilePath);
 
         expect(deps.spawnIssue.run).toHaveBeenCalledWith(
           ISSUE_ID,
@@ -112,11 +103,11 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
       });
 
       it('keeps a title line without a leading "# " verbatim', async () => {
-        await writeFile(subIssueFile, 'Plain Title\n\nBody.\n');
+        await writeFile(fixture.seedFilePath, 'Plain Title\n\nBody.\n');
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath }), deps);
+        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath: fixture.repoPath }), deps);
 
-        await instance.run(ISSUE_ID, subIssueFile);
+        await instance.run(ISSUE_ID, fixture.seedFilePath);
 
         expect(deps.spawnIssue.run).toHaveBeenCalledWith(
           ISSUE_ID,
@@ -129,11 +120,11 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
 
     describe('count-segment derivation for the progress line', () => {
       it('uses the numeric segment between "<issueId>_" and the next "_"', async () => {
-        const filePath = path.join(repoPath, `${ISSUE_ID}_02_my_sub_issue.md`);
+        const filePath = path.join(fixture.repoPath, `${ISSUE_ID}_02_my_sub_issue.md`);
 
         await writeFile(filePath, '# My Sub Issue\n\nBody.\n');
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath }), deps);
+        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath: fixture.repoPath }), deps);
 
         const result = await instance.run(ISSUE_ID, filePath);
 
@@ -141,11 +132,11 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
       });
 
       it('falls back to "?" when the segment is not purely numeric', async () => {
-        const filePath = path.join(repoPath, `${ISSUE_ID}_abc_my_sub_issue.md`);
+        const filePath = path.join(fixture.repoPath, `${ISSUE_ID}_abc_my_sub_issue.md`);
 
         await writeFile(filePath, '# My Sub Issue\n\nBody.\n');
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath }), deps);
+        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath: fixture.repoPath }), deps);
 
         const result = await instance.run(ISSUE_ID, filePath);
 
@@ -156,9 +147,9 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
     describe('happy path', () => {
       it('delegates to spawnIssue.run with --as-subissue, tracks the new id in state, and resolves STATUS=ok', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath }), deps);
+        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath: fixture.repoPath }), deps);
 
-        const result = await instance.run(ISSUE_ID, subIssueFile);
+        const result = await instance.run(ISSUE_ID, fixture.seedFilePath);
 
         expect(deps.spawnIssue.run).toHaveBeenCalledWith(
           ISSUE_ID,
@@ -166,7 +157,7 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
           jasmine.any(String),
           '--as-subissue'
         );
-        const stateFile = path.join(repoPath, '.claude', 'state', `issue-${ISSUE_ID}.json`);
+        const stateFile = path.join(fixture.repoPath, '.claude', 'state', `issue-${ISSUE_ID}.json`);
         const written = JSON.parse(await readFile(stateFile, 'utf8'));
 
         expect(written).toEqual({ 'sub-issues': ['42'] });
@@ -175,9 +166,9 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
 
       it('cleans up the temp body file after a successful run', async () => {
         const deps = stubDeps();
-        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath }), deps);
+        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath: fixture.repoPath }), deps);
 
-        await instance.run(ISSUE_ID, subIssueFile);
+        await instance.run(ISSUE_ID, fixture.seedFilePath);
 
         const [, , bodyFile] = deps.spawnIssue.run.calls.mostRecent().args;
 
@@ -190,9 +181,9 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
         const deps = stubDeps({
           spawnIssue: { run: jasmine.createSpy('run').and.rejectWith(new DispatchFailure('STATUS=failed\n')) }
         });
-        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath }), deps);
+        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath: fixture.repoPath }), deps);
 
-        const thrown = await captureRejection(instance.run(ISSUE_ID, subIssueFile));
+        const thrown = await captureRejection(instance.run(ISSUE_ID, fixture.seedFilePath));
 
         expect(thrown).toBeInstanceOf(DispatchFailure);
         // STATUS=failed legitimately appears twice: SpawnIssue#run's own
@@ -205,7 +196,7 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
         );
         expect(thrown.exitCode).toEqual(1);
 
-        const stateFile = path.join(repoPath, '.claude', 'state', `issue-${ISSUE_ID}.json`);
+        const stateFile = path.join(fixture.repoPath, '.claude', 'state', `issue-${ISSUE_ID}.json`);
 
         await expectAsync(readFile(stateFile, 'utf8')).toBeRejected();
       });
@@ -214,11 +205,11 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
         const deps = stubDeps({
           spawnIssue: { run: jasmine.createSpy('run').and.rejectWith(new Error('boom')) }
         });
-        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath }), deps);
+        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath: fixture.repoPath }), deps);
 
-        await expectAsync(instance.run(ISSUE_ID, subIssueFile)).toBeRejectedWithError('boom');
+        await expectAsync(instance.run(ISSUE_ID, fixture.seedFilePath)).toBeRejectedWithError('boom');
 
-        const stateFile = path.join(repoPath, '.claude', 'state', `issue-${ISSUE_ID}.json`);
+        const stateFile = path.join(fixture.repoPath, '.claude', 'state', `issue-${ISSUE_ID}.json`);
 
         await expectAsync(readFile(stateFile, 'utf8')).toBeRejected();
       });
@@ -227,12 +218,12 @@ describe('ArcanumSplitIssueCreateSubIssue', () => {
         const deps = stubDeps({
           spawnIssue: { run: jasmine.createSpy('run').and.rejectWith(new DispatchFailure('STATUS=failed\n')) }
         });
-        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath }), deps);
+        const instance = new ArcanumSplitIssueCreateSubIssue(new RepoContext({ repoPath: fixture.repoPath }), deps);
 
         let bodyFile;
 
         try {
-          await instance.run(ISSUE_ID, subIssueFile);
+          await instance.run(ISSUE_ID, fixture.seedFilePath);
         } catch {
           bodyFile = deps.spawnIssue.run.calls.mostRecent().args[2];
         }
