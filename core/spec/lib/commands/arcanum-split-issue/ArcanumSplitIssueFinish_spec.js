@@ -85,56 +85,62 @@ describe('ArcanumSplitIssueFinish', () => {
     });
 
     describe('file cleanup', () => {
-      it('deletes only matching <id>-*/<id>_* files, in that order, listing them relative to repoPath', async () => {
-        const issuesDir = path.join(fixture.repoPath, ISSUES_DIR);
-
-        await mkdir(issuesDir, { recursive: true });
-        await writeFile(path.join(issuesDir, `${ISSUE_ID}-first.md`), 'a');
-        await writeFile(path.join(issuesDir, `${ISSUE_ID}-second.md`), 'b');
-        await writeFile(path.join(issuesDir, `${ISSUE_ID}_third.md`), 'c');
-        await writeFile(path.join(issuesDir, 'unrelated.md'), 'd');
-        await writeFile(path.join(issuesDir, `1${ISSUE_ID}-not-matching.md`), 'e');
-
-        const deps = stubDeps();
-        const instance = new ArcanumSplitIssueFinish({ repoPath: fixture.repoPath }, deps);
-
-        const result = await instance.run(ISSUE_ID);
-
-        expect(result).toEqual(
-          'Deleted:\n' +
+      const rows = [
+        {
+          description: 'deletes only matching <id>-*/<id>_* files, in that order, listing them relative to repoPath',
+          filesToSeed: {
+            [`${ISSUE_ID}-first.md`]: 'a',
+            [`${ISSUE_ID}-second.md`]: 'b',
+            [`${ISSUE_ID}_third.md`]: 'c',
+            'unrelated.md': 'd',
+            [`1${ISSUE_ID}-not-matching.md`]: 'e'
+          },
+          expectedResult:
+            'Deleted:\n' +
             `  ${ISSUES_DIR}/${ISSUE_ID}-first.md\n` +
             `  ${ISSUES_DIR}/${ISSUE_ID}-second.md\n` +
             `  ${ISSUES_DIR}/${ISSUE_ID}_third.md\n` +
-            'BRANCH=main\n'
-        );
+            'BRANCH=main\n',
+          expectedRemaining: ['1999-not-matching.md', 'unrelated.md']
+        },
+        {
+          description: 'returns "Deleted: (nothing to clean up)\\n" when no files match',
+          filesToSeed: { 'unrelated.md': 'd' },
+          expectedResult: 'Deleted: (nothing to clean up)\nBRANCH=main\n'
+        },
+        {
+          description: 'returns "Deleted: (nothing to clean up)\\n" when the issues directory does not exist',
+          filesToSeed: null,
+          expectedResult: 'Deleted: (nothing to clean up)\nBRANCH=main\n'
+        }
+      ];
 
-        const remaining = await readdir(issuesDir);
+      for (const { description, filesToSeed, expectedResult, expectedRemaining } of rows) {
+        it(description, async () => {
+          const issuesDir = path.join(fixture.repoPath, ISSUES_DIR);
 
-        expect(remaining.sort()).toEqual(['1999-not-matching.md', 'unrelated.md'].sort());
-      });
+          if (filesToSeed) {
+            await mkdir(issuesDir, { recursive: true });
 
-      it('returns "Deleted: (nothing to clean up)\\n" when no files match', async () => {
-        const issuesDir = path.join(fixture.repoPath, ISSUES_DIR);
+            for (const [name, content] of Object.entries(filesToSeed)) {
+              await writeFile(path.join(issuesDir, name), content);
+            }
+          }
 
-        await mkdir(issuesDir, { recursive: true });
-        await writeFile(path.join(issuesDir, 'unrelated.md'), 'd');
+          const deps = stubDeps();
+          const instance = new ArcanumSplitIssueFinish({ repoPath: fixture.repoPath }, deps);
 
-        const deps = stubDeps();
-        const instance = new ArcanumSplitIssueFinish({ repoPath: fixture.repoPath }, deps);
+          const result = await instance.run(ISSUE_ID);
 
-        const result = await instance.run(ISSUE_ID);
+          expect(result).toEqual(expectedResult);
 
-        expect(result).toEqual('Deleted: (nothing to clean up)\nBRANCH=main\n');
-      });
+          if (expectedRemaining) {
+            const remaining = await readdir(issuesDir);
 
-      it('returns "Deleted: (nothing to clean up)\\n" when the issues directory does not exist', async () => {
-        const deps = stubDeps();
-        const instance = new ArcanumSplitIssueFinish({ repoPath: fixture.repoPath }, deps);
-
-        const result = await instance.run(ISSUE_ID);
-
-        expect(result).toEqual('Deleted: (nothing to clean up)\nBRANCH=main\n');
-      });
+            expect(remaining.sort()).toEqual(expectedRemaining.sort());
+          }
+        });
+      }
     });
 
     describe('safe-branch release', () => {
