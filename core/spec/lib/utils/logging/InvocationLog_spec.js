@@ -1,20 +1,9 @@
-import InvocationLog from '../../../../lib/utils/logging/InvocationLog.js';
-
-const CONFIG_CHAIN_PATH = '/fake/arcanum/_lib/config_chain.sh';
+import { buildInvocationLog, CONFIG_CHAIN_PATH } from '../../../support/utils/logging/invocationLogHarness.js';
 
 describe('InvocationLog', () => {
   describe('#record', () => {
     it('resolves the location and appends the expected log line', async () => {
-      const execFileSpy = jasmine
-        .createSpy('execFileAsync')
-        .and.returnValue(Promise.resolve({ stdout: '"/var/log/arcanum"\n', stderr: '' }));
-      const appendFileSpy = jasmine.createSpy('appendFileAsync').and.returnValue(Promise.resolve());
-      const invocationLog = new InvocationLog({
-        execFileAsync: execFileSpy,
-        appendFileAsync: appendFileSpy,
-        configChainPath: CONFIG_CHAIN_PATH,
-        env: { ARCANUM_REPO_PATH: '/repo/my-repo' }
-      });
+      const { invocationLog, appendFileSpy } = buildInvocationLog();
 
       await invocationLog.record('list-agents');
 
@@ -26,14 +15,7 @@ describe('InvocationLog', () => {
     });
 
     it('no-ops (never appends) when ARCANUM_REPO_PATH is absent', async () => {
-      const execFileSpy = jasmine.createSpy('execFileAsync');
-      const appendFileSpy = jasmine.createSpy('appendFileAsync');
-      const invocationLog = new InvocationLog({
-        execFileAsync: execFileSpy,
-        appendFileAsync: appendFileSpy,
-        configChainPath: CONFIG_CHAIN_PATH,
-        env: {}
-      });
+      const { invocationLog, execFileSpy, appendFileSpy } = buildInvocationLog({ env: {} });
 
       await invocationLog.record('list-agents');
 
@@ -42,13 +24,8 @@ describe('InvocationLog', () => {
     });
 
     it('no-ops when execFileAsync resolves with an empty/unset location', async () => {
-      const execFileSpy = jasmine.createSpy('execFileAsync').and.returnValue(Promise.resolve({ stdout: '\n', stderr: '' }));
-      const appendFileSpy = jasmine.createSpy('appendFileAsync');
-      const invocationLog = new InvocationLog({
-        execFileAsync: execFileSpy,
-        appendFileAsync: appendFileSpy,
-        configChainPath: CONFIG_CHAIN_PATH,
-        env: { ARCANUM_REPO_PATH: '/repo/my-repo' }
+      const { invocationLog, appendFileSpy } = buildInvocationLog({
+        execFileAsync: () => Promise.resolve({ stdout: '\n', stderr: '' })
       });
 
       await invocationLog.record('list-agents');
@@ -57,13 +34,8 @@ describe('InvocationLog', () => {
     });
 
     it('swallows silently (resolves, does not throw) when execFileAsync rejects', async () => {
-      const execFileSpy = jasmine.createSpy('execFileAsync').and.returnValue(Promise.reject(new Error('boom')));
-      const appendFileSpy = jasmine.createSpy('appendFileAsync');
-      const invocationLog = new InvocationLog({
-        execFileAsync: execFileSpy,
-        appendFileAsync: appendFileSpy,
-        configChainPath: CONFIG_CHAIN_PATH,
-        env: { ARCANUM_REPO_PATH: '/repo/my-repo' }
+      const { invocationLog, appendFileSpy } = buildInvocationLog({
+        execFileAsync: () => Promise.reject(new Error('boom'))
       });
 
       await expectAsync(invocationLog.record('list-agents')).toBeResolved();
@@ -71,31 +43,15 @@ describe('InvocationLog', () => {
     });
 
     it('swallows silently when appendFileAsync rejects', async () => {
-      const execFileSpy = jasmine
-        .createSpy('execFileAsync')
-        .and.returnValue(Promise.resolve({ stdout: '"/var/log/arcanum"\n', stderr: '' }));
-      const appendFileSpy = jasmine.createSpy('appendFileAsync').and.returnValue(Promise.reject(new Error('disk full')));
-      const invocationLog = new InvocationLog({
-        execFileAsync: execFileSpy,
-        appendFileAsync: appendFileSpy,
-        configChainPath: CONFIG_CHAIN_PATH,
-        env: { ARCANUM_REPO_PATH: '/repo/my-repo' }
+      const { invocationLog } = buildInvocationLog({
+        appendFileAsync: () => Promise.reject(new Error('disk full'))
       });
 
       await expectAsync(invocationLog.record('list-agents')).toBeResolved();
     });
 
     it('passes repoPath/configChainPath as separate args array elements, never interpolated into the script string', async () => {
-      const execFileSpy = jasmine
-        .createSpy('execFileAsync')
-        .and.returnValue(Promise.resolve({ stdout: '"/var/log/arcanum"\n', stderr: '' }));
-      const appendFileSpy = jasmine.createSpy('appendFileAsync').and.returnValue(Promise.resolve());
-      const invocationLog = new InvocationLog({
-        execFileAsync: execFileSpy,
-        appendFileAsync: appendFileSpy,
-        configChainPath: CONFIG_CHAIN_PATH,
-        env: { ARCANUM_REPO_PATH: '/repo/my-repo' }
-      });
+      const { invocationLog, execFileSpy } = buildInvocationLog();
 
       await invocationLog.record('list-agents');
 
