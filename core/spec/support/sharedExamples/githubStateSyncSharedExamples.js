@@ -10,28 +10,32 @@ import { createAutoFixIssueGithub, REPO } from '../factories/autoFixIssueGithub.
  * `set`/`setJson`, all resolving); pass individual overrides (e.g. a
  * specific `fetchLabels` resolution, `branch: 'main'` for the no-op
  * case, or an `issueStateService.set` that rejects) to vary just what a
- * given test needs.
+ * given test needs — `issueTagger`/`issueStateService` overrides are
+ * shallow-merged over the defaults, so a caller only has to redeclare
+ * the one spy it wants to change.
  * @param {object} [overrides] - per-test overrides merged over the
  *   defaults; any extra keys (e.g. `githubClient`) pass through
  *   untouched.
  * @returns {object} the `createAutoFixIssueGithub(...)`-ready overrides.
  */
 export function githubStateFixture(overrides = {}) {
-  const {
-    branch = 'issue-5',
-    issueTagger = {
+  const { branch = 'issue-5', issueTagger = {}, issueStateService = {}, ...rest } = overrides;
+
+  return {
+    branch,
+    issueTagger: {
       mutateTag: jasmine.createSpy('mutateTag').and.resolveTo(),
       fetchLabels: jasmine.createSpy('fetchLabels').and.resolveTo([]),
-      addLabel: jasmine.createSpy('addLabel').and.resolveTo()
+      addLabel: jasmine.createSpy('addLabel').and.resolveTo(),
+      ...issueTagger
     },
-    issueStateService = {
+    issueStateService: {
       set: jasmine.createSpy('set').and.resolveTo(),
-      setJson: jasmine.createSpy('setJson').and.resolveTo()
+      setJson: jasmine.createSpy('setJson').and.resolveTo(),
+      ...issueStateService
     },
     ...rest
-  } = overrides;
-
-  return { branch, issueTagger, issueStateService, ...rest };
+  };
 }
 
 /**
