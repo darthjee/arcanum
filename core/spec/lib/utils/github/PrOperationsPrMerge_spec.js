@@ -1,4 +1,5 @@
 import { newPrOperations } from '../../../support/factories/prOperations.js';
+import { registerMergeBodyResolverSharedExamples } from '../../../support/sharedExamples/mergeBodyResolverSharedExamples.js';
 
 describe('PrOperations#prMerge', () => {
   const PULL = { number: 7, title: 'My PR', html_url: 'https://github.com/darthjee/arcanum/pull/7', state: 'open' };
@@ -28,65 +29,14 @@ describe('PrOperations#prMerge', () => {
     expect(mergeCall.args[1].commit_title).toEqual('My PR (#123)');
   });
 
-  it('omits commit_message entirely in "full" mode', async () => {
-    const { prOperations, githubClient } = newPrOperations({ pull: PULL, configValues: { merge_body_mode: 'full' } });
+  registerMergeBodyResolverSharedExamples(async ({ commits, configValues, modelEmail }) => {
+    const { prOperations, githubClient } = newPrOperations({ pull: PULL, commits, configValues });
 
-    await prOperations.prMerge();
+    await prOperations.prMerge(modelEmail);
 
-    const mergeCall = githubClient.mergePr.calls.mostRecent();
+    const args = githubClient.mergePr.calls.mostRecent().args[1];
 
-    expect(mergeCall.args[1]).toEqual({ merge_method: 'squash', commit_title: 'My PR (#7)' });
-  });
-
-  it('sends an empty commit_message in "empty" mode', async () => {
-    const { prOperations, githubClient } = newPrOperations({ pull: PULL, configValues: { merge_body_mode: 'empty' } });
-
-    await prOperations.prMerge();
-
-    const mergeCall = githubClient.mergePr.calls.mostRecent();
-
-    expect(mergeCall.args[1].commit_message).toEqual('');
-  });
-
-  describe('"coauthors" mode', () => {
-    it('builds a deduped, email-sorted Co-authored-by block from the PR commits', async () => {
-      const commits = [
-        { commit: { author: { name: 'Bob', email: 'bob@x.com' } }, author: { login: 'bob' } },
-        { commit: { author: { name: 'Alice', email: 'alice@x.com' } }, author: { login: 'alice' } }
-      ];
-      const { prOperations, githubClient } = newPrOperations({
-        pull: PULL,
-        commits,
-        user: { login: 'merger' },
-        configValues: { merge_body_mode: 'coauthors' }
-      });
-
-      await prOperations.prMerge();
-
-      const mergeCall = githubClient.mergePr.calls.mostRecent();
-
-      expect(mergeCall.args[1].commit_message).toEqual(
-        'Co-authored-by: Alice <alice@x.com>\nCo-authored-by: Bob <bob@x.com>\n'
-      );
-    });
-
-    it('falls back to "full" mode\'s behavior (omit commit_message) when the resulting list is empty', async () => {
-      const commits = [
-        { commit: { author: { name: 'Merger', email: 'merger@x.com' } }, author: { login: 'merger' } }
-      ];
-      const { prOperations, githubClient } = newPrOperations({
-        pull: PULL,
-        commits,
-        user: { login: 'merger' },
-        configValues: { merge_body_mode: 'coauthors' }
-      });
-
-      await prOperations.prMerge();
-
-      const mergeCall = githubClient.mergePr.calls.mostRecent();
-
-      expect(mergeCall.args[1]).toEqual({ merge_method: 'squash', commit_title: 'My PR (#7)' });
-    });
+    return { included: 'commit_message' in args, body: args.commit_message ?? '' };
   });
 
   it('rejects with the merge-failure error when the merge REST call fails', async () => {
