@@ -6,6 +6,7 @@ import RepoConfig from '../../../../lib/utils/config/RepoConfig.js';
 import RepoContext from '../../../../lib/context/RepoContext.js';
 import SafeBranch from '../../../../lib/commands/shared/SafeBranch.js';
 import { createGitFixtureRepo } from '../../../support/utils/gitFixtureRepo.js';
+import { trackedExecFileAsync } from '../../../support/utils/execCallTracker.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -61,12 +62,7 @@ describe('SafeBranch', () => {
     });
 
     it('fetches and checks out the configured safe branch when the tree is clean', async () => {
-      const calls = [];
-      const execFileSpy = jasmine.createSpy('execFileAsync').and.callFake((file, args) => {
-        calls.push(args);
-
-        return Promise.resolve({ stdout: '', stderr: '' });
-      });
+      const { execFileAsync: execFileSpy, calls } = trackedExecFileAsync();
       const repoConfig = { getSafeBranch: async () => 'origin/develop' };
       const safeBranch = new SafeBranch(contextFor('/repo'), { execFileAsync: execFileSpy, repoConfig });
 

@@ -1,77 +1,97 @@
 import Origin from '../../../../lib/utils/git/Origin.js';
+import { trackedExecFileAsync } from '../../../support/utils/execCallTracker.js';
+
+/**
+ * @param {string} stdout - the stubbed `git remote get-url origin` stdout.
+ * @returns {Origin} an Origin instance whose execFileAsync always resolves to <stdout>.
+ */
+function originWithStdout(stdout) {
+  return new Origin({ execFileAsync: async () => ({ stdout, stderr: '' }) });
+}
+
+/**
+ * Assert that `Origin#resolve` parses `url` into `expected`.
+ * @param {string} url - the stubbed `git remote get-url origin` stdout.
+ * @param {{ domain: string, repo: string }} expected - the expected parsed origin.
+ * @returns {Promise<void>} resolves once the assertion completes.
+ */
+async function parsesOrigin(url, expected) {
+  const origin = originWithStdout(url);
+
+  await expectAsync(origin.resolve('/repo')).toBeResolvedTo(expected);
+}
+
+const remoteUrlFixtures = [
+  ['parses an ssh (git@) origin url', 'git@github.com:darthjee/arcanum.git\n', {
+    domain: 'github.com',
+    repo: 'darthjee/arcanum'
+  }],
+  ['parses an https origin url', 'https://github.com/darthjee/arcanum.git\n', {
+    domain: 'github.com',
+    repo: 'darthjee/arcanum'
+  }],
+  ['parses an https origin url without a trailing .git', 'https://github.com/darthjee/arcanum\n', {
+    domain: 'github.com',
+    repo: 'darthjee/arcanum'
+  }],
+  ['supports non-github.com ssh domains', 'git@github.enterprise.example.com:owner/repo.git\n', {
+    domain: 'github.enterprise.example.com',
+    repo: 'owner/repo'
+  }],
+  ['parses an ssh:// origin url', 'ssh://git@github.com/darthjee/arcanum.git\n', {
+    domain: 'github.com',
+    repo: 'darthjee/arcanum'
+  }],
+  ['parses an ssh:// origin url with a port, stripping it from the domain', 'ssh://git@github.com:22/darthjee/arcanum.git\n', {
+    domain: 'github.com',
+    repo: 'darthjee/arcanum'
+  }],
+  ['parses an ssh:// origin url without a user', 'ssh://github.com/darthjee/arcanum.git\n', {
+    domain: 'github.com',
+    repo: 'darthjee/arcanum'
+  }]
+];
+
+/**
+ * Register the shared `repoPath`-fallback/override test pair for `methodName`
+ * (`resolve` or `resolveWithRef`), against the expected shape built by
+ * `buildExpected`.
+ * @param {string} methodName - the `Origin` method under test.
+ * @param {() => object} buildExpected - builds the expected resolved value.
+ * @returns {void}
+ */
+function repoPathResolutionCases(methodName, buildExpected) {
+  it('falls back to `repoContext.repoPath` when no `repoPath` argument is passed', async () => {
+    const { execFileAsync, calls } = trackedExecFileAsync('git@github.com:darthjee/arcanum.git\n');
+    const origin = new Origin({ execFileAsync, repoContext: { repoPath: '/repo' } });
+
+    await expectAsync(origin[methodName]()).toBeResolvedTo(buildExpected());
+
+    expect(calls).toContain(['-C', '/repo', 'remote', 'get-url', 'origin']);
+  });
+
+  it('prefers an explicit `repoPath` argument over the constructor `repoContext`', async () => {
+    const { execFileAsync, calls } = trackedExecFileAsync('git@github.com:darthjee/arcanum.git\n');
+    const origin = new Origin({ execFileAsync, repoContext: { repoPath: '/repo' } });
+
+    await expectAsync(origin[methodName]('/other')).toBeResolvedTo(buildExpected());
+
+    expect(calls).toContain(['-C', '/other', 'remote', 'get-url', 'origin']);
+  });
+}
 
 describe('Origin', () => {
-  /**
-   * @param {string} stdout - the stubbed `git remote get-url origin` stdout.
-   * @returns {Origin} an Origin instance whose execFileAsync always resolves to <stdout>.
-   */
-  function originWithStdout(stdout) {
-    return new Origin({ execFileAsync: async () => ({ stdout, stderr: '' }) });
-  }
-
   describe('#resolve', () => {
-    it('parses an ssh (git@) origin url', async () => {
-      const origin = originWithStdout('git@github.com:darthjee/arcanum.git\n');
-
-      await expectAsync(origin.resolve('/repo')).toBeResolvedTo({
-        domain: 'github.com',
-        repo: 'darthjee/arcanum'
+    remoteUrlFixtures.forEach(([description, url, expected]) => {
+      it(description, async () => {
+        await parsesOrigin(url, expected);
       });
     });
 
-    it('parses an https origin url', async () => {
-      const origin = originWithStdout('https://github.com/darthjee/arcanum.git\n');
-
-      await expectAsync(origin.resolve('/repo')).toBeResolvedTo({
-        domain: 'github.com',
-        repo: 'darthjee/arcanum'
-      });
-    });
-
-    it('parses an https origin url without a trailing .git', async () => {
-      const origin = originWithStdout('https://github.com/darthjee/arcanum\n');
-
-      await expectAsync(origin.resolve('/repo')).toBeResolvedTo({
-        domain: 'github.com',
-        repo: 'darthjee/arcanum'
-      });
-    });
-
-    it('supports non-github.com ssh domains', async () => {
-      const origin = originWithStdout('git@github.enterprise.example.com:owner/repo.git\n');
-
-      await expectAsync(origin.resolve('/repo')).toBeResolvedTo({
-        domain: 'github.enterprise.example.com',
-        repo: 'owner/repo'
-      });
-    });
-
-    it('parses an ssh:// origin url', async () => {
-      const origin = originWithStdout('ssh://git@github.com/darthjee/arcanum.git\n');
-
-      await expectAsync(origin.resolve('/repo')).toBeResolvedTo({
-        domain: 'github.com',
-        repo: 'darthjee/arcanum'
-      });
-    });
-
-    it('parses an ssh:// origin url with a port, stripping it from the domain', async () => {
-      const origin = originWithStdout('ssh://git@github.com:22/darthjee/arcanum.git\n');
-
-      await expectAsync(origin.resolve('/repo')).toBeResolvedTo({
-        domain: 'github.com',
-        repo: 'darthjee/arcanum'
-      });
-    });
-
-    it('parses an ssh:// origin url without a user', async () => {
-      const origin = originWithStdout('ssh://github.com/darthjee/arcanum.git\n');
-
-      await expectAsync(origin.resolve('/repo')).toBeResolvedTo({
-        domain: 'github.com',
-        repo: 'darthjee/arcanum'
-      });
-    });
+    repoPathResolutionCases('resolve', () => ({
+      domain: 'github.com',
+      repo: 'darthjee/arcanum'
+    }));
 
     it('errors when the repo has no origin remote', async () => {
       const origin = new Origin({
@@ -91,40 +111,6 @@ describe('Origin', () => {
       await expectAsync(origin.resolve('/repo')).toBeRejectedWithError(
         'Error: unrecognized origin format: /local/path/to/remote.git'
       );
-    });
-
-    it('falls back to `repoContext.repoPath` when no `repoPath` argument is passed', async () => {
-      const calls = [];
-      const execFileSpy = jasmine.createSpy('execFileAsync').and.callFake((file, args) => {
-        calls.push(args);
-
-        return Promise.resolve({ stdout: 'git@github.com:darthjee/arcanum.git\n', stderr: '' });
-      });
-      const origin = new Origin({ execFileAsync: execFileSpy, repoContext: { repoPath: '/repo' } });
-
-      await expectAsync(origin.resolve()).toBeResolvedTo({
-        domain: 'github.com',
-        repo: 'darthjee/arcanum'
-      });
-
-      expect(calls).toContain(['-C', '/repo', 'remote', 'get-url', 'origin']);
-    });
-
-    it('prefers an explicit `repoPath` argument over the constructor `repoContext`', async () => {
-      const calls = [];
-      const execFileSpy = jasmine.createSpy('execFileAsync').and.callFake((file, args) => {
-        calls.push(args);
-
-        return Promise.resolve({ stdout: 'git@github.com:darthjee/arcanum.git\n', stderr: '' });
-      });
-      const origin = new Origin({ execFileAsync: execFileSpy, repoContext: { repoPath: '/repo' } });
-
-      await expectAsync(origin.resolve('/other')).toBeResolvedTo({
-        domain: 'github.com',
-        repo: 'darthjee/arcanum'
-      });
-
-      expect(calls).toContain(['-C', '/other', 'remote', 'get-url', 'origin']);
     });
   });
 
@@ -161,40 +147,10 @@ describe('Origin', () => {
       );
     });
 
-    it('falls back to `repoContext.repoPath` when no `repoPath` argument is passed', async () => {
-      const calls = [];
-      const execFileSpy = jasmine.createSpy('execFileAsync').and.callFake((file, args) => {
-        calls.push(args);
-
-        return Promise.resolve({ stdout: 'git@github.com:darthjee/arcanum.git\n', stderr: '' });
-      });
-      const origin = new Origin({ execFileAsync: execFileSpy, repoContext: { repoPath: '/repo' } });
-
-      await expectAsync(origin.resolveWithRef()).toBeResolvedTo({
-        domain: 'github.com',
-        repo: 'darthjee/arcanum',
-        repoRef: 'darthjee/arcanum'
-      });
-
-      expect(calls).toContain(['-C', '/repo', 'remote', 'get-url', 'origin']);
-    });
-
-    it('prefers an explicit `repoPath` argument over the constructor `repoContext`', async () => {
-      const calls = [];
-      const execFileSpy = jasmine.createSpy('execFileAsync').and.callFake((file, args) => {
-        calls.push(args);
-
-        return Promise.resolve({ stdout: 'git@github.com:darthjee/arcanum.git\n', stderr: '' });
-      });
-      const origin = new Origin({ execFileAsync: execFileSpy, repoContext: { repoPath: '/repo' } });
-
-      await expectAsync(origin.resolveWithRef('/other')).toBeResolvedTo({
-        domain: 'github.com',
-        repo: 'darthjee/arcanum',
-        repoRef: 'darthjee/arcanum'
-      });
-
-      expect(calls).toContain(['-C', '/other', 'remote', 'get-url', 'origin']);
-    });
+    repoPathResolutionCases('resolveWithRef', () => ({
+      domain: 'github.com',
+      repo: 'darthjee/arcanum',
+      repoRef: 'darthjee/arcanum'
+    }));
   });
 });
