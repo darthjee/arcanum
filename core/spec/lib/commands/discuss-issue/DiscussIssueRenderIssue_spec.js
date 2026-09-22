@@ -1,7 +1,8 @@
-import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import DiscussIssueRenderIssue from '../../../../lib/commands/discuss-issue/DiscussIssueRenderIssue.js';
 import RepoContext from '../../../../lib/context/RepoContext.js';
+import { resolveInstallPath } from '../../../../lib/utils/file/InstallRoot.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 const TEMPLATE = [
@@ -19,15 +20,34 @@ const TEMPLATE = [
   ''
 ].join('\n');
 
+const TEMPLATE_PATH = resolveInstallPath('discuss-issue', 'templates', 'issue.tmpl.md');
+
+/**
+ * Build a stub `readFile` that returns `TEMPLATE` for the install-root
+ * template path, mirroring `DiscussIssueRenderIssue`'s real read — and
+ * proving resolution is install-root-relative, since `repoPath` (the
+ * temp dir used below) never has a `discuss-issue/` folder in it.
+ * @returns {Function} a jasmine spy usable as `readFile`.
+ */
+function fakeReadFile() {
+  return jasmine.createSpy('readFile').and.callFake(async (file) => {
+    if (file === TEMPLATE_PATH) {
+      return TEMPLATE;
+    }
+
+    throw new Error(`unexpected readFile call: ${file}`);
+  });
+}
+
 describe('DiscussIssueRenderIssue', () => {
   let repoPath;
   let outputFile;
+  let readFileStub;
 
   beforeEach(async () => {
     repoPath = await createTempDir();
-    await mkdir(path.join(repoPath, 'discuss-issue', 'templates'), { recursive: true });
-    await writeFile(path.join(repoPath, 'discuss-issue', 'templates', 'issue.tmpl.md'), TEMPLATE);
     outputFile = path.join(repoPath, 'issue.md');
+    readFileStub = fakeReadFile();
   });
 
   afterEach(async () => {
@@ -36,7 +56,7 @@ describe('DiscussIssueRenderIssue', () => {
 
   describe('#run', () => {
     it('renders every section when all arguments are present', async () => {
-      const discussIssueRenderIssue = new DiscussIssueRenderIssue(new RepoContext({ repoPath }));
+      const discussIssueRenderIssue = new DiscussIssueRenderIssue(new RepoContext({ repoPath }), { readFile: readFileStub });
 
       await discussIssueRenderIssue.run(
         outputFile,
@@ -74,7 +94,7 @@ describe('DiscussIssueRenderIssue', () => {
     });
 
     it('collapses the blank lines left behind by an omitted description section', async () => {
-      const discussIssueRenderIssue = new DiscussIssueRenderIssue(new RepoContext({ repoPath }));
+      const discussIssueRenderIssue = new DiscussIssueRenderIssue(new RepoContext({ repoPath }), { readFile: readFileStub });
 
       await discussIssueRenderIssue.run(
         outputFile,
@@ -109,7 +129,7 @@ describe('DiscussIssueRenderIssue', () => {
     });
 
     it('collapses the blank lines left behind by an omitted problem section', async () => {
-      const discussIssueRenderIssue = new DiscussIssueRenderIssue(new RepoContext({ repoPath }));
+      const discussIssueRenderIssue = new DiscussIssueRenderIssue(new RepoContext({ repoPath }), { readFile: readFileStub });
 
       await discussIssueRenderIssue.run(
         outputFile,
@@ -144,7 +164,7 @@ describe('DiscussIssueRenderIssue', () => {
     });
 
     it('collapses the blank lines left behind by an omitted expected_behavior section', async () => {
-      const discussIssueRenderIssue = new DiscussIssueRenderIssue(new RepoContext({ repoPath }));
+      const discussIssueRenderIssue = new DiscussIssueRenderIssue(new RepoContext({ repoPath }), { readFile: readFileStub });
 
       await discussIssueRenderIssue.run(
         outputFile,
@@ -179,7 +199,7 @@ describe('DiscussIssueRenderIssue', () => {
     });
 
     it('collapses the blank lines left behind by an omitted solution section', async () => {
-      const discussIssueRenderIssue = new DiscussIssueRenderIssue(new RepoContext({ repoPath }));
+      const discussIssueRenderIssue = new DiscussIssueRenderIssue(new RepoContext({ repoPath }), { readFile: readFileStub });
 
       await discussIssueRenderIssue.run(
         outputFile,
@@ -214,7 +234,7 @@ describe('DiscussIssueRenderIssue', () => {
     });
 
     it('trims a trailing blank line left behind by an omitted benefits section', async () => {
-      const discussIssueRenderIssue = new DiscussIssueRenderIssue(new RepoContext({ repoPath }));
+      const discussIssueRenderIssue = new DiscussIssueRenderIssue(new RepoContext({ repoPath }), { readFile: readFileStub });
 
       await discussIssueRenderIssue.run(
         outputFile,
@@ -249,7 +269,7 @@ describe('DiscussIssueRenderIssue', () => {
     });
 
     it('collapses a longer blank-line run left behind by multiple consecutive omissions', async () => {
-      const discussIssueRenderIssue = new DiscussIssueRenderIssue(new RepoContext({ repoPath }));
+      const discussIssueRenderIssue = new DiscussIssueRenderIssue(new RepoContext({ repoPath }), { readFile: readFileStub });
 
       await discussIssueRenderIssue.run(
         outputFile,
@@ -269,7 +289,7 @@ describe('DiscussIssueRenderIssue', () => {
     });
 
     it('throws and writes no file when outputFile is missing', async () => {
-      const discussIssueRenderIssue = new DiscussIssueRenderIssue(new RepoContext({ repoPath }));
+      const discussIssueRenderIssue = new DiscussIssueRenderIssue(new RepoContext({ repoPath }), { readFile: readFileStub });
 
       await expectAsync(
         discussIssueRenderIssue.run('', 'Something broke', '## Description\nDesc text')
@@ -283,7 +303,7 @@ describe('DiscussIssueRenderIssue', () => {
     });
 
     it('throws and writes no file when title is missing', async () => {
-      const discussIssueRenderIssue = new DiscussIssueRenderIssue(new RepoContext({ repoPath }));
+      const discussIssueRenderIssue = new DiscussIssueRenderIssue(new RepoContext({ repoPath }), { readFile: readFileStub });
 
       await expectAsync(
         discussIssueRenderIssue.run(outputFile, '', '## Description\nDesc text')

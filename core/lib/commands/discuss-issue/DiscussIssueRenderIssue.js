@@ -1,26 +1,31 @@
-import { readFile, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import { readFile as defaultReadFile, writeFile } from 'node:fs/promises';
+import { resolveInstallPath } from '../../utils/file/InstallRoot.js';
 
 /**
  * Native implementation of the `discuss-issue-render-issue` migrated
  * entrypoint — byte-identical stdout/exit-code counterpart to
  * `discuss-issue/scripts/render_issue.sh`. Renders
- * `discuss-issue/templates/issue.tmpl.md` by substituting each
- * `%%PLACEHOLDER%%` with its corresponding argument, collapsing the
- * blank-line runs left behind by omitted sections, and writing the
- * result to `outputFile`. Purely filesystem-based — no GitHub/network
- * dependency. See
+ * `discuss-issue/templates/issue.tmpl.md` (resolved from the arcanum
+ * install, never the target `repoPath` — see `InstallRoot.js`) by
+ * substituting each `%%PLACEHOLDER%%` with its corresponding argument,
+ * collapsing the blank-line runs left behind by omitted sections, and
+ * writing the result to `outputFile`. Purely filesystem-based — no
+ * GitHub/network dependency. See
  * docs/agents/plans/448-migrate-discuss-issue-render-issue-entrypoint-to-native-node-js/plan.md
  * for the full design/shared contracts.
  */
 class DiscussIssueRenderIssue {
   /**
    * @param {import('../../context/RepoContext.js').default} repoContext -
-   *   the target repo's context (provides `repoPath`, used to resolve the
-   *   template file's location).
+   *   the target repo's context (currently unused by this class, kept for
+   *   the migrated-command constructor convention).
+   * @param {object} [deps] - injectable collaborators, for testing.
+   * @param {Function} [deps.readFile] - `node:fs/promises` `readFile`-
+   *   compatible implementation, used to read the issue template.
    */
-  constructor(repoContext) {
+  constructor(repoContext, { readFile = defaultReadFile } = {}) {
     this._repoContext = repoContext;
+    this._readFile = readFile;
   }
 
   /**
@@ -48,8 +53,8 @@ class DiscussIssueRenderIssue {
       );
     }
 
-    const templatePath = path.join(this._repoContext.repoPath, 'discuss-issue', 'templates', 'issue.tmpl.md');
-    const template = await readFile(templatePath, 'utf8');
+    const templatePath = resolveInstallPath('discuss-issue', 'templates', 'issue.tmpl.md');
+    const template = await this._readFile(templatePath, 'utf8');
 
     let content = template
       .replace('%%TITLE%%', title)
