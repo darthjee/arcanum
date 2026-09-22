@@ -1,0 +1,14 @@
+# Parameterize Origin_spec.js's repeated assertions
+
+`Origin_spec.js`'s `#resolve` describe block repeats the same three-line shape (build an `Origin` stubbed with a remote URL string, resolve, assert the parsed `{ domain, repo }`) across 7 `it(...)` blocks — `'parses an ssh (git@) origin url'`, `'parses an https origin url'`, `'parses an https origin url without a trailing .git'`, `'supports non-github.com ssh domains'`, `'parses an ssh:// origin url'`, `'parses an ssh:// origin url with a port, stripping it from the domain'`, and `'parses an ssh:// origin url without a user'`.
+
+1. Introduce a `remoteUrlFixtures` array (one entry per existing `it(...)`, preserving each one's description/URL/expected `{ domain, repo }`) and replace those 7 `it` blocks with a single `it.each(remoteUrlFixtures)('%s', async (description, url, expected) => { ... })` (or the equivalent shape already used elsewhere in `core/spec/` for `it.each`, if a project convention exists — check `core/spec/lib/` for prior `it.each` usage before inventing a new shape).
+2. Add a `parsesOrigin(url, expected)` helper (local to `Origin_spec.js`, or lifted into `core/spec/support/utils/` if step 03 ends up needing the exact same shape from `SafeBranch_spec.js` — decide based on what step 03 actually needs) that wraps `originWithStdout(url)` + `expectAsync(origin.resolve('/repo')).toBeResolvedTo(expected)`, and use it from the parameterized test.
+3. The `#resolve` describe block's two `'falls back to repoContext.repoPath...'`/`'prefers an explicit repoPath argument...'` tests and the `#resolveWithRef` describe block's identically-named pair are near-duplicates of each other (same body, different method call and expected shape). Factor the shared body into a small local helper (e.g. `repoPathResolutionCases(methodName, buildExpected)` or similar) parameterized over which method (`resolve` vs `resolveWithRef`) is under test, and use it from both describe blocks — do not delete either pair's distinct assertions (`resolveWithRef`'s extra `repoRef` field must still be asserted).
+4. Leave the two error-path tests (`'errors when the repo has no origin remote'`, `'errors on an unrecognized origin url format'`) and the `#resolveWithRef`-specific behavioral tests (`'leaves the repoRef unqualified...'`, `'domain-qualifies the repoRef...'`, `'propagates a resolve failure'`) untouched — they are not part of the flagged duplication.
+
+Every existing assertion must still run after the refactor — this is a structural dedup, not a coverage change.
+
+## Files to Change
+
+- `core/spec/lib/utils/git/Origin_spec.js` — replace the repeated remote-URL-format assertions with `it.each(remoteUrlFixtures)` + a `parsesOrigin` helper, and dedupe the `repoPath`-fallback/override test pairs shared between `#resolve` and `#resolveWithRef`.
