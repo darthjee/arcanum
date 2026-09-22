@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -21,7 +21,6 @@ const execFileAsync = promisify(execFile);
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const SHELL_SCRIPT = path.join(REPO_ROOT, 'discuss-issue', 'scripts', 'render_issue_shell.sh');
 const NATIVE_BIN = path.join(REPO_ROOT, 'core', 'bin', 'arcanum');
-const REAL_TEMPLATE = path.join(REPO_ROOT, 'discuss-issue', 'templates', 'issue.tmpl.md');
 
 /**
  * Run a render-issue invocation (shell or native) and capture its
@@ -48,10 +47,6 @@ describe('discuss-issue-render-issue parity (shell vs. native)', () => {
   beforeEach(async () => {
     repoPath = await createTempDir('arcanum-core-dirp-parity-');
     await execFileAsync('git', ['init', '--quiet', '-b', 'main', repoPath]);
-    await mkdir(path.join(repoPath, 'discuss-issue', 'templates'), { recursive: true });
-    const templateContent = await readFile(REAL_TEMPLATE, 'utf8');
-
-    await writeFile(path.join(repoPath, 'discuss-issue', 'templates', 'issue.tmpl.md'), templateContent);
     shellOutputFile = path.join(repoPath, 'shell-issue.md');
     nativeOutputFile = path.join(repoPath, 'native-issue.md');
   });
