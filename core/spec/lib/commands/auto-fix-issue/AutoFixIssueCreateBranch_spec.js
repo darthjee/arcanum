@@ -61,6 +61,27 @@ describe('AutoFixIssueCreateBranch', () => {
     await writeFile(path.join(repoPath, PLAN_DIR, 'plan.md'), content);
   }
 
+  /**
+   * Arrange and run `AutoFixIssueCreateBranch#run`, optionally writing
+   * `plan.md` first and faking `execFileAsync` to control whether the
+   * target branch already exists locally.
+   * @param {string} [planContent] - the `plan.md` file's contents; when
+   *   omitted, no `plan.md` is written.
+   * @param {object} [opts] - behavior overrides.
+   * @param {boolean} [opts.branchExists] - forwarded to `fakeExecFileAsync`.
+   * @returns {Promise<{result: string, execFileAsync: Function}>} the
+   *   resolved branch name and the spy used as `execFileAsync`.
+   */
+  async function runCreateBranch(planContent, { branchExists = false } = {}) {
+    if (planContent) {
+      await writePlanFile(planContent);
+    }
+    const execFileAsync = fakeExecFileAsync({ branchExists });
+    const instance = new AutoFixIssueCreateBranch({ repoPath }, { execFileAsync });
+    const result = await instance.run(PLAN_DIR, ID);
+    return { result, execFileAsync };
+  }
+
   describe('#run', () => {
     describe('argument validation', () => {
       it('throws the usage message when planDir is missing', async () => {
@@ -96,11 +117,9 @@ describe('AutoFixIssueCreateBranch', () => {
 
     describe('checkout vs. create', () => {
       it('checks out the branch (no -b) when it already exists locally', async () => {
-        await writePlanFile('## Branch\n\n`my-branch`\n');
-        const execFileAsync = fakeExecFileAsync({ branchExists: true });
-        const instance = new AutoFixIssueCreateBranch({ repoPath }, { execFileAsync });
-
-        const result = await instance.run(PLAN_DIR, ID);
+        const { result, execFileAsync } = await runCreateBranch('## Branch\n\n`my-branch`\n', {
+          branchExists: true
+        });
 
         expect(result).toBe('my-branch\n');
         expect(execFileAsync).toHaveBeenCalledWith(
@@ -110,11 +129,7 @@ describe('AutoFixIssueCreateBranch', () => {
       });
 
       it('creates the branch (-b) when it does not exist locally', async () => {
-        await writePlanFile('## Branch\n\n`my-branch`\n');
-        const execFileAsync = fakeExecFileAsync({ branchExists: false });
-        const instance = new AutoFixIssueCreateBranch({ repoPath }, { execFileAsync });
-
-        const result = await instance.run(PLAN_DIR, ID);
+        const { result, execFileAsync } = await runCreateBranch('## Branch\n\n`my-branch`\n');
 
         expect(result).toBe('my-branch\n');
         expect(execFileAsync).toHaveBeenCalledWith('git', ['checkout', '-b', 'my-branch'], { cwd: repoPath });
@@ -123,41 +138,26 @@ describe('AutoFixIssueCreateBranch', () => {
 
     describe('branch name resolution', () => {
       it('falls back to issue-<id> when plan.md does not exist', async () => {
-        const execFileAsync = fakeExecFileAsync({ branchExists: false });
-        const instance = new AutoFixIssueCreateBranch({ repoPath }, { execFileAsync });
-
-        const result = await instance.run(PLAN_DIR, ID);
+        const { result, execFileAsync } = await runCreateBranch();
 
         expect(result).toBe('issue-999\n');
         expect(execFileAsync).toHaveBeenCalledWith('git', ['checkout', '-b', 'issue-999'], { cwd: repoPath });
       });
 
       it('falls back to issue-<id> when plan.md has no ## Branch section', async () => {
-        await writePlanFile('# Plan\n\nSome content, no branch heading.\n');
-        const execFileAsync = fakeExecFileAsync({ branchExists: false });
-        const instance = new AutoFixIssueCreateBranch({ repoPath }, { execFileAsync });
-
-        const result = await instance.run(PLAN_DIR, ID);
+        const { result } = await runCreateBranch('# Plan\n\nSome content, no branch heading.\n');
 
         expect(result).toBe('issue-999\n');
       });
 
       it('extracts the branch name stripped of backticks and surrounding whitespace', async () => {
-        await writePlanFile('## Branch\n\n  `my-branch`  \n');
-        const execFileAsync = fakeExecFileAsync({ branchExists: false });
-        const instance = new AutoFixIssueCreateBranch({ repoPath }, { execFileAsync });
-
-        const result = await instance.run(PLAN_DIR, ID);
+        const { result } = await runCreateBranch('## Branch\n\n  `my-branch`  \n');
 
         expect(result).toBe('my-branch\n');
       });
 
       it('falls back to issue-<id> when the extracted branch name is empty', async () => {
-        await writePlanFile('## Branch\n\n` `\n');
-        const execFileAsync = fakeExecFileAsync({ branchExists: false });
-        const instance = new AutoFixIssueCreateBranch({ repoPath }, { execFileAsync });
-
-        const result = await instance.run(PLAN_DIR, ID);
+        const { result } = await runCreateBranch('## Branch\n\n` `\n');
 
         expect(result).toBe('issue-999\n');
       });
