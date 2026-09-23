@@ -1,6 +1,6 @@
 # Script Engine (Shell → Node.js Migration)
 
-Arcanum's skill entrypoint scripts (`<skill>/scripts/*.sh`, `arcanum/_lib/*.sh`) are migrating, incrementally and per-entrypoint, from bash to a native Node.js implementation. This doc captures the permanent design decided in #168 and refined in #189, before any of the implementation sub-issues (#190 scaffolding, #191 CI, #192 dispatch guard, #193 first entrypoint) start building against it. Nothing here is implemented yet — `core/` and `arcanum/_lib/engine_dispatch.sh` do not exist in the repo as of this doc. Treat this as the target design for those sub-issues to build toward, not a description of current behavior.
+Arcanum's skill entrypoint scripts (`<skill>/scripts/*.sh`, `arcanum/_lib/*.sh`) are migrating, incrementally and per-entrypoint, from bash to a native Node.js implementation. This doc captures the permanent design decided in #168 and refined in #189, and implemented from #190 (scaffolding), #191 (CI), #192 (dispatch guard) and #193 (first entrypoint) onward. The migration is in progress: most entrypoints now have a native implementation, the rest are tracked in #584, #585 and #586 — see [entrypoint-migration-status.md](entrypoint-migration-status.md) for the per-command status. `engine.mode` still defaults to `shell`.
 
 ## The `engine` config key
 
