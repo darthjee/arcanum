@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createFakeGhBin } from '../utils/fakeGhBin.js';
 import { createGitFixtureRepo } from '../utils/gitFixtureRepo.js';
+import { createTempDir, removeTempDir } from '../utils/tempDir.js';
 import { FAKE_FETCH_PRELOAD, NATIVE_BIN, REPO_ROOT, runCommand, seedOriginUrl } from '../utils/runCommand.js';
 
 const FAKE_GITHUB_URL = 'https://github.com/darthjee/arcanum-queue-fixture.git';
@@ -109,5 +110,24 @@ export async function setupParityTest() {
     nativeRepo,
     fakeGh,
     cleanup: () => Promise.all([shellRepo.cleanup(), nativeRepo.cleanup(), fakeGh.cleanup()])
+  };
+}
+
+/**
+ * Orchestrates the setup shared by every pure-local-file-I/O queue
+ * parity test case (`pop`/`empty`/`list`/`next`/`wait-next`): two
+ * independent plain (non-git) temp dirs, one per side, never shared.
+ * @returns {Promise<{shellRepoPath: string, nativeRepoPath: string, cleanup: Function}>}
+ *   both temp dirs' paths, ready for runPair, plus a cleanup() that
+ *   removes both of them together.
+ */
+export async function setupTempDirPair() {
+  const shellRepoPath = await createTempDir('arcanum-core-afaq-parity-shell-');
+  const nativeRepoPath = await createTempDir('arcanum-core-afaq-parity-native-');
+
+  return {
+    shellRepoPath,
+    nativeRepoPath,
+    cleanup: () => Promise.all([removeTempDir(shellRepoPath), removeTempDir(nativeRepoPath)])
   };
 }
