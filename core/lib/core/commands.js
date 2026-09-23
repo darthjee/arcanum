@@ -20,7 +20,9 @@
  *     the `auto-fix-all-github-*` family (add-tag / cleanup-branch /
  *     has-shipit-label / pr-merge / pr-number / pr-state / remove-tag), on
  *     the `auto-fix-issue-github-*` family (info / pr-create / pr-view /
- *     pr-ready), on `auto-monitor-issue-pr-resolve-pr-number`, on
+ *     pr-ready), on the `github-issue-*` family (create / fetch / info /
+ *     update / mark-created / mark-enhancing / mark-planning / mark-ready /
+ *     mark-refined / mark-split), on `auto-monitor-issue-pr-resolve-pr-number`, on
  *     `auto-monitor-pr-monitor-pr`, on `auto-new-issue-commit-issue`, on
  *     `auto-plan-issue-commit-plan`, on `discuss-issue-render-issue`, and
  *     on the `auto-fix-all-queue-*` family (empty / list / next / pop /
@@ -292,6 +294,42 @@ export const COMMANDS = {
   'github-issue-info': {
     module: 'commands/shared/GithubIssue.js',
     method: 'info',
+    context: 'repo',
+    validateRepoPath: false
+  },
+  'github-issue-mark-created': {
+    module: 'commands/shared/GithubIssueMark.js',
+    method: 'markCreated',
+    context: 'repo',
+    validateRepoPath: false
+  },
+  'github-issue-mark-enhancing': {
+    module: 'commands/shared/GithubIssueMark.js',
+    method: 'markEnhancing',
+    context: 'repo',
+    validateRepoPath: false
+  },
+  'github-issue-mark-planning': {
+    module: 'commands/shared/GithubIssueMark.js',
+    method: 'markPlanning',
+    context: 'repo',
+    validateRepoPath: false
+  },
+  'github-issue-mark-ready': {
+    module: 'commands/shared/GithubIssueMark.js',
+    method: 'markReady',
+    context: 'repo',
+    validateRepoPath: false
+  },
+  'github-issue-mark-refined': {
+    module: 'commands/shared/GithubIssueMark.js',
+    method: 'markRefined',
+    context: 'repo',
+    validateRepoPath: false
+  },
+  'github-issue-mark-split': {
+    module: 'commands/shared/GithubIssueMark.js',
+    method: 'markSplit',
     context: 'repo',
     validateRepoPath: false
   },
