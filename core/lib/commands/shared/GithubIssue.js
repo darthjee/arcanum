@@ -16,8 +16,10 @@ const DEFAULT_TIMEOUT_MS = 30000;
 const ISSUES_DIR = 'docs/agents/issues';
 
 /**
- * Native equivalent of `arcanum/_lib/github_issue.sh`'s `fetch`
- * command: fetches a GitHub issue over the REST API, writes its body to
+ * Native equivalent of `arcanum/_lib/github_issue.sh`'s `fetch`,
+ * `update`, `info` and `create` commands (the `github-issue-fetch`,
+ * `github-issue-update`, `github-issue-info` and `github-issue-create`
+ * migrated entrypoints). `fetch` fetches a GitHub issue over the REST API, writes its body to
  * `docs/agents/issues/`, maps its labels to canonical tags, and
  * persists the result to `.claude/state/issue-<id>.json`. Note this
  * hardcodes `docs/agents/issues` for the freshly-fetched file's
@@ -28,6 +30,7 @@ class GithubIssue {
   /**
    * @param {import('../context/RepoContext.js').default} [repoContext] -
    *   the target repo's context, supplied only by the
+   *   `github-issue-fetch` / `github-issue-update` /
    *   `github-issue-create` / `github-issue-info` CLI entrypoints (whose
    *   leading `repoPath` positional is stripped by
    *   `Dispatcher.commandArgs()`). Absent when `GithubIssue` is used
@@ -53,7 +56,8 @@ class GithubIssue {
    *   `IssueStateService`, which now builds its own instance bound to
    *   the per-call `RepoContext`.
    * @param {GithubIssueService} [deps.githubIssueService] - the
-   *   REST-call-plus-file-write logic shared by `#fetch`/`#create`,
+   *   REST-call-plus-file-write logic shared by `#fetch`/`#create`/
+   *   `#update`,
    *   built from the collaborators above by default.
    */
   constructor(repoContext, {
@@ -112,6 +116,50 @@ class GithubIssue {
     });
 
     return { title, file: filePath, domain, repo };
+  }
+
+  /**
+   * Native implementation of the `github-issue-fetch` migrated
+   * entrypoint — mirrors `github_issue.sh`'s `cmd_fetch` stdout. Named
+   * apart from `#fetch` because `ResolveAndFetch` calls
+   * `fetch(repoPath, id)` on a context-bound instance, so `#fetch`'s
+   * signature and return shape must stay unchanged. `repoPath` is read
+   * from `this._repoContext` (the leading positional is stripped by
+   * `Dispatcher.commandArgs()`, which also runs the
+   * `RepoContext#validate()` repo-path guard beforehand).
+   * @param {string} id - the numeric issue id.
+   * @returns {Promise<string>} the `TITLE=...\nFILE=...\nDOMAIN=...\nREPO=...\n` output.
+   */
+  async fetchIssue(id) {
+    const { title, file, domain, repo } = await this.fetch(this._repoContext.repoPath, id);
+
+    return `TITLE=${title}\nFILE=${file}\nDOMAIN=${domain}\nREPO=${repo}\n`;
+  }
+
+  /**
+   * Native implementation of the `github-issue-update` migrated
+   * entrypoint — mirrors `github_issue.sh`'s `cmd_update` exactly, in
+   * the same check order: (1) `file` must be readable, resolved against
+   * the process cwd (never joined with `repoPath`); (2) the git origin
+   * is resolved; (3) the issue's title/body are PATCHed, with `body`
+   * being `file`'s contents minus all trailing newlines. No
+   * `RepoContext#validate()` guard — the registry entry sets
+   * `validateRepoPath: false`, since `cmd_update` never calls
+   * `repo_path_enter`.
+   * @param {string} id - the numeric issue id.
+   * @param {string} title - the issue's new title.
+   * @param {string} file - the local file whose contents become the
+   *   issue's new body.
+   * @returns {Promise<string>} the `Updated issue #<id> on <repo>\n` output.
+   */
+  async update(id, title, file) {
+    const { repoPath } = this._repoContext;
+    const body = await this._githubIssueService.readBody(file);
+    const { repo } = await this._origin.resolve(repoPath);
+
+    await this._githubIssueService.issueClient(repoPath).updateIssue(id, { title, body });
+
+    return `Updated issue #${id} on ${repo}\n`;
   }
 
   /**

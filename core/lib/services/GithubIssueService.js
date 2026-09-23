@@ -9,7 +9,7 @@ const ISSUES_DIR = 'docs/agents/issues';
 
 /**
  * REST-call-plus-file-write logic shared by `commands/shared/GithubIssue.js`'s
- * `create`/`fetch` methods, extracted so `context/RepoContext.js` can depend
+ * `create`/`fetch`/`update` methods, extracted so `context/RepoContext.js` can depend
  * on it directly instead of reaching into `commands/` — a `services/`
  * module, per `core/lib/`'s one-way `commands` → `context`/`services` →
  * `utils` layering, may only depend on `utils/`, so it never builds a
@@ -75,20 +75,9 @@ class GithubIssueService {
    */
   async create(repoPath, title, file) {
     const targetPath = repoPath ?? this._repoContext?.repoPath;
-
-    let rawBody;
-
-    try {
-      rawBody = await readFile(file, 'utf8');
-    } catch {
-      throw new Error(`Error: file not found: ${file}`);
-    }
-
-    // $(cat "$file") in bash strips ALL trailing newlines via command
-    // substitution; the shell then re-adds exactly one via `printf '%s\n'`.
-    // Match that exactly, in both the POST payload and the written file —
-    // do not just pass the raw file contents through.
-    const body = rawBody.replace(/\n+$/, '');
+    // The shell then re-adds exactly one trailing newline via
+    // `printf '%s\n'` when writing the local file — see `#readBody`.
+    const body = await this.readBody(file);
 
     const { domain, repo } = await this._origin.resolve(targetPath);
     const issue = await this.issueClient(targetPath).createIssue(title, body);
@@ -100,6 +89,32 @@ class GithubIssueService {
     await writeFile(path.join(targetPath, filePath), `${body}\n`);
 
     return `ID=${id}\nTITLE=${title}\nFILE=${filePath}\nDOMAIN=${domain}\nREPO=${repo}\n`;
+  }
+
+  /**
+   * Reads `file` as an issue body, mirroring the shell's
+   * `body=$(cat "$file")`: command substitution strips ALL trailing
+   * newlines, so this does too — do not just pass the raw file contents
+   * through. `file` is resolved against the process cwd, never against
+   * any `repoPath`. Shared by `#create` and
+   * `commands/shared/GithubIssue.js#update`.
+   * @param {string} file - the local file whose contents become the
+   *   issue's body.
+   * @returns {Promise<string>} the file contents, trailing newlines
+   *   stripped.
+   * @throws {Error} `Error: file not found: <file>` when `file` cannot
+   *   be read.
+   */
+  async readBody(file) {
+    let rawBody;
+
+    try {
+      rawBody = await readFile(file, 'utf8');
+    } catch {
+      throw new Error(`Error: file not found: ${file}`);
+    }
+
+    return rawBody.replace(/\n+$/, '');
   }
 
   /**
