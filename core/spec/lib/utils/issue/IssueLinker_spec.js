@@ -1,4 +1,5 @@
 import IssueLinker from '../../../../lib/utils/issue/IssueLinker.js';
+import { fakeExecFileAsync as fakeCommandExecFileAsync, subcommand } from '../../../support/utils/fakeExecFileAsync.js';
 
 const REPO_REF = 'darthjee/arcanum';
 
@@ -20,45 +21,44 @@ function fakeExecFileAsync({
   nodeIds = {},
   nodeIdFail = false
 } = {}) {
-  return jasmine.createSpy('execFileAsync').and.callFake(async (cmd, args) => {
-    if (cmd !== 'gh') {
-      throw new Error(`unexpected command: ${cmd}`);
-    }
+  return fakeCommandExecFileAsync('gh', [
+    {
+      match: (args) => subcommand('issue', 'view')(args) && args.includes('id'),
+      respond: (args) => {
+        if (nodeIdFail) {
+          throw new Error('gh: could not resolve node id');
+        }
 
-    if (args[0] === 'issue' && args[1] === 'view' && args.includes('id')) {
-      if (nodeIdFail) {
-        throw new Error('gh: could not resolve node id');
+        return { stdout: `${nodeIds[args[2]] || ''}\n` };
       }
+    },
+    {
+      match: subcommand('issue', 'comment'),
+      respond: (args) => {
+        const isParentComment = args[3].startsWith('Spawned issue #');
 
-      const id = args[2];
+        if (isParentComment && parentCommentFail) {
+          throw new Error('gh: could not comment on parent');
+        }
 
-      return { stdout: `${nodeIds[id] || ''}\n` };
-    }
+        if (!isParentComment && newCommentFail) {
+          throw new Error('gh: could not comment on new issue');
+        }
 
-    if (args[0] === 'issue' && args[1] === 'comment') {
-      const isParentComment = args[3].startsWith('Spawned issue #');
-
-      if (isParentComment && parentCommentFail) {
-        throw new Error('gh: could not comment on parent');
+        return { stdout: '' };
       }
+    },
+    {
+      match: subcommand('api', 'graphql'),
+      respond: () => {
+        if (graphqlFail) {
+          throw new Error('gh: graphql mutation failed');
+        }
 
-      if (!isParentComment && newCommentFail) {
-        throw new Error('gh: could not comment on new issue');
+        return { stdout: '' };
       }
-
-      return { stdout: '' };
     }
-
-    if (args[0] === 'api' && args[1] === 'graphql') {
-      if (graphqlFail) {
-        throw new Error('gh: graphql mutation failed');
-      }
-
-      return { stdout: '' };
-    }
-
-    throw new Error(`unexpected gh invocation: ${JSON.stringify(args)}`);
-  });
+  ]);
 }
 
 describe('IssueLinker', () => {

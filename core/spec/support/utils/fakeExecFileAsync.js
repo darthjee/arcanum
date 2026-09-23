@@ -6,7 +6,7 @@
  * may throw to simulate a failure.
  * @param {string} command - the only command name the fake accepts; any
  *   other `cmd` throws `unexpected command: <cmd>`.
- * @param {Array<{match: Function, respond: Function}>} routes - ordered
+ * @param {Array<{match: function(string[], object): *, respond: function(string[], object): *}>} routes - ordered
  *   routes, each receiving `(args, options)`. When none matches, the
  *   fake throws `unexpected <command> invocation: <JSON args>`.
  * @returns {Function} a jasmine spy usable as `execFileAsync`.
@@ -32,7 +32,7 @@ export function fakeExecFileAsync(command, routes) {
  * exactly `names` (e.g. `subcommand('issue', 'view')` matches
  * `['issue', 'view', '1', ...]`).
  * @param {...string} names - the expected leading args, in order.
- * @returns {Function} a `match(args)` predicate for `fakeExecFileAsync`.
+ * @returns {function(string[]): boolean} a `match(args)` predicate for `fakeExecFileAsync`.
  */
 export function subcommand(...names) {
   return (args) => names.every((name, index) => args[index] === name);

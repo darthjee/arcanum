@@ -1,4 +1,5 @@
 import LabelApplicator from '../../../../lib/utils/issue/LabelApplicator.js';
+import { fakeExecFileAsync as fakeCommandExecFileAsync, subcommand } from '../../../support/utils/fakeExecFileAsync.js';
 
 const REPO_REF = 'darthjee/arcanum';
 
@@ -13,29 +14,28 @@ const REPO_REF = 'darthjee/arcanum';
  * @returns {Function} a jasmine spy usable as `execFileAsync`.
  */
 function fakeExecFileAsync({ parentLabels = [], parentLabelsFail = false, editFail = false } = {}) {
-  return jasmine.createSpy('execFileAsync').and.callFake(async (cmd, args) => {
-    if (cmd !== 'gh') {
-      throw new Error(`unexpected command: ${cmd}`);
-    }
+  return fakeCommandExecFileAsync('gh', [
+    {
+      match: (args) => subcommand('issue', 'view')(args) && args.includes('labels'),
+      respond: () => {
+        if (parentLabelsFail) {
+          throw new Error('gh: could not fetch labels');
+        }
 
-    if (args[0] === 'issue' && args[1] === 'view' && args.includes('labels')) {
-      if (parentLabelsFail) {
-        throw new Error('gh: could not fetch labels');
+        return { stdout: `${parentLabels.join('\n')}\n` };
       }
+    },
+    {
+      match: subcommand('issue', 'edit'),
+      respond: () => {
+        if (editFail) {
+          throw new Error('gh: could not apply labels');
+        }
 
-      return { stdout: `${parentLabels.join('\n')}\n` };
-    }
-
-    if (args[0] === 'issue' && args[1] === 'edit') {
-      if (editFail) {
-        throw new Error('gh: could not apply labels');
+        return { stdout: '' };
       }
-
-      return { stdout: '' };
     }
-
-    throw new Error(`unexpected gh invocation: ${JSON.stringify(args)}`);
-  });
+  ]);
 }
 
 describe('LabelApplicator', () => {
