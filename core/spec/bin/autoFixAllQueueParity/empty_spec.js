@@ -1,6 +1,4 @@
-import { runPair, seedQueue } from '../../support/factories/queueParitySetup.js';
-import { expectParity } from '../../support/utils/runCommand.js';
-import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
+import { itMatchesShellForQueueOp } from '../../support/sharedExamples/queueParitySharedExamples.js';
 
 // Parity test for the "auto-fix-all-queue-empty" migrated entrypoint
 // (issue #264) — see docs/agents/architecture/script-engine.md's
@@ -15,37 +13,17 @@ import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
 // `gh`/network touchpoint at all), so its fixtures are plain (non-git)
 // temp dirs.
 describe('auto-fix-all-queue-* parity (shell vs. native) — empty', () => {
-  it('matches shell exit code (0, empty stdout) for a zero-length queue', async () => {
-    const shellRepo = await createTempDir('arcanum-core-afaq-parity-shell-');
-    const nativeRepo = await createTempDir('arcanum-core-afaq-parity-native-');
-
-    try {
-      await Promise.all([seedQueue(shellRepo, []), seedQueue(nativeRepo, [])]);
-
-      const { shell, native } = await runPair('empty', shellRepo, nativeRepo, []);
-
-      expectParity(shell, native);
-      expect(shell.code).toEqual(0);
-      expect(shell.stdout).toEqual('');
-    } finally {
-      await Promise.all([removeTempDir(shellRepo), removeTempDir(nativeRepo)]);
-    }
+  itMatchesShellForQueueOp('matches shell exit code (0, empty stdout) for a zero-length queue', {
+    op: 'empty',
+    seed: [],
+    expectedCode: 0,
+    expectedStdout: ''
   });
 
-  it('matches shell exit code (1, empty stdout) for a non-empty queue', async () => {
-    const shellRepo = await createTempDir('arcanum-core-afaq-parity-shell-');
-    const nativeRepo = await createTempDir('arcanum-core-afaq-parity-native-');
-
-    try {
-      await Promise.all([seedQueue(shellRepo, ['x']), seedQueue(nativeRepo, ['x'])]);
-
-      const { shell, native } = await runPair('empty', shellRepo, nativeRepo, []);
-
-      expectParity(shell, native);
-      expect(shell.code).toEqual(1);
-      expect(shell.stdout).toEqual('');
-    } finally {
-      await Promise.all([removeTempDir(shellRepo), removeTempDir(nativeRepo)]);
-    }
+  itMatchesShellForQueueOp('matches shell exit code (1, empty stdout) for a non-empty queue', {
+    op: 'empty',
+    seed: ['x'],
+    expectedCode: 1,
+    expectedStdout: ''
   });
 });
