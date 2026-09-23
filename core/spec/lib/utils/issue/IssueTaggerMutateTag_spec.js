@@ -42,7 +42,7 @@ describe('IssueTagger#mutateTag', () => {
     expect(stdout).toEqual('Removed tag \'ready_for_work\' from issue #10 on darthjee/arcanum\n');
   });
 
-  it('warns to stderr and prints nothing else when the labels fetch fails', async () => {
+  it('prints the fetch Error line then the Warning line to stderr, and nothing to stdout, when the labels fetch fails', async () => {
     spyOn(process.stderr, 'write');
 
     const tagger = newTagger({ issueClient: fakeIssueClient({ getFails: true }) });
@@ -52,12 +52,13 @@ describe('IssueTagger#mutateTag', () => {
     );
 
     expect(stdout).toEqual('');
-    expect(process.stderr.write).toHaveBeenCalledWith(
-      'Warning: could not add \'enqueued\' tag to issue #10 on darthjee/arcanum\n'
-    );
+    expect(process.stderr.write.calls.allArgs()).toEqual([
+      ['Error: could not fetch issue #10 from darthjee/arcanum\n'],
+      ['Warning: could not add \'enqueued\' tag to issue #10 on darthjee/arcanum\n']
+    ]);
   });
 
-  it('warns to stderr and prints nothing else when the mutation itself fails', async () => {
+  it('prints the update Error line then the Warning line to stderr, and nothing to stdout, when an add fails', async () => {
     spyOn(process.stderr, 'write');
 
     const tagger = newTagger({ issueClient: fakeIssueClient({ existingLabels: [], mutateFails: true }) });
@@ -67,8 +68,49 @@ describe('IssueTagger#mutateTag', () => {
     );
 
     expect(stdout).toEqual('');
-    expect(process.stderr.write).toHaveBeenCalledWith(
-      'Warning: could not add \'enqueued\' tag to issue #10 on darthjee/arcanum\n'
+    expect(process.stderr.write.calls.allArgs()).toEqual([
+      ['Error: could not update issue #10 on darthjee/arcanum\n'],
+      ['Warning: could not add \'enqueued\' tag to issue #10 on darthjee/arcanum\n']
+    ]);
+  });
+
+  it('prints the update Error line then the Warning line to stderr when a remove fails', async () => {
+    spyOn(process.stderr, 'write');
+
+    const tagger = newTagger({ issueClient: fakeIssueClient({ existingLabels: ['Ready for Work'], mutateFails: true }) });
+
+    const { stdout } = await captureStdout(() =>
+      tagger.mutateTag('10', REPO, 'remove', 'ready_for_work')
     );
+
+    expect(stdout).toEqual('');
+    expect(process.stderr.write.calls.allArgs()).toEqual([
+      ['Error: could not update issue #10 on darthjee/arcanum\n'],
+      ['Warning: could not remove \'ready_for_work\' tag from issue #10 on darthjee/arcanum\n']
+    ]);
+  });
+
+  ['add', 'remove'].forEach((action) => {
+    it(`refuses to ${action} shipit, printing the guard Error and Warning lines without any API call`, async () => {
+      spyOn(process.stderr, 'write');
+
+      const issueClient = fakeIssueClient();
+      const tagger = newTagger({ issueClient });
+
+      const { stdout } = await captureStdout(() =>
+        tagger.mutateTag('10', REPO, action, 'shipit')
+      );
+
+      const preposition = action === 'add' ? 'to' : 'from';
+
+      expect(stdout).toEqual('');
+      expect(process.stderr.write.calls.allArgs()).toEqual([
+        ['Error: shipit is human-only; scripts must not add or remove it\n'],
+        [`Warning: could not ${action} 'shipit' tag ${preposition} issue #10 on darthjee/arcanum\n`]
+      ]);
+      expect(issueClient.getIssue).not.toHaveBeenCalled();
+      expect(issueClient.addLabel).not.toHaveBeenCalled();
+      expect(issueClient.removeLabel).not.toHaveBeenCalled();
+    });
   });
 });

@@ -32,8 +32,17 @@
 #   - For add-tag/remove-tag, the tag mutated is the last whitespace-
 #     separated argument on the matched line.
 #   - For mark-<x>, the tag(s) added/removed are resolved by looking up
-#     arcanum/_lib/github_issue.sh's cmd_mark_<x> function body for its
-#     tag_mutate_add_label/tag_mutate_remove_label calls.
+#     arcanum/_lib/github_issue_shell.sh's cmd_mark_<x> function body for
+#     its tag_mutate_add_label/tag_mutate_remove_label calls (the shell
+#     side of the github-issue engine_dispatch shim; github_issue.sh itself
+#     only dispatches). If a mark-<x> verb has no cmd_mark_<x> function
+#     there, the generator prints an error and exits non-zero rather than
+#     silently rendering "-" / "-". This lookup only applies when the
+#     entrypoint is a github-issue wrapper (basename matching
+#     GITHUB_ISSUE_ENTRYPOINT_REGEX: a skill's scripts/github.sh or
+#     arcanum/_lib/github_issue.sh); any other "<x>.sh mark-<y>" match
+#     (e.g. arcanum/migrations/ledger.sh mark-complete) is not a tag
+#     mutation and keeps rendering "-" / "-".
 #   - The entrypoint column is the thin per-skill wrapper actually
 #     referenced on the matched line, resolved to a real file on disk by
 #     trying it relative to the skill folder, then the matched file's own
@@ -58,7 +67,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-LIB_GITHUB_ISSUE="${REPO_ROOT}/arcanum/_lib/github_issue.sh"
+LIB_GITHUB_ISSUE_MARKS="${REPO_ROOT}/arcanum/_lib/github_issue_shell.sh"
+GITHUB_ISSUE_ENTRYPOINT_REGEX='^(github|github_issue)\.sh$'
 REVIEW_JSON="${REPO_ROOT}/docs/agents/tag-mutations.review.json"
 OUTPUT_TABLE="${REPO_ROOT}/docs/agents/tag-mutations.md"
 
@@ -160,19 +170,29 @@ resolve_entrypoint() {
 }
 
 # --- Resolve tags added/removed for a mark-<x> verb by reading
-#     arcanum/_lib/github_issue.sh's cmd_mark_<x> function body. Prints
-#     "<added-csv>|<removed-csv>". ---
+#     arcanum/_lib/github_issue_shell.sh's cmd_mark_<x> function body.
+#     Prints "<added-csv>|<removed-csv>". Exits non-zero (with an error on
+#     stderr) when the function cannot be found. ---
 mark_tags_for_verb() {
   local verb="$1"
   local suffix="${verb#mark-}"
   local func_name="cmd_mark_${suffix//-/_}"
 
+  if [[ ! -f "$LIB_GITHUB_ISSUE_MARKS" ]]; then
+    echo "Error: cannot resolve '${verb}': ${LIB_GITHUB_ISSUE_MARKS#"${REPO_ROOT}"/} not found" >&2
+    return 1
+  fi
+
   local body
-  body=$(awk -v fn="${func_name}() {" '
-    index($0, fn) == 1 { found=1; next }
+  if ! body=$(awk -v fn="${func_name}() {" '
+    index($0, fn) == 1 { found=1; seen=1; next }
     found && /^}/ { found=0 }
     found { print }
-  ' "$LIB_GITHUB_ISSUE")
+    END { exit(seen ? 0 : 2) }
+  ' "$LIB_GITHUB_ISSUE_MARKS"); then
+    echo "Error: cannot resolve '${verb}': no ${func_name}() function in ${LIB_GITHUB_ISSUE_MARKS#"${REPO_ROOT}"/}" >&2
+    return 1
+  fi
 
   local added=() removed=()
   local line
@@ -229,11 +249,14 @@ scan_file() {
     elif [[ "$verb" == "remove-tag" ]]; then
       tags_added=""
       tags_removed="$(awk '{print $NF}' <<< "$argstr")"
-    else
+    elif [[ "$(basename "$entrypoint")" =~ $GITHUB_ISSUE_ENTRYPOINT_REGEX ]]; then
       local resolved
-      resolved="$(mark_tags_for_verb "$verb")"
+      resolved="$(mark_tags_for_verb "$verb")" || exit 1
       tags_added="${resolved%%|*}"
       tags_removed="${resolved#*|}"
+    else
+      tags_added=""
+      tags_removed=""
     fi
 
     printf "%s${FS_CHAR}%s${FS_CHAR}%s${FS_CHAR}%s${FS_CHAR}%s${FS_CHAR}%s${FS_CHAR}%s\n" \

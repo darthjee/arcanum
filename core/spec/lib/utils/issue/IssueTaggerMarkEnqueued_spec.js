@@ -21,22 +21,21 @@ describe('IssueTagger#markEnqueued', () => {
     expect(issueClient.removeLabel.calls.count()).toEqual(4);
   });
 
-  it('warns to stderr, without stopping, when a label mutation fails', async () => {
+  it('prints the Error and Warning lines to stderr, without stopping, when a label mutation fails', async () => {
     spyOn(process.stderr, 'write');
 
     const tagger = newTagger({ issueClient: fakeIssueClient({ getFails: true }) });
 
     await captureStdout(() => tagger.markEnqueued(['10']));
 
-    expect(process.stderr.write).toHaveBeenCalledWith(
-      'Warning: could not add \'enqueued\' tag to issue #10 on darthjee/arcanum\n'
-    );
-    expect(process.stderr.write).toHaveBeenCalledWith(
-      'Warning: could not remove \'ready_for_work\' tag from issue #10 on darthjee/arcanum\n'
-    );
-    expect(process.stderr.write).toHaveBeenCalledWith(
-      'Warning: could not remove \'created\' tag from issue #10 on darthjee/arcanum\n'
-    );
+    expect(process.stderr.write.calls.allArgs()).toEqual([
+      ['Error: could not fetch issue #10 from darthjee/arcanum\n'],
+      ['Warning: could not add \'enqueued\' tag to issue #10 on darthjee/arcanum\n'],
+      ['Error: could not fetch issue #10 from darthjee/arcanum\n'],
+      ['Warning: could not remove \'ready_for_work\' tag from issue #10 on darthjee/arcanum\n'],
+      ['Error: could not fetch issue #10 from darthjee/arcanum\n'],
+      ['Warning: could not remove \'created\' tag from issue #10 on darthjee/arcanum\n']
+    ]);
   });
 
   it('rejects with a DispatchFailure (stdout "", exit code 1) when resolving the origin fails', async () => {
@@ -69,6 +68,9 @@ describe('IssueTagger#markEnqueued', () => {
 
     await captureStdout(() => tagger.markEnqueued(['10']));
 
+    expect(process.stderr.write).toHaveBeenCalledWith(
+      'Error: could not fetch issue #10 from example.com/darthjee/arcanum\n'
+    );
     expect(process.stderr.write).toHaveBeenCalledWith(
       'Warning: could not add \'enqueued\' tag to issue #10 on example.com/darthjee/arcanum\n'
     );

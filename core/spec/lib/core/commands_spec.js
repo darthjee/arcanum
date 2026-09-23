@@ -48,6 +48,12 @@ describe('COMMANDS', () => {
       'github-issue-create',
       'github-issue-fetch',
       'github-issue-info',
+      'github-issue-mark-created',
+      'github-issue-mark-enhancing',
+      'github-issue-mark-planning',
+      'github-issue-mark-ready',
+      'github-issue-mark-refined',
+      'github-issue-mark-split',
       'github-issue-update',
       'issue-state',
       'list-agents',
@@ -70,7 +76,7 @@ describe('COMMANDS', () => {
     expect(COMMANDS['arcanum-update-run-update-apply'].method).toBe('apply');
   });
 
-  it('sets validateRepoPath: false on the file-only auto-fix-all-queue subcommands, github-issue-info and github-issue-update', () => {
+  it('sets validateRepoPath: false on the file-only auto-fix-all-queue subcommands, github-issue-info, the github-issue-mark-* family and github-issue-update', () => {
     const skipValidation = Object.keys(COMMANDS).filter((name) => COMMANDS[name].validateRepoPath === false);
 
     expect(skipValidation).toEqual([
@@ -80,6 +86,12 @@ describe('COMMANDS', () => {
       'auto-fix-all-queue-pop',
       'auto-fix-all-queue-wait-next',
       'github-issue-info',
+      'github-issue-mark-created',
+      'github-issue-mark-enhancing',
+      'github-issue-mark-planning',
+      'github-issue-mark-ready',
+      'github-issue-mark-refined',
+      'github-issue-mark-split',
       'github-issue-update'
     ]);
   });
@@ -95,6 +107,26 @@ describe('COMMANDS', () => {
       method: 'update',
       context: 'repo',
       validateRepoPath: false
+    });
+  });
+
+  it('routes the github-issue-mark-* family to GithubIssueMark#mark*', () => {
+    const expected = {
+      'github-issue-mark-created': 'markCreated',
+      'github-issue-mark-enhancing': 'markEnhancing',
+      'github-issue-mark-planning': 'markPlanning',
+      'github-issue-mark-ready': 'markReady',
+      'github-issue-mark-refined': 'markRefined',
+      'github-issue-mark-split': 'markSplit'
+    };
+
+    Object.entries(expected).forEach(([name, method]) => {
+      expect(COMMANDS[name]).toEqual({
+        module: 'commands/shared/GithubIssueMark.js',
+        method,
+        context: 'repo',
+        validateRepoPath: false
+      });
     });
   });
 
