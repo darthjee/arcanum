@@ -1,5 +1,6 @@
 import AutoFixIssueMergeMain from '../../../../lib/commands/auto-fix-issue/AutoFixIssueMergeMain.js';
 import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
+import { fakeExecFileAsync as fakeCommandExecFileAsync, subcommand } from '../../../support/utils/fakeExecFileAsync.js';
 
 const REPO_PATH = '/repo/path';
 
@@ -29,45 +30,43 @@ function fakeExecFileAsync({
   diffStdout = '',
   fetchError = null
 } = {}) {
-  return jasmine.createSpy('execFileAsync').and.callFake(async (cmd, args) => {
-    if (cmd !== 'git') {
-      throw new Error(`unexpected command: ${cmd}`);
-    }
+  return fakeCommandExecFileAsync('git', [
+    {
+      match: subcommand('fetch'),
+      respond: () => {
+        if (fetchError) {
+          throw fetchError;
+        }
 
-    if (args[0] === 'fetch') {
-      if (fetchError) {
-        throw fetchError;
-      }
-
-      return { stdout: '' };
-    }
-
-    if (args[0] === 'show-ref') {
-      if (originMainExists) {
         return { stdout: '' };
       }
+    },
+    {
+      match: subcommand('show-ref'),
+      respond: () => {
+        if (originMainExists) {
+          return { stdout: '' };
+        }
 
-      const error = new Error('not found');
-      error.code = 1;
-      throw error;
-    }
-
-    if (args[0] === 'merge') {
-      if (mergeConflict) {
-        const error = new Error('merge conflict');
-        error.stdout = mergeStdout;
+        const error = new Error('not found');
+        error.code = 1;
         throw error;
       }
+    },
+    {
+      match: subcommand('merge'),
+      respond: () => {
+        if (mergeConflict) {
+          const error = new Error('merge conflict');
+          error.stdout = mergeStdout;
+          throw error;
+        }
 
-      return { stdout: '' };
-    }
-
-    if (args[0] === 'diff') {
-      return { stdout: diffStdout };
-    }
-
-    throw new Error(`unexpected git invocation: ${JSON.stringify(args)}`);
-  });
+        return { stdout: '' };
+      }
+    },
+    { match: subcommand('diff'), respond: () => ({ stdout: diffStdout }) }
+  ]);
 }
 
 describe('AutoFixIssueMergeMain', () => {
