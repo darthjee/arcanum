@@ -1,4 +1,5 @@
 import Git from '../git/Git.js';
+import GitHubTransport from './GitHubTransport.js';
 
 const DEFAULT_TIMEOUT_MS = 30000;
 const GRAPHQL_URL = 'https://api.github.com/graphql';
@@ -10,7 +11,10 @@ const GRAPHQL_URL = 'https://api.github.com/graphql';
  * Bound to a single `RepoContext` at construction — `repo`/`repoRef`/
  * `token` are all resolved internally via `this._context` rather than
  * taken as method parameters, so a `GitHubClient` instance is scoped to
- * one repo (mirroring `GitClient`/`MergeBodyResolver`).
+ * one repo (mirroring `GitClient`/`MergeBodyResolver`). Request
+ * mechanics live in `GitHubTransport`; a "failed request" below means a
+ * rejected fetch (network error, timeout), a non-ok response, or
+ * unparseable JSON — all mapped to the method's own domain error.
  */
 class GitHubClient {
   /**
@@ -30,6 +34,7 @@ class GitHubClient {
     this._fetch = fetchFn;
     this._timeoutMs = timeoutMs;
     this._git = git;
+    this._transport = new GitHubTransport({ context, fetchFn, timeoutMs });
   }
 
   /**
@@ -43,39 +48,15 @@ class GitHubClient {
    *   branch on <repoRef>` on any lookup failure.
    */
   async getPr(branch) {
-    const { repo, repoRef } = await this._context.resolveWithRef();
-    const token = await this._context.getToken();
-    const notFound = () => new Error(`Error: no pull request found for the current branch on ${repoRef}`);
+    const { repo, repoRef } = await this._transport.repo();
+    const failure = () => new Error(`Error: no pull request found for the current branch on ${repoRef}`);
     const owner = repo.split('/')[0];
-    const url = `https://api.github.com/repos/${repo}/pulls?head=${encodeURIComponent(owner)}:${encodeURIComponent(branch)}&state=all`;
-
-    let response;
-
-    try {
-      response = await this._fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(this._timeoutMs)
-      });
-    } catch {
-      throw notFound();
-    }
-
-    if (!response.ok) {
-      throw notFound();
-    }
-
-    let pulls;
-
-    try {
-      pulls = await response.json();
-    } catch {
-      throw notFound();
-    }
-
-    const pull = Array.isArray(pulls) && pulls.length > 0 ? pulls[0] : undefined;
+    const path = `/repos/${repo}/pulls?head=${encodeURIComponent(owner)}:${encodeURIComponent(branch)}&state=all`;
+    const pulls = await this._transport.requestArray(path, { failure });
+    const pull = pulls[0];
 
     if (!pull || !pull.number) {
-      throw notFound();
+      throw failure();
     }
 
     return pull;
@@ -86,23 +67,13 @@ class GitHubClient {
    * @returns {Promise<Array>} the pull request's commits (first page
    *   only, `per_page=100`), or `[]` on a malformed response.
    * @throws {Error} `could not fetch commits for pull request #<number>
-   *   in <repo>` on any non-ok response.
+   *   in <repo>` on a failed request.
    */
   async getPrCommits(number) {
-    const { repo } = await this._context.resolveWithRef();
-    const token = await this._context.getToken();
-    const response = await this._fetch(`https://api.github.com/repos/${repo}/pulls/${number}/commits?per_page=100`, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(this._timeoutMs)
-    });
+    const { repo } = await this._transport.repo();
+    const failure = () => new Error(`could not fetch commits for pull request #${number} in ${repo}`);
 
-    if (!response.ok) {
-      throw new Error(`could not fetch commits for pull request #${number} in ${repo}`);
-    }
-
-    const commits = await response.json();
-
-    return Array.isArray(commits) ? commits : [];
+    return this._transport.requestArray(`/repos/${repo}/pulls/${number}/commits?per_page=100`, { failure });
   }
 
   /**
@@ -163,24 +134,15 @@ class GitHubClient {
    * @returns {Promise<string>} the pull request's current head commit
    *   sha.
    * @throws {Error} `Error: could not fetch pull request #<prNumber> from
-   *   <repo>` on a non-ok response.
+   *   <repo>` on a failed request.
    * @throws {Error} `Error: could not resolve head commit for pull
    *   request #<prNumber> in <repo>` when the response has no
    *   `head.sha`.
    */
   async getPrHeadSha(prNumber) {
-    const { repo } = await this._context.resolveWithRef();
-    const token = await this._context.getToken();
-    const response = await this._fetch(`https://api.github.com/repos/${repo}/pulls/${prNumber}`, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(this._timeoutMs)
-    });
-
-    if (!response.ok) {
-      throw new Error(`Error: could not fetch pull request #${prNumber} from ${repo}`);
-    }
-
-    const pull = await response.json();
+    const { repo } = await this._transport.repo();
+    const failure = () => new Error(`Error: could not fetch pull request #${prNumber} from ${repo}`);
+    const pull = await this._transport.requestJson(`/repos/${repo}/pulls/${prNumber}`, { failure });
     const sha = pull && pull.head && pull.head.sha;
 
     if (!sha) {
@@ -198,25 +160,16 @@ class GitHubClient {
    *   only, `per_page=100` — no pagination, matching the shell script's
    *   own single-page fetch).
    * @throws {Error} `Error: could not fetch check-runs for <sha> in
-   *   <repo>` on a non-ok response.
+   *   <repo>` on a failed request.
    * @throws {Error} `Error: malformed check-runs response for <sha> in
    *   <repo>` when `check_runs` isn't an array.
    */
   async getCheckRuns(sha) {
-    const { repo } = await this._context.resolveWithRef();
-    const token = await this._context.getToken();
-    const response = await this._fetch(`https://api.github.com/repos/${repo}/commits/${sha}/check-runs?per_page=100`, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(this._timeoutMs)
-    });
+    const { repo } = await this._transport.repo();
+    const failure = () => new Error(`Error: could not fetch check-runs for ${sha} in ${repo}`);
+    const body = await this._transport.requestJson(`/repos/${repo}/commits/${sha}/check-runs?per_page=100`, { failure });
 
-    if (!response.ok) {
-      throw new Error(`Error: could not fetch check-runs for ${sha} in ${repo}`);
-    }
-
-    const body = await response.json();
-
-    if (!Array.isArray(body.check_runs)) {
+    if (!body || !Array.isArray(body.check_runs)) {
       throw new Error(`Error: malformed check-runs response for ${sha} in ${repo}`);
     }
 
@@ -226,21 +179,11 @@ class GitHubClient {
   /**
    * Resolve the acting GitHub user, replacing `gh api user`.
    * @returns {Promise<object>} the parsed `/user` response body.
-   * @throws {Error} `could not fetch current user` on any non-ok
-   *   response.
+   * @throws {Error} `could not fetch current user` on a failed
+   *   request.
    */
   async getCurrentUser() {
-    const token = await this._context.getToken();
-    const response = await this._fetch('https://api.github.com/user', {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(this._timeoutMs)
-    });
-
-    if (!response.ok) {
-      throw new Error('could not fetch current user');
-    }
-
-    return response.json();
+    return this._transport.requestJson('/user', { failure: () => new Error('could not fetch current user') });
   }
 
   /**
@@ -344,21 +287,13 @@ class GitHubClient {
    * @returns {Promise<object>} the raw pull request object (`state`,
    *   `merged`, `merged_at`, etc.).
    * @throws {Error} `Error: could not fetch pull request #<prNumber> from
-   *   <repo>` on a non-ok response.
+   *   <repo>` on a failed request.
    */
   async getPrState(prNumber) {
-    const { repo } = await this._context.resolveWithRef();
-    const token = await this._context.getToken();
-    const response = await this._fetch(`https://api.github.com/repos/${repo}/pulls/${prNumber}`, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(this._timeoutMs)
-    });
+    const { repo } = await this._transport.repo();
+    const failure = () => new Error(`Error: could not fetch pull request #${prNumber} from ${repo}`);
 
-    if (!response.ok) {
-      throw new Error(`Error: could not fetch pull request #${prNumber} from ${repo}`);
-    }
-
-    return response.json();
+    return this._transport.requestJson(`/repos/${repo}/pulls/${prNumber}`, { failure });
   }
 
   /**
@@ -389,23 +324,13 @@ class GitHubClient {
    *   `submitted_at`, `body`, `node_id` — or `[]` on a malformed
    *   response.
    * @throws {Error} `could not fetch reviews for pull request #<prNumber>
-   *   in <repo>` on a non-ok response.
+   *   in <repo>` on a failed request.
    */
   async getPrReviews(prNumber) {
-    const { repo } = await this._context.resolveWithRef();
-    const token = await this._context.getToken();
-    const response = await this._fetch(`https://api.github.com/repos/${repo}/pulls/${prNumber}/reviews?per_page=100`, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(this._timeoutMs)
-    });
+    const { repo } = await this._transport.repo();
+    const failure = () => new Error(`could not fetch reviews for pull request #${prNumber} in ${repo}`);
 
-    if (!response.ok) {
-      throw new Error(`could not fetch reviews for pull request #${prNumber} in ${repo}`);
-    }
-
-    const reviews = await response.json();
-
-    return Array.isArray(reviews) ? reviews : [];
+    return this._transport.requestArray(`/repos/${repo}/pulls/${prNumber}/reviews?per_page=100`, { failure });
   }
 
   /**
@@ -420,23 +345,13 @@ class GitHubClient {
    *   `per_page=100`), each with `user.login`, `created_at`, `body`,
    *   `node_id`, `html_url` — or `[]` on a malformed response.
    * @throws {Error} `could not fetch comments for pull request
-   *   #<prNumber> in <repo>` on a non-ok response.
+   *   #<prNumber> in <repo>` on a failed request.
    */
   async getIssueComments(prNumber) {
-    const { repo } = await this._context.resolveWithRef();
-    const token = await this._context.getToken();
-    const response = await this._fetch(`https://api.github.com/repos/${repo}/issues/${prNumber}/comments?per_page=100`, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(this._timeoutMs)
-    });
+    const { repo } = await this._transport.repo();
+    const failure = () => new Error(`could not fetch comments for pull request #${prNumber} in ${repo}`);
 
-    if (!response.ok) {
-      throw new Error(`could not fetch comments for pull request #${prNumber} in ${repo}`);
-    }
-
-    const comments = await response.json();
-
-    return Array.isArray(comments) ? comments : [];
+    return this._transport.requestArray(`/repos/${repo}/issues/${prNumber}/comments?per_page=100`, { failure });
   }
 
   /**
@@ -450,23 +365,13 @@ class GitHubClient {
    *   only, `per_page=100`), each with `user.login`, `created_at`,
    *   `body`, `node_id`, `html_url` — or `[]` on a malformed response.
    * @throws {Error} `could not fetch review comments for pull request
-   *   #<prNumber> in <repo>` on a non-ok response.
+   *   #<prNumber> in <repo>` on a failed request.
    */
   async getPrReviewComments(prNumber) {
-    const { repo } = await this._context.resolveWithRef();
-    const token = await this._context.getToken();
-    const response = await this._fetch(`https://api.github.com/repos/${repo}/pulls/${prNumber}/comments?per_page=100`, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(this._timeoutMs)
-    });
+    const { repo } = await this._transport.repo();
+    const failure = () => new Error(`could not fetch review comments for pull request #${prNumber} in ${repo}`);
 
-    if (!response.ok) {
-      throw new Error(`could not fetch review comments for pull request #${prNumber} in ${repo}`);
-    }
-
-    const comments = await response.json();
-
-    return Array.isArray(comments) ? comments : [];
+    return this._transport.requestArray(`/repos/${repo}/pulls/${prNumber}/comments?per_page=100`, { failure });
   }
 
   /**
