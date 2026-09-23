@@ -113,6 +113,15 @@ describe('GitHubClient', () => {
         'could not merge PR #7 on darthjee/arcanum'
       );
     });
+
+    it('throws the domain error when fetch itself rejects (e.g. timeout)', async () => {
+      const fetchFn = jasmine.createSpy().and.rejectWith(new Error('fetch failed'));
+      const client = newClient(fetchFn);
+
+      await expectAsync(client.mergePr(7, {})).toBeRejectedWithError(
+        'could not merge PR #7 on darthjee/arcanum'
+      );
+    });
   });
 
   describe('#deleteBranch', () => {
@@ -492,6 +501,33 @@ describe('GitHubClient', () => {
     });
   });
 
+  describe('#createPr failed-request mapping', () => {
+    const git = { currentBranch: () => Promise.resolve('issue-5') };
+
+    it('throws the domain error when fetch itself rejects', async () => {
+      const client = newClient(jasmine.createSpy().and.rejectWith(new Error('fetch failed')), git);
+
+      await expectAsync(client.createPr('My PR', 'body')).toBeRejectedWithError(
+        `could not create pull request on ${REPO}`
+      );
+    });
+
+    it('throws the domain error when the created pull request body is not valid JSON', async () => {
+      const fetchFn = jasmine.createSpy().and.callFake(async (url, options = {}) => {
+        if (options.method === undefined) {
+          return { ok: true, json: async () => ({ default_branch: 'main' }) };
+        }
+
+        return { ok: true, json: () => Promise.reject(new SyntaxError('Unexpected token')) };
+      });
+      const client = newClient(fetchFn, git);
+
+      await expectAsync(client.createPr('My PR', 'body')).toBeRejectedWithError(
+        `could not create pull request on ${REPO}`
+      );
+    });
+  });
+
   describe('#markPrReady', () => {
     it('POSTs the markPullRequestReadyForReview mutation with the node id and the auth header', async () => {
       const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true, json: async () => ({ data: {} }) });
@@ -520,6 +556,14 @@ describe('GitHubClient', () => {
       );
     });
 
+    it('throws when fetch itself rejects', async () => {
+      const client = newClient(jasmine.createSpy().and.rejectWith(new Error('fetch failed')));
+
+      await expectAsync(client.markPrReady('PR_kwABC')).toBeRejectedWithError(
+        'could not mark pull request ready for review'
+      );
+    });
+
     it('throws when the GraphQL response reports errors', async () => {
       const fetchFn = jasmine.createSpy().and.resolveTo({
         ok: true,
@@ -530,6 +574,43 @@ describe('GitHubClient', () => {
       await expectAsync(client.markPrReady('PR_kwABC')).toBeRejectedWithError(
         'could not mark pull request ready for review'
       );
+    });
+  });
+
+  describe('failed-request error mapping on read methods', () => {
+    const malformedJson = async () => {
+      throw new SyntaxError('Unexpected token');
+    };
+    const cases = [
+      ['#getPr', (client) => client.getPr('issue-5'), `Error: no pull request found for the current branch on ${REPO}`],
+      ['#getPrCommits', (client) => client.getPrCommits(7), `could not fetch commits for pull request #7 in ${REPO}`],
+      ['#getPrHeadSha', (client) => client.getPrHeadSha(7), `Error: could not fetch pull request #7 from ${REPO}`],
+      ['#getCheckRuns', (client) => client.getCheckRuns('abc123'), `Error: could not fetch check-runs for abc123 in ${REPO}`],
+      ['#getCurrentUser', (client) => client.getCurrentUser(), 'could not fetch current user'],
+      ['#getPrState', (client) => client.getPrState(7), `Error: could not fetch pull request #7 from ${REPO}`],
+      ['#getPrReviews', (client) => client.getPrReviews(7), `could not fetch reviews for pull request #7 in ${REPO}`],
+      ['#getIssueComments', (client) => client.getIssueComments(7), `could not fetch comments for pull request #7 in ${REPO}`],
+      [
+        '#getPrReviewComments',
+        (client) => client.getPrReviewComments(7),
+        `could not fetch review comments for pull request #7 in ${REPO}`
+      ]
+    ];
+
+    cases.forEach(([name, call, message]) => {
+      describe(name, () => {
+        it('throws the domain error when fetch itself rejects (e.g. timeout)', async () => {
+          const client = newClient(jasmine.createSpy().and.rejectWith(new Error('fetch failed')));
+
+          await expectAsync(call(client)).toBeRejectedWithError(message);
+        });
+
+        it('throws the domain error when the response body is not valid JSON', async () => {
+          const client = newClient(jasmine.createSpy().and.resolveTo({ ok: true, json: malformedJson }));
+
+          await expectAsync(call(client)).toBeRejectedWithError(message);
+        });
+      });
     });
   });
 });
