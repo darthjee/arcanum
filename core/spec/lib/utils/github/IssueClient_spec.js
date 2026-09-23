@@ -47,14 +47,16 @@ describe('IssueClient', () => {
       );
     });
 
-    it('propagates a malformed (non-JSON) response as a rejection', async () => {
+    it('throws a descriptive error on a malformed (non-JSON) response', async () => {
       const fetchFn = jasmine.createSpy().and.resolveTo({
         ok: true,
-        json: async () => { throw new Error('bad json'); }
+        json: async () => { throw new SyntaxError('bad json'); }
       });
       const client = newClient(fetchFn);
 
-      await expectAsync(client.getIssue('10')).toBeRejected();
+      await expectAsync(client.getIssue('10')).toBeRejectedWithError(
+        `Error: could not fetch issue #10 from ${REPO}`
+      );
     });
   });
 
@@ -107,6 +109,18 @@ describe('IssueClient', () => {
         signal: jasmine.anything()
       });
       expect(result).toEqual(created);
+    });
+
+    it('throws a descriptive error on a malformed (non-JSON) response', async () => {
+      const fetchFn = jasmine.createSpy().and.resolveTo({
+        ok: true,
+        json: async () => { throw new SyntaxError('bad json'); }
+      });
+      const client = newClient(fetchFn);
+
+      await expectAsync(client.createIssue('My title', 'My body')).toBeRejectedWithError(
+        `Error: could not create issue on ${REPO}`
+      );
     });
   });
 
