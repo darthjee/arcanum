@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createTempDir } from '../utils/tempDir.js';
+import { fakeExecFileAsync, subcommand } from '../utils/fakeExecFileAsync.js';
 
 /**
  * Build a fresh temp repo plus the on-disk fixture a commit-command
@@ -63,52 +64,47 @@ export async function createCommitCommandRepo({ filePath: relativeFilePath, dirP
 export function fakeGitExecFileAsync({ branch = 'my-branch', stagesAdd = true, tracked } = {}) {
   let staged = false;
 
-  return jasmine.createSpy('execFileAsync').and.callFake(async (cmd, args, options = {}) => {
-    if (cmd !== 'git') {
-      throw new Error(`unexpected command: ${cmd}`);
-    }
+  const empty = () => ({ stdout: '' });
+  const trackedRoutes = [
+    {
+      match: subcommand('ls-files'),
+      respond: (args) => {
+        const target = args[1];
 
-    if (tracked && args[0] === 'ls-files') {
-      const target = args[1];
-
-      return { stdout: tracked.includes(target) ? `${target}\n` : '' };
-    }
-
-    if (tracked && args[0] === 'rm') {
-      staged = true;
-
-      return { stdout: '' };
-    }
-
-    if (tracked && args[0] === 'diff') {
-      if (staged) {
-        const error = new Error('diff reported changes');
-
-        error.code = 1;
-        throw error;
+        return { stdout: tracked.includes(target) ? `${target}\n` : '' };
       }
+    },
+    {
+      match: subcommand('rm'),
+      respond: () => {
+        staged = true;
 
-      return { stdout: '' };
+        return { stdout: '' };
+      }
+    },
+    {
+      match: subcommand('diff'),
+      respond: () => {
+        if (staged) {
+          const error = new Error('diff reported changes');
+
+          error.code = 1;
+          throw error;
+        }
+
+        return { stdout: '' };
+      }
     }
+  ];
+  const addRoutes = [{ match: subcommand('add'), respond: empty }];
 
-    if (!tracked && stagesAdd && args[0] === 'add') {
-      return { stdout: '' };
-    }
-
-    if (args[0] === 'commit') {
-      return { stdout: '', __input: options.input };
-    }
-
-    if (args[0] === 'branch') {
-      return { stdout: `${branch}\n` };
-    }
-
-    if (args[0] === 'push') {
-      return { stdout: '' };
-    }
-
-    throw new Error(`unexpected git invocation: ${JSON.stringify(args)}`);
-  });
+  return fakeExecFileAsync('git', [
+    ...(tracked ? trackedRoutes : []),
+    ...(!tracked && stagesAdd ? addRoutes : []),
+    { match: subcommand('commit'), respond: (args, options) => ({ stdout: '', __input: options.input }) },
+    { match: subcommand('branch'), respond: () => ({ stdout: `${branch}\n` }) },
+    { match: subcommand('push'), respond: empty }
+  ]);
 }
 
 /**

@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import AutoFixIssueCreateBranch from '../../../../lib/commands/auto-fix-issue/AutoFixIssueCreateBranch.js';
+import { fakeExecFileAsync as fakeCommandExecFileAsync, subcommand } from '../../../support/utils/fakeExecFileAsync.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 const PLAN_DIR = 'plan-dir';
@@ -17,27 +18,21 @@ const ID = '999';
  * @returns {Function} a jasmine spy usable as `execFileAsync`.
  */
 function fakeExecFileAsync({ branchExists = false } = {}) {
-  return jasmine.createSpy('execFileAsync').and.callFake(async (cmd, args) => {
-    if (cmd !== 'git') {
-      throw new Error(`unexpected command: ${cmd}`);
-    }
+  return fakeCommandExecFileAsync('git', [
+    {
+      match: subcommand('show-ref'),
+      respond: () => {
+        if (branchExists) {
+          return { stdout: '' };
+        }
 
-    if (args[0] === 'show-ref') {
-      if (branchExists) {
-        return { stdout: '' };
+        const error = new Error('not found');
+        error.code = 1;
+        throw error;
       }
-
-      const error = new Error('not found');
-      error.code = 1;
-      throw error;
-    }
-
-    if (args[0] === 'checkout') {
-      return { stdout: '' };
-    }
-
-    throw new Error(`unexpected git invocation: ${JSON.stringify(args)}`);
-  });
+    },
+    { match: subcommand('checkout'), respond: () => ({ stdout: '' }) }
+  ]);
 }
 
 describe('AutoFixIssueCreateBranch', () => {

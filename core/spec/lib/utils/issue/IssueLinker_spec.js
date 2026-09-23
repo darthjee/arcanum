@@ -1,4 +1,5 @@
 import IssueLinker from '../../../../lib/utils/issue/IssueLinker.js';
+import { fakeExecFileAsync as fakeCommandExecFileAsync, subcommand } from '../../../support/utils/fakeExecFileAsync.js';
 
 const REPO_REF = 'darthjee/arcanum';
 
@@ -20,57 +21,70 @@ function fakeExecFileAsync({
   nodeIds = {},
   nodeIdFail = false
 } = {}) {
-  return jasmine.createSpy('execFileAsync').and.callFake(async (cmd, args) => {
-    if (cmd !== 'gh') {
-      throw new Error(`unexpected command: ${cmd}`);
-    }
+  return fakeCommandExecFileAsync('gh', [
+    {
+      match: (args) => subcommand('issue', 'view')(args) && args.includes('id'),
+      respond: (args) => {
+        if (nodeIdFail) {
+          throw new Error('gh: could not resolve node id');
+        }
 
-    if (args[0] === 'issue' && args[1] === 'view' && args.includes('id')) {
-      if (nodeIdFail) {
-        throw new Error('gh: could not resolve node id');
+        return { stdout: `${nodeIds[args[2]] || ''}\n` };
       }
+    },
+    {
+      match: subcommand('issue', 'comment'),
+      respond: (args) => {
+        const isParentComment = args[3].startsWith('Spawned issue #');
 
-      const id = args[2];
+        if (isParentComment && parentCommentFail) {
+          throw new Error('gh: could not comment on parent');
+        }
 
-      return { stdout: `${nodeIds[id] || ''}\n` };
-    }
+        if (!isParentComment && newCommentFail) {
+          throw new Error('gh: could not comment on new issue');
+        }
 
-    if (args[0] === 'issue' && args[1] === 'comment') {
-      const isParentComment = args[3].startsWith('Spawned issue #');
-
-      if (isParentComment && parentCommentFail) {
-        throw new Error('gh: could not comment on parent');
+        return { stdout: '' };
       }
+    },
+    {
+      match: subcommand('api', 'graphql'),
+      respond: () => {
+        if (graphqlFail) {
+          throw new Error('gh: graphql mutation failed');
+        }
 
-      if (!isParentComment && newCommentFail) {
-        throw new Error('gh: could not comment on new issue');
+        return { stdout: '' };
       }
-
-      return { stdout: '' };
     }
+  ]);
+}
 
-    if (args[0] === 'api' && args[1] === 'graphql') {
-      if (graphqlFail) {
-        throw new Error('gh: graphql mutation failed');
-      }
+/**
+ * Arrange and run `IssueLinker#link('1', '42', 'New issue', REPO_REF,
+ * asSubissue)` against a fresh fake `execFileAsync`, with
+ * `process.stderr.write` spied on.
+ * @param {object} fakeOptions - forwarded to `fakeExecFileAsync`.
+ * @param {boolean} asSubissue - whether to link as a native sub-issue.
+ * @returns {Promise<Function>} the spy used as `execFileAsync`.
+ */
+async function runLink(fakeOptions, asSubissue) {
+  const execFileAsync = fakeExecFileAsync(fakeOptions);
+  const issueLinker = new IssueLinker({ execFileAsync });
 
-      return { stdout: '' };
-    }
+  spyOn(process.stderr, 'write');
 
-    throw new Error(`unexpected gh invocation: ${JSON.stringify(args)}`);
-  });
+  await issueLinker.link('1', '42', 'New issue', REPO_REF, asSubissue);
+
+  return execFileAsync;
 }
 
 describe('IssueLinker', () => {
   describe('#link', () => {
     describe('comment-only linking', () => {
       it('comments on both the parent and the new issue', async () => {
-        const execFileAsync = fakeExecFileAsync();
-        const issueLinker = new IssueLinker({ execFileAsync });
-
-        spyOn(process.stderr, 'write');
-
-        await issueLinker.link('1', '42', 'New issue', REPO_REF, false);
+        const execFileAsync = await runLink({}, false);
 
         expect(execFileAsync).toHaveBeenCalledWith('gh', [
           'issue', 'comment', '1', '-R', REPO_REF, '--body', 'Spawned issue #42: New issue'
@@ -84,12 +98,7 @@ describe('IssueLinker', () => {
 
     describe('linking comments best-effort', () => {
       it('warns for both failed comment calls without throwing', async () => {
-        const execFileAsync = fakeExecFileAsync({ parentCommentFail: true, newCommentFail: true });
-        const issueLinker = new IssueLinker({ execFileAsync });
-
-        spyOn(process.stderr, 'write');
-
-        await issueLinker.link('1', '42', 'New issue', REPO_REF, false);
+        await runLink({ parentCommentFail: true, newCommentFail: true }, false);
 
         expect(process.stderr.write).toHaveBeenCalledWith(
           'Warning: could not comment on parent issue #1 on darthjee/arcanum\n'
@@ -102,12 +111,7 @@ describe('IssueLinker', () => {
 
     describe('--as-subissue success', () => {
       it('invokes the addSubIssue mutation with the two resolved node ids', async () => {
-        const execFileAsync = fakeExecFileAsync({ nodeIds: { 1: 'PARENT_NODE_ID', 42: 'NEW_NODE_ID' } });
-        const issueLinker = new IssueLinker({ execFileAsync });
-
-        spyOn(process.stderr, 'write');
-
-        await issueLinker.link('1', '42', 'New issue', REPO_REF, true);
+        const execFileAsync = await runLink({ nodeIds: { 1: 'PARENT_NODE_ID', 42: 'NEW_NODE_ID' } }, true);
 
         const graphqlCall = execFileAsync.calls.all().find((call) => call.args[1][0] === 'api');
 
@@ -120,51 +124,34 @@ describe('IssueLinker', () => {
       });
     });
 
-    describe('--as-subissue node-id lookup failure fallback', () => {
-      it('warns to stderr but does not attempt the mutation when a node id is missing', async () => {
-        const execFileAsync = fakeExecFileAsync({ nodeIds: {} });
-        const issueLinker = new IssueLinker({ execFileAsync });
+    describe('--as-subissue link failure fallback', () => {
+      [
+        {
+          description: 'the node id is missing',
+          fakeOptions: { nodeIds: {} },
+          expectsMutation: false
+        },
+        {
+          description: 'the node-id lookup itself throws',
+          fakeOptions: { nodeIdFail: true },
+          expectsMutation: false
+        },
+        {
+          description: 'the GraphQL mutation call fails',
+          fakeOptions: { graphqlFail: true, nodeIds: { 1: 'PARENT_NODE_ID', 42: 'NEW_NODE_ID' } },
+          expectsMutation: true
+        }
+      ].forEach(({ description, fakeOptions, expectsMutation }) => {
+        it(`warns to stderr when ${description}`, async () => {
+          const execFileAsync = await runLink(fakeOptions, true);
 
-        spyOn(process.stderr, 'write');
-
-        await issueLinker.link('1', '42', 'New issue', REPO_REF, true);
-
-        expect(execFileAsync).not.toHaveBeenCalledWith('gh', jasmine.arrayContaining(['api']));
-        expect(process.stderr.write).toHaveBeenCalledWith(
-          'Warning: could not link issue #42 as a native sub-issue of #1 — created but not linked; link it manually on GitHub\n'
-        );
-      });
-
-      it('warns to stderr but does not attempt the mutation when the node-id lookup itself throws', async () => {
-        const execFileAsync = fakeExecFileAsync({ nodeIdFail: true });
-        const issueLinker = new IssueLinker({ execFileAsync });
-
-        spyOn(process.stderr, 'write');
-
-        await issueLinker.link('1', '42', 'New issue', REPO_REF, true);
-
-        expect(execFileAsync).not.toHaveBeenCalledWith('gh', jasmine.arrayContaining(['api']));
-        expect(process.stderr.write).toHaveBeenCalledWith(
-          'Warning: could not link issue #42 as a native sub-issue of #1 — created but not linked; link it manually on GitHub\n'
-        );
-      });
-    });
-
-    describe('--as-subissue GraphQL failure fallback', () => {
-      it('warns to stderr when the mutation call fails', async () => {
-        const execFileAsync = fakeExecFileAsync({
-          graphqlFail: true,
-          nodeIds: { 1: 'PARENT_NODE_ID', 42: 'NEW_NODE_ID' }
+          if (!expectsMutation) {
+            expect(execFileAsync).not.toHaveBeenCalledWith('gh', jasmine.arrayContaining(['api']));
+          }
+          expect(process.stderr.write).toHaveBeenCalledWith(
+            'Warning: could not link issue #42 as a native sub-issue of #1 — created but not linked; link it manually on GitHub\n'
+          );
         });
-        const issueLinker = new IssueLinker({ execFileAsync });
-
-        spyOn(process.stderr, 'write');
-
-        await issueLinker.link('1', '42', 'New issue', REPO_REF, true);
-
-        expect(process.stderr.write).toHaveBeenCalledWith(
-          'Warning: could not link issue #42 as a native sub-issue of #1 — created but not linked; link it manually on GitHub\n'
-        );
       });
     });
   });
