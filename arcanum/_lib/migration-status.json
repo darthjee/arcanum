@@ -4,6 +4,8 @@
   "resolve-id-and-file": true,
   "github-issue-create": true,
   "github-issue-info": true,
+  "github-issue-fetch": true,
+  "github-issue-update": true,
   "github-issue": false,
   "issue-state": true,
   "permission-grant-add": true,
