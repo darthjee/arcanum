@@ -102,7 +102,7 @@ if [[ -n "$EXISTING" ]]; then
 fi
 
 # No local file yet — fetch the issue from GitHub.
-if FETCH_OUTPUT=$("$SCRIPT_DIR/github_issue.sh" fetch "$REPO_PATH" "$ID" 2>/tmp/resolve_and_fetch.err.$$); then
+if FETCH_OUTPUT=$("$SCRIPT_DIR/github_issue_fetch_shell.sh" "$REPO_PATH" "$ID" 2>/tmp/resolve_and_fetch.err.$$); then
   rm -f /tmp/resolve_and_fetch.err.$$
   echo "STATUS=ok"
   echo "ID=$ID"
