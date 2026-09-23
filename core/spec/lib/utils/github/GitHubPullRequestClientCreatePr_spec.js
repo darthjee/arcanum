@@ -1,6 +1,9 @@
-import { newGitHubClient, REPO, TOKEN } from '../../../support/factories/githubClient.js';
+import GitHubPullRequestClient from '../../../../lib/utils/github/GitHubPullRequestClient.js';
+import { newFocusedClient, REPO, TOKEN } from '../../../support/factories/githubClient.js';
 
-describe('GitHubClient (pull request creation)', () => {
+const newClient = (fetchFn, git) => newFocusedClient(GitHubPullRequestClient, fetchFn, { git });
+
+describe('GitHubPullRequestClient (pull request creation)', () => {
   describe('#createPr', () => {
     function fakeGit(branch = 'issue-5') {
       return { currentBranch: jasmine.createSpy().and.resolveTo(branch) };
@@ -14,7 +17,7 @@ describe('GitHubClient (pull request creation)', () => {
 
         return { ok: true, json: async () => ({ html_url: 'https://github.com/darthjee/arcanum/pull/9' }) };
       });
-      const client = newGitHubClient(fetchFn, fakeGit('issue-5'));
+      const client = newClient(fetchFn, fakeGit('issue-5'));
 
       const result = await client.createPr('My PR', 'body text');
 
@@ -37,7 +40,7 @@ describe('GitHubClient (pull request creation)', () => {
 
     it('throws when the default-branch lookup fails', async () => {
       const fetchFn = jasmine.createSpy().and.resolveTo({ ok: false });
-      const client = newGitHubClient(fetchFn, fakeGit());
+      const client = newClient(fetchFn, fakeGit());
 
       await expectAsync(client.createPr('My PR', 'body text')).toBeRejectedWithError(
         `could not create pull request on ${REPO}`
@@ -52,7 +55,7 @@ describe('GitHubClient (pull request creation)', () => {
 
         return { ok: false };
       });
-      const client = newGitHubClient(fetchFn, fakeGit());
+      const client = newClient(fetchFn, fakeGit());
 
       await expectAsync(client.createPr('My PR', 'body text')).toBeRejectedWithError(
         `could not create pull request on ${REPO}`
@@ -67,7 +70,7 @@ describe('GitHubClient (pull request creation)', () => {
 
         return { ok: true, json: async () => ({}) };
       });
-      const client = newGitHubClient(fetchFn, fakeGit());
+      const client = newClient(fetchFn, fakeGit());
 
       await expectAsync(client.createPr('My PR', 'body text')).toBeRejectedWithError(
         `could not create pull request on ${REPO}`
@@ -79,7 +82,7 @@ describe('GitHubClient (pull request creation)', () => {
     const git = { currentBranch: () => Promise.resolve('issue-5') };
 
     it('throws the domain error when fetch itself rejects', async () => {
-      const client = newGitHubClient(jasmine.createSpy().and.rejectWith(new Error('fetch failed')), git);
+      const client = newClient(jasmine.createSpy().and.rejectWith(new Error('fetch failed')), git);
 
       await expectAsync(client.createPr('My PR', 'body')).toBeRejectedWithError(
         `could not create pull request on ${REPO}`
@@ -94,7 +97,7 @@ describe('GitHubClient (pull request creation)', () => {
 
         return { ok: true, json: () => Promise.reject(new SyntaxError('Unexpected token')) };
       });
-      const client = newGitHubClient(fetchFn, git);
+      const client = newClient(fetchFn, git);
 
       await expectAsync(client.createPr('My PR', 'body')).toBeRejectedWithError(
         `could not create pull request on ${REPO}`

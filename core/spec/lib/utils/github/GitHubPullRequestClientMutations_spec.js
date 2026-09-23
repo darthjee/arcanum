@@ -1,10 +1,13 @@
-import { newGitHubClient, REPO, TOKEN } from '../../../support/factories/githubClient.js';
+import GitHubPullRequestClient from '../../../../lib/utils/github/GitHubPullRequestClient.js';
+import { newFocusedClient, REPO, TOKEN } from '../../../support/factories/githubClient.js';
 
-describe('GitHubClient (pull request mutations)', () => {
+const newClient = (fetchFn, git) => newFocusedClient(GitHubPullRequestClient, fetchFn, { git });
+
+describe('GitHubPullRequestClient (pull request mutations)', () => {
   describe('#mergePr', () => {
     it('PUTs the given payload to the merge endpoint with the auth + content-type headers', async () => {
       const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true });
-      const client = newGitHubClient(fetchFn);
+      const client = newClient(fetchFn);
       const payload = { merge_method: 'squash', commit_title: 'My PR (#7)' };
 
       await client.mergePr(7, payload);
@@ -19,7 +22,7 @@ describe('GitHubClient (pull request mutations)', () => {
 
     it('throws when the response is not ok', async () => {
       const fetchFn = jasmine.createSpy().and.resolveTo({ ok: false });
-      const client = newGitHubClient(fetchFn);
+      const client = newClient(fetchFn);
 
       await expectAsync(client.mergePr(7, {})).toBeRejectedWithError(
         'could not merge PR #7 on darthjee/arcanum'
@@ -28,7 +31,7 @@ describe('GitHubClient (pull request mutations)', () => {
 
     it('throws the domain error when fetch itself rejects (e.g. timeout)', async () => {
       const fetchFn = jasmine.createSpy().and.rejectWith(new Error('fetch failed'));
-      const client = newGitHubClient(fetchFn);
+      const client = newClient(fetchFn);
 
       await expectAsync(client.mergePr(7, {})).toBeRejectedWithError(
         'could not merge PR #7 on darthjee/arcanum'
@@ -39,7 +42,7 @@ describe('GitHubClient (pull request mutations)', () => {
   describe('#markPrReady', () => {
     it('POSTs the markPullRequestReadyForReview mutation with the node id and the auth header', async () => {
       const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true, json: async () => ({ data: {} }) });
-      const client = newGitHubClient(fetchFn);
+      const client = newClient(fetchFn);
 
       await client.markPrReady('PR_kwABC');
 
@@ -57,7 +60,7 @@ describe('GitHubClient (pull request mutations)', () => {
 
     it('throws when the response is not ok', async () => {
       const fetchFn = jasmine.createSpy().and.resolveTo({ ok: false });
-      const client = newGitHubClient(fetchFn);
+      const client = newClient(fetchFn);
 
       await expectAsync(client.markPrReady('PR_kwABC')).toBeRejectedWithError(
         'could not mark pull request ready for review'
@@ -65,7 +68,7 @@ describe('GitHubClient (pull request mutations)', () => {
     });
 
     it('throws when fetch itself rejects', async () => {
-      const client = newGitHubClient(jasmine.createSpy().and.rejectWith(new Error('fetch failed')));
+      const client = newClient(jasmine.createSpy().and.rejectWith(new Error('fetch failed')));
 
       await expectAsync(client.markPrReady('PR_kwABC')).toBeRejectedWithError(
         'could not mark pull request ready for review'
@@ -77,7 +80,7 @@ describe('GitHubClient (pull request mutations)', () => {
         ok: true,
         json: async () => ({ errors: [{ message: 'not found' }] })
       });
-      const client = newGitHubClient(fetchFn);
+      const client = newClient(fetchFn);
 
       await expectAsync(client.markPrReady('PR_kwABC')).toBeRejectedWithError(
         'could not mark pull request ready for review'
@@ -88,7 +91,7 @@ describe('GitHubClient (pull request mutations)', () => {
   describe('#deleteBranch', () => {
     it('DELETEs the branch ref with the auth header', async () => {
       const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true });
-      const client = newGitHubClient(fetchFn);
+      const client = newClient(fetchFn);
 
       await client.deleteBranch('issue-5');
 
@@ -101,14 +104,14 @@ describe('GitHubClient (pull request mutations)', () => {
 
     it('tolerates a non-ok response', async () => {
       const fetchFn = jasmine.createSpy().and.resolveTo({ ok: false });
-      const client = newGitHubClient(fetchFn);
+      const client = newClient(fetchFn);
 
       await expectAsync(client.deleteBranch('issue-5')).toBeResolved();
     });
 
     it('tolerates a rejected fetch call', async () => {
       const fetchFn = jasmine.createSpy().and.rejectWith(new Error('network error'));
-      const client = newGitHubClient(fetchFn);
+      const client = newClient(fetchFn);
 
       await expectAsync(client.deleteBranch('issue-5')).toBeResolved();
     });

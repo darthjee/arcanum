@@ -1,11 +1,14 @@
-import { newGitHubClient, REPO, TOKEN } from '../../../support/factories/githubClient.js';
+import GitHubChecksClient from '../../../../lib/utils/github/GitHubChecksClient.js';
+import { newFocusedClient, REPO, TOKEN } from '../../../support/factories/githubClient.js';
 
-describe('GitHubClient (check runs and current user)', () => {
+const newClient = (fetchFn) => newFocusedClient(GitHubChecksClient, fetchFn);
+
+describe('GitHubChecksClient', () => {
   describe('#getCheckRuns', () => {
     it('requests the commit\'s check-runs and returns the check_runs array', async () => {
       const checkRuns = [{ name: 'build', status: 'completed', conclusion: 'success' }];
       const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true, json: async () => ({ check_runs: checkRuns }) });
-      const client = newGitHubClient(fetchFn);
+      const client = newClient(fetchFn);
 
       const result = await client.getCheckRuns('abc123');
 
@@ -18,7 +21,7 @@ describe('GitHubClient (check runs and current user)', () => {
 
     it('throws when the response is not ok', async () => {
       const fetchFn = jasmine.createSpy().and.resolveTo({ ok: false });
-      const client = newGitHubClient(fetchFn);
+      const client = newClient(fetchFn);
 
       await expectAsync(client.getCheckRuns('abc123')).toBeRejectedWithError(
         `Error: could not fetch check-runs for abc123 in ${REPO}`
@@ -27,34 +30,11 @@ describe('GitHubClient (check runs and current user)', () => {
 
     it('throws when check_runs is not an array', async () => {
       const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true, json: async () => ({}) });
-      const client = newGitHubClient(fetchFn);
+      const client = newClient(fetchFn);
 
       await expectAsync(client.getCheckRuns('abc123')).toBeRejectedWithError(
         `Error: malformed check-runs response for abc123 in ${REPO}`
       );
-    });
-  });
-
-  describe('#getCurrentUser', () => {
-    it('requests the current user with the auth header', async () => {
-      const user = { login: 'fake-merger' };
-      const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true, json: async () => user });
-      const client = newGitHubClient(fetchFn);
-
-      const result = await client.getCurrentUser();
-
-      expect(fetchFn).toHaveBeenCalledWith(
-        'https://api.github.com/user',
-        jasmine.objectContaining({ headers: { Authorization: `Bearer ${TOKEN}` } })
-      );
-      expect(result).toEqual(user);
-    });
-
-    it('throws when the response is not ok', async () => {
-      const fetchFn = jasmine.createSpy().and.resolveTo({ ok: false });
-      const client = newGitHubClient(fetchFn);
-
-      await expectAsync(client.getCurrentUser()).toBeRejectedWithError('could not fetch current user');
     });
   });
 });
