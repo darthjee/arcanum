@@ -117,7 +117,7 @@ export async function setupParityTest() {
  * Orchestrates the setup shared by every pure-local-file-I/O queue
  * parity test case (`pop`/`empty`/`list`/`next`/`wait-next`): two
  * independent plain (non-git) temp dirs, one per side, never shared.
- * @returns {Promise<{shellRepoPath: string, nativeRepoPath: string, cleanup: Function}>}
+ * @returns {Promise<{shellRepoPath: string, nativeRepoPath: string, cleanup: () => Promise<unknown>}>}
  *   both temp dirs' paths, ready for runPair, plus a cleanup() that
  *   removes both of them together.
  */

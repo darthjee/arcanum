@@ -14,7 +14,7 @@ export const NON_ZERO = Symbol('NON_ZERO');
  * @param {boolean} github - whether to build the git + fake `gh`
  *   fixtures (setupParityTest) rather than two plain temp dirs.
  * @param {object} env - the case's extra env vars.
- * @returns {Promise<{shellRepoPath: string, nativeRepoPath: string, env: object, cleanup: Function}>}
+ * @returns {Promise<{shellRepoPath: string, nativeRepoPath: string, env: object, cleanup: () => Promise<unknown>}>}
  *   the normalized fixtures.
  */
 async function buildFixtures(github, env) {
