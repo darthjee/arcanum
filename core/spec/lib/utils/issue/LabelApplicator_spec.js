@@ -38,16 +38,28 @@ function fakeExecFileAsync({ parentLabels = [], parentLabelsFail = false, editFa
   ]);
 }
 
+/**
+ * Arrange and run `LabelApplicator#apply('1', '42', REPO_REF)` against a
+ * fresh fake `execFileAsync`, with `process.stderr.write` spied on.
+ * @param {object} fakeOptions - forwarded to `fakeExecFileAsync`.
+ * @returns {Promise<Function>} the spy used as `execFileAsync`.
+ */
+async function runApply(fakeOptions) {
+  const execFileAsync = fakeExecFileAsync(fakeOptions);
+  const labelApplicator = new LabelApplicator({ execFileAsync });
+
+  spyOn(process.stderr, 'write');
+
+  await labelApplicator.apply('1', '42', REPO_REF);
+
+  return execFileAsync;
+}
+
 describe('LabelApplicator', () => {
   describe('#apply', () => {
     describe('parent label lookup failure fallback', () => {
       it('applies only Spawned and does not throw', async () => {
-        const execFileAsync = fakeExecFileAsync({ parentLabelsFail: true });
-        const labelApplicator = new LabelApplicator({ execFileAsync });
-
-        spyOn(process.stderr, 'write');
-
-        await labelApplicator.apply('1', '42', REPO_REF);
+        const execFileAsync = await runApply({ parentLabelsFail: true });
 
         const editCall = execFileAsync.calls.all().find((call) => call.args[1][1] === 'edit');
 
@@ -62,12 +74,7 @@ describe('LabelApplicator', () => {
 
     describe('label filtering', () => {
       it('strips pipeline tags, keeps non-pipeline labels, and always adds Spawned once', async () => {
-        const execFileAsync = fakeExecFileAsync({ parentLabels: ['Refined', 'Ready', 'Feature', 'Bug'] });
-        const labelApplicator = new LabelApplicator({ execFileAsync });
-
-        spyOn(process.stderr, 'write');
-
-        await labelApplicator.apply('1', '42', REPO_REF);
+        const execFileAsync = await runApply({ parentLabels: ['Refined', 'Ready', 'Feature', 'Bug'] });
 
         const editCall = execFileAsync.calls.all().find((call) => call.args[1][1] === 'edit');
 
@@ -80,12 +87,7 @@ describe('LabelApplicator', () => {
 
     describe('edit failure', () => {
       it('warns to stderr and does not throw', async () => {
-        const execFileAsync = fakeExecFileAsync({ editFail: true });
-        const labelApplicator = new LabelApplicator({ execFileAsync });
-
-        spyOn(process.stderr, 'write');
-
-        await labelApplicator.apply('1', '42', REPO_REF);
+        await runApply({ editFail: true });
 
         expect(process.stderr.write).toHaveBeenCalledWith(
           'Warning: could not apply labels to issue #42 on darthjee/arcanum\n'
