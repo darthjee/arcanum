@@ -90,6 +90,26 @@ class IssueClient {
   }
 
   /**
+   * Replaces issue `id`'s title and body (PATCH), mirroring
+   * `github_issue_shell.sh`'s `cmd_update` — the response body is
+   * discarded.
+   * @param {string} id - the issue id.
+   * @param {object} fields - the new issue fields.
+   * @param {string} fields.title - the new issue title.
+   * @param {string} fields.body - the new issue body.
+   * @returns {Promise<void>} resolves once updated.
+   * @throws {Error} `Error: could not update issue #<id> on <repo>` on a
+   *   rejected fetch or non-ok response.
+   */
+  async updateIssue(id, { title, body }) {
+    await this._transport.repoRequest(({ repo }) => `/repos/${repo}/issues/${id}`, {
+      method: 'PATCH',
+      body: { title, body },
+      message: ({ repo }) => `Error: could not update issue #${id} on ${repo}`
+    });
+  }
+
+  /**
    * Posts `body` as a comment on issue/pull-request `number` — PR
    * comments live under the `issues` REST endpoint too, so this is
    * reused for both.
