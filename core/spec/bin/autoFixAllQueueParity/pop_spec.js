@@ -1,6 +1,4 @@
-import { runPair, seedQueue } from '../../support/factories/queueParitySetup.js';
-import { expectParity } from '../../support/utils/runCommand.js';
-import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
+import { itMatchesShellForQueueOp } from '../../support/sharedExamples/queueParitySharedExamples.js';
 
 // Parity test for the "auto-fix-all-queue-pop" migrated entrypoint
 // (issue #264) — see docs/agents/architecture/script-engine.md's
@@ -15,25 +13,11 @@ import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
 // `gh`/network touchpoint at all), so its fixtures are plain (non-git)
 // temp dirs.
 describe('auto-fix-all-queue-* parity (shell vs. native) — pop', () => {
-  it('matches shell output (exit 0, empty stdout) removing the first entry', async () => {
-    const shellRepo = await createTempDir('arcanum-core-afaq-parity-shell-');
-    const nativeRepo = await createTempDir('arcanum-core-afaq-parity-native-');
-
-    try {
-      await Promise.all([seedQueue(shellRepo, ['a', 'b']), seedQueue(nativeRepo, ['a', 'b'])]);
-
-      const { shell, native } = await runPair('pop', shellRepo, nativeRepo, []);
-
-      expectParity(shell, native);
-      expect(shell.code).toEqual(0);
-      expect(shell.stdout).toEqual('');
-
-      const nextResult = await runPair('next', shellRepo, nativeRepo, []);
-
-      expect(nextResult.shell.stdout).toEqual('b\n');
-      expect(nextResult.native.stdout).toEqual(nextResult.shell.stdout);
-    } finally {
-      await Promise.all([removeTempDir(shellRepo), removeTempDir(nativeRepo)]);
-    }
+  itMatchesShellForQueueOp('matches shell output (exit 0, empty stdout) removing the first entry', {
+    op: 'pop',
+    seed: ['a', 'b'],
+    expectedCode: 0,
+    expectedStdout: '',
+    followUp: { op: 'next', expectedStdout: 'b\n' }
   });
 });

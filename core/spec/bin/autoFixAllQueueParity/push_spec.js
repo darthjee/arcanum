@@ -1,5 +1,9 @@
-import { runPair, seedQueue, setupParityTest } from '../../support/factories/queueParitySetup.js';
-import { expectParity } from '../../support/utils/runCommand.js';
+import { NON_ZERO, itMatchesShellForQueueOp } from '../../support/sharedExamples/queueParitySharedExamples.js';
+
+const LABELS_ENV = {
+  FAKE_GH_ISSUE_LABELS: 'Ready for Work',
+  FAKE_FETCH_ISSUE_LABELS: 'Ready for Work'
+};
 
 // Parity test for the "auto-fix-all-queue-push" migrated entrypoint
 // (issue #264) — see docs/agents/architecture/script-engine.md's
@@ -28,99 +32,47 @@ import { expectParity } from '../../support/utils/runCommand.js';
 //
 // None of this touches the real network at any point.
 describe('auto-fix-all-queue-* parity (shell vs. native) — push', () => {
-  it('rejects with the same exit code and empty stdout when no ids are given', async () => {
-    const ctx = await setupParityTest();
-
-    try {
-      await Promise.all([
-        seedQueue(ctx.shellRepo.repoPath, ['existing']),
-        seedQueue(ctx.nativeRepo.repoPath, ['existing'])
-      ]);
-
-      const env = { PATH: `${ctx.fakeGh.binDir}:${process.env.PATH}` };
-      const { shell, native } = await runPair('push', ctx.shellRepo.repoPath, ctx.nativeRepo.repoPath, [], { env });
-
-      expectParity(shell, native);
-      expect(shell.code).not.toEqual(0);
-      expect(shell.stdout).toEqual('');
-    } finally {
-      await ctx.cleanup();
-    }
+  itMatchesShellForQueueOp('rejects with the same exit code and empty stdout when no ids are given', {
+    op: 'push',
+    github: true,
+    seed: ['existing'],
+    expectedCode: NON_ZERO,
+    expectedStdout: ''
   });
 
-  it('matches shell output/exit code for a successful push, appending to the existing queue', async () => {
-    const ctx = await setupParityTest();
-
-    try {
-      await Promise.all([
-        seedQueue(ctx.shellRepo.repoPath, ['existing']),
-        seedQueue(ctx.nativeRepo.repoPath, ['existing'])
-      ]);
-
-      const env = {
-        PATH: `${ctx.fakeGh.binDir}:${process.env.PATH}`,
-        FAKE_GH_ISSUE_LABELS: 'Ready for Work',
-        FAKE_FETCH_ISSUE_LABELS: 'Ready for Work'
-      };
-      const { shell, native } = await runPair('push', ctx.shellRepo.repoPath, ctx.nativeRepo.repoPath, ['30'], {
-        env,
-        fakeFetch: true
-      });
-
-      expectParity(shell, native);
-      expect(shell.code).toEqual(0);
-      // See the equivalent `save` test's comment: the label mutation's
-      // own per-tag stdout lines follow the `Pushed: ...` confirmation.
-      expect(shell.stdout).toEqual(
-        'Pushed: 30\n' +
-        'Added tag \'enqueued\' to issue #30 on darthjee/arcanum-queue-fixture\n' +
-        'Removed tag \'ready_for_work\' from issue #30 on darthjee/arcanum-queue-fixture\n' +
-        'Tag \'created\' not present on issue #30 — nothing to do.\n'
-      );
-
-      const listResult = await runPair('list', ctx.shellRepo.repoPath, ctx.nativeRepo.repoPath, []);
-
-      expect(listResult.shell.stdout).toEqual('existing\n30\n');
-      expect(listResult.native.stdout).toEqual(listResult.shell.stdout);
-    } finally {
-      await ctx.cleanup();
-    }
+  itMatchesShellForQueueOp('matches shell output/exit code for a successful push, appending to the existing queue', {
+    op: 'push',
+    github: true,
+    seed: ['existing'],
+    args: ['30'],
+    env: LABELS_ENV,
+    fakeFetch: true,
+    expectedCode: 0,
+    // See the equivalent `save` test's comment: the label mutation's
+    // own per-tag stdout lines follow the `Pushed: ...` confirmation.
+    expectedStdout:
+      'Pushed: 30\n' +
+      'Added tag \'enqueued\' to issue #30 on darthjee/arcanum-queue-fixture\n' +
+      'Removed tag \'ready_for_work\' from issue #30 on darthjee/arcanum-queue-fixture\n' +
+      'Tag \'created\' not present on issue #30 — nothing to do.\n',
+    followUp: { op: 'list', expectedStdout: 'existing\n30\n' }
   });
 
-  it('matches shell output/exit code when a label mutation\'s own gh/fetch update call fails (best-effort)', async () => {
-    const ctx = await setupParityTest();
-
-    try {
-      await Promise.all([
-        seedQueue(ctx.shellRepo.repoPath, ['existing']),
-        seedQueue(ctx.nativeRepo.repoPath, ['existing'])
-      ]);
-
-      const env = {
-        PATH: `${ctx.fakeGh.binDir}:${process.env.PATH}`,
-        FAKE_GH_ISSUE_EDIT_FAIL: '1',
-        FAKE_FETCH_ISSUE_EDIT_FAIL: '1',
-        FAKE_GH_ISSUE_LABELS: 'Ready for Work',
-        FAKE_FETCH_ISSUE_LABELS: 'Ready for Work'
-      };
-      const { shell, native } = await runPair('push', ctx.shellRepo.repoPath, ctx.nativeRepo.repoPath, ['30'], {
-        env,
-        fakeFetch: true
-      });
-
-      expectParity(shell, native);
-      expect(shell.code).toEqual(0);
-      // Both the `enqueued` add and the `ready_for_work` remove reach
-      // (and fail at) the `gh issue edit`/`PATCH` update call, so only
-      // stderr gets their failure messages; the `created` remove is a
-      // no-op (label never present) and never reaches that call, so its
-      // "nothing to do" line still lands on stdout.
-      expect(shell.stdout).toEqual(
-        'Pushed: 30\n' +
-        'Tag \'created\' not present on issue #30 — nothing to do.\n'
-      );
-    } finally {
-      await ctx.cleanup();
-    }
+  itMatchesShellForQueueOp('matches shell output/exit code when a label mutation\'s own gh/fetch update call fails (best-effort)', {
+    op: 'push',
+    github: true,
+    seed: ['existing'],
+    args: ['30'],
+    env: { FAKE_GH_ISSUE_EDIT_FAIL: '1', FAKE_FETCH_ISSUE_EDIT_FAIL: '1', ...LABELS_ENV },
+    fakeFetch: true,
+    expectedCode: 0,
+    // Both the `enqueued` add and the `ready_for_work` remove reach
+    // (and fail at) the `gh issue edit`/`PATCH` update call, so only
+    // stderr gets their failure messages; the `created` remove is a
+    // no-op (label never present) and never reaches that call, so its
+    // "nothing to do" line still lands on stdout.
+    expectedStdout:
+      'Pushed: 30\n' +
+      'Tag \'created\' not present on issue #30 — nothing to do.\n'
   });
 });

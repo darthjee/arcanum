@@ -1,5 +1,4 @@
-import { runPair, setupParityTest } from '../../support/factories/queueParitySetup.js';
-import { expectParity } from '../../support/utils/runCommand.js';
+import { NON_ZERO, itMatchesShellForQueueOp } from '../../support/sharedExamples/queueParitySharedExamples.js';
 
 // Parity test for the "auto-fix-all-queue-save" migrated entrypoint
 // (issue #264) — see docs/agents/architecture/script-engine.md's
@@ -28,74 +27,41 @@ import { expectParity } from '../../support/utils/runCommand.js';
 //
 // None of this touches the real network at any point.
 describe('auto-fix-all-queue-* parity (shell vs. native) — save', () => {
-  it('rejects with the same exit code and empty stdout when no ids are given', async () => {
-    const ctx = await setupParityTest();
-
-    try {
-      const env = { PATH: `${ctx.fakeGh.binDir}:${process.env.PATH}` };
-      const { shell, native } = await runPair('save', ctx.shellRepo.repoPath, ctx.nativeRepo.repoPath, [], { env });
-
-      expectParity(shell, native);
-      expect(shell.code).not.toEqual(0);
-      expect(shell.stdout).toEqual('');
-    } finally {
-      await ctx.cleanup();
-    }
+  itMatchesShellForQueueOp('rejects with the same exit code and empty stdout when no ids are given', {
+    op: 'save',
+    github: true,
+    expectedCode: NON_ZERO,
+    expectedStdout: ''
   });
 
-  it('matches shell output/exit code for a successful save, with the label mutation succeeding', async () => {
-    const ctx = await setupParityTest();
-
-    try {
-      const env = {
-        PATH: `${ctx.fakeGh.binDir}:${process.env.PATH}`,
-        FAKE_GH_ISSUE_LABELS: '',
-        FAKE_FETCH_ISSUE_LABELS: ''
-      };
-      const { shell, native } = await runPair('save', ctx.shellRepo.repoPath, ctx.nativeRepo.repoPath, ['10', '20'], {
-        env,
-        fakeFetch: true
-      });
-
-      expectParity(shell, native);
-      expect(shell.code).toEqual(0);
-      // `tag_mutate_add_label`/`tag_mutate_remove_label` (and their
-      // native `_mutateTag` counterpart) print their own per-tag
-      // success/no-op line to stdout, after the `Queue saved: ...`
-      // confirmation — see AutoFixAllQueue.js#_mutateTag's doc comment.
-      expect(shell.stdout).toEqual(
-        'Queue saved: 10 20\n' +
-        'Added tag \'enqueued\' to issue #10 on darthjee/arcanum-queue-fixture\n' +
-        'Tag \'ready_for_work\' not present on issue #10 — nothing to do.\n' +
-        'Tag \'created\' not present on issue #10 — nothing to do.\n' +
-        'Added tag \'enqueued\' to issue #20 on darthjee/arcanum-queue-fixture\n' +
-        'Tag \'ready_for_work\' not present on issue #20 — nothing to do.\n' +
-        'Tag \'created\' not present on issue #20 — nothing to do.\n'
-      );
-    } finally {
-      await ctx.cleanup();
-    }
+  itMatchesShellForQueueOp('matches shell output/exit code for a successful save, with the label mutation succeeding', {
+    op: 'save',
+    github: true,
+    args: ['10', '20'],
+    env: { FAKE_GH_ISSUE_LABELS: '', FAKE_FETCH_ISSUE_LABELS: '' },
+    fakeFetch: true,
+    expectedCode: 0,
+    // `tag_mutate_add_label`/`tag_mutate_remove_label` (and their
+    // native `_mutateTag` counterpart) print their own per-tag
+    // success/no-op line to stdout, after the `Queue saved: ...`
+    // confirmation — see AutoFixAllQueue.js#_mutateTag's doc comment.
+    expectedStdout:
+      'Queue saved: 10 20\n' +
+      'Added tag \'enqueued\' to issue #10 on darthjee/arcanum-queue-fixture\n' +
+      'Tag \'ready_for_work\' not present on issue #10 — nothing to do.\n' +
+      'Tag \'created\' not present on issue #10 — nothing to do.\n' +
+      'Added tag \'enqueued\' to issue #20 on darthjee/arcanum-queue-fixture\n' +
+      'Tag \'ready_for_work\' not present on issue #20 — nothing to do.\n' +
+      'Tag \'created\' not present on issue #20 — nothing to do.\n'
   });
 
-  it('matches shell output/exit code even when the label mutation fails entirely (best-effort)', async () => {
-    const ctx = await setupParityTest();
-
-    try {
-      const env = {
-        PATH: `${ctx.fakeGh.binDir}:${process.env.PATH}`,
-        FAKE_GH_ISSUE_VIEW_FAIL: '1',
-        FAKE_FETCH_ISSUE_VIEW_FAIL: '1'
-      };
-      const { shell, native } = await runPair('save', ctx.shellRepo.repoPath, ctx.nativeRepo.repoPath, ['10'], {
-        env,
-        fakeFetch: true
-      });
-
-      expectParity(shell, native);
-      expect(shell.code).toEqual(0);
-      expect(shell.stdout).toEqual('Queue saved: 10\n');
-    } finally {
-      await ctx.cleanup();
-    }
+  itMatchesShellForQueueOp('matches shell output/exit code even when the label mutation fails entirely (best-effort)', {
+    op: 'save',
+    github: true,
+    args: ['10'],
+    env: { FAKE_GH_ISSUE_VIEW_FAIL: '1', FAKE_FETCH_ISSUE_VIEW_FAIL: '1' },
+    fakeFetch: true,
+    expectedCode: 0,
+    expectedStdout: 'Queue saved: 10\n'
   });
 });

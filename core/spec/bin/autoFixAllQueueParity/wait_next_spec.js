@@ -1,6 +1,4 @@
-import { runPair, seedQueue } from '../../support/factories/queueParitySetup.js';
-import { expectParity } from '../../support/utils/runCommand.js';
-import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
+import { itMatchesShellForQueueOp } from '../../support/sharedExamples/queueParitySharedExamples.js';
 
 // Parity test for the "auto-fix-all-queue-wait-next" migrated
 // entrypoint (issue #264) — see
@@ -22,20 +20,10 @@ import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
 // (no real 5s wait, no hang), same testing concern already solved by
 // autoFixAllWaitCiParity_spec.js.
 describe('auto-fix-all-queue-* parity (shell vs. native) — wait-next', () => {
-  it('matches shell output when the queue is already non-empty (resolves on the first check)', async () => {
-    const shellRepo = await createTempDir('arcanum-core-afaq-parity-shell-');
-    const nativeRepo = await createTempDir('arcanum-core-afaq-parity-native-');
-
-    try {
-      await Promise.all([seedQueue(shellRepo, ['7']), seedQueue(nativeRepo, ['7'])]);
-
-      const { shell, native } = await runPair('wait-next', shellRepo, nativeRepo, []);
-
-      expectParity(shell, native);
-      expect(shell.code).toEqual(0);
-      expect(shell.stdout).toEqual('7\n');
-    } finally {
-      await Promise.all([removeTempDir(shellRepo), removeTempDir(nativeRepo)]);
-    }
+  itMatchesShellForQueueOp('matches shell output when the queue is already non-empty (resolves on the first check)', {
+    op: 'wait-next',
+    seed: ['7'],
+    expectedCode: 0,
+    expectedStdout: '7\n'
   });
 });
