@@ -284,9 +284,20 @@ export const COMMANDS = {
     method: 'create',
     context: 'repo'
   },
+  'github-issue-fetch': {
+    module: 'commands/shared/GithubIssue.js',
+    method: 'fetchIssue',
+    context: 'repo'
+  },
   'github-issue-info': {
     module: 'commands/shared/GithubIssue.js',
     method: 'info',
+    context: 'repo',
+    validateRepoPath: false
+  },
+  'github-issue-update': {
+    module: 'commands/shared/GithubIssue.js',
+    method: 'update',
     context: 'repo',
     validateRepoPath: false
   },

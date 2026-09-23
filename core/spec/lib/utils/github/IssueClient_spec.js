@@ -124,6 +124,22 @@ describe('IssueClient', () => {
     });
   });
 
+  describe('#updateIssue', () => {
+    it('PATCHes the title/body with the auth + content-type headers', async () => {
+      const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true });
+      const client = newClient(fetchFn);
+
+      await client.updateIssue('10', { title: 'New title', body: 'New body' });
+
+      expect(fetchFn).toHaveBeenCalledWith(`https://api.github.com/repos/${REPO}/issues/10`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: 'New title', body: 'New body' }),
+        signal: jasmine.anything()
+      });
+    });
+  });
+
   describe('#postComment', () => {
     it('POSTs the comment body with the auth + content-type headers', async () => {
       const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true });
@@ -142,7 +158,7 @@ describe('IssueClient', () => {
 
   describe('write operation error handling', () => {
     // One entry per write operation (`#addLabel`, `#removeLabel`, `#createIssue`,
-    // `#postComment`), each carrying the call to make and the exact error
+    // `#updateIssue`, `#postComment`), each carrying the call to make and the exact error
     // message it must raise. Shared by both scenario loops below, mirroring
     // the case-table pattern used in `GithubToken_spec.js` (issue #541).
     const cases = [
@@ -160,6 +176,11 @@ describe('IssueClient', () => {
         operation: '#createIssue',
         call: (client) => client.createIssue('My title', 'My body'),
         error: `Error: could not create issue on ${REPO}`
+      },
+      {
+        operation: '#updateIssue',
+        call: (client) => client.updateIssue('10', { title: 'New title', body: 'New body' }),
+        error: `Error: could not update issue #10 on ${REPO}`
       },
       {
         operation: '#postComment',

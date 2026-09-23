@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import GithubIssueService from '../../../lib/services/GithubIssueService.js';
 import GithubToken from '../../../lib/utils/github/GithubToken.js';
@@ -47,6 +47,33 @@ describe('GithubIssueService#create', () => {
     } finally {
       await removeTempDir(otherRepoPath);
     }
+  });
+});
+
+describe('GithubIssueService#readBody', () => {
+  let dir;
+
+  beforeEach(async () => {
+    dir = await createTempDir();
+  });
+
+  afterEach(async () => {
+    await removeTempDir(dir);
+  });
+
+  it('returns the file contents with all trailing newlines stripped', async () => {
+    const file = path.join(dir, 'body.md');
+    await writeFile(file, 'a\n\nb\n\n\n');
+
+    await expectAsync(new GithubIssueService(stubDeps()).readBody(file)).toBeResolvedTo('a\n\nb');
+  });
+
+  it('throws file-not-found when the file cannot be read', async () => {
+    const file = path.join(dir, 'missing.md');
+
+    await expectAsync(new GithubIssueService(stubDeps()).readBody(file)).toBeRejectedWithError(
+      `Error: file not found: ${file}`
+    );
   });
 });
 
