@@ -2,15 +2,28 @@
 # Thin per-sub-command engine_dispatch shim for the "github-issue"
 # migrated entrypoint — see docs/agents/architecture/script-engine.md,
 # docs/agents/plans/237-migrate-github-issue-entrypoint-info-create-to-native-node-js/plan.md
-# (#237, `info`/`create`) and
+# (#237, `info`/`create`),
 # docs/agents/plans/588-migrate-github-issue-fetch-and-update-subcommands-to-native-node-js/plan.md
-# (#588, `fetch`/`update`) for the full design/shared contracts.
-# `info`/`create`/`fetch`/`update` route through engine_dispatch; only
-# `mark-*` still call the shell implementation directly, unchanged, until
-# #589 migrates them. `fetch`/`update` check their positional arguments
-# here, before dispatching, so neither engine needs usage-error handling.
+# (#588, `fetch`/`update`) and
+# docs/agents/plans/589-migrate-github-issue-mark-subcommands-to-native-node-js-and-finish-the-entrypoint-migration/plan.md
+# (#589, `mark-*`) for the full design/shared contracts.
+# All ten subcommands route through engine_dispatch. `fetch`/`update`/`mark-*`
+# check their positional arguments here, before dispatching, so neither
+# engine needs usage-error handling. Unknown subcommands get the usage
+# error below (exit 1).
 #
-# Usage: github_issue.sh <command> [args...]  (unchanged from before)
+# Usage: github_issue.sh <command> [args]
+# Commands:
+#   info <repo_path>                            Print DOMAIN and REPO from git origin
+#   fetch <repo_path> <id>                      Fetch a GitHub issue and save to docs/agents/issues/
+#   update <repo_path> <id> <title> <file>      Update a GitHub issue title and body from a file
+#   create <repo_path> <title> <file>           Create a new GitHub issue and save it to docs/agents/issues/
+#   mark-created <repo_path> <id>               Add the Created label and remove Idea/Writting/Enhancing, if present
+#   mark-refined <repo_path> <id>               Add the Refined label and remove Created/Idea/Writting, if present
+#   mark-ready <repo_path> <id>                 Add the Ready label and remove Refined, if present
+#   mark-enhancing <repo_path> <id>             Add the Enhancing label and remove Idea/Writting, if present
+#   mark-planning <repo_path> <id>              Add the Planning label and remove Idea/Writting/Created, if present
+#   mark-split <repo_path> <id>                 Add the Split label and remove Planning, if present
 
 set -euo pipefail
 
@@ -68,6 +81,18 @@ case "$COMMAND" in
     engine_dispatch "$REPO_PATH" github-issue-mark-split "${SCRIPT_DIR}/github_issue_mark_split_shell.sh" HOME -- "$@"
     ;;
   *)
-    exec "${SCRIPT_DIR}/github_issue_shell.sh" "$COMMAND" "$@"
+    echo "Usage: $0 <command> [args]" >&2
+    echo "Commands:" >&2
+    echo "  info <repo_path>                            Print DOMAIN and REPO from git origin" >&2
+    echo "  fetch <repo_path> <id>                      Fetch a GitHub issue and save to docs/agents/issues/" >&2
+    echo "  update <repo_path> <id> <title> <file>      Update a GitHub issue title and body from a file" >&2
+    echo "  create <repo_path> <title> <file>           Create a new GitHub issue and save it to docs/agents/issues/" >&2
+    echo "  mark-created <repo_path> <id>               Add the Created label and remove Idea/Writting/Enhancing, if present" >&2
+    echo "  mark-refined <repo_path> <id>               Add the Refined label and remove Created/Idea/Writting, if present" >&2
+    echo "  mark-ready <repo_path> <id>                 Add the Ready label and remove Refined, if present" >&2
+    echo "  mark-enhancing <repo_path> <id>             Add the Enhancing label and remove Idea/Writting, if present" >&2
+    echo "  mark-planning <repo_path> <id>              Add the Planning label and remove Idea/Writting/Created, if present" >&2
+    echo "  mark-split <repo_path> <id>                 Add the Split label and remove Planning, if present" >&2
+    exit 1
     ;;
 esac
