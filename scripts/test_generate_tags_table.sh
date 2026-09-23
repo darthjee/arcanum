@@ -17,6 +17,12 @@
 #   4. An entry marked "ignored" in tag-mutations.review.json is excluded
 #      from the generated table; an unclassified candidate still appears
 #      (fail-open).
+#   5. A github.sh mark-<x> call resolves its added/removed tags from
+#      arcanum/_lib/github_issue_shell.sh's cmd_mark_<x> body, while a
+#      non-github "<x>.sh mark-<y>" call (mirroring ledger.sh
+#      mark-complete) renders "-" / "-" without a lookup.
+#   6. A github.sh mark-<x> call with no matching cmd_mark_<x> function
+#      makes the generator fail loudly (non-zero exit, error on stderr).
 
 set -uo pipefail
 
@@ -169,6 +175,72 @@ grep -qF '| (run.md) |' "$TABLE" \
   || fail "expected the unclassified candidate to still appear (fail-open), got:\n$(cat "$TABLE")"
 
 echo "OK: an 'ignored' review.json entry excludes its candidate; an unclassified candidate still appears (fail-open)"
+
+# --- Fixture repo 2: mark-* lookup against github_issue_shell.sh ---
+
+MARK_REPO="${TMP_DIR}/mark-fixture-repo"
+build_fixture_repo "$MARK_REPO"
+mkdir -p "${MARK_REPO}/arcanum/_lib" "${MARK_REPO}/skill-mark/steps" "${MARK_REPO}/skill-mark/scripts"
+touch "${MARK_REPO}/skill-mark/scripts/github.sh" "${MARK_REPO}/skill-mark/scripts/ledger.sh"
+
+cat > "${MARK_REPO}/arcanum/_lib/github_issue_shell.sh" <<'EOF'
+cmd_mark_shiny() {
+  tag_mutate_add_label "$id" "$repo_ref" shiny \
+    || echo "Warning" >&2
+  tag_mutate_remove_label "$id" "$repo_ref" dull \
+    || echo "Warning" >&2
+  tag_mutate_remove_label "$id" "$repo_ref" rusty \
+    || echo "Warning" >&2
+}
+EOF
+
+cat > "${MARK_REPO}/skill-mark/SKILL.md" <<'EOF'
+---
+name: skill-mark
+description: fixture
+---
+
+## Step 1 — Polish
+
+Read [steps/polish.md](steps/polish.md) and follow it.
+EOF
+
+cat > "${MARK_REPO}/skill-mark/steps/polish.md" <<'EOF'
+```bash
+scripts/github.sh mark-shiny "$REPO_PATH" <id>
+scripts/ledger.sh mark-complete "$REPO_PATH" <version> <id>
+```
+EOF
+
+OUTPUT_3="$("${MARK_REPO}/scripts/generate_tags_table.sh" 2>&1)" \
+  || fail "generator exited non-zero on mark-* fixture: ${OUTPUT_3}"
+
+MARK_TABLE="${MARK_REPO}/docs/agents/tag-mutations.md"
+
+# Assertion 5: mark-<x> resolved from github_issue_shell.sh; a non-github
+# mark-<y> renders "-" / "-". Literal backticks in the patterns, not
+# shell expansions.
+# shellcheck disable=SC2016
+grep -qF '| `skill-mark/scripts/github.sh` | shiny | dull,rusty |' "$MARK_TABLE" \
+  || fail "expected mark-shiny to resolve to 'shiny' / 'dull,rusty', got:\n$(cat "$MARK_TABLE")"
+# shellcheck disable=SC2016
+grep -qF '| `skill-mark/scripts/ledger.sh` | - | - |' "$MARK_TABLE" \
+  || fail "expected ledger.sh mark-complete to render '-' / '-', got:\n$(cat "$MARK_TABLE")"
+
+echo "OK: github.sh mark-* resolves from github_issue_shell.sh; non-github mark-* renders '-' / '-'"
+
+# Assertion 6: a github.sh mark-<x> with no cmd_mark_<x> fails loudly.
+# Literal fixture line, not a shell expansion
+# shellcheck disable=SC2016
+echo 'scripts/github.sh mark-missing "$REPO_PATH" <id>' >> "${MARK_REPO}/skill-mark/steps/polish.md"
+
+if OUTPUT_4="$("${MARK_REPO}/scripts/generate_tags_table.sh" 2>&1)"; then
+  fail "expected generator to fail on a mark-* verb with no cmd_mark_* function, got success: ${OUTPUT_4}"
+fi
+grep -qF "no cmd_mark_missing() function" <<< "$OUTPUT_4" \
+  || fail "expected a 'no cmd_mark_missing() function' error, got: ${OUTPUT_4}"
+
+echo "OK: a github.sh mark-* verb with no cmd_mark_* function fails loudly"
 
 echo "PASS: scripts/generate_tags_table.sh's parsing/table/review-json logic behaves as expected"
 exit 0
