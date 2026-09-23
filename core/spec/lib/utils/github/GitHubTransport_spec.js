@@ -130,6 +130,90 @@ describe('GitHubTransport', () => {
     });
   });
 
+  describe('repo-scoped helpers', () => {
+    const pathFn = ({ repo }) => `/repos/${repo}/pulls/7`;
+    const messageFn = ({ repo, repoRef }) => `could not do it in ${repo} (${repoRef})`;
+    const expectedMessage = `could not do it in ${REPO} (${REPO})`;
+    const okJson = (body) => jasmine.createSpy().and.resolveTo({ ok: true, json: async () => body });
+
+    [
+      { name: 'repoRequest', success: (result) => expect(result.ok).toBeTrue() },
+      { name: 'repoRequestJson', success: (result) => expect(result).toEqual([1]) },
+      { name: 'repoRequestArray', success: (result) => expect(result).toEqual([1]) }
+    ].forEach(({ name, success }) => {
+      describe(`#${name}`, () => {
+        it('builds the path and message from the resolved identity', async () => {
+          const fetchFn = jasmine.createSpy().and.resolveTo({ ok: false });
+          const pathSpy = jasmine.createSpy('pathFn').and.callFake(pathFn);
+          const message = jasmine.createSpy('message').and.callFake(messageFn);
+
+          await expectAsync(newTransport(fetchFn)[name](pathSpy, { message }))
+            .toBeRejectedWithError(expectedMessage);
+
+          const ids = jasmine.objectContaining({ repo: REPO, repoRef: REPO });
+
+          expect(pathSpy).toHaveBeenCalledWith(ids);
+          expect(message).toHaveBeenCalledWith(ids);
+        });
+
+        it('requests the built path with the given method and body', async () => {
+          const fetchFn = okJson([1]);
+          const body = { a: 1 };
+
+          await newTransport(fetchFn)[name](pathFn, { method: 'PUT', body, message: messageFn });
+
+          expect(fetchFn).toHaveBeenCalledWith(`${API}/repos/${REPO}/pulls/7`, {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: jasmine.any(AbortSignal)
+          });
+        });
+
+        it('resolves without invoking the message builder on success', async () => {
+          const message = jasmine.createSpy('message');
+
+          success(await newTransport(okJson([1]))[name](pathFn, { message }));
+
+          expect(message).not.toHaveBeenCalled();
+        });
+
+        it('rejects with the built message when fetch rejects', async () => {
+          const transport = newTransport(jasmine.createSpy().and.rejectWith(new Error('timeout')));
+
+          await expectAsync(transport[name](pathFn, { message: messageFn }))
+            .toBeRejectedWithError(expectedMessage);
+        });
+
+        it('propagates a repo-resolution rejection unmapped', async () => {
+          const resolveWithRef = jasmine.createSpy().and.rejectWith(new Error('no origin'));
+          const fetchFn = jasmine.createSpy();
+          const message = jasmine.createSpy('message');
+
+          await expectAsync(newTransport(fetchFn, { resolveWithRef })[name](pathFn, { message }))
+            .toBeRejectedWithError('no origin');
+          expect(fetchFn).not.toHaveBeenCalled();
+          expect(message).not.toHaveBeenCalled();
+        });
+      });
+    });
+
+    it('#repoRequestJson rejects with the built message on malformed JSON', async () => {
+      const json = async () => {
+        throw new SyntaxError('Unexpected token');
+      };
+      const transport = newTransport(jasmine.createSpy().and.resolveTo({ ok: true, json }));
+
+      await expectAsync(transport.repoRequestJson(pathFn, { message: messageFn }))
+        .toBeRejectedWithError(expectedMessage);
+    });
+
+    it('#repoRequestArray normalizes a non-array body to []', async () => {
+      await expectAsync(newTransport(okJson({})).repoRequestArray(pathFn, { message: messageFn }))
+        .toBeResolvedTo([]);
+    });
+  });
+
   describe('#graphql', () => {
     const query = 'mutation($id: ID!) { x(input: { id: $id }) { id } }';
 

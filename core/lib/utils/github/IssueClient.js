@@ -35,10 +35,10 @@ class IssueClient {
    *   a failed request.
    */
   async getIssue(id) {
-    const { repo } = await this._transport.repo();
-    const failure = () => new Error(`Error: could not fetch issue #${id} from ${repo}`);
-
-    return this._transport.requestJson(`/repos/${repo}/issues/${id}`, { failure });
+    return this._transport.repoRequestJson(
+      ({ repo }) => `/repos/${repo}/issues/${id}`,
+      { message: ({ repo }) => `Error: could not fetch issue #${id} from ${repo}` }
+    );
   }
 
   /**
@@ -49,13 +49,10 @@ class IssueClient {
    *   <repo>` on a rejected fetch or non-ok response.
    */
   async addLabel(id, label) {
-    const { repo } = await this._transport.repo();
-    const failure = () => new Error(`could not add label '${label}' to issue #${id} on ${repo}`);
-
-    await this._transport.request(`/repos/${repo}/issues/${id}/labels`, {
+    await this._transport.repoRequest(({ repo }) => `/repos/${repo}/issues/${id}/labels`, {
       method: 'POST',
       body: { labels: [label] },
-      failure
+      message: ({ repo }) => `could not add label '${label}' to issue #${id} on ${repo}`
     });
   }
 
@@ -67,13 +64,13 @@ class IssueClient {
    *   on <repo>` on a rejected fetch or non-ok response.
    */
   async removeLabel(id, label) {
-    const { repo } = await this._transport.repo();
-    const failure = () => new Error(`could not remove label '${label}' from issue #${id} on ${repo}`);
-
-    await this._transport.request(`/repos/${repo}/issues/${id}/labels/${encodeURIComponent(label)}`, {
-      method: 'DELETE',
-      failure
-    });
+    await this._transport.repoRequest(
+      ({ repo }) => `/repos/${repo}/issues/${id}/labels/${encodeURIComponent(label)}`,
+      {
+        method: 'DELETE',
+        message: ({ repo }) => `could not remove label '${label}' from issue #${id} on ${repo}`
+      }
+    );
   }
 
   /**
@@ -85,13 +82,10 @@ class IssueClient {
    *   failed request.
    */
   async createIssue(title, body) {
-    const { repo } = await this._transport.repo();
-    const failure = () => new Error(`Error: could not create issue on ${repo}`);
-
-    return this._transport.requestJson(`/repos/${repo}/issues`, {
+    return this._transport.repoRequestJson(({ repo }) => `/repos/${repo}/issues`, {
       method: 'POST',
       body: { title, body },
-      failure
+      message: ({ repo }) => `Error: could not create issue on ${repo}`
     });
   }
 
@@ -106,13 +100,10 @@ class IssueClient {
    *   #<number> in <repo>` on a rejected fetch or non-ok response.
    */
   async postComment(number, body) {
-    const { repo } = await this._transport.repo();
-    const failure = () => new Error(`Error: could not post comment on pull request #${number} in ${repo}`);
-
-    await this._transport.request(`/repos/${repo}/issues/${number}/comments`, {
+    await this._transport.repoRequest(({ repo }) => `/repos/${repo}/issues/${number}/comments`, {
       method: 'POST',
       body: { body },
-      failure
+      message: ({ repo }) => `Error: could not post comment on pull request #${number} in ${repo}`
     });
   }
 }

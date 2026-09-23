@@ -10,6 +10,13 @@ const GRAPHQL_URL = 'https://api.github.com/graphql';
  * (network error, timeout), a non-ok response, and unparseable JSON to
  * the caller-supplied `failure()` error, so domain methods only state
  * their endpoint, payload, shape validation, and error message.
+ *
+ * The repo-scoped helpers (`repoRequest`, `repoRequestJson`,
+ * `repoRequestArray`) additionally resolve the repo identity and build
+ * the path and failure message from it. Use them when the only
+ * repo-dependent parts of a method are its path and failure message;
+ * methods with post-response validation keep calling `repo()` once plus
+ * the base request methods.
  */
 class GitHubTransport {
   /**
@@ -86,6 +93,47 @@ class GitHubTransport {
   }
 
   /**
+   * Resolve the repo identity, then `request` the path built from it.
+   * Repo-resolution failures propagate unmapped.
+   * @param {(ids: object) => string} pathFn - builds the path under the
+   *   API base URL from the resolved identity (`{ repo, repoRef, ... }`).
+   * @param {object} opts - request options.
+   * @param {string} [opts.method] - the HTTP method (`GET` by default).
+   * @param {object} [opts.body] - a JSON payload, if any.
+   * @param {(ids: object) => string} opts.message - builds the failure
+   *   message from the resolved identity; only invoked on failure.
+   * @returns {Promise<object>} the ok response.
+   * @throws {Error} with `message(ids)`, on any `request` failure.
+   */
+  async repoRequest(pathFn, opts) {
+    return this._repoScoped(pathFn, opts, (path, requestOpts) => this.request(path, requestOpts));
+  }
+
+  /**
+   * `repoRequest`, then parse the response body as JSON.
+   * @param {(ids: object) => string} pathFn - same as `repoRequest`'s.
+   * @param {object} opts - same as `repoRequest`'s.
+   * @returns {Promise<unknown>} the parsed JSON body.
+   * @throws {Error} with `opts.message(ids)`, on any `requestJson`
+   *   failure.
+   */
+  async repoRequestJson(pathFn, opts) {
+    return this._repoScoped(pathFn, opts, (path, requestOpts) => this.requestJson(path, requestOpts));
+  }
+
+  /**
+   * `repoRequestJson`, normalizing a non-array body to `[]`.
+   * @param {(ids: object) => string} pathFn - same as `repoRequest`'s.
+   * @param {object} opts - same as `repoRequest`'s.
+   * @returns {Promise<Array>} the parsed array, or `[]` when malformed.
+   * @throws {Error} with `opts.message(ids)`, on any `requestArray`
+   *   failure.
+   */
+  async repoRequestArray(pathFn, opts) {
+    return this._repoScoped(pathFn, opts, (path, requestOpts) => this.requestArray(path, requestOpts));
+  }
+
+  /**
    * POST a GraphQL query to the GitHub GraphQL endpoint.
    * @param {string} query - the GraphQL query/mutation document.
    * @param {object} variables - the query variables.
@@ -118,6 +166,26 @@ class GitHubTransport {
     } catch {
       // best-effort — tolerate any failure.
     }
+  }
+
+  /**
+   * Resolve the repo identity (unmapped on rejection), then run `send`
+   * with the built path and a lazy `failure` built from `message`.
+   * @param {(ids: object) => string} pathFn - builds the request path.
+   * @param {object} opts - request options.
+   * @param {string} [opts.method] - the HTTP method.
+   * @param {object} [opts.body] - a JSON payload, if any.
+   * @param {(ids: object) => string} opts.message - builds the failure
+   *   message from the resolved identity.
+   * @param {(path: string, opts: object) => Promise<unknown>} send - the
+   *   base request method to delegate to.
+   * @returns {Promise<unknown>} whatever `send` resolves to.
+   */
+  async _repoScoped(pathFn, { method, body, message }, send) {
+    const ids = await this.repo();
+    const failure = () => new Error(message(ids));
+
+    return send(pathFn(ids), { method, body, failure });
   }
 
   /**
