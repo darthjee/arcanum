@@ -8,8 +8,8 @@ export const TOKEN = 'fake-token';
  * Build a `GitHubClient` bound to a spy-backed `RepoContext` whose origin
  * resolves to `REPO` on github.com and whose GitHub token resolves to
  * `TOKEN`.
- * @param {Function} fetchFn - the (fake) `fetch` the client issues its
- *   requests through.
+ * @param {(url: string, options?: object) => Promise<object>} fetchFn - the
+ *   (fake) `fetch` the client issues its requests through.
  * @param {object} [git] - the (fake) `Git` facade, used by `createPr`.
  * @returns {GitHubClient} the client under test.
  */
