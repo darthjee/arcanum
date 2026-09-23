@@ -43,6 +43,30 @@ case "$COMMAND" in
       || { echo "Usage: $0 update <repo_path> <id> <title> <file>" >&2; exit 1; }
     engine_dispatch "$REPO_PATH" github-issue-update "${SCRIPT_DIR}/github_issue_update_shell.sh" HOME -- "$@"
     ;;
+  mark-created)
+    [[ -n "${2:-}" ]] || { echo "Usage: $0 mark-created <repo_path> <id>" >&2; exit 1; }
+    engine_dispatch "$REPO_PATH" github-issue-mark-created "${SCRIPT_DIR}/github_issue_mark_created_shell.sh" HOME -- "$@"
+    ;;
+  mark-refined)
+    [[ -n "${2:-}" ]] || { echo "Usage: $0 mark-refined <repo_path> <id>" >&2; exit 1; }
+    engine_dispatch "$REPO_PATH" github-issue-mark-refined "${SCRIPT_DIR}/github_issue_mark_refined_shell.sh" HOME -- "$@"
+    ;;
+  mark-ready)
+    [[ -n "${2:-}" ]] || { echo "Usage: $0 mark-ready <repo_path> <id>" >&2; exit 1; }
+    engine_dispatch "$REPO_PATH" github-issue-mark-ready "${SCRIPT_DIR}/github_issue_mark_ready_shell.sh" HOME -- "$@"
+    ;;
+  mark-enhancing)
+    [[ -n "${2:-}" ]] || { echo "Usage: $0 mark-enhancing <repo_path> <id>" >&2; exit 1; }
+    engine_dispatch "$REPO_PATH" github-issue-mark-enhancing "${SCRIPT_DIR}/github_issue_mark_enhancing_shell.sh" HOME -- "$@"
+    ;;
+  mark-planning)
+    [[ -n "${2:-}" ]] || { echo "Usage: $0 mark-planning <repo_path> <id>" >&2; exit 1; }
+    engine_dispatch "$REPO_PATH" github-issue-mark-planning "${SCRIPT_DIR}/github_issue_mark_planning_shell.sh" HOME -- "$@"
+    ;;
+  mark-split)
+    [[ -n "${2:-}" ]] || { echo "Usage: $0 mark-split <repo_path> <id>" >&2; exit 1; }
+    engine_dispatch "$REPO_PATH" github-issue-mark-split "${SCRIPT_DIR}/github_issue_mark_split_shell.sh" HOME -- "$@"
+    ;;
   *)
     exec "${SCRIPT_DIR}/github_issue_shell.sh" "$COMMAND" "$@"
     ;;
