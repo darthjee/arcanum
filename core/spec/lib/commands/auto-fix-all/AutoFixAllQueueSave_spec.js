@@ -65,15 +65,14 @@ describe('AutoFixAllQueue (save)', () => {
       const { stdout } = await captureStdout(() => queue.save('10'));
 
       expect(stdout).toEqual('Queue saved: 10\n');
-      expect(process.stderr.write).toHaveBeenCalledWith(
-        'Warning: could not add \'enqueued\' tag to issue #10 on darthjee/arcanum\n'
-      );
-      expect(process.stderr.write).toHaveBeenCalledWith(
-        'Warning: could not remove \'ready_for_work\' tag from issue #10 on darthjee/arcanum\n'
-      );
-      expect(process.stderr.write).toHaveBeenCalledWith(
-        'Warning: could not remove \'created\' tag from issue #10 on darthjee/arcanum\n'
-      );
+      expect(process.stderr.write.calls.allArgs()).toEqual([
+        ['Error: could not fetch issue #10 from darthjee/arcanum\n'],
+        ['Warning: could not add \'enqueued\' tag to issue #10 on darthjee/arcanum\n'],
+        ['Error: could not fetch issue #10 from darthjee/arcanum\n'],
+        ['Warning: could not remove \'ready_for_work\' tag from issue #10 on darthjee/arcanum\n'],
+        ['Error: could not fetch issue #10 from darthjee/arcanum\n'],
+        ['Warning: could not remove \'created\' tag from issue #10 on darthjee/arcanum\n']
+      ]);
     });
 
     it('rejects with a DispatchFailure (stdout "", exit code 1), after printing the confirmation line, when resolving the origin/token itself fails', async () => {

@@ -72,6 +72,9 @@ describe('AutoFixAllQueue (push)', () => {
 
       expect(stdout).toEqual('Pushed: 10\n');
       expect(process.stderr.write).toHaveBeenCalledWith(
+        'Error: could not update issue #10 on darthjee/arcanum\n'
+      );
+      expect(process.stderr.write).toHaveBeenCalledWith(
         'Warning: could not add \'enqueued\' tag to issue #10 on darthjee/arcanum\n'
       );
     });

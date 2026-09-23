@@ -67,16 +67,18 @@ class IssueTagger {
   /**
    * Add or remove a single canonical tag's mapped GitHub label on issue
    * `id`, mirroring `tag_mutate_add_label`/`tag_mutate_remove_label`
-   * exactly, including their own stdout lines (not just the caller's
-   * stderr warning on failure): fetches the issue's current labels
-   * (a fetch failure prints `Error: could not fetch issue #<id> from
-   * <repo>` to stderr); if the label is already in the desired state,
-   * prints a "nothing to do" line to stdout and stops; otherwise
-   * mutates it (a mutate failure prints `Error: could not update issue
-   * #<id> on <repo>` to stderr) and prints a success line to stdout. In
-   * either failure case, this method's own caller-facing warning
-   * (`Warning: could not add/remove '<tag>' tag ...`) is also printed
-   * to stderr, exactly as `_mark_enqueued`'s `|| echo ...` does.
+   * plus their caller's `|| echo "Warning: ..."` fallback exactly:
+   * - `shipit` is refused up front (human-only): stderr gets `Error:
+   *   shipit is human-only; scripts must not add or remove it` followed
+   *   by the caller's `Warning:` line, and no API call is made;
+   * - fetches the issue's current labels; on failure stderr gets
+   *   `Error: could not fetch issue #<id> from <repoRef>` followed by
+   *   the `Warning:` line;
+   * - if the label is already in the desired state, prints a "nothing
+   *   to do" line to stdout and stops;
+   * - otherwise mutates it; on failure stderr gets `Error: could not
+   *   update issue #<id> on <repoRef>` followed by the `Warning:` line;
+   *   on success a success line is printed to stdout.
    * @param {string} id - the issue id.
    * @param {string} repoRef - the (possibly domain-qualified) repo
    *   reference, used in both the success/failure messages.
@@ -85,12 +87,20 @@ class IssueTagger {
    * @returns {Promise<void>} resolves regardless of outcome.
    */
   async mutateTag(id, repoRef, action, tag) {
+    if (tag === 'shipit') {
+      process.stderr.write('Error: shipit is human-only; scripts must not add or remove it\n');
+      this.warnMutationFailure(action, tag, id, repoRef);
+
+      return;
+    }
+
     const label = TAG_TO_LABEL[tag];
     let labels;
 
     try {
       labels = await this.fetchLabels(id);
     } catch {
+      process.stderr.write(`Error: could not fetch issue #${id} from ${repoRef}\n`);
       this.warnMutationFailure(action, tag, id, repoRef);
 
       return;
@@ -113,6 +123,7 @@ class IssueTagger {
         await this.removeLabel(id, label);
       }
     } catch {
+      process.stderr.write(`Error: could not update issue #${id} on ${repoRef}\n`);
       this.warnMutationFailure(action, tag, id, repoRef);
 
       return;
