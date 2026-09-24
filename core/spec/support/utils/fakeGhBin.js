@@ -68,6 +68,11 @@ import { createTempDir, removeTempDir } from './tempDir.js';
 //     tag_mutate.sh's `tag_mutate_add_label`/`tag_mutate_remove_label`
 //     (queue_save_shell.sh's/queue_push_shell.sh's `_mark_enqueued`, and
 //     `github.sh`'s `cmd_has_shipit_label`/`cmd_add_tag`/`cmd_remove_tag`).
+//   - `gh issue list -R <ref> [--author <x>] --state open --json
+//     number,title,updatedAt,labels --search ... --limit 100` -> prints
+//     `$FAKE_GH_ISSUE_LIST_JSON` (default `[]`), ignoring the filters;
+//     fails when `$FAKE_GH_ISSUE_LIST_FAIL` is `1` — used by
+//     `monitor_issues_shell.sh`'s poll cycle.
 //   - `gh issue edit <id> -R <ref> --add-label <label>` /
 //     `gh issue edit <id> -R <ref> --remove-label <label>` -> succeeds
 //     (prints nothing) unless `$FAKE_GH_ISSUE_EDIT_FAIL` is `1`.
@@ -257,6 +262,14 @@ function buildIssueCase() {
         if [[ -n "\${FAKE_GH_ISSUE_LABELS:-}" ]]; then
           printf '%s\\n' "$FAKE_GH_ISSUE_LABELS"
         fi
+        exit 0
+        ;;
+      list)
+        if [[ "\${FAKE_GH_ISSUE_LIST_FAIL:-}" == "1" ]]; then
+          echo "fake gh: issue list failed" >&2
+          exit 1
+        fi
+        echo "\${FAKE_GH_ISSUE_LIST_JSON:-[]}"
         exit 0
         ;;
       edit)

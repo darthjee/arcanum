@@ -1,4 +1,5 @@
-import TagMutationService from '../../../lib/services/TagMutationService.js';
+import TagMutationService, { defaultIssueTaggerFactory } from '../../../lib/services/TagMutationService.js';
+import IssueTagger from '../../../lib/utils/issue/IssueTagger.js';
 import { TAG_TO_LABEL } from '../../../lib/utils/issue/Tags.js';
 
 const REPO_REF = 'darthjee/arcanum';
@@ -122,6 +123,35 @@ describe('TagMutationService', () => {
       expect(typeof result).toEqual('string');
       expect(stdout).not.toHaveBeenCalled();
       expect(stderr).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('.fromRepoContext', () => {
+    it('builds the service off a per-call bundle from the factory', async () => {
+      const context = { resolveWithRef: jasmine.createSpy().and.resolveTo({ repoRef: REPO_REF }) };
+      const bundle = { context, issueClient: {} };
+      const repoContextFactory = { buildFromContext: jasmine.createSpy('buildFromContext').and.returnValue(bundle) };
+      const issueTagger = { fetchLabels: jasmine.createSpy().and.resolveTo([]) };
+      const issueTaggerFactory = jasmine.createSpy('issueTaggerFactory').and.returnValue(issueTagger);
+      const repoContext = { repoPath: '/x' };
+
+      const service = TagMutationService.fromRepoContext(repoContext, { repoContextFactory, issueTaggerFactory });
+
+      expect(repoContextFactory.buildFromContext).toHaveBeenCalledWith(repoContext);
+      expect(issueTaggerFactory).toHaveBeenCalledWith(bundle);
+      await expectAsync(service.removeTag(ID, TAG)).toBeResolvedTo(
+        `Tag '${TAG}' not present on issue #${ID} — nothing to do.\n`
+      );
+    });
+
+    it('uses the default factories when none are injected', () => {
+      expect(TagMutationService.fromRepoContext({ repoPath: '/x' })).toBeInstanceOf(TagMutationService);
+    });
+  });
+
+  describe('defaultIssueTaggerFactory', () => {
+    it('builds an IssueTagger off the bundle', () => {
+      expect(defaultIssueTaggerFactory({ context: {}, issueClient: {} })).toBeInstanceOf(IssueTagger);
     });
   });
 });

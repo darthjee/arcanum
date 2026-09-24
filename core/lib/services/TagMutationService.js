@@ -1,4 +1,16 @@
+import IssueTagger from '../utils/issue/IssueTagger.js';
+import RepoContextFactory from '../context/RepoContextFactory.js';
 import { TAG_TO_LABEL } from '../utils/issue/Tags.js';
+
+/**
+ * Default `issueTaggerFactory`: builds a context-bound `IssueTagger` off
+ * a `RepoContextFactory#buildFromContext` bundle.
+ * @param {{context: object, issueClient: object}} bundle - the per-call bundle.
+ * @returns {IssueTagger} the context-bound tagger.
+ */
+export function defaultIssueTaggerFactory(bundle) {
+  return new IssueTagger({ context: bundle.context, issueClient: bundle.issueClient });
+}
 
 /**
  * Strict tag-mutation decision tree behind `github.sh add-tag`/
@@ -21,6 +33,33 @@ class TagMutationService {
   constructor({ issueTagger, context } = {}) {
     this._issueTagger = issueTagger;
     this._context = context;
+  }
+
+  /**
+   * Build a `TagMutationService` bound to `repoContext`, shared by the
+   * `github.sh remove-tag`/`add-tag` facades (`AutoFixAllGithub`,
+   * `MonitorIssuesGithub`): wraps the context into a per-call
+   * `RepoContextFactory` bundle and builds its `IssueTagger` off it.
+   * @param {import('../context/RepoContext.js').default} repoContext -
+   *   the target repo's context.
+   * @param {object} [deps] - injectable collaborators, for testing.
+   * @param {RepoContextFactory} [deps.repoContextFactory] - builds the
+   *   per-call bundle via `buildFromContext`.
+   * @param {(bundle: object) => object} [deps.issueTaggerFactory] - builds the
+   *   `IssueTagger` from the bundle (defaults to
+   *   `defaultIssueTaggerFactory`).
+   * @returns {TagMutationService} the context-bound service.
+   */
+  static fromRepoContext(repoContext, {
+    repoContextFactory = new RepoContextFactory(),
+    issueTaggerFactory = defaultIssueTaggerFactory
+  } = {}) {
+    const bundle = repoContextFactory.buildFromContext(repoContext);
+
+    return new TagMutationService({
+      issueTagger: issueTaggerFactory(bundle),
+      context: bundle.context
+    });
   }
 
   /**

@@ -80,6 +80,32 @@ if (mode === 'success') {
 
     return new Response(JSON.stringify({ message: 'not found' }), { status: 404 });
   };
+} else if (mode === 'monitor-issues') {
+  // Drives `MonitorIssuesMonitorIssues.js`'s poll cycle (issue #586):
+  // `GET /search/issues?...` answers `{ items: $FAKE_FETCH_SEARCH_ITEMS_JSON }`
+  // (default `[]`, ignoring the query, like fakeGhBin.js's `gh issue
+  // list`), failing when `FAKE_FETCH_SEARCH_FAIL` is `1`; every other
+  // call is the in-process `AutoFixAllQueue#push`'s label mutation,
+  // answered exactly like `queue` mode (`FAKE_FETCH_ISSUE_LABELS`).
+  const items = process.env.FAKE_FETCH_SEARCH_ITEMS_JSON || '[]';
+  const searchFail = process.env.FAKE_FETCH_SEARCH_FAIL === '1';
+  const labels = (process.env.FAKE_FETCH_ISSUE_LABELS || '').split('\n').filter(Boolean);
+
+  globalThis.fetch = async (rawUrl, options = {}) => {
+    const url = typeof rawUrl === 'string' ? rawUrl : rawUrl.toString();
+
+    if (url.includes('/search/issues')) {
+      return searchFail
+        ? new Response(JSON.stringify({ message: 'Validation Failed' }), { status: 422 })
+        : new Response(`{"items": ${items}}`, { status: 200 });
+    }
+
+    if (options.method === undefined) {
+      return new Response(JSON.stringify({ labels: labels.map((name) => ({ name })) }), { status: 200 });
+    }
+
+    return new Response('{}', { status: 200 });
+  };
 } else if (mode === 'wait-ci-and-merge') {
   // Drives AutoFixAllWaitCiAndMerge.js (issue #266): the union of
   // `wait-ci` mode's three GET calls (`AutoFixAllWaitCi#run`'s PR

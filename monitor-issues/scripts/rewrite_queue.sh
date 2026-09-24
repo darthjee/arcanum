@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-
-# Rewrite queue management for monitor-issues.
-#
-# State is stored in .claude/state/monitor-issues-rewrite-queue.json — a
-# JSON array of entry objects ({"id": "<issue_id>"} each), mirroring
-# auto-fix-all/scripts/queue.sh's schema so future fields can be added to
-# an entry without changing the overall shape.
+# Thin per-subcommand engine_dispatch shim for the
+# "monitor-issues-rewrite-queue-*" migrated entrypoints — see
+# docs/agents/architecture/script-engine.md and
+# docs/agents/plans/586-migrate-monitor-issues-entrypoints-to-native-node-js/plan.md
+# for the full design/shared contracts. Rewrite queue management for
+# monitor-issues, via either the shell implementation
+# (rewrite_queue_<subcommand>_shell.sh) or the native one
+# (core/bin/arcanum), per engine.mode / arcanum/_lib/migration-status.json.
 #
 # Commands:
 #   push <id>  — append the given issue id to the end of the queue if not
@@ -15,72 +16,28 @@
 #                the id, one line) under lock. Prints nothing and exits 1
 #                if the queue is empty.
 #
-# `push` and `pop` both mutate the shared queue file, so they go through a
-# simple lock (.claude/state/monitor-issues-rewrite-queue.lock) to avoid
-# one clobbering the other if they ever run concurrently: write this
-# invocation's instance id into the lock file, sleep 1s, re-read it back —
-# if it still matches, the lock is held; otherwise retry. Acquisition never
-# gives up: every 10 attempts the attempt counter resets to 0 (so it never
-# grows unbounded), and the very first time that threshold is hit a warning
-# is printed — once only, never again for the same acquisition — that the
-# lock looks stuck and may need manual intervention (check whether a
-# process actually holds it, and if not, remove the lock file by hand). It
-# then keeps retrying silently. The lock file is removed once the mutation
-# is done.
+# Queue schema and lock semantics are documented in
+# rewrite_queue_common.sh.
+#
+# The CLI stays cwd-relative (no <repo_path> argument): "$PWD" is passed
+# as engine_dispatch's <repo_path> with --prepend-repo-path, so only the
+# native invocation receives it as its leading positional.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-STATE_DIR=".claude/state"
-QUEUE_FILE="${STATE_DIR}/monitor-issues-rewrite-queue.json"
-# shellcheck disable=SC2034
-# Read by _acquire_lock/_release_lock (lock.sh, sourced above), called later
-# in this file
-LOCK_FILE="${STATE_DIR}/monitor-issues-rewrite-queue.lock"
+# shellcheck source=../../arcanum/_lib/engine_dispatch.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/engine_dispatch.sh"
 
-mkdir -p "$STATE_DIR"
-
-# shellcheck source=../../arcanum/_lib/lock.sh
-source "${SCRIPT_DIR}/../../arcanum/_lib/lock.sh"
-
-# Reads the queue array from QUEUE_FILE, or "[]" if absent/empty.
-_read_queue() {
-  if [[ -s "$QUEUE_FILE" ]]; then
-    cat "$QUEUE_FILE"
-  else
-    echo "[]"
-  fi
-}
-
-case ${1:-} in
-  push)
-    ID="${2:-}"
-    if [[ -z "$ID" ]]; then
-      echo "Error: push requires an ID" >&2
-      exit 1
-    fi
-    _acquire_lock
-    _read_queue | jq --arg id "$ID" 'if any(.[]; .id == $id) then . else . + [{"id": $id}] end' > "${QUEUE_FILE}.tmp"
-    mv "${QUEUE_FILE}.tmp" "$QUEUE_FILE"
-    _release_lock
-    echo "Pushed: $ID"
-    ;;
-
-  pop)
-    _acquire_lock
-    ID=$(_read_queue | jq -r '.[0].id // ""')
-    if [[ -z "$ID" ]]; then
-      _release_lock
-      exit 1
-    fi
-    _read_queue | jq '.[1:]' > "${QUEUE_FILE}.tmp"
-    mv "${QUEUE_FILE}.tmp" "$QUEUE_FILE"
-    _release_lock
-    echo "$ID"
-    ;;
-
+COMMAND="${1:-}"
+case "$COMMAND" in
+  push|pop) ;;
   *)
     echo "Usage: $0 {push <id>|pop}" >&2
     exit 1
     ;;
 esac
+shift
+
+engine_dispatch "$PWD" "monitor-issues-rewrite-queue-${COMMAND}" \
+  "${SCRIPT_DIR}/rewrite_queue_${COMMAND}_shell.sh" --prepend-repo-path -- "$@"

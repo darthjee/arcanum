@@ -5,7 +5,7 @@ describe('COMMANDS', () => {
     expect(Object.keys(COMMANDS).length).toBeGreaterThan(0);
   });
 
-  it('sets context: \'repo\' on the migrated arcanum-split-issue, auto-fix-all lifecycle, auto-fix-issue-commit-change, auto-fix-issue-create-branch, auto-fix-issue-merge-main, auto-fix-all-github, auto-fix-issue-github, auto-monitor-issue-pr-resolve-pr-number, auto-monitor-pr-monitor-pr, auto-new-issue-commit-issue, auto-plan-issue-commit-plan, discuss-issue-render-issue, github-issue, auto-fix-all-queue and spawn-issue entries', () => {
+  it('sets context: \'repo\' on the migrated arcanum-split-issue, auto-fix-all lifecycle, auto-fix-issue-commit-change, auto-fix-issue-create-branch, auto-fix-issue-merge-main, auto-fix-all-github, auto-fix-issue-github, auto-monitor-issue-pr-resolve-pr-number, auto-monitor-pr-monitor-pr, auto-new-issue-commit-issue, auto-plan-issue-commit-plan, discuss-issue-render-issue, github-issue, auto-fix-all-queue, monitor-issues and spawn-issue entries', () => {
     const withRepoContext = Object.keys(COMMANDS).filter((name) => COMMANDS[name].context === 'repo');
 
     expect(withRepoContext).toEqual([
@@ -57,6 +57,10 @@ describe('COMMANDS', () => {
       'github-issue-update',
       'issue-state',
       'list-agents',
+      'monitor-issues-github-remove-tag',
+      'monitor-issues-monitor-issues',
+      'monitor-issues-rewrite-queue-pop',
+      'monitor-issues-rewrite-queue-push',
       'resolve-and-fetch',
       'resolve-id-and-file',
       'resolve-plan-paths',
@@ -76,7 +80,7 @@ describe('COMMANDS', () => {
     expect(COMMANDS['arcanum-update-run-update-apply'].method).toBe('apply');
   });
 
-  it('sets validateRepoPath: false on the file-only auto-fix-all-queue subcommands, github-issue-info, the github-issue-mark-* family and github-issue-update', () => {
+  it('sets validateRepoPath: false on the file-only auto-fix-all-queue subcommands, github-issue-info, the github-issue-mark-* family, github-issue-update and the monitor-issues-rewrite-queue-* family', () => {
     const skipValidation = Object.keys(COMMANDS).filter((name) => COMMANDS[name].validateRepoPath === false);
 
     expect(skipValidation).toEqual([
@@ -92,8 +96,23 @@ describe('COMMANDS', () => {
       'github-issue-mark-ready',
       'github-issue-mark-refined',
       'github-issue-mark-split',
-      'github-issue-update'
+      'github-issue-update',
+      'monitor-issues-rewrite-queue-pop',
+      'monitor-issues-rewrite-queue-push'
     ]);
+  });
+
+  it('routes the monitor-issues-config-* family to MonitorIssuesConfig with no context', () => {
+    const expected = {
+      'monitor-issues-config-get': 'get',
+      'monitor-issues-config-is-enabled': 'isEnabled',
+      'monitor-issues-config-set': 'set',
+      'monitor-issues-config-toggle': 'toggle'
+    };
+
+    Object.entries(expected).forEach(([name, method]) => {
+      expect(COMMANDS[name]).toEqual({ module: 'commands/monitor-issues/MonitorIssuesConfig.js', method });
+    });
   });
 
   it('routes github-issue-fetch/github-issue-update to GithubIssue#fetchIssue/#update', () => {

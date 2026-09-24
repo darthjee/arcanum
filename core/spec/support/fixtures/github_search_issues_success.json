@@ -1,0 +1,23 @@
+{
+  "total_count": 2,
+  "incomplete_results": false,
+  "items": [
+    {
+      "number": 12,
+      "title": "First issue",
+      "updated_at": "2026-01-02T03:04:05Z",
+      "state": "open",
+      "labels": [
+        { "id": 1, "name": "Created", "color": "ffffff" },
+        { "id": 2, "name": "Bug", "color": "000000" }
+      ]
+    },
+    {
+      "number": 13,
+      "title": "Second issue",
+      "updated_at": "2026-01-02T03:05:00Z",
+      "state": "open",
+      "labels": []
+    }
+  ]
+}

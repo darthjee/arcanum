@@ -1,105 +1,40 @@
 #!/usr/bin/env bash
-# Config management for monitor-issues.
+# Thin per-subcommand engine_dispatch shim for the "monitor-issues-config-*"
+# migrated entrypoints — see docs/agents/architecture/script-engine.md and
+# docs/agents/plans/586-migrate-monitor-issues-entrypoints-to-native-node-js/plan.md
+# for the full design/shared contracts. Config management for
+# monitor-issues, via either the shell implementation
+# (config_<subcommand>_shell.sh) or the native one (core/bin/arcanum), per
+# engine.mode / arcanum/_lib/migration-status.json.
+#
 # Usage: config.sh get <key>
 #        config.sh is-enabled <key>
 #        config.sh set <key> true|false
 #        config.sh toggle <key>
+#
+# The CLI stays cwd-relative (no <repo_path> argument): "$PWD" is passed
+# as engine_dispatch's <repo_path> with --prepend-repo-path, so only the
+# native invocation receives it as its leading positional; the
+# config_<subcommand>_shell.sh scripts keep the plain <key> [<value>] CLI.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE=".claude/configuration/monitor-issues.json"
-STATE_CONFIG_FILE=".claude/state/monitor-issues-config.json"
-# shellcheck disable=SC2034
-# Read by _acquire_lock/_release_lock (lock.sh, sourced above), called later
-# in this file
-LOCK_FILE=".claude/state/monitor-issues-config.lock"
-STATE_DIR=".claude/state"
+# shellcheck source=../../arcanum/_lib/engine_dispatch.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/engine_dispatch.sh"
 
-mkdir -p "$STATE_DIR"
+USAGE="Usage: $0 {get <key>|is-enabled <key>|set <key> true|false|toggle <key>}"
 
-# shellcheck source=../../arcanum/_lib/lock.sh
-source "${SCRIPT_DIR}/../../arcanum/_lib/lock.sh"
-
-# Returns the file that a given key should be read from/written to:
-# clear_context is personal, frequently-toggled state and lives in the
-# gitignored STATE_CONFIG_FILE; every other key lives in the committed
-# CONFIG_FILE.
-_config_file_for_key() {
-  [[ "$1" == "clear_context" ]] && echo "$STATE_CONFIG_FILE" || echo "$CONFIG_FILE"
-}
-
-# Reads the config object from the given file, or "{}" if absent/empty.
-_read_config() {
-  local f="$1"
-  if [[ -s "$f" ]]; then
-    cat "$f"
-  else
-    echo "{}"
-  fi
-}
-
-case ${1:-} in
-  get)
-    if [[ $# -lt 2 ]]; then
-      echo "Error: get requires a key" >&2
-      exit 1
-    fi
-    KEY="$2"
-    TARGET_FILE="$(_config_file_for_key "$KEY")"
-    _read_config "$TARGET_FILE" | jq -r --arg k "$KEY" '.[$k] // false'
-    ;;
-
-  is-enabled)
-    if [[ $# -lt 2 ]]; then
-      echo "Error: is-enabled requires a key" >&2
-      exit 1
-    fi
-    KEY="$2"
-    TARGET_FILE="$(_config_file_for_key "$KEY")"
-    VALUE=$(_read_config "$TARGET_FILE" | jq -r --arg k "$KEY" '.[$k] // false')
-    [[ "$VALUE" == "true" ]]
-    ;;
-
-  set)
-    if [[ $# -lt 3 ]]; then
-      echo "Error: set requires a key and a value (true|false)" >&2
-      exit 1
-    fi
-    KEY="$2"
-    VALUE="$3"
-    if [[ "$VALUE" != "true" && "$VALUE" != "false" ]]; then
-      echo "Error: value must be 'true' or 'false'" >&2
-      exit 1
-    fi
-    TARGET_FILE="$(_config_file_for_key "$KEY")"
-    _acquire_lock
-    _read_config "$TARGET_FILE" | jq --arg k "$KEY" --arg v "$VALUE" '.[$k] = ($v == "true")' > "${TARGET_FILE}.tmp"
-    mv "${TARGET_FILE}.tmp" "$TARGET_FILE"
-    _release_lock
-    ;;
-
-  toggle)
-    if [[ $# -lt 2 ]]; then
-      echo "Error: toggle requires a key" >&2
-      exit 1
-    fi
-    KEY="$2"
-    TARGET_FILE="$(_config_file_for_key "$KEY")"
-    _acquire_lock
-    CURRENT=$(_read_config "$TARGET_FILE" | jq -r --arg k "$KEY" '.[$k] // false')
-    if [[ "$CURRENT" == "true" ]]; then
-      NEW_VALUE="false"
-    else
-      NEW_VALUE="true"
-    fi
-    _read_config "$TARGET_FILE" | jq --arg k "$KEY" --arg v "$NEW_VALUE" '.[$k] = ($v == "true")' > "${TARGET_FILE}.tmp"
-    mv "${TARGET_FILE}.tmp" "$TARGET_FILE"
-    _release_lock
-    echo "$NEW_VALUE"
-    ;;
-
+COMMAND="${1:-}"
+case "$COMMAND" in
+  get|is-enabled|set|toggle) ;;
   *)
-    echo "Usage: $0 {get <key>|is-enabled <key>|set <key> true|false|toggle <key>}" >&2
+    echo "$USAGE" >&2
     exit 1
     ;;
 esac
+shift
+
+# From here, "$@" is <key> [<value>] — per-subcommand argument-count
+# errors are raised by the shell/native implementations themselves.
+SHELL_SCRIPT="${SCRIPT_DIR}/config_${COMMAND//-/_}_shell.sh"
+engine_dispatch "$PWD" "monitor-issues-config-${COMMAND}" "$SHELL_SCRIPT" --prepend-repo-path -- "$@"

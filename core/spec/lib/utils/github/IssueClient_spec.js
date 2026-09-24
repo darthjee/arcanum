@@ -1,4 +1,5 @@
 import IssueClient from '../../../../lib/utils/github/IssueClient.js';
+import { loadFixture } from '../../../support/factories/githubIssue.js';
 import { createRepoContextMock } from '../../../support/factories/repoContextFactory.js';
 
 const REPO = 'darthjee/arcanum';
@@ -56,6 +57,83 @@ describe('IssueClient', () => {
 
       await expectAsync(client.getIssue('10')).toBeRejectedWithError(
         `Error: could not fetch issue #10 from ${REPO}`
+      );
+    });
+  });
+
+  describe('#searchOpenIssuesUpdatedSince', () => {
+    const SINCE = '2026-01-01T00:00:00Z';
+
+    function searchUrl(query) {
+      return `https://api.github.com/search/issues?q=${encodeURIComponent(query)}&per_page=100`;
+    }
+
+    it('queries open issues of the repo updated since the timestamp', async () => {
+      const payload = await loadFixture('github_search_issues_success.json');
+      const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true, json: async () => payload });
+      const client = newClient(fetchFn);
+
+      await client.searchOpenIssuesUpdatedSince(SINCE);
+
+      expect(fetchFn).toHaveBeenCalledWith(
+        searchUrl(`repo:${REPO} is:issue is:open updated:>${SINCE}`),
+        jasmine.objectContaining({ headers: { Authorization: `Bearer ${TOKEN}` } })
+      );
+    });
+
+    it('restricts the query to the author when given', async () => {
+      const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true, json: async () => ({ items: [] }) });
+      const client = newClient(fetchFn);
+
+      await client.searchOpenIssuesUpdatedSince(SINCE, { author: 'darthjee' });
+
+      expect(fetchFn).toHaveBeenCalledWith(
+        searchUrl(`repo:${REPO} is:issue is:open author:darthjee updated:>${SINCE}`),
+        jasmine.anything()
+      );
+    });
+
+    it('maps the items to gh issue list\'s number/title/updatedAt/labels shape', async () => {
+      const payload = await loadFixture('github_search_issues_success.json');
+      const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true, json: async () => payload });
+      const client = newClient(fetchFn);
+
+      await expectAsync(client.searchOpenIssuesUpdatedSince(SINCE)).toBeResolvedTo([
+        {
+          number: 12,
+          title: 'First issue',
+          updatedAt: '2026-01-02T03:04:05Z',
+          labels: [{ name: 'Created' }, { name: 'Bug' }]
+        },
+        { number: 13, title: 'Second issue', updatedAt: '2026-01-02T03:05:00Z', labels: [] }
+      ]);
+    });
+
+    it('returns [] when the body has no items array', async () => {
+      const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true, json: async () => ({}) });
+      const client = newClient(fetchFn);
+
+      await expectAsync(client.searchOpenIssuesUpdatedSince(SINCE)).toBeResolvedTo([]);
+    });
+
+    it('defaults missing labels to []', async () => {
+      const fetchFn = jasmine.createSpy().and.resolveTo({
+        ok: true,
+        json: async () => ({ items: [{ number: 1, title: 't', updated_at: 'u' }] })
+      });
+      const client = newClient(fetchFn);
+
+      await expectAsync(client.searchOpenIssuesUpdatedSince(SINCE)).toBeResolvedTo([
+        { number: 1, title: 't', updatedAt: 'u', labels: [] }
+      ]);
+    });
+
+    it('throws a descriptive error on a failed request', async () => {
+      const fetchFn = jasmine.createSpy().and.resolveTo({ ok: false });
+      const client = newClient(fetchFn);
+
+      await expectAsync(client.searchOpenIssuesUpdatedSince(SINCE)).toBeRejectedWithError(
+        `Error: could not search issues in ${REPO}`
       );
     });
   });

@@ -1,4 +1,4 @@
-import Tags, { LABEL_TO_TAG, TAG_TO_LABEL } from '../../../../lib/utils/issue/Tags.js';
+import Tags, { ACTIONABLE_TAGS, LABEL_TO_TAG, TAG_TO_LABEL } from '../../../../lib/utils/issue/Tags.js';
 
 describe('Tags', () => {
   describe('TAG_TO_LABEL', () => {
@@ -49,6 +49,28 @@ describe('Tags', () => {
     it('returns an empty array for an empty/undefined input', () => {
       expect(Tags.extractTags([])).toEqual([]);
       expect(Tags.extractTags(undefined)).toEqual([]);
+    });
+  });
+
+  describe('.actionableTags', () => {
+    it('lists question, created, ready_for_work as the actionable tags', () => {
+      expect(ACTIONABLE_TAGS).toEqual(['question', 'created', 'ready_for_work']);
+    });
+
+    it('returns the present actionable tags in the fixed order', () => {
+      expect(Tags.actionableTags(['Ready for Work', 'Bug', 'Question', 'Created'])).toEqual([
+        'question', 'created', 'ready_for_work'
+      ]);
+    });
+
+    it('omits absent actionable tags and ignores non-actionable ones', () => {
+      expect(Tags.actionableTags(['Ready for Work', 'shipit'])).toEqual(['ready_for_work']);
+    });
+
+    it('returns [] when none are present', () => {
+      expect(Tags.actionableTags(['Bug', 'Enqueued'])).toEqual([]);
+      expect(Tags.actionableTags([])).toEqual([]);
+      expect(Tags.actionableTags(undefined)).toEqual([]);
     });
   });
 });

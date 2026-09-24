@@ -35,6 +35,36 @@ describe('QueueStore', () => {
     });
   });
 
+  describe('with custom file names', () => {
+    beforeEach(() => {
+      store = new QueueStore(repoContext, {
+        queueFile: 'monitor-issues-rewrite-queue.json',
+        lockFile: 'monitor-issues-rewrite-queue.lock'
+      });
+    });
+
+    it('resolves the custom queue file under .claude/state/', () => {
+      expect(store.queueFile()).toEqual(
+        path.join(dir, '.claude', 'state', 'monitor-issues-rewrite-queue.json')
+      );
+    });
+
+    it('resolves the custom lock file under .claude/state/', () => {
+      expect(store.lockFile()).toEqual(
+        path.join(dir, '.claude', 'state', 'monitor-issues-rewrite-queue.lock')
+      );
+    });
+
+    it('reads and writes the custom queue file', async () => {
+      await store.write([{ id: '7' }]);
+
+      const raw = await readFile(store.queueFile(), 'utf8');
+
+      expect(JSON.parse(raw)).toEqual([{ id: '7' }]);
+      await expectAsync(store.read()).toBeResolvedTo([{ id: '7' }]);
+    });
+  });
+
   describe('#read', () => {
     it('returns an empty array when the queue file is absent', async () => {
       await expectAsync(store.read()).toBeResolvedTo([]);
