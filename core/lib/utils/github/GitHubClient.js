@@ -1,5 +1,6 @@
 import Git from '../git/Git.js';
 import GitHubChecksClient from './GitHubChecksClient.js';
+import GitHubLabelClient from './GitHubLabelClient.js';
 import GitHubPullRequestClient from './GitHubPullRequestClient.js';
 import GitHubPullRequestFeedbackClient from './GitHubPullRequestFeedbackClient.js';
 import GitHubTransport from './GitHubTransport.js';
@@ -20,6 +21,8 @@ import GitHubUserClient from './GitHubUserClient.js';
  *   `addReaction`, `removeReaction`).
  * - `GitHubChecksClient` — check runs (`getCheckRuns`).
  * - `GitHubUserClient` — the acting user (`getCurrentUser`).
+ * - `GitHubLabelClient` — repository labels (`listLabelNames`,
+ *   `createLabel`, `updateLabel`).
  *
  * See each focused client for the full method contracts.
  */
@@ -44,6 +47,7 @@ class GitHubClient {
     this._feedback = new GitHubPullRequestFeedbackClient({ transport });
     this._checks = new GitHubChecksClient({ transport });
     this._users = new GitHubUserClient({ transport });
+    this._labels = new GitHubLabelClient({ transport });
   }
 
   /**
@@ -191,6 +195,35 @@ class GitHubClient {
    */
   markPrReady(nodeId) {
     return this._pullRequests.markPrReady(nodeId);
+  }
+
+  /**
+   * @see GitHubLabelClient#listLabelNames
+   * @returns {Promise<string[]>} every label name in the repo.
+   */
+  listLabelNames() {
+    return this._labels.listLabelNames();
+  }
+
+  /**
+   * @see GitHubLabelClient#createLabel
+   * @param {string} name - the label name.
+   * @param {string} color - the 6-hex-digit color.
+   * @returns {Promise<void>} resolves once the label is created.
+   */
+  createLabel(name, color) {
+    return this._labels.createLabel(name, color);
+  }
+
+  /**
+   * @see GitHubLabelClient#updateLabel
+   * @param {string} existingName - the label's current name.
+   * @param {string} name - the label's new name.
+   * @param {string} color - the 6-hex-digit color.
+   * @returns {Promise<void>} resolves once the label is updated.
+   */
+  updateLabel(existingName, name, color) {
+    return this._labels.updateLabel(existingName, name, color);
   }
 }
 
