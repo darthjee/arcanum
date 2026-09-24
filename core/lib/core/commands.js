@@ -26,7 +26,9 @@
  *     `auto-monitor-pr-monitor-pr`, on `auto-new-issue-commit-issue`, on
  *     `auto-plan-issue-commit-plan`, on `discuss-issue-render-issue`, on
  *     the `init-claude-*` family (set-ci-ignored-patterns /
- *     setup-docs-structure / setup-templates / stamp-arcanum-version — all
+ *     setup-docs-structure / setup-templates / stamp-arcanum-version /
+ *     write-label-config-replace / write-label-config-remove /
+ *     write-label-config-add / sync-labels — all
  *     `validateRepoPath: false`, since their shell originals never
  *     required the target project to be a git repo), and
  *     on the `auto-fix-all-queue-*` family (empty / list / next / pop /
@@ -364,6 +366,30 @@ export const COMMANDS = {
   'init-claude-stamp-arcanum-version': {
     module: 'commands/init-claude/InitClaudeStampArcanumVersion.js',
     method: 'run',
+    context: 'repo',
+    validateRepoPath: false
+  },
+  'init-claude-sync-labels': {
+    module: 'commands/init-claude/InitClaudeSyncLabels.js',
+    method: 'run',
+    context: 'repo',
+    validateRepoPath: false
+  },
+  'init-claude-write-label-config-add': {
+    module: 'commands/init-claude/InitClaudeWriteLabelConfig.js',
+    method: 'add',
+    context: 'repo',
+    validateRepoPath: false
+  },
+  'init-claude-write-label-config-remove': {
+    module: 'commands/init-claude/InitClaudeWriteLabelConfig.js',
+    method: 'remove',
+    context: 'repo',
+    validateRepoPath: false
+  },
+  'init-claude-write-label-config-replace': {
+    module: 'commands/init-claude/InitClaudeWriteLabelConfig.js',
+    method: 'replace',
     context: 'repo',
     validateRepoPath: false
   },

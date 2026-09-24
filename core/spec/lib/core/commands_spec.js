@@ -59,6 +59,10 @@ describe('COMMANDS', () => {
       'init-claude-setup-docs-structure',
       'init-claude-setup-templates',
       'init-claude-stamp-arcanum-version',
+      'init-claude-sync-labels',
+      'init-claude-write-label-config-add',
+      'init-claude-write-label-config-remove',
+      'init-claude-write-label-config-replace',
       'issue-state',
       'list-agents',
       'monitor-issues-github-remove-tag',
@@ -105,6 +109,10 @@ describe('COMMANDS', () => {
       'init-claude-setup-docs-structure',
       'init-claude-setup-templates',
       'init-claude-stamp-arcanum-version',
+      'init-claude-sync-labels',
+      'init-claude-write-label-config-add',
+      'init-claude-write-label-config-remove',
+      'init-claude-write-label-config-replace',
       'monitor-issues-rewrite-queue-pop',
       'monitor-issues-rewrite-queue-push'
     ]);
@@ -169,6 +177,24 @@ describe('COMMANDS', () => {
       expect(COMMANDS[name]).toEqual({
         module: `commands/init-claude/${className}.js`,
         method: 'run',
+        context: 'repo',
+        validateRepoPath: false
+      });
+    });
+  });
+
+  it('routes the init-claude label commands to InitClaudeWriteLabelConfig/InitClaudeSyncLabels', () => {
+    const expected = {
+      'init-claude-sync-labels': ['InitClaudeSyncLabels', 'run'],
+      'init-claude-write-label-config-add': ['InitClaudeWriteLabelConfig', 'add'],
+      'init-claude-write-label-config-remove': ['InitClaudeWriteLabelConfig', 'remove'],
+      'init-claude-write-label-config-replace': ['InitClaudeWriteLabelConfig', 'replace']
+    };
+
+    Object.entries(expected).forEach(([name, [className, method]]) => {
+      expect(COMMANDS[name]).toEqual({
+        module: `commands/init-claude/${className}.js`,
+        method,
         context: 'repo',
         validateRepoPath: false
       });
