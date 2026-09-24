@@ -28,6 +28,21 @@
 # covered by the exclusion above), #511 (core/spec/lib), #512
 # (core/lib/commands), #513 (core/lib/utils), and #514 (core/lib/services,
 # core/lib/context, core/lib/core).
+#
+# Excludes core/Dockerfile from the Opengrep (Semgrep-based) engine only —
+# Hadolint and the other tools keep analysing it. Opengrep's
+# missing-user / missing-user-entrypoint rules flag the file because it
+# has no USER directive, which is intentional: the entrypoint must start
+# as root to `chown` the mount points (the core_node_modules volume and,
+# on Linux, the bind-mounted repo root), then drops to `node` via `su`
+# before running CMD — see core/docker-entrypoint.sh. Inline `nosemgrep`
+# suppression is not honoured by Codacy. The engine key is `opengrep`,
+# the tool's shortName in Codacy's API (api/v3/tools) and the name listed
+# in Codacy's configuration-file docs. See issues #494 and #604.
+engines:
+  opengrep:
+    exclude_paths:
+      - "core/Dockerfile"
 exclude_paths:
   - "core/spec/support/**"
   - "CLAUDE.md"

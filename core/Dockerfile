@@ -30,11 +30,10 @@ WORKDIR /home/node/app
 # No USER directive is added here: that would make docker-entrypoint.sh
 # itself run as `node`, breaking its `chown -R node:node` calls against
 # the root-owned `core_node_modules` volume and (when needed) the
-# bind-mounted repo root. The findings below are suppressed accordingly.
+# bind-mounted repo root. Semgrep's missing-USER findings for this file
+# are suppressed in .codacy.yml (see #494/#604).
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# nosemgrep: Semgrep_dockerfile.security.missing-user-entrypoint.missing-user-entrypoint
 ENTRYPOINT ["docker-entrypoint.sh"]
-# nosemgrep: Semgrep_dockerfile.security.missing-user.missing-user
 CMD ["sh", "-c", "yarn install --frozen-lockfile && yarn test"]
