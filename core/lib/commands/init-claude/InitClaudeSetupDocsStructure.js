@@ -110,7 +110,7 @@ class InitClaudeSetupDocsStructure {
    * @param {import('../../context/RepoContext.js').default} repoContext -
    *   the target repo's context, supplying `repoPath`.
    * @param {object} [deps] - injectable collaborators, for testing.
-   * @param {{write: function(string): *}} [deps.stderr] - the stream the
+   * @param {{write: function(string): boolean}} [deps.stderr] - the stream the
    *   missing-`AGENTS.md` warning is written to (defaults to
    *   `process.stderr`).
    */
