@@ -9,7 +9,7 @@ Sub-issue C of #585. Migrate the label-related `init-claude` entrypoints and the
 | `init-claude-write-label-config` | `init-claude/scripts/write_label_config.sh` | 76 | `replace`/`remove`/`add` subcommands; takes `<config_path>` only (no `<repo_path>`) |
 | `init-claude-sync-labels` | `init-claude/scripts/sync_labels.sh` | 112 | `<repo_path> [<config_path>]`; interactive confirm (stdin) + GitHub label sync via `gh label list/create/edit` |
 
-Shared helper: `init-claude/scripts/lib/label_config.sh` (241 lines — `validate_pair`, `write`, `ensure_defaults`, `read_pairs`, `remove`, `add`, plus `DEFAULT_LABEL_CONFIG_PATH` and the 19 `DEFAULT_LABEL_PAIRS`), used by both commands.
+Shared helper: `init-claude/scripts/lib/label_config.sh` (241 lines — `validate_pair`, `write`, `ensure_defaults`, `read_pairs`, `remove`, `add`, plus `DEFAULT_LABEL_CONFIG_PATH` and the 22 `DEFAULT_LABEL_PAIRS`), used by both commands.
 
 ## Expected Behavior
 
@@ -41,4 +41,4 @@ Follow `docs/agents/architecture/script-engine.md` and the precedent of #588 (pe
 5. In `arcanum/_lib/migration-status.json`, replace the relevant `false` key(s) with one `true` key per dispatched command name, then regenerate `docs/agents/architecture/entrypoint-migration-status.md` via `scripts/generate_entrypoint_migration_status.sh`.
 6. Add native unit specs mirroring `core/lib/` 1:1, plus a shell-vs-native parity spec per command.
 7. Verify `engine_dispatch.sh` routing under both `engine.mode=native` and `shell`.
-8. Fix the stale label count in `init-claude/setup_labels.md` ("standard 9 labels"; there are now 19 defaults).
+8. Fix the stale label count in `init-claude/setup_labels.md` ("standard 9 labels"; there are now 22 defaults).
