@@ -1,55 +1,44 @@
 #!/usr/bin/env bash
-# Stamp this arcanum install's version into the repo being configured by
-# init-claude, so arcanum/migrations/run.sh (used by /arcanum-migrate)
-# can later tell which per-repo migrations are pending.
+# Thin engine_dispatch shim for the "init-claude-stamp-arcanum-version"
+# migrated entrypoint — see docs/agents/architecture/script-engine.md and
+# docs/agents/plans/592-migrate-init-claude-set-ci-ignored-patterns-setup-templates-and-stamp-arcanum-version-to-native-node-js/plan.md
+# for the full design/shared contracts. Stamps this arcanum install's
+# version into the target project's committed and local config pointers,
+# via either the shell implementation (stamp_arcanum_version_shell.sh) or
+# the native one (core/bin/arcanum), per engine.mode /
+# arcanum/_lib/migration-status.json.
+#
 # Usage: stamp_arcanum_version.sh
-#   Run from the target project root (the repo being configured), with
-#   this script resolved relative to the init-claude skill folder
-#   (i.e. the arcanum install this skill lives inside).
+#   Run from the target project root.
 #
-# Resolves the current arcanum install's version the same way
-# arcanum-update/scripts/run_update.sh's resolve_target/current_version
-# do (arcanum.json for a zip install, exact git tag for a git-clone
-# install), relative to this script's own location
-# (<script_dir>/../.. — the install this skill lives inside). If the
-# version can't be resolved as valid semver (e.g. a git clone install
-# not checked out on a release tag), this is a silent no-op — always
-# exits 0, never blocks init-claude.
+# Like monitor-issues/scripts/config.sh, this entrypoint never took a
+# <repo_path> argument: it is run from the target project root and the
+# shell implementation writes relative to the current working directory.
+# The literal "$PWD" (NOT `git rev-parse --show-toplevel`, which would
+# break parity when run from a subdirectory or a non-git dir) is passed
+# as engine_dispatch's <repo_path> with --prepend-repo-path, so only the
+# native invocation receives it as its leading positional (the
+# Dispatcher strips it into RepoContext.repoPath; native code never
+# reads process.cwd() — see docs/agents/architecture/repo-path-threading.md),
+# while the shell implementation's own args stay untouched.
 #
-# On success, writes .version in
-# .claude/configuration/arcanum-repo-config.json (the committed
-# pointer) AND .migrations.version in
-# .claude/state/arcanum-config.json (the local-only pointer — see
-# docs/guides/arcanum-repo-version.md), both relative to the current
-# working directory — the repo being configured, not the arcanum
-# install — via arcanum/_lib/repo_config.sh's repo_config_set_version.
-# Stamping both here is what lets a freshly-set-up repo start with no
-# backlog on either axis; cloning that repo to a second machine later
-# does NOT re-run init-claude (.claude/configuration/ already exists,
-# pulled via git), so that second clone's local pointer correctly stays
-# unstamped (absent -> 0.0.0), discovering every local-scoped entry it
-# still needs to apply for itself.
+# HOME is forwarded to the native path's explicit env-var allowlist —
+# resolving a git-clone install's version runs `git describe`, which
+# needs it to resolve git config once native's `env -i PATH="$PATH"`
+# strips the ambient environment down (same reasoning as
+# auto-new-issue/scripts/commit_issue.sh).
+#
+# Output and exit code: unchanged from before this migration — no
+# output, always exits 0; see stamp_arcanum_version_shell.sh's own
+# header for the full behavior contract.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INSTALL_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-CONFIG_FILE=".claude/configuration/arcanum-repo-config.json"
-LOCAL_CONFIG_FILE=".claude/state/arcanum-config.json"
 
-# shellcheck source=../../arcanum/_lib/repo_config.sh
-source "${SCRIPT_DIR}/../../arcanum/_lib/repo_config.sh"
+# shellcheck source=../../arcanum/_lib/engine_dispatch.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/engine_dispatch.sh"
 
-VERSION=""
-if [[ -f "${INSTALL_ROOT}/arcanum.json" ]]; then
-  VERSION="$(jq -r '.version // empty' "${INSTALL_ROOT}/arcanum.json" 2>/dev/null || true)"
-elif [[ -d "${INSTALL_ROOT}/.git" ]]; then
-  VERSION="$(git -C "$INSTALL_ROOT" describe --tags --exact-match 2>/dev/null || true)"
-fi
+REPO_PATH="$PWD"
 
-if [[ -n "$VERSION" ]] && [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  repo_config_set_version "$CONFIG_FILE" "$VERSION"
-  repo_config_set_version "$LOCAL_CONFIG_FILE" "$VERSION" migrations
-fi
-
-exit 0
+engine_dispatch "$REPO_PATH" init-claude-stamp-arcanum-version "${SCRIPT_DIR}/stamp_arcanum_version_shell.sh" --prepend-repo-path HOME -- "$@"

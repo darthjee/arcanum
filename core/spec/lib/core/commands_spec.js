@@ -5,7 +5,7 @@ describe('COMMANDS', () => {
     expect(Object.keys(COMMANDS).length).toBeGreaterThan(0);
   });
 
-  it('sets context: \'repo\' on the migrated arcanum-split-issue, auto-fix-all lifecycle, auto-fix-issue-commit-change, auto-fix-issue-create-branch, auto-fix-issue-merge-main, auto-fix-all-github, auto-fix-issue-github, auto-monitor-issue-pr-resolve-pr-number, auto-monitor-pr-monitor-pr, auto-new-issue-commit-issue, auto-plan-issue-commit-plan, discuss-issue-render-issue, github-issue, auto-fix-all-queue, monitor-issues and spawn-issue entries', () => {
+  it('sets context: \'repo\' on the migrated arcanum-split-issue, auto-fix-all lifecycle, auto-fix-issue-commit-change, auto-fix-issue-create-branch, auto-fix-issue-merge-main, auto-fix-all-github, auto-fix-issue-github, auto-monitor-issue-pr-resolve-pr-number, auto-monitor-pr-monitor-pr, auto-new-issue-commit-issue, auto-plan-issue-commit-plan, discuss-issue-render-issue, github-issue, init-claude, auto-fix-all-queue, monitor-issues and spawn-issue entries', () => {
     const withRepoContext = Object.keys(COMMANDS).filter((name) => COMMANDS[name].context === 'repo');
 
     expect(withRepoContext).toEqual([
@@ -55,6 +55,9 @@ describe('COMMANDS', () => {
       'github-issue-mark-refined',
       'github-issue-mark-split',
       'github-issue-update',
+      'init-claude-set-ci-ignored-patterns',
+      'init-claude-setup-templates',
+      'init-claude-stamp-arcanum-version',
       'issue-state',
       'list-agents',
       'monitor-issues-github-remove-tag',
@@ -80,7 +83,7 @@ describe('COMMANDS', () => {
     expect(COMMANDS['arcanum-update-run-update-apply'].method).toBe('apply');
   });
 
-  it('sets validateRepoPath: false on the file-only auto-fix-all-queue subcommands, github-issue-info, the github-issue-mark-* family, github-issue-update and the monitor-issues-rewrite-queue-* family', () => {
+  it('sets validateRepoPath: false on the file-only auto-fix-all-queue subcommands, github-issue-info, the github-issue-mark-* family, github-issue-update, the init-claude-* family and the monitor-issues-rewrite-queue-* family', () => {
     const skipValidation = Object.keys(COMMANDS).filter((name) => COMMANDS[name].validateRepoPath === false);
 
     expect(skipValidation).toEqual([
@@ -97,6 +100,9 @@ describe('COMMANDS', () => {
       'github-issue-mark-refined',
       'github-issue-mark-split',
       'github-issue-update',
+      'init-claude-set-ci-ignored-patterns',
+      'init-claude-setup-templates',
+      'init-claude-stamp-arcanum-version',
       'monitor-issues-rewrite-queue-pop',
       'monitor-issues-rewrite-queue-push'
     ]);
@@ -143,6 +149,23 @@ describe('COMMANDS', () => {
       expect(COMMANDS[name]).toEqual({
         module: 'commands/shared/GithubIssueMark.js',
         method,
+        context: 'repo',
+        validateRepoPath: false
+      });
+    });
+  });
+
+  it('routes the init-claude-* family to their InitClaude* commands#run', () => {
+    const expected = {
+      'init-claude-set-ci-ignored-patterns': 'InitClaudeSetCiIgnoredPatterns',
+      'init-claude-setup-templates': 'InitClaudeSetupTemplates',
+      'init-claude-stamp-arcanum-version': 'InitClaudeStampArcanumVersion'
+    };
+
+    Object.entries(expected).forEach(([name, className]) => {
+      expect(COMMANDS[name]).toEqual({
+        module: `commands/init-claude/${className}.js`,
+        method: 'run',
         context: 'repo',
         validateRepoPath: false
       });
