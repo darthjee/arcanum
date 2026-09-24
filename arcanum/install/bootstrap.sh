@@ -21,7 +21,7 @@
 
 set -euo pipefail
 
-DEFAULT_VERSION="0.24.0"
+DEFAULT_VERSION="1.0.0"
 
 REPO="${ARCANUM_REPO:-darthjee/arcanum}"
 VERSION="${ARCANUM_VERSION:-$DEFAULT_VERSION}"
