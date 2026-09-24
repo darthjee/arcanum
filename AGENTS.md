@@ -4,7 +4,7 @@ Arcanum — a collection of Claude Code skills (slash commands), reusable across
 
 ## Stack
 
-Markdown files drive every skill — there is no build step and no application runtime for the skills themselves. A Node.js `core/` package holds the ongoing shell→native migration. Skill entrypoint scripts (`<skill>/scripts/*.sh`, `arcanum/_lib/*.sh`) are migrating, per-entrypoint, from bash to native Node.js — see [Script Engine](docs/agents/architecture/script-engine.md) for the full design. `core/` exists as scaffolding today: Yarn, Jasmine, c8, jscpd (the duplication-detection tool), and ESLint. Every entrypoint still runs as shell until its native counterpart ships.
+Markdown files drive every skill — there is no build step and no application runtime for the skills themselves. A Node.js `core/` package holds the ongoing shell→native migration. Skill entrypoint scripts (`<skill>/scripts/*.sh`, `arcanum/_lib/*.sh`) are migrating, per-entrypoint, from bash to native Node.js — see [Script Engine](docs/agents/architecture/script-engine.md) for the full design. `core/` uses Yarn, Jasmine, c8, jscpd (the duplication-detection tool), and ESLint. Most entrypoints already have a native counterpart (see [Entry Point Migration Status](docs/agents/architecture/entrypoint-migration-status.md)), but `engine.mode` defaults to `shell`, so native only runs where a repo opts in.
 
 ## Conventions
 
