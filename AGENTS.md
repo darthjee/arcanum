@@ -55,6 +55,7 @@ All project documentation lives under [`docs/agents/`](docs/agents/):
 | [Flow](docs/agents/flow.md) | Main runtime flow of the application. |
 | [Plans](docs/agents/plans/) | Implementation plans for ongoing or upcoming features. |
 | [Issues](docs/agents/issues/) | Detailed specs for open issues. |
+| [Specs](docs/agents/specs/) | Forward-looking designs that guide future work, not yet implemented. |
 
 ### Issues (`docs/agents/issues/`)
 
@@ -75,3 +76,13 @@ docs/agents/plans/<issue_id>_<topic>/<related_files>.md
 ```
 
 Example: `docs/agents/plans/12_add-auth/plan.md` for issue #12.
+
+### Specs (`docs/agents/specs/`)
+
+Forward-looking designs that guide future work but are not implemented yet. Unlike issues and plans, a spec is not tied to one issue: it records the agreed direction, prerequisites, and open points for a later change. Naming convention (kebab-case topic):
+
+```text
+docs/agents/specs/<topic>.md
+```
+
+Example: `docs/agents/specs/shell-engine-removal.md`.

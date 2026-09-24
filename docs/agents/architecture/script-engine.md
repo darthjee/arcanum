@@ -91,10 +91,11 @@ The image's `CMD` (and, by extension, whatever command the `engine.mode=docker` 
 ## Scope boundaries
 
 - Only skill entrypoints are in scope for migration: `<skill>/scripts/*.sh` and `arcanum/_lib/*.sh`. The unrelated top-level `scripts/` folder (this repo's own release/versioning tooling, e.g. `scripts/bump-version.sh`) is out of scope.
-- No per-repo migration script is needed for consuming repos: the `engine.mode` key's absence defaults to `shell`, today's existing behavior, so a repo that hasn't opted in is unaffected.
+- The `engine.mode` key's absence still defaults to `shell` today, so a repo that hasn't opted in is unaffected. Because `shell` is deprecated and will be removed, a global, skippable `instructions` migration (`arcanum/migrations/repos/next/001`, #601) warns users once per machine/account and offers to write `engine.mode` (`native` or `docker`) to the global config. See [Shell Engine Removal](../specs/shell-engine-removal.md) for the planned removal and its auto-detection rule.
 - No standalone, wholesale `_lib` migration. Native equivalents of shared bash helper logic grow inside `core/lib/` per-entrypoint need only, as each entrypoint that depends on that helper logic gets migrated — the original `arcanum/_lib/*.sh` files stay untouched for callers still running in `shell` mode.
 
 ## See also
 
+- [Shell Engine Removal](../specs/shell-engine-removal.md) — forward-looking spec for removing `engine.mode=shell`, its prerequisites, and the auto-detection rule for users who never chose an engine.
 - [Shared State & Configuration Files](shared-state-and-configuration.md) — the `engine.mode` config key's row and the 3-tier resolution chain it uses.
 - [Script Preference](script-preference.md) — why deterministic logic belongs in scripts at all, the general rule this migration's output/exit-code contract keeps intact across engines.

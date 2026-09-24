@@ -23,7 +23,7 @@ import { OWNER, itMatchesShellForState } from '../../support/factories/autoMonit
 // any other work. The legacy (--issue-id-absent) shape needs no such
 // allowance -- it flat-overwrites a plain file with no lock involved on
 // either side.
-const ISSUE_ID_SCENARIO_TIMEOUT_MS = 20000;
+const ISSUE_ID_SCENARIO_TIMEOUT_MS = 60000;
 
 describe('auto-monitor-pr-monitor-pr parity (shell vs. native) — commented', () => {
   const COMMENT_BODY = 'Please fix the typo';

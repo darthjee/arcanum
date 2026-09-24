@@ -10,6 +10,12 @@ import { removeTempDir } from '../../support/utils/tempDir.js';
 // repos, asserting byte-identical stdout, exit code, and resulting
 // `.claude/state/issue-<id>.json` content.
 
+// Each shell/native write acquires the issue-state lock, which sleeps a
+// real 1 second per acquisition (see docs/agents/architecture/lock-system.md),
+// so these specs get a generous timeout rather than Jasmine's 5000ms default
+// to avoid flaking on slower CI runners.
+const LOCKED_WRITE_TIMEOUT_MS = 30000;
+
 describe('issue-state parity (shell vs. native) — set-json', () => {
   let shellRepo;
   let nativeRepo;
@@ -33,7 +39,7 @@ describe('issue-state parity (shell vs. native) — set-json', () => {
       expect(shell.code).toEqual(0);
 
       await assertStateFilesMatch('42', shellRepo, nativeRepo);
-    });
+    }, LOCKED_WRITE_TIMEOUT_MS);
   });
 
   describe('set-json with an array value', () => {
@@ -45,6 +51,6 @@ describe('issue-state parity (shell vs. native) — set-json', () => {
       expect(shell.code).toEqual(0);
 
       await assertStateFilesMatch('42', shellRepo, nativeRepo);
-    });
+    }, LOCKED_WRITE_TIMEOUT_MS);
   });
 });

@@ -22,7 +22,8 @@
 | `arcanum.version` | Lives at the repository root, used only at build/release time: `scripts/build_release_zip.sh` reads the version from here and `scripts/bump-version.sh` updates it. No longer copied into the release zip nor read by installations — replaced in that role by `arcanum.json`, written dynamically by `installer.sh`/`updater.sh` at the root of the installed tree (clone or zip), containing `version`, `repo` (so fork installations keep updating from the fork itself) and `manifest` (list of tracked paths, used to compute removals on `update`). |
 | `scripts/` | This repository's own development tools, not included in the release zip: `build_release_zip.sh` (assembles the release zip, including the `MANIFEST` file embedded at the zip's root) and `bump-version.sh` (updates `arcanum.version` and the default version embedded in `arcanum/install/bootstrap.sh`). |
 | `.circleci/` | Release pipeline: on a semver tag push, builds the release zip via `scripts/build_release_zip.sh` and publishes it as a GitHub Release asset. |
-| `docs/agents/` | This repository's own documentation (architecture, flow, issues, plans). |
+| `docs/agents/` | This repository's own documentation (architecture, flow, issues, plans, specs). |
+| `docs/agents/specs/` | Forward-looking designs that guide future work but are not implemented yet (e.g. `shell-engine-removal.md`). Named `<topic>.md`, kebab-case, not tied to a single issue. |
 | `docs/guides/` | The only subdirectory of `docs/` included in the release zip (see `scripts/build_release_zip.sh`) — guides aimed at the end user of a repository that has installed arcanum, e.g. `arcanum-repo-config.md` and `arcanum-repo-version.md`, referenced by the scripts' own fallback/error warnings. |
 | `.github/` | Contains `copilot-instructions.md`, which points to AGENTS.md. |
 | `.claude/` | Local Claude Code configuration for this repository. Contains subfolders for runtime state and skill configuration. |
