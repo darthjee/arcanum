@@ -17,16 +17,8 @@ You do not make fixes. You report the violations found to the architect, who dec
 For each modified skill file you're given:
 
 1. Read the file.
-2. Identify bash code blocks (```` ```bash ```` ... ```` ``` ````) with complex logic that should **not** be inline. Examples of complex logic:
-   - Multi-stage pipelines (`cmd1 | cmd2 | cmd3 | ...`) doing non-trivial parsing or transformation
-   - Loops (`for`, `while`) or conditionals (`if`/`case`) with a multi-line body
-   - Process substitution or here-documents used for data manipulation
-   - Command sequences with intermediate variables that indicate validation or parsing logic
-3. **Do not** flag as a violation:
-   - A single command with flags (e.g. `gh issue list --label bug`)
-   - Two commands chained with `&&` or `||` in a simple, obvious way
-   - Calls to scripts that already exist under `<skill>/scripts/`
-   - Commands that just print or read a variable
+2. Identify bash code blocks (```` ```bash ```` ... ```` ``` ````) with complex logic that should **not** be inline — anything matching the **Must be extracted** criteria in [Script Preference](../../docs/agents/architecture/script-preference.md#allowed-inline-vs-must-extract).
+3. **Do not** flag as a violation anything matching the **Allowed inline** criteria in that same section.
 
 ## How to report
 
@@ -41,7 +33,7 @@ Suggestion: extract to <skill>/scripts/<suggested-name>.sh
 
 If no violations are found, report:
 
-```
+```text
 No violations found.
 ```
 
