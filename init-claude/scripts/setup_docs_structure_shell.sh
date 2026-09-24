@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
 # Create the standard docs/agents/ directory structure and register it in AGENTS.md.
-# Usage: setup_docs_structure.sh
-#   Run from the target project root.
+# Shell implementation behind the setup_docs_structure.sh engine_dispatch
+# shim (command "init-claude-setup-docs-structure"); the native counterpart
+# must stay byte-identical in stdout, stderr, exit code and resulting files.
+#
+# Usage: setup_docs_structure_shell.sh
+#   Run from the target project root. Arguments are ignored.
 #
 # Creates (skipping any that already exist):
 #   docs/agents/issues/.gitkeep
 #   docs/agents/plans/.gitkeep
-#   docs/agents/architecture.md  (placeholder)
-#   docs/agents/flow.md          (placeholder)
-#   docs/agents/issue-enhancement.md (placeholder)
+#   docs/agents/architecture.md          (placeholder)
+#   docs/agents/flow.md                  (placeholder)
+#   docs/agents/issue-enhancement.md     (placeholder)
+#   docs/agents/arcanum-split-issue.md   (placeholder)
 #
 # Appends the standard ## Documentation section to AGENTS.md if not already present.
 
