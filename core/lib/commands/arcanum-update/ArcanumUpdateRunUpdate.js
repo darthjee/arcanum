@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import DispatchFailure from '../../utils/errors/DispatchFailure.js';
+import InstallVersion from '../../utils/file/InstallVersion.js';
 
 const defaultExecFileAsync = promisify(execFile);
 const GIT_SSH_PREFIX = 'git@github.com:';
@@ -46,6 +47,11 @@ class ArcanumUpdateRunUpdate {
     this._spawn = spawnFn;
     this._readFile = readFileFn;
     this._existsSync = existsSyncFn;
+    this._installVersion = new InstallVersion({
+      readFile: readFileFn,
+      existsSync: existsSyncFn,
+      execFileAsync
+    });
   }
 
   /**
@@ -195,20 +201,13 @@ class ArcanumUpdateRunUpdate {
     }
 
     const installRoot = this._claudeContext.installRoot();
+    const tag = await this._installVersion.exactTag(installRoot);
 
-    try {
-      const { stdout } = await this._execFileAsync('git', [
-        '-C', installRoot, 'describe', '--tags', '--exact-match'
-      ]);
-      const tag = stdout.trim();
-
-      if (tag) {
-        return tag;
-      }
-    } catch {
-      // No exact tag on HEAD — fall through to the short commit hash.
+    if (tag) {
+      return tag;
     }
 
+    // No exact tag on HEAD — fall back to the short commit hash.
     const { stdout } = await this._execFileAsync('git', ['-C', installRoot, 'rev-parse', '--short', 'HEAD']);
 
     return stdout.trim();
