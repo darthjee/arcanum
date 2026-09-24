@@ -349,6 +349,35 @@ export const COMMANDS = {
     method: 'run',
     context: 'repo'
   },
+  'monitor-issues-config-get': { module: 'commands/monitor-issues/MonitorIssuesConfig.js', method: 'get' },
+  'monitor-issues-config-is-enabled': {
+    module: 'commands/monitor-issues/MonitorIssuesConfig.js',
+    method: 'isEnabled'
+  },
+  'monitor-issues-config-set': { module: 'commands/monitor-issues/MonitorIssuesConfig.js', method: 'set' },
+  'monitor-issues-config-toggle': { module: 'commands/monitor-issues/MonitorIssuesConfig.js', method: 'toggle' },
+  'monitor-issues-github-remove-tag': {
+    module: 'commands/monitor-issues/MonitorIssuesGithub.js',
+    method: 'removeTag',
+    context: 'repo'
+  },
+  'monitor-issues-monitor-issues': {
+    module: 'commands/monitor-issues/MonitorIssuesMonitorIssues.js',
+    method: 'run',
+    context: 'repo'
+  },
+  'monitor-issues-rewrite-queue-pop': {
+    module: 'commands/monitor-issues/MonitorIssuesRewriteQueue.js',
+    method: 'pop',
+    context: 'repo',
+    validateRepoPath: false
+  },
+  'monitor-issues-rewrite-queue-push': {
+    module: 'commands/monitor-issues/MonitorIssuesRewriteQueue.js',
+    method: 'push',
+    context: 'repo',
+    validateRepoPath: false
+  },
   'permission-grant-add': { module: 'commands/shared/PermissionGrant.js', method: 'add', context: 'claude' },
   'resolve-and-fetch': {
     module: 'commands/shared/ResolveAndFetch.js',
