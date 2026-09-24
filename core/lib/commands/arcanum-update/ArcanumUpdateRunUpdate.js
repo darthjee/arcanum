@@ -47,11 +47,7 @@ class ArcanumUpdateRunUpdate {
     this._spawn = spawnFn;
     this._readFile = readFileFn;
     this._existsSync = existsSyncFn;
-    this._installVersion = new InstallVersion({
-      readFile: readFileFn,
-      existsSync: existsSyncFn,
-      execFileAsync
-    });
+    this._installVersion = new InstallVersion({ readFile: readFileFn, execFileAsync });
   }
 
   /**

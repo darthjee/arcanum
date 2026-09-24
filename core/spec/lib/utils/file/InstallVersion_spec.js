@@ -1,19 +1,25 @@
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import InstallVersion from '../../../../lib/utils/file/InstallVersion.js';
 import { fakeExecFileAsync, subcommand } from '../../../support/utils/fakeExecFileAsync.js';
+import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 const INSTALL = '/install/root';
 const ARCANUM_JSON = path.join(INSTALL, 'arcanum.json');
 const GIT_DIR = path.join(INSTALL, '.git');
 
 /**
- * @param {string[]} paths - the paths that "exist".
- * @returns {Function} a fake `existsSync`.
+ * @param {string[]} paths - the paths that "exist" (as a regular file
+ *   for `arcanum.json`, as a directory for `.git`).
+ * @returns {{isFile: Function, isDirectory: Function}} fake checks.
  */
 function existing(paths) {
   const set = new Set(paths);
 
-  return (file) => set.has(file);
+  return {
+    isFile: (file) => file === ARCANUM_JSON && set.has(file),
+    isDirectory: (file) => file === GIT_DIR && set.has(file)
+  };
 }
 
 /**
@@ -113,10 +119,45 @@ describe('InstallVersion', () => {
   });
 
   describe('#resolve', () => {
+    let dir;
+
+    afterEach(async () => {
+      if (dir) {
+        await removeTempDir(dir);
+        dir = undefined;
+      }
+    });
+
+    it('ignores a .git file (git worktree), like [[ -d ]]', async () => {
+      dir = await createTempDir();
+      await writeFile(path.join(dir, '.git'), 'gitdir: /elsewhere\n');
+      const execFileAsync = jasmine.createSpy('execFileAsync');
+      const version = new InstallVersion({ execFileAsync });
+
+      await expectAsync(version.resolve(dir)).toBeResolvedTo('');
+      expect(execFileAsync).not.toHaveBeenCalled();
+    });
+
+    it('uses real filesystem checks by default', async () => {
+      dir = await createTempDir();
+      await writeFile(path.join(dir, 'arcanum.json'), '{"version":"4.5.6"}');
+      await mkdir(path.join(dir, '.git'));
+
+      await expectAsync(new InstallVersion().resolve(dir)).toBeResolvedTo('4.5.6');
+    });
+
+    it('ignores an arcanum.json directory, like [[ -f ]]', async () => {
+      dir = await createTempDir();
+      await mkdir(path.join(dir, 'arcanum.json'));
+      const version = new InstallVersion({ execFileAsync: jasmine.createSpy('execFileAsync') });
+
+      await expectAsync(version.resolve(dir)).toBeResolvedTo('');
+    });
+
     it('uses arcanum.json when it exists, even alongside .git', async () => {
       const execFileAsync = describing('9.9.9\n');
       const version = new InstallVersion({
-        existsSync: existing([ARCANUM_JSON, GIT_DIR]),
+        ...existing([ARCANUM_JSON, GIT_DIR]),
         readFile: readingAs('{"version":"1.2.3"}'),
         execFileAsync
       });
@@ -127,7 +168,7 @@ describe('InstallVersion', () => {
 
     it('does not fall back to git when arcanum.json has no version', async () => {
       const version = new InstallVersion({
-        existsSync: existing([ARCANUM_JSON, GIT_DIR]),
+        ...existing([ARCANUM_JSON, GIT_DIR]),
         readFile: readingAs('{}'),
         execFileAsync: describing('9.9.9\n')
       });
@@ -138,7 +179,7 @@ describe('InstallVersion', () => {
     it('uses the exact tag when only .git exists', async () => {
       const readFile = readingAs('{"version":"1.2.3"}');
       const version = new InstallVersion({
-        existsSync: existing([GIT_DIR]),
+        ...existing([GIT_DIR]),
         readFile,
         execFileAsync: describing('2.0.0\n')
       });
@@ -148,7 +189,7 @@ describe('InstallVersion', () => {
     });
 
     it('returns an empty string when neither exists', async () => {
-      const version = new InstallVersion({ existsSync: existing([]) });
+      const version = new InstallVersion({ ...existing([]) });
 
       await expectAsync(version.resolve(INSTALL)).toBeResolvedTo('');
     });
