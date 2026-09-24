@@ -57,10 +57,10 @@ One row per entry point tracked in [`arcanum/_lib/migration-status.json`](../../
 | `github-issue-mark-refined` | Yes | #589 |
 | `github-issue-mark-split` | Yes | #589 |
 | `github-issue-update` | Yes | #588 |
-| `init-claude-set-ci-ignored-patterns` | No | #230 |
+| `init-claude-set-ci-ignored-patterns` | Yes | #230 |
 | `init-claude-setup-docs-structure` | No | #230 |
-| `init-claude-setup-templates` | No | #230 |
-| `init-claude-stamp-arcanum-version` | No | #230 |
+| `init-claude-setup-templates` | Yes | #230 |
+| `init-claude-stamp-arcanum-version` | Yes | #230 |
 | `init-claude-sync-labels` | No | #230 |
 | `init-claude-write-label-config` | No | #230 |
 | `issue-state` | Yes | #230 |
