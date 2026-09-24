@@ -25,6 +25,15 @@ const FAKE_GITHUB_URL = 'https://github.com/darthjee/arcanum-monitor-pr-fixture.
 /** The GitHub login every scenario treats as the PR's owner. */
 export const OWNER = 'darthjee';
 
+/**
+ * Default per-spec Jasmine timeout for `itMatchesShellForState` scenarios
+ * that don't pass their own. Each scenario spawns the real bash
+ * implementation plus a native Node process and builds two git fixture
+ * repos, which routinely exceeds Jasmine's 5000ms default on slower CI
+ * runners even with no lock contention involved.
+ */
+export const DEFAULT_PARITY_TIMEOUT_MS = 30000;
+
 /** The pull request number used by every scenario below. */
 export const PR_NUMBER = '7';
 
@@ -116,10 +125,10 @@ export async function runPair(shellRepo, nativeRepo, shellEnv = process.env, nat
  * @param {object} [scenario.fetchVars] - `FAKE_FETCH_*` overrides, for the native side.
  * @param {string} [scenario.issueId] - the `--issue-id` value, omitted for the legacy per-PR-file shape.
  * @param {string} scenario.expectedStdout - the expected shared stdout value.
- * @param {number} [scenario.timeout] - Jasmine's per-spec timeout override, when the scenario needs longer than the default (e.g. lock-contention scenarios).
+ * @param {number} [scenario.timeout] - Jasmine's per-spec timeout override; defaults to `DEFAULT_PARITY_TIMEOUT_MS`.
  * @returns {void}
  */
-export function itMatchesShellForState(description, { ghVars, fetchVars, issueId, expectedStdout, timeout } = {}) {
+export function itMatchesShellForState(description, { ghVars, fetchVars, issueId, expectedStdout, timeout = DEFAULT_PARITY_TIMEOUT_MS } = {}) {
   it(description, async () => {
     const ctx = await setupParityTest({ ghVars, fetchVars });
 
