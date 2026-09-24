@@ -26,7 +26,7 @@
  *     `auto-monitor-pr-monitor-pr`, on `auto-new-issue-commit-issue`, on
  *     `auto-plan-issue-commit-plan`, on `discuss-issue-render-issue`, on
  *     the `init-claude-*` family (set-ci-ignored-patterns /
- *     setup-templates / stamp-arcanum-version — all
+ *     setup-docs-structure / setup-templates / stamp-arcanum-version — all
  *     `validateRepoPath: false`, since their shell originals never
  *     required the target project to be a git repo), and
  *     on the `auto-fix-all-queue-*` family (empty / list / next / pop /
@@ -345,6 +345,12 @@ export const COMMANDS = {
   },
   'init-claude-set-ci-ignored-patterns': {
     module: 'commands/init-claude/InitClaudeSetCiIgnoredPatterns.js',
+    method: 'run',
+    context: 'repo',
+    validateRepoPath: false
+  },
+  'init-claude-setup-docs-structure': {
+    module: 'commands/init-claude/InitClaudeSetupDocsStructure.js',
     method: 'run',
     context: 'repo',
     validateRepoPath: false

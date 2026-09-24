@@ -56,6 +56,7 @@ describe('COMMANDS', () => {
       'github-issue-mark-split',
       'github-issue-update',
       'init-claude-set-ci-ignored-patterns',
+      'init-claude-setup-docs-structure',
       'init-claude-setup-templates',
       'init-claude-stamp-arcanum-version',
       'issue-state',
@@ -101,6 +102,7 @@ describe('COMMANDS', () => {
       'github-issue-mark-split',
       'github-issue-update',
       'init-claude-set-ci-ignored-patterns',
+      'init-claude-setup-docs-structure',
       'init-claude-setup-templates',
       'init-claude-stamp-arcanum-version',
       'monitor-issues-rewrite-queue-pop',
@@ -158,6 +160,7 @@ describe('COMMANDS', () => {
   it('routes the init-claude-* family to their InitClaude* commands#run', () => {
     const expected = {
       'init-claude-set-ci-ignored-patterns': 'InitClaudeSetCiIgnoredPatterns',
+      'init-claude-setup-docs-structure': 'InitClaudeSetupDocsStructure',
       'init-claude-setup-templates': 'InitClaudeSetupTemplates',
       'init-claude-stamp-arcanum-version': 'InitClaudeStampArcanumVersion'
     };
