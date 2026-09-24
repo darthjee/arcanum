@@ -16,18 +16,21 @@
 # file-nloc complexity check flags it purely for line count, which is
 # meaningless for a machine-generated dependency manifest. See issue #500.
 #
-# Excludes 87 specific files (not whole directories, to keep other Codacy
-# checks running on the ~169 other files in these same directories) hit by
-# PMD's ecmascript parser misidentifying required JS syntax — try {
-# openers, destructuring assignments, returned object literals, and one
-# switch-case block required by the already-enabled no-case-declarations
+# Excludes core/**/*.js from the PMD engine only — ESLint, Lizard,
+# Opengrep, duplication and the other tools keep analysing every core/
+# file. PMD's ecmascript parser misidentifies required JS syntax — try {
+# openers, destructuring assignments, returned object literals, and
+# switch-case blocks required by the already-enabled no-case-declarations
 # ESLint rule — as "unnecessary blocks"
 # (PMD_category_ecmascript_codestyle_UnnecessaryBlock). None of these can
-# be removed without breaking the code or violating an existing lint rule.
-# See issues #509 (core/spec/bin), #510 (core/spec/support, already
-# covered by the exclusion above), #511 (core/spec/lib), #512
-# (core/lib/commands), #513 (core/lib/utils), and #514 (core/lib/services,
-# core/lib/context, core/lib/core).
+# be removed without breaking the code or violating an existing lint
+# rule, so every such finding is a false positive. A glob replaces the
+# former per-file global list, which switched off every tool on those
+# files and had to grow with each new core/ JS file. The engine key is
+# `pmd`, the shortName in Codacy's API (api/v3/tools) of the PMD tool
+# enabled for this repo and emitting the pattern (PMD7, `pmd-7`, is
+# disabled). core/spec/support/** stays excluded globally for its own
+# reason (see above; #510). See issues #509–#514 and #609.
 #
 # Excludes core/Dockerfile from the Opengrep (Semgrep-based) engine only —
 # Hadolint and the other tools keep analysing it. Opengrep's
@@ -43,100 +46,11 @@ engines:
   opengrep:
     exclude_paths:
       - "core/Dockerfile"
+  pmd:
+    exclude_paths:
+      - "core/**/*.js"
 exclude_paths:
   - "core/spec/support/**"
   - "CLAUDE.md"
   - ".github/copilot-instructions.md"
   - "core/yarn.lock"
-  # #509 — core/spec/bin (33 files)
-  - "core/spec/bin/arcanumSplitIssueFinishParity_spec.js"
-  - "core/spec/bin/arcanum_spec.js"
-  - "core/spec/bin/autoFixAllCheckoutFromMainParity/happy_path_spec.js"
-  - "core/spec/bin/autoFixAllCheckoutFromMainParity/merge_conflict_spec.js"
-  - "core/spec/bin/autoFixAllCleanupArtifactsParity_spec.js"
-  - "core/spec/bin/autoFixAllConfigParity/get_spec.js"
-  - "core/spec/bin/autoFixAllConfigParity/is_enabled_spec.js"
-  - "core/spec/bin/autoFixAllConfigParity/set_spec.js"
-  - "core/spec/bin/autoFixAllConfigParity/toggle_spec.js"
-  - "core/spec/bin/autoFixIssueCommitChangeParity_spec.js"
-  - "core/spec/bin/autoFixIssueCreateBranchParity_spec.js"
-  - "core/spec/bin/autoFixIssueListPlanAgentsParity_spec.js"
-  - "core/spec/bin/autoFixIssueListPlanStepsParity_spec.js"
-  - "core/spec/bin/autoFixIssueMergeMainParity_spec.js"
-  - "core/spec/bin/autoFixIssueRunChecksParity_spec.js"
-  - "core/spec/bin/autoNewIssueCommitIssueParity_spec.js"
-  - "core/spec/bin/autoPlanIssueCommitPlanParity_spec.js"
-  - "core/spec/bin/checkoutSafeBranchParity_spec.js"
-  - "core/spec/bin/discussIssueConfirmParity_spec.js"
-  - "core/spec/bin/discussIssueRenderIssueParity_spec.js"
-  - "core/spec/bin/githubIssueCreateParity_spec.js"
-  - "core/spec/bin/githubIssueInfoParity_spec.js"
-  - "core/spec/bin/issueStateParity/append_json_spec.js"
-  - "core/spec/bin/issueStateParity/argument_validation_spec.js"
-  - "core/spec/bin/issueStateParity/get_spec.js"
-  - "core/spec/bin/issueStateParity/set_json_spec.js"
-  - "core/spec/bin/issueStateParity/set_spec.js"
-  - "core/spec/bin/listAgentsParity_spec.js"
-  - "core/spec/bin/permissionGrantParity_spec.js"
-  - "core/spec/bin/resolveAndFetchParity_spec.js"
-  - "core/spec/bin/resolveIdAndFileParity_spec.js"
-  - "core/spec/bin/resolvePlanPathsParity_spec.js"
-  - "core/spec/bin/spawnIssueParity_spec.js"
-  # #511 — core/spec/lib (17 files)
-  - "core/spec/lib/commands/auto-fix-all/AutoFixAllGithubWiring_spec.js"
-  - "core/spec/lib/commands/auto-fix-all/AutoFixAllQueuePush_spec.js"
-  - "core/spec/lib/commands/auto-fix-all/AutoFixAllQueueSave_spec.js"
-  - "core/spec/lib/commands/auto-fix-all/AutoFixAllWaitCiTransientErrors_spec.js"
-  - "core/spec/lib/commands/auto-fix-issue/AutoFixIssueGithubPrCreate_spec.js"
-  - "core/spec/lib/commands/auto-monitor-pr/AutoMonitorPrMonitorPr_spec.js"
-  - "core/spec/lib/commands/discuss-issue/DiscussIssueConfirm_spec.js"
-  - "core/spec/lib/context/RepoContextFactory_spec.js"
-  - "core/spec/lib/core/dispatcherErrorHandling_spec.js"
-  - "core/spec/lib/services/PrChecker_spec.js"
-  - "core/spec/lib/services/PrMonitor_spec.js"
-  - "core/spec/lib/services/TagMutationService_spec.js"
-  - "core/spec/lib/utils/git/GitBranch_spec.js"
-  - "core/spec/lib/utils/git/Git_spec.js"
-  - "core/spec/lib/utils/github/GitHubClient_spec.js"
-  - "core/spec/lib/utils/github/PrOperationsPrNumber_spec.js"
-  - "core/spec/lib/utils/github/PrOperationsQueries_spec.js"
-  # #512 — core/lib/commands (16 files)
-  - "core/lib/commands/arcanum-split-issue/ArcanumSplitIssueCreateSubIssue.js"
-  - "core/lib/commands/arcanum-update/ArcanumUpdateRunUpdate.js"
-  - "core/lib/commands/auto-fix-all/AutoFixAllCheckoutFromMain.js"
-  - "core/lib/commands/auto-fix-all/AutoFixAllConfig.js"
-  - "core/lib/commands/auto-fix-all/AutoFixAllReplyComment.js"
-  - "core/lib/commands/auto-fix-issue/AutoFixIssueCreateBranch.js"
-  - "core/lib/commands/auto-fix-issue/AutoFixIssueGithub.js"
-  - "core/lib/commands/auto-fix-issue/AutoFixIssueMergeMain.js"
-  - "core/lib/commands/auto-monitor-pr/AutoMonitorPrMonitorPr.js"
-  - "core/lib/commands/shared/GithubIssue.js"
-  - "core/lib/commands/shared/IssueState.js"
-  - "core/lib/commands/shared/ResolveAndFetch.js"
-  - "core/lib/commands/shared/ResolveIdAndFile.js"
-  - "core/lib/commands/shared/ResolvePlanPaths.js"
-  - "core/lib/commands/shared/SafeBranch.js"
-  - "core/lib/commands/shared/SpawnIssue.js"
-  # #513 — core/lib/utils (17 files)
-  - "core/lib/utils/config/ConfigChain.js"
-  - "core/lib/utils/config/RepoConfig.js"
-  - "core/lib/utils/file/IssueFileLocator.js"
-  - "core/lib/utils/file/IssueStatePaths.js"
-  - "core/lib/utils/file/Lock.js"
-  - "core/lib/utils/git/BranchCleanup.js"
-  - "core/lib/utils/git/GitClient.js"
-  - "core/lib/utils/git/Origin.js"
-  - "core/lib/utils/github/GitHubClient.js"
-  - "core/lib/utils/github/GithubToken.js"
-  - "core/lib/utils/github/IssueClient.js"
-  - "core/lib/utils/github/MergeBodyResolver.js"
-  - "core/lib/utils/issue/IssueLinker.js"
-  - "core/lib/utils/json/JsonParser.js"
-  - "core/lib/utils/json/JsonReader.js"
-  - "core/lib/utils/logging/InvocationLog.js"
-  - "core/lib/utils/safe/SafeFetcher.js"
-  # #514 — core/lib/services, core/lib/context, core/lib/core (4 files)
-  - "core/lib/context/RepoContextFactory.js"
-  - "core/lib/core/dispatcher.js"
-  - "core/lib/services/IssueStateService.js"
-  - "core/lib/services/PrMonitor.js"
