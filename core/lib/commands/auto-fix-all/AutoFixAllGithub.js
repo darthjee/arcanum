@@ -1,9 +1,8 @@
 import BranchCleanup from '../../utils/git/BranchCleanup.js';
 import DispatchFailure from '../../utils/errors/DispatchFailure.js';
-import IssueTagger from '../../utils/issue/IssueTagger.js';
 import PrOperations from '../../utils/github/PrOperations.js';
 import RepoContextFactory from '../../context/RepoContextFactory.js';
-import TagMutationService from '../../services/TagMutationService.js';
+import TagMutationService, { defaultIssueTaggerFactory } from '../../services/TagMutationService.js';
 
 /**
  * Native equivalent of `auto-fix-all/scripts/github.sh`'s 7 GitHub-facing
@@ -36,7 +35,7 @@ class AutoFixAllGithub {
    *   `#_prOperations`/`#_issueTagger`/`#_tagMutationService`. Only its
    *   `execFileAsync`/`fetchFn`/`timeoutMs` knobs are consulted on this
    *   path.
-   * @param {Function} [deps.issueTaggerFactory] - builds an
+   * @param {(bundle: object) => object} [deps.issueTaggerFactory] - builds an
    *   `IssueTagger` (used by `addTag`/`removeTag`/`hasShipitLabel`) from
    *   a per-call `RepoContext` bundle — see `#_issueTagger`. A factory,
    *   not a pre-built instance, since the context-bound `IssueTagger` is
@@ -47,10 +46,7 @@ class AutoFixAllGithub {
    */
   constructor(repoContext, {
     repoContextFactory = new RepoContextFactory(),
-    issueTaggerFactory = (bundle) => new IssueTagger({
-      context: bundle.context,
-      issueClient: bundle.issueClient
-    }),
+    issueTaggerFactory = defaultIssueTaggerFactory,
     branchCleanup
   } = {}) {
     this._repoContext = repoContext;
@@ -114,7 +110,8 @@ class AutoFixAllGithub {
    * `RepoContextFactory` bundle wrapping the injected `RepoContext` (it
    * reads `.context`/`.issueClient` off it) — the context-bound
    * `IssueTagger` is rebuilt per call rather than shared.
-   * @returns {IssueTagger} the per-call `IssueTagger` delegate.
+   * @returns {import('../../utils/issue/IssueTagger.js').default} the
+   *   per-call `IssueTagger` delegate.
    */
   _issueTagger() {
     return this._issueTaggerFactory(this._repoContextFactory.buildFromContext(this._repoContext));
@@ -128,11 +125,9 @@ class AutoFixAllGithub {
    * @returns {TagMutationService} the per-call tag-mutation service.
    */
   _tagMutationService() {
-    const bundle = this._repoContextFactory.buildFromContext(this._repoContext);
-
-    return new TagMutationService({
-      issueTagger: this._issueTaggerFactory(bundle),
-      context: bundle.context
+    return TagMutationService.fromRepoContext(this._repoContext, {
+      repoContextFactory: this._repoContextFactory,
+      issueTaggerFactory: this._issueTaggerFactory
     });
   }
 
