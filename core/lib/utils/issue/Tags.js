@@ -41,6 +41,13 @@ export const TAG_TO_LABEL = Object.fromEntries(
 );
 
 /**
+ * The tags that drive monitor-issues dispatch, in the fixed order
+ * `arcanum/_lib/tag_actions.sh`'s `ACTIONABLE_TAGS` lists them.
+ * @type {string[]}
+ */
+export const ACTIONABLE_TAGS = ['question', 'created', 'ready_for_work'];
+
+/**
  * Maps GitHub issue label names to their canonical tag names.
  */
 class Tags {
@@ -66,6 +73,20 @@ class Tags {
     }
 
     return tags;
+  }
+
+  /**
+   * Native port of `arcanum/_lib/tag_actions.sh`'s `actionable_tags`:
+   * the subset of `ACTIONABLE_TAGS` present among `labelNames` (via the
+   * same label -> tag mapping as `extractTags`, i.e. `has_tag`), in
+   * `ACTIONABLE_TAGS`' fixed order.
+   * @param {string[]} labelNames - the issue's GitHub label names.
+   * @returns {string[]} the actionable tags present, possibly empty.
+   */
+  static actionableTags(labelNames) {
+    const tags = new Set(Tags.extractTags(labelNames));
+
+    return ACTIONABLE_TAGS.filter((tag) => tags.has(tag));
   }
 }
 
