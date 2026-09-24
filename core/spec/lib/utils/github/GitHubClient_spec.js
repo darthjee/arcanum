@@ -1,5 +1,6 @@
 import GitHubChecksClient from '../../../../lib/utils/github/GitHubChecksClient.js';
 import GitHubClient from '../../../../lib/utils/github/GitHubClient.js';
+import GitHubLabelClient from '../../../../lib/utils/github/GitHubLabelClient.js';
 import GitHubPullRequestClient from '../../../../lib/utils/github/GitHubPullRequestClient.js';
 import GitHubPullRequestFeedbackClient from '../../../../lib/utils/github/GitHubPullRequestFeedbackClient.js';
 import GitHubUserClient from '../../../../lib/utils/github/GitHubUserClient.js';
@@ -21,7 +22,10 @@ describe('GitHubClient (delegating facade)', () => {
     [GitHubPullRequestFeedbackClient, 'addReaction', ['node', 'EYES']],
     [GitHubPullRequestFeedbackClient, 'removeReaction', ['node', 'EYES']],
     [GitHubChecksClient, 'getCheckRuns', ['abc123']],
-    [GitHubUserClient, 'getCurrentUser', []]
+    [GitHubUserClient, 'getCurrentUser', []],
+    [GitHubLabelClient, 'listLabelNames', []],
+    [GitHubLabelClient, 'createLabel', ['Bug', 'b60205']],
+    [GitHubLabelClient, 'updateLabel', ['bug', 'Bug', 'b60205']]
   ];
 
   delegations.forEach(([ClientClass, method, args]) => {

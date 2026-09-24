@@ -326,6 +326,37 @@ if (mode === 'success') {
 
     return new Response(JSON.stringify({ message: 'not found' }), { status: 404 });
   };
+} else if (mode === 'labels') {
+  // Drives `GitHubLabelClient`'s calls (issue #594), mirroring
+  // fakeGhBin.js's `gh label list`/`create`/`edit`: `GET
+  // /repos/{repo}/labels?per_page=N&page=P` serves the newline-separated
+  // `FAKE_FETCH_REPO_LABELS`, paginated; `POST /repos/{repo}/labels`
+  // answers 201 and `PATCH /repos/{repo}/labels/{name}` answers 200 —
+  // both 422 when `FAKE_FETCH_LABEL_WRITE_FAIL` is `1`.
+  const labels = (process.env.FAKE_FETCH_REPO_LABELS || '').split('\n').filter(Boolean);
+  const writeFail = process.env.FAKE_FETCH_LABEL_WRITE_FAIL === '1';
+
+  globalThis.fetch = async (rawUrl, options = {}) => {
+    const url = new URL(typeof rawUrl === 'string' ? rawUrl : rawUrl.toString());
+
+    if (!/^\/repos\/[^/]+\/[^/]+\/labels(\/|$)/.test(url.pathname)) {
+      return new Response(JSON.stringify({ message: 'not found' }), { status: 404 });
+    }
+
+    if (options.method === 'POST' || options.method === 'PATCH') {
+      if (writeFail) {
+        return new Response(JSON.stringify({ message: 'Validation Failed' }), { status: 422 });
+      }
+
+      return new Response('{}', { status: options.method === 'POST' ? 201 : 200 });
+    }
+
+    const perPage = Number(url.searchParams.get('per_page') || '30');
+    const page = Number(url.searchParams.get('page') || '1');
+    const slice = labels.slice((page - 1) * perPage, page * perPage);
+
+    return new Response(JSON.stringify(slice.map((name) => ({ name }))), { status: 200 });
+  };
 } else if (mode === 'monitor-pr') {
   // Drives every REST/GraphQL call `PrMonitor.js`/`AutoMonitorPrMonitorPr.js`
   // make (issue #436): `GET /repos/{repo}/pulls/{prNumber}` (`getPrState`,

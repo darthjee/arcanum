@@ -40,11 +40,22 @@ export const FAKE_FETCH_PRELOAD = pathToFileURL(
  * @param {string[]} commandAndArgs - `[file, ...args]` to `execFile`.
  * @param {string} cwd - the directory to run the command in.
  * @param {object} [env] - the environment to run the command with.
+ * @param {string} [input] - when given, written to the child's stdin,
+ *   which is then closed (so `''` means "immediate EOF"); when omitted,
+ *   stdin is left untouched.
  * @returns {Promise<{stdout: string, stderr: string, code: number}>} the process result.
  */
-export async function runCommand([file, ...args], cwd, env = process.env) {
+export async function runCommand([file, ...args], cwd, env = process.env, input = undefined) {
+  const pending = execFileAsync(file, args, { cwd, env });
+
+  if (input !== undefined) {
+    // The child may exit before draining stdin (EPIPE) — irrelevant here.
+    pending.child.stdin.on('error', () => {});
+    pending.child.stdin.end(input);
+  }
+
   try {
-    const { stdout, stderr } = await execFileAsync(file, args, { cwd, env });
+    const { stdout, stderr } = await pending;
 
     return { stdout, stderr, code: 0 };
   } catch (error) {

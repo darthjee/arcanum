@@ -89,6 +89,12 @@ import { createTempDir, removeTempDir } from './tempDir.js';
 //     `monitor_pr_shell.sh`'s `add_reaction`/`remove_reaction` GraphQL
 //     mutations, which already swallow any failure via `|| true` on the
 //     shell side, so there is no failure mode worth simulating here.
+//   - `gh label list -R <ref> [--limit N] --json name -q '.[].name'` ->
+//     prints `$FAKE_GH_REPO_LABELS` (one label name per line), or nothing
+//     when unset — used by `sync_labels_shell.sh`.
+//   - `gh label create <name> -R <ref> --color <c>` / `gh label edit
+//     <name> -R <ref> --name <n> --color <c>` -> succeed (print nothing)
+//     unless `$FAKE_GH_LABEL_WRITE_FAIL` is `1`.
 /**
  * Build the `gh auth` subcommand's case branches (`switch`, `token`).
  * @returns {string} bash source for the `auth` subcommand's case body.
@@ -283,6 +289,28 @@ function buildIssueCase() {
 }
 
 /**
+ * Build the `gh label` subcommand's case branches (`list`, `create`,
+ * `edit`).
+ * @returns {string} bash source for the `label` subcommand's case body.
+ */
+function buildLabelCase() {
+  return `      list)
+        if [[ -n "\${FAKE_GH_REPO_LABELS:-}" ]]; then
+          printf '%s\\n' "$FAKE_GH_REPO_LABELS"
+        fi
+        exit 0
+        ;;
+      create|edit)
+        if [[ "\${FAKE_GH_LABEL_WRITE_FAIL:-}" == "1" ]]; then
+          echo "fake gh: label write failed" >&2
+          exit 1
+        fi
+        exit 0
+        ;;
+`;
+}
+
+/**
  * @param {boolean} authTokenAlwaysFails - whether `gh auth token` should
  *   unconditionally fail, baked in as a literal (not read from the
  *   runtime environment) at script-generation time.
@@ -321,6 +349,10 @@ ${buildApiCase()}    esac
   issue)
     case "\${2:-}" in
 ${buildIssueCase()}    esac
+    ;;
+  label)
+    case "\${2:-}" in
+${buildLabelCase()}    esac
     ;;
 esac
 
