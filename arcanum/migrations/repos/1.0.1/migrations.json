@@ -1,0 +1,10 @@
+[
+  {
+    "id": "001",
+    "type": "instructions",
+    "description_file": "001.md",
+    "instructions_file": "001.instructions.md",
+    "skippable": true,
+    "applies_to": "global"
+  }
+]
