@@ -13,6 +13,12 @@ import { expectParity } from '../../support/utils/runCommand.js';
 const CONFIG = path.join('.claude', 'configuration', 'monitor-issues.json');
 const STATE = path.join('.claude', 'state', 'monitor-issues-config.json');
 
+// Each shell/native write acquires the config/state file lock, which sleeps a
+// real 1 second per acquisition (see docs/agents/architecture/lock-system.md),
+// so these specs get a generous timeout rather than Jasmine's 5000ms default
+// to avoid flaking on slower CI runners.
+const LOCKED_WRITE_TIMEOUT_MS = 30000;
+
 describe('monitor-issues-config-* parity (shell vs. native)', () => {
   let dirs;
 
@@ -79,7 +85,7 @@ describe('monitor-issues-config-* parity (shell vs. native)', () => {
 
     expectParity(state.shell, state.native);
     await expectSameFile(STATE);
-  });
+  }, LOCKED_WRITE_TIMEOUT_MS);
 
   it('set: matches for an invalid value (exit 1, same stderr message)', async () => {
     const { shell, native } = await run('set', ['auto_rewrite', 'maybe']);
@@ -101,7 +107,7 @@ describe('monitor-issues-config-* parity (shell vs. native)', () => {
     expect(second.shell.stdout).toEqual('true\n');
     await expectSameFile(CONFIG);
     await expectSameFile(STATE);
-  });
+  }, LOCKED_WRITE_TIMEOUT_MS);
 
   for (const subcommand of ['get', 'is-enabled', 'set', 'toggle']) {
     it(`${subcommand}: matches for a missing key (exit 1, same stderr message)`, async () => {
