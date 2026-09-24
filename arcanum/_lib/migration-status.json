@@ -58,7 +58,7 @@
   "discuss-issue-confirm": true,
   "discuss-issue-render-issue": true,
   "init-claude-set-ci-ignored-patterns": true,
-  "init-claude-setup-docs-structure": false,
+  "init-claude-setup-docs-structure": true,
   "init-claude-setup-templates": true,
   "init-claude-stamp-arcanum-version": true,
   "init-claude-sync-labels": false,
