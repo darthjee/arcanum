@@ -63,8 +63,12 @@
   "init-claude-stamp-arcanum-version": false,
   "init-claude-sync-labels": false,
   "init-claude-write-label-config": false,
-  "monitor-issues-config": false,
-  "monitor-issues-github": false,
-  "monitor-issues-monitor-issues": false,
-  "monitor-issues-rewrite-queue": false
+  "monitor-issues-config-get": true,
+  "monitor-issues-config-is-enabled": true,
+  "monitor-issues-config-set": true,
+  "monitor-issues-config-toggle": true,
+  "monitor-issues-github-remove-tag": true,
+  "monitor-issues-monitor-issues": true,
+  "monitor-issues-rewrite-queue-pop": true,
+  "monitor-issues-rewrite-queue-push": true
 }
