@@ -1,4 +1,34 @@
 #!/usr/bin/env bash
+# Thin engine_dispatch shim for the "init-claude-write-label-config-replace",
+# "init-claude-write-label-config-remove" and
+# "init-claude-write-label-config-add" migrated entrypoints (one command
+# name per subcommand) — see docs/agents/architecture/script-engine.md and
+# docs/agents/plans/594-migrate-init-claude-label-commands-write-label-config-sync-labels-to-native-node-js/plan.md
+# for the full design/shared contracts. Runs either the per-subcommand
+# shell implementation (write_label_config_<sub>_shell.sh) or the native
+# one (core/bin/arcanum), per engine.mode / arcanum/_lib/migration-status.json.
+#
+# Like monitor-issues/scripts/config.sh, this entrypoint never took a
+# <repo_path> argument: it is run from the target project root. The
+# literal "$PWD" (NOT `git rev-parse --show-toplevel`, which would break
+# parity when run from a subdirectory or a non-git dir) is passed as
+# engine_dispatch's <repo_path> with --prepend-repo-path, so only the
+# native invocation receives it as its leading positional (the
+# Dispatcher strips it into RepoContext.repoPath; native code never
+# reads process.cwd() — see docs/agents/architecture/repo-path-threading.md),
+# while the shell implementation's own args stay untouched.
+#
+# <config_path> is made absolute against $PWD here (left as-is when it
+# already starts with '/'), so both implementations receive the same
+# absolute path (issue #594).
+#
+# No env vars are forwarded to the native path's allowlist — this
+# entrypoint only reads/writes the label-config file.
+#
+# All usage/arity validation below lives here, before engine_dispatch,
+# so usage errors (usage block on stderr, exit 2) are identical in both
+# modes and never reach either implementation.
+#
 # Mutate a label-config JSON file via one of three subcommands.
 # Usage:
 #   write_label_config.sh replace <config_path> <Label1>:<color1> [<Label2>:<color2> ...]
@@ -36,8 +66,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=lib/label_config.sh
-source "${SCRIPT_DIR}/lib/label_config.sh"
+
+# shellcheck source=../../arcanum/_lib/engine_dispatch.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/engine_dispatch.sh"
 
 usage() {
   echo "Usage: $0 replace <config_path> <Label1>:<color1> [<Label2>:<color2> ...]" >&2
@@ -63,14 +94,12 @@ shift
 
 [[ $# -ge 1 ]] || usage
 
-case "$SUBCOMMAND" in
-  replace)
-    label_config_write "$CONFIG_PATH" "$@" || exit $?
-    ;;
-  remove)
-    label_config_remove "$CONFIG_PATH" "$@" || exit $?
-    ;;
-  add)
-    label_config_add "$CONFIG_PATH" "$@" || exit $?
-    ;;
-esac
+if [[ "$CONFIG_PATH" == /* ]]; then
+  ABS_CONFIG_PATH="$CONFIG_PATH"
+else
+  ABS_CONFIG_PATH="$PWD/$CONFIG_PATH"
+fi
+
+REPO_PATH="$PWD"
+
+engine_dispatch "$REPO_PATH" "init-claude-write-label-config-${SUBCOMMAND}" "${SCRIPT_DIR}/write_label_config_${SUBCOMMAND}_shell.sh" --prepend-repo-path -- "$ABS_CONFIG_PATH" "$@"

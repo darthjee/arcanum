@@ -61,8 +61,10 @@ One row per entry point tracked in [`arcanum/_lib/migration-status.json`](../../
 | `init-claude-setup-docs-structure` | Yes | #230 |
 | `init-claude-setup-templates` | Yes | #230 |
 | `init-claude-stamp-arcanum-version` | Yes | #230 |
-| `init-claude-sync-labels` | No | #230 |
-| `init-claude-write-label-config` | No | #230 |
+| `init-claude-sync-labels` | Yes | #230 |
+| `init-claude-write-label-config-add` | Yes | #594 |
+| `init-claude-write-label-config-remove` | Yes | #594 |
+| `init-claude-write-label-config-replace` | Yes | #594 |
 | `issue-state` | Yes | #230 |
 | `list-agents` | Yes | #230 |
 | `monitor-issues-config-get` | Yes | #586 |

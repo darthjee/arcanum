@@ -16,7 +16,7 @@ The label/color table is no longer threaded through CLI arguments. It is persist
 }
 ```
 
-Neither you nor `scripts/sync_labels.sh` need to hardcode a default table anymore: `scripts/lib/label_config.sh`'s `label_config_ensure_defaults` function (invoked automatically by `scripts/sync_labels.sh`, see Step 2) populates this file with the standard 9 labels the first time it's missing or its `labels` array is empty. You never need to write this file by hand for a first run.
+Neither you nor `scripts/sync_labels.sh` need to hardcode a default table anymore: `scripts/lib/label_config.sh`'s `label_config_ensure_defaults` function (invoked automatically by `scripts/sync_labels.sh`, see Step 2) populates this file with the standard default labels (see `DEFAULT_LABEL_PAIRS` in `scripts/lib/label_config.sh`) the first time it's missing or its `labels` array is empty. You never need to write this file by hand for a first run.
 
 ## Step 2 — Invoke the script
 

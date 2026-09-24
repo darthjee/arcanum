@@ -1,6 +1,6 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { NATIVE_BIN, REPO_ROOT, runCommand } from './runCommand.js';
+import { FAKE_FETCH_PRELOAD, NATIVE_BIN, REPO_ROOT, runCommand } from './runCommand.js';
 
 /**
  * Run one `init-claude` entrypoint on both sides: the shell
@@ -15,18 +15,50 @@ import { NATIVE_BIN, REPO_ROOT, runCommand } from './runCommand.js';
  *   `setup_templates`).
  * @param {string} opts.command - the `core/bin/arcanum` command name.
  * @param {string[]} [opts.args] - the entrypoint's own arguments.
+ * @param {string[]} [opts.shellArgs] - the shell side's arguments, when
+ *   they differ per side (e.g. a per-dir absolute config path);
+ *   defaults to `args`.
+ * @param {string[]} [opts.nativeArgs] - the native side's arguments
+ *   after `<nativeDir>`; defaults to `args`.
  * @param {string} opts.shellDir - the shell side's project dir.
  * @param {string} opts.nativeDir - the native side's project dir.
  * @param {string} opts.nativeCwd - the native process's cwd.
+ * @param {object} [opts.shellEnv] - the shell side's environment.
+ * @param {object} [opts.nativeEnv] - the native side's environment.
+ * @param {string} [opts.input] - stdin fed to both sides (see
+ *   `runCommand`).
+ * @param {boolean} [opts.fakeFetch] - whether to load the fake-fetch
+ *   preload on the native side.
  * @returns {Promise<{shell: object, native: object}>} both sides'
  *   `{ stdout, stderr, code }` results.
  */
-export async function runInitClaudeBoth({ script, command, args = [], shellDir, nativeDir, nativeCwd }) {
+export async function runInitClaudeBoth({
+  script,
+  command,
+  args = [],
+  shellArgs = args,
+  nativeArgs = args,
+  shellDir,
+  nativeDir,
+  nativeCwd,
+  shellEnv = process.env,
+  nativeEnv = process.env,
+  input = undefined,
+  fakeFetch = false
+}) {
   const shell = await runCommand(
-    [path.join(REPO_ROOT, 'init-claude', 'scripts', `${script}_shell.sh`), ...args],
-    shellDir
+    [path.join(REPO_ROOT, 'init-claude', 'scripts', `${script}_shell.sh`), ...shellArgs],
+    shellDir,
+    shellEnv,
+    input
   );
-  const native = await runCommand([process.execPath, NATIVE_BIN, command, nativeDir, ...args], nativeCwd);
+  const preload = fakeFetch ? ['--import', FAKE_FETCH_PRELOAD] : [];
+  const native = await runCommand(
+    [process.execPath, ...preload, NATIVE_BIN, command, nativeDir, ...nativeArgs],
+    nativeCwd,
+    nativeEnv,
+    input
+  );
 
   return { shell, native };
 }

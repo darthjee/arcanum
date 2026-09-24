@@ -14,12 +14,13 @@ import { runCommand } from '../utils/runCommand.js';
  * @param {string} description - the `describe` block's label.
  * @param {string} shimScript - the real `engine_dispatch` shim script's
  *   path (e.g. `auto-fix-all/scripts/wait_ci.sh`).
- * @param {(repo: {repoPath: string}, mode: string) => Promise<{args: string[], env?: object, cleanup?: () => Promise<void>}>} prepare
+ * @param {(repo: {repoPath: string}, mode: string) => Promise<{args: string[], env?: object, input?: string, cwd?: string, cleanup?: () => Promise<void>}>} prepare
  *   - per-case fixture setup, including seeding `engine.mode` for
  *   `mode`. Returns the arguments to append after `shimScript` when
- *   invoking `runCommand`, an optional environment to run it with, and
- *   an optional `cleanup` (e.g. a `fakeGh.cleanup()`) run alongside the
- *   fixture repo's own teardown.
+ *   invoking `runCommand`, an optional environment to run it with, an
+ *   optional stdin `input` (see `runCommand`), an optional `cwd`
+ *   (defaults to the fixture repo), and an optional `cleanup` (e.g. a
+ *   `fakeGh.cleanup()`) run alongside the fixture repo's own teardown.
  * @param {object} assertions - per-mode assertion callbacks.
  * @param {(result: {stdout: string, stderr: string, code: number}) => void} assertions.shell
  *   - asserts on the result when `engine.mode=shell`.
@@ -39,10 +40,10 @@ export function itRoutesEngineDispatch(description, shimScript, prepare, { shell
         const repo = await createGitFixtureRepo();
 
         try {
-          const { args, env, cleanup } = await prepare(repo, mode);
+          const { args, env, input, cwd = repo.repoPath, cleanup } = await prepare(repo, mode);
 
           try {
-            const result = await runCommand([shimScript, ...args], repo.repoPath, env);
+            const result = await runCommand([shimScript, ...args], cwd, env, input);
 
             await assert(result);
           } finally {

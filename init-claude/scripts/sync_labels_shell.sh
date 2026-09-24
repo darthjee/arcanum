@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+# Shell implementation of the "init-claude-sync-labels" migrated
+# entrypoint, dispatched by sync_labels.sh (the engine_dispatch shim).
+#
+# Print a label/color table, confirm interactively, then sync to GitHub.
+# Usage: sync_labels_shell.sh <repo_path> [<config_path>]
+#   repo_path is required — the local checkout path of the target repo,
+#   used to resolve origin explicitly rather than trusting ambient cwd.
+#   config_path defaults to lib/label_config.sh's DEFAULT_LABEL_CONFIG_PATH
+#   (.claude/state/init-claude-config.json, relative to cwd); the
+#   sync_labels.sh shim always passes it, already made absolute.
+#
+# usage() prints the literal public entrypoint name (sync_labels.sh), not
+# $0, so the message is identical to the native implementation's.
+#
+# The label/color table is read from the JSON config file, schema:
+#   { "labels": [ { "name": "<label name>", "color": "<hex, no '#'>" } ] }
+# If the file is missing, empty, or its "labels" array is missing/empty,
+# it is first initialized with the standard default labels (see
+# lib/label_config.sh) before anything is printed or synced.
+#
+# Prints the table as markdown, then prompts on stdout:
+#   Sync these labels to GitHub? [y/n]:
+# Accepts y/yes/n/no (case-insensitive), re-prompting on anything else.
+#
+# On "yes": creates missing labels / updates colors of existing ones via
+#   `gh label create` / `gh label edit`, prints STATUS=synced followed by
+#   one CREATED=<name>/UPDATED=<name> line per label, exits 0.
+# On "no": prints STATUS=discuss, exits 1, no GitHub calls made.
+# On invalid/malformed config contents: prints a usage-style error to
+#   stderr, exits 2.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../../arcanum/_lib/origin.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/origin.sh"
+# shellcheck source=lib/label_config.sh
+source "${SCRIPT_DIR}/lib/label_config.sh"
+
+usage() {
+  echo "Usage: sync_labels.sh <repo_path> [<config_path>]" >&2
+  echo "  config_path defaults to ${DEFAULT_LABEL_CONFIG_PATH}" >&2
+  exit 2
+}
+
+REPO_PATH="${1:?Usage: $0 <repo_path> [<config_path>]}"
+CONFIG_PATH="${2:-$DEFAULT_LABEL_CONFIG_PATH}"
+
+label_config_ensure_defaults "$CONFIG_PATH"
+
+NAMES=()
+COLORS=()
+
+while IFS= read -r pair; do
+  label_config_validate_pair "$pair" || usage
+
+  NAMES+=("${pair%%:*}")
+  COLORS+=("${pair#*:}")
+done < <(label_config_read_pairs "$CONFIG_PATH")
+
+# --- Print the table ---
+
+echo "| Label | Color |"
+echo "| --- | --- |"
+for i in "${!NAMES[@]}"; do
+  echo "| ${NAMES[$i]} | #${COLORS[$i]} |"
+done
+
+# --- Prompt for confirmation ---
+
+answer=""
+while true; do
+  printf 'Sync these labels to GitHub? [y/n]: '
+  if ! read -r answer; then
+    echo "Error: no input available for confirmation prompt" >&2
+    exit 2
+  fi
+
+  case "$(printf '%s' "$answer" | tr '[:upper:]' '[:lower:]')" in
+    y|yes)
+      break
+      ;;
+    n|no)
+      echo "STATUS=discuss"
+      exit 1
+      ;;
+    *)
+      continue
+      ;;
+  esac
+done
+
+# --- Sync to GitHub ---
+
+REPO=$(get_repo_ref "$REPO_PATH")
+
+# `gh label list` caps at 30 labels by default; without an explicit
+# --limit, labels beyond the first 30 would be missed and `create` would
+# then fail on the existing name (issue #594).
+EXISTING=$(gh label list -R "$REPO" --limit 1000 --json name -q '.[].name')
+
+echo "STATUS=synced"
+
+for i in "${!NAMES[@]}"; do
+  name="${NAMES[$i]}"
+  color="${COLORS[$i]}"
+
+  # GitHub label names are unique case-insensitively, so match existing
+  # names case-insensitively too — otherwise a same-name-different-case
+  # label (e.g. repo default "bug" vs. our "Bug") is missed and `create`
+  # fails on the case-insensitive collision instead of updating it.
+  existing_name=$(grep -ixF "$name" <<< "$EXISTING" || true)
+
+  if [[ -n "$existing_name" ]]; then
+    gh label edit "$existing_name" -R "$REPO" --name "$name" --color "$color" >/dev/null
+    echo "UPDATED=$name"
+  else
+    gh label create "$name" -R "$REPO" --color "$color" >/dev/null
+    echo "CREATED=$name"
+  fi
+done
