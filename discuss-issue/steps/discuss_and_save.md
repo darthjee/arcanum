@@ -79,7 +79,7 @@ Run:
 
 Only reached right after a successful push above. Ask:
 
-```
+```text
 Would you like me to start planning this issue now?
 ```
 
