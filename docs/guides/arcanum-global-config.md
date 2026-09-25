@@ -36,7 +36,7 @@ setting.
 
 ## Resolution order
 
-```
+```text
 local repo state  ->  repo config  ->  global user config  ->  hardcoded default
 ```
 
