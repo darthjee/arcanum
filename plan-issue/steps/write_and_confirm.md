@@ -126,7 +126,7 @@ When the user asks you to look at the code (e.g., "check the code", "look at the
 
 4. Present the updated overview and ask again:
 
-   ```
+   ```text
    Does this approach look correct? Anything to add or correct?
    ```
 
@@ -134,7 +134,7 @@ When the user asks you to look at the code (e.g., "check the code", "look at the
 
 Once the plan is confirmed, ask:
 
-```
+```text
 Would you like to proceed and open a PR to fix this issue now?
 ```
 
