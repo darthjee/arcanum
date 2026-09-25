@@ -71,7 +71,7 @@ Every source file (excluding test files) must act as a **class declarer** — it
 The only exceptions are **entrypoints**:
 
 | Application | Entrypoint |
-|---|---|
+| --- | --- |
 | Main app (`source/`) | `source/bin/navi.js` |
 | Dev app (`dev/app/`) | `dev/app/server.js` |
 
