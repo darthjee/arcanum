@@ -42,6 +42,18 @@
 # suppression is not honoured by Codacy. The engine key is `opengrep`,
 # the tool's shortName in Codacy's API (api/v3/tools) and the name listed
 # in Codacy's configuration-file docs. See issues #494 and #604.
+#
+# Excludes the seven literal template files (.github/{pull_request_template,
+# commit_message_template,commit_message_template-2.0}.md, their mirrors
+# under init-claude/templates/, and auto-fix-all/templates/reply.tmpl.md)
+# from the markdownlint engine only — the other tools keep analysing them.
+# Their content is substituted verbatim into commit messages, PR bodies,
+# and reply comments, so a `# Title` line added to satisfy MD041 would leak
+# into that generated output. .markdownlintignore already lists them for
+# local runs, but Codacy does not honor .markdownlintignore. The engine key
+# is `markdownlint`, the tool's shortName in Codacy's API (api/v3/tools).
+# Keep this list in sync with the template block in .markdownlintignore.
+# See issues #502 and #622–#628.
 engines:
   opengrep:
     exclude_paths:
@@ -49,6 +61,15 @@ engines:
   pmd:
     exclude_paths:
       - "core/**/*.js"
+  markdownlint:
+    exclude_paths:
+      - ".github/pull_request_template.md"
+      - ".github/commit_message_template.md"
+      - ".github/commit_message_template-2.0.md"
+      - "init-claude/templates/pull_request_template.md"
+      - "init-claude/templates/commit_message_template.md"
+      - "init-claude/templates/commit_message_template-2.0.md"
+      - "auto-fix-all/templates/reply.tmpl.md"
 exclude_paths:
   - "core/spec/support/**"
   - "CLAUDE.md"
