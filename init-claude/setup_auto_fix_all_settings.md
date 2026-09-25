@@ -19,7 +19,7 @@ Treat a missing file, a missing key, or empty `jq` output as "none" for the patt
 Show the user a single table with all three rows and their current values, e.g.:
 
 | Setting | Tier | Current value | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | CI check-ignore patterns | repo (committed) | `<patterns, or "none">` | CI check-runs that should never block a PR from being merged when `auto-fix-all` monitors it (e.g. informational bots, code-quality dashboards that don't report a clean pass/fail). Matched case-insensitively as regular expressions against each check-run's name (e.g. `Codacy` matches "Codacy Static Code Analysis"). |
 | `clear_context` | local (gitignored) | `<true/false>` | Clear conversation context between issues (via a short `ScheduleWakeup` pause); only takes effect when `auto-fix-all` is invoked through `/loop`. |
 | `finish_on_empty_queue` | local (gitignored) | `<true/false>` | Stop the run once the queue empties instead of waiting forever for more issues to be pushed onto it. |
