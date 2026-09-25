@@ -126,7 +126,10 @@ if [[ "$METHOD" == "git" ]]; then
     exit 0
   fi
 
-  if [[ -n "$(git -C "$TARGET" status --porcelain)" ]]; then
+  # Only tracked changes block the update: the host (e.g. Claude Code's
+  # synced/) may write untracked files into the install, and `git checkout`
+  # already refuses to overwrite an untracked file on its own.
+  if [[ -n "$(git -C "$TARGET" status --porcelain --untracked-files=no)" ]]; then
     echo "Error: ${TARGET} has uncommitted changes." >&2
     echo "Commit, stash, or discard them, then re-run." >&2
     exit 1
