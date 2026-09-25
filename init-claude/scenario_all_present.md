@@ -18,7 +18,7 @@ The following changes will be made:
 
 Ask:
 
-```
+```text
 Shall I proceed?
 ```
 
@@ -66,7 +66,7 @@ See [AGENTS.md](../AGENTS.md) for project instructions.
 
 Tell the user:
 
-```
+```text
 Done! Consolidation complete:
 - AGENTS.md — unified content from all three files
 - CLAUDE.md — now points to AGENTS.md

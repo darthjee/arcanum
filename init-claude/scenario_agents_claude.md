@@ -18,7 +18,7 @@ The following changes will be made:
 
 Ask:
 
-```
+```text
 Shall I proceed?
 ```
 
@@ -65,7 +65,7 @@ See [AGENTS.md](../AGENTS.md) for project instructions.
 
 Tell the user:
 
-```
+```text
 Done! Migration complete:
 - AGENTS.md — consolidated content from AGENTS.md and CLAUDE.md
 - CLAUDE.md — now points to AGENTS.md

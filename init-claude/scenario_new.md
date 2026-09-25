@@ -61,7 +61,7 @@ See [AGENTS.md](../AGENTS.md) for project instructions.
 
 Tell the user:
 
-```
+```text
 Done! Files created:
 - AGENTS.md
 - CLAUDE.md

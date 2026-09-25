@@ -16,7 +16,7 @@ Found AGENTS.md. The following files will be created pointing to it:
 
 Ask:
 
-```
+```text
 Shall I proceed?
 ```
 
@@ -45,7 +45,7 @@ See [AGENTS.md](../AGENTS.md) for project instructions.
 
 Tell the user:
 
-```
+```text
 Done! Files created:
 - CLAUDE.md — pointing to AGENTS.md
 - .github/copilot-instructions.md — pointing to AGENTS.md
