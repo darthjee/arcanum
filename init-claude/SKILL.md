@@ -24,7 +24,7 @@ Check which of these files exist in the current working directory:
 Based on what exists, read and follow the appropriate scenario file:
 
 | AGENTS.md | CLAUDE.md | copilot-instructions.md | Scenario file |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | absent | absent | absent | [scenario_new.md](scenario_new.md) |
 | absent | present | absent | [scenario_claude_only.md](scenario_claude_only.md) |
 | absent | absent | present | [scenario_copilot_only.md](scenario_copilot_only.md) |
