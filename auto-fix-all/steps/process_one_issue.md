@@ -8,19 +8,19 @@ OUTCOME=merged
 
 or
 
-```
+```text
 OUTCOME=closed PR_NUMBER=<n>
 ```
 
 or
 
-```
+```text
 OUTCOME=blocked AGENT=<agent-name> ACTION=<description>
 ```
 
 or
 
-```
+```text
 OUTCOME=pending PR_NUMBER=<n>
 ```
 
