@@ -21,7 +21,7 @@ Common agents seen across projects: `frontend`, `backend`, `infra`. These are on
 
 Ask the user:
 
-```
+```text
 Which agents should this project have, and what is each one's scope (which folders/files it owns) and responsibility?
 ```
 
@@ -127,7 +127,7 @@ Adapt section names and content to what the project actually has — do not inve
 
 Show all drafted agent files to the user and ask:
 
-```
+```text
 These are the proposed agents under .claude/agents/. Shall I write them, or would you like to make changes?
 ```
 
@@ -160,7 +160,7 @@ Do not generate a check script for the `architect` coordinator unless the user e
 
 Tell the user:
 
-```
+```text
 .claude/agents/ written:
 - architect.md
 - <agent-name>.md (one per specialist agent)

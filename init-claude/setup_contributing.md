@@ -43,7 +43,7 @@ Produce a draft of `docs/agents/contributing.md` based on the sample, with the f
 
 Show the drafted content to the user and ask:
 
-```
+```text
 This is the proposed docs/agents/contributing.md (adapted for <language>). Shall I write it, or would you like to make changes?
 ```
 
@@ -60,7 +60,7 @@ Write (or overwrite) the file with the confirmed content.
 
 Add a row for the contributing guide in the `## Documentation` table inside `AGENTS.md` if not already present:
 
-```
+```markdown
 | [Contributing](docs/agents/contributing.md) | Commit guidelines, PR standards, code organization, and refactoring rules. |
 ```
 
@@ -68,7 +68,7 @@ Add a row for the contributing guide in the `## Documentation` table inside `AGE
 
 Tell the user:
 
-```
+```text
 docs/agents/contributing.md written and adapted for <language>.
 AGENTS.md updated.
 ```

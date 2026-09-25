@@ -21,7 +21,7 @@ Here is the current arcanum-split-issue checklist. Would you like to add, remove
 
 Let the user describe the change they want (add a new concern, remove one, reword one). Apply it to the in-memory draft, present the updated list, and ask again:
 
-```
+```text
 Anything else to add, remove, or reword?
 ```
 
@@ -35,6 +35,6 @@ Write (or overwrite) `docs/agents/arcanum-split-issue.md` with the confirmed con
 
 Tell the user:
 
-```
+```text
 docs/agents/arcanum-split-issue.md is set. /arcanum-split-issue will use it to guide how broad issues get broken into sub-issues.
 ```

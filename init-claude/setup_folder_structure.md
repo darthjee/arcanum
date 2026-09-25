@@ -61,7 +61,7 @@ Write (or overwrite) the file with the confirmed content.
 
 Add a row for folder structure in the `## Documentation` table inside `AGENTS.md` if not already present:
 
-```
+```markdown
 | [Folder Structure](docs/agents/folder-structure.md) | Top-level directory layout and the role of each folder. |
 ```
 
@@ -69,7 +69,7 @@ Add a row for folder structure in the `## Documentation` table inside `AGENTS.md
 
 Tell the user:
 
-```
+```text
 docs/agents/folder-structure.md written.
 AGENTS.md updated.
 ```

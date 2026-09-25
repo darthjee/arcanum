@@ -60,7 +60,7 @@ If the existing file already has detailed descriptions, preserve them and only f
 
 Show the drafted content to the user and ask:
 
-```
+```text
 This is the proposed docs/agents/architecture.md. Shall I write it, or would you like to make changes?
 ```
 
@@ -77,7 +77,7 @@ Write (or overwrite) the file with the confirmed content.
 
 Tell the user:
 
-```
+```text
 docs/agents/architecture.md written.
 Review and expand it with implementation details as needed.
 ```

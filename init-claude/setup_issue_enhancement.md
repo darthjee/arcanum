@@ -21,7 +21,7 @@ Here is the current issue-enhancement checklist. Would you like to add, remove, 
 
 Let the user describe the change they want (add a new concern, remove one, reword one). Apply it to the in-memory draft, present the updated list, and ask again:
 
-```
+```text
 Anything else to add, remove, or reword?
 ```
 
@@ -35,6 +35,6 @@ Write (or overwrite) `docs/agents/issue-enhancement.md` with the confirmed conte
 
 Tell the user:
 
-```
+```text
 docs/agents/issue-enhancement.md is set. /enhance-issue will use it to check fresh issue ideas against these concerns.
 ```

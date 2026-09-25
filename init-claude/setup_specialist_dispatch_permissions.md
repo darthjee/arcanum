@@ -4,7 +4,7 @@ Optionally seed the common specialist-dispatch permission exemption bundle into 
 
 ## Step 1 — Ask the user
 
-```
+```text
 Would you like to grant the common specialist-dispatch scripts (commit_change.sh, run_checks.sh) and git add permission to run without confirmation, in this repo's shared .claude/settings.json (committed, visible to all contributors)? [y/n]
 ```
 
