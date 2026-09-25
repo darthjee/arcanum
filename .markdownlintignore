@@ -2,6 +2,9 @@
 # into real commit messages, PR bodies, and GitHub reply comments. Adding
 # a `# Title` line to satisfy MD041 would inject unwanted heading text
 # into that generated output. See issue #502.
+# Codacy ignores this file, so the same paths are mirrored in .codacy.yml
+# under engines.markdownlint.exclude_paths — keep both lists in sync
+# (see issues #622–#628).
 .github/pull_request_template.md
 .github/commit_message_template.md
 .github/commit_message_template-2.0.md
