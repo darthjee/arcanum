@@ -5,7 +5,7 @@ import { expectInvalidRepoPathParity, expectParity, runBoth } from '../../suppor
 // entrypoint (issue #265) — see docs/agents/architecture/script-engine.md's
 // "output/exit-code contract" and
 // docs/agents/plans/265-migrate-auto-fix-all-github-entrypoint-pr-number-pr-state-pr-merge-cleanup-branch-has-shipit-label-add-tag-remove-tag-to-native-node-js/node.md.
-// Runs auto-fix-all/scripts/github.sh pr-merge and
+// Runs auto-fix-all/scripts/github_shell.sh pr-merge and
 // `core/bin/arcanum auto-fix-all-github-pr-merge` against equivalent
 // inputs, asserting byte-identical stdout and exit code — see
 // setupParityTest/runBoth for how `gh`/`fetch` are faked on each side.

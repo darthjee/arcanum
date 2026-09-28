@@ -41,8 +41,8 @@ describe('auto-fix-all-wait-ci-and-merge parity (shell vs. native) — precondit
     });
   });
 
-  // `wait_ci_and_merge_shell.sh` composes the `wait_ci.sh` /
-  // `github.sh pr-merge` shims rather than calling `repo_path_enter`
+  // `wait_ci_and_merge_shell.sh` composes the `wait_ci.sh` shim /
+  // `github_shell.sh pr-merge` rather than calling `repo_path_enter`
   // itself, so its own stderr wording for a bad `repo_path` isn't
   // byte-identical to the native dispatcher's — only the stdout /
   // exit-code contract (empty stdout, non-zero exit, matching codes) is,
