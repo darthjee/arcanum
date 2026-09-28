@@ -18,7 +18,13 @@ One row per entry point tracked in [`arcanum/_lib/migration-status.json`](../../
 | `auto-fix-all-config-is-enabled` | Yes | #261 |
 | `auto-fix-all-config-set` | Yes | #261 |
 | `auto-fix-all-config-toggle` | Yes | #261 |
-| `auto-fix-all-github` | Yes | #230 |
+| `auto-fix-all-github-add-tag` | Yes | - |
+| `auto-fix-all-github-cleanup-branch` | Yes | - |
+| `auto-fix-all-github-has-shipit-label` | Yes | - |
+| `auto-fix-all-github-pr-merge` | Yes | - |
+| `auto-fix-all-github-pr-number` | Yes | - |
+| `auto-fix-all-github-pr-state` | Yes | - |
+| `auto-fix-all-github-remove-tag` | Yes | - |
 | `auto-fix-all-queue-empty` | Yes | #264 |
 | `auto-fix-all-queue-list` | Yes | #264 |
 | `auto-fix-all-queue-next` | Yes | #264 |
