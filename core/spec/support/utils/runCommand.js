@@ -9,8 +9,14 @@ const execFileAsync = promisify(execFile);
 /** The repository's root directory. */
 export const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
 
-/** The `auto-fix-all-github` shell entrypoint's script path. */
-export const SHELL_SCRIPT = path.join(REPO_ROOT, 'auto-fix-all', 'scripts', 'github.sh');
+/**
+ * The `auto-fix-all-github` shell entrypoint's script path — run
+ * directly (never through the `auto-fix-all/scripts/github.sh`
+ * engine_dispatch router) by every parity spec under
+ * `core/spec/bin/autoFixAllGithubParity/` except `engine_dispatch_spec.js`
+ * itself, which exercises the real router.
+ */
+export const SHELL_SCRIPT = path.join(REPO_ROOT, 'auto-fix-all', 'scripts', 'github_shell.sh');
 
 /**
  * The `auto-fix-issue-github` shell entrypoint's script path — run

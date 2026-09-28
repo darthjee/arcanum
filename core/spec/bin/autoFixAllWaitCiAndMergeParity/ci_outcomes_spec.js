@@ -36,10 +36,10 @@ const MODEL_EMAIL = 'model@example.com';
 // precedence, repo-local tier) with `engine.mode: "shell"`, overriding
 // any such global default, so the shell side always exercises real
 // shell logic end to end regardless of the machine it runs on.
-// `github.sh` hasn't been split into its own engine_dispatch shim yet
-// (see autoFixAllGithubParity_spec.js's own header comment), so
-// `wait_ci_and_merge_shell.sh`'s `github.sh pr-merge` call is always
-// the real shell implementation directly, unaffected by `engine.mode`.
+// `wait_ci_and_merge_shell.sh` calls `github_shell.sh pr-merge`
+// directly (never the `github.sh` engine_dispatch shim), so its merge
+// step is always the real shell implementation, unaffected by
+// `engine.mode`.
 //
 // Every scenario below is network-free, per the repo-wide "no real
 // network calls in specs" rule:

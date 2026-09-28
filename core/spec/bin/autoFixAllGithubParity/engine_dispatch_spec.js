@@ -1,74 +1,145 @@
-import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import { buildDispatchFixtures, seedEngineMode } from '../../support/fixtures/engineDispatchFixtures.js';
+import { seedGithubLikeRepo } from '../../support/factories/githubParitySetup.js';
+import { itRoutesEngineDispatch } from '../../support/sharedExamples/engineDispatchRouting.js';
+import { seedEngineMode } from '../../support/utils/engineMode.js';
+import { createFakeGhBin } from '../../support/utils/fakeGhBin.js';
+import { createGitFixtureRepo } from '../../support/utils/gitFixtureRepo.js';
+import { REPO_ROOT, runCommand } from '../../support/utils/runCommand.js';
 import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
-import { runCommand } from '../../support/utils/runCommand.js';
 
-// Proves arcanum/_lib/engine_dispatch.sh correctly routes based on
-// migration-status.json now marking "auto-fix-all-github" migrated
-// (node/06's own "Dispatch verification" requirement), using that
-// exact single migration-status.json key — unlike every sibling parity
-// spec in this directory (matched 1:1 to a `core/bin/arcanum
-// auto-fix-all-github-*` COMMANDS entry each), migration-status.json
-// tracks this whole 7-subcommand entrypoint under ONE flag
-// ("auto-fix-all-github", not 7 separate per-subcommand keys — see
-// node/05's "Files to Change"), since `github.sh` hasn't been split
-// into a per-entrypoint engine_dispatch shim yet (see node/05's scope
-// note, "all changes scoped to core/"). A future shim built against
-// that single flag will need to map it to whichever specific
-// `core/bin/arcanum` command each subcommand actually dispatches to —
-// out of scope here.
+const SHIM_SCRIPT = path.join(REPO_ROOT, 'auto-fix-all', 'scripts', 'github.sh');
+const NATIVE_TOKEN_FAILURE = 'could not obtain GitHub token via gh auth token';
+
+// Routing test for the real auto-fix-all/scripts/github.sh
+// engine_dispatch router (issue #656) — unlike the sibling
+// pr_number/pr_state/pr_merge/cleanup_branch/has_shipit_label/add_tag/
+// remove_tag specs in this directory (which all bypass the shim, running
+// github_shell.sh directly), this file exercises the real github.sh shim
+// itself, proving it resolves each subcommand's own
+// migration-status.json/COMMANDS key (`auto-fix-all-github-<subcommand>`)
+// and routes accordingly — see
+// docs/agents/plans/656-route-auto-fix-all-scripts-github-sh-through-engine-dispatch-native-counterparts-unreachable/plan.md.
 //
-// This section exercises the real, shared arcanum/_lib/engine_dispatch.sh
-// directly via a throwaway wrapper script (built here, not committed)
-// plus a throwaway fixture standing in for "the shell implementation"
-// — the same role auto-fix-all/scripts/wait_ci_shell.sh plays for
-// autoFixAllWaitCiParity_spec.js's own routing section.
+// Once native mode routes through the shim, `env -i` strips this
+// process's own ambient environment (only PATH, ARCANUM_REPO_PATH, and
+// HOME survive — see github.sh's own header comment), and the shim
+// invokes `core/bin/arcanum` as a plain argv call, with no `--import`
+// flag to preload the fake-fetch monkey-patch. `pr-state` resolves a
+// GitHub token via `GithubToken#get` (`gh auth token`) before any REST
+// call on the native side, so a fake `gh` whose `auth token`
+// unconditionally fails (baked in via
+// `createFakeGhBin({ authTokenAlwaysFails: true })`, so it survives
+// `env -i`) forces a native-only failure at that very first step, well
+// before any real network call. The shell side's own `gh pr view` never
+// consults `gh auth token` (our fake `gh` answers it unconditionally),
+// so the SAME fake `gh` lets the shell side succeed. That
+// success-vs-failure split proves which implementation actually ran.
 //
-// This file tests routing, not output parity — it uses `runCommand`/
-// `buildDispatchFixtures`/`ENGINE_DISPATCH_SCRIPT` only, never
-// `setupParityTest`/`expectParity`.
-describe('auto-fix-all-github engine_dispatch routing (via a throwaway shim standing in for github.sh)', () => {
-  const COMMAND = 'auto-fix-all-github';
+// This file tests routing, not output parity.
+describe('auto-fix-all-github engine_dispatch routing (via the real github.sh shim)', () => {
+  /**
+   * Builds a github.com-shaped fixture repo's pr-state invocation, with a
+   * fake `gh` whose `auth token` always fails, on `PATH`.
+   * @param {{repoPath: string}} repo - the fixture repo.
+   * @param {object} [extraEnv] - additional environment overrides.
+   * @returns {Promise<{args: string[], env: object, cleanup: () => Promise<void>}>}
+   *   the shim arguments, environment, and fake-`gh` teardown.
+   */
+  async function preparePrState(repo, extraEnv = {}) {
+    const fakeGh = await createFakeGhBin({ authTokenAlwaysFails: true });
 
-  it('routes to the shell fixture when engine.mode=shell', async () => {
-    const dir = await createTempDir('arcanum-core-afag-dispatch-');
+    await seedGithubLikeRepo(repo);
 
-    try {
-      const { wrapperPath, fixturePath } = await buildDispatchFixtures(dir);
-      const repoDir = path.join(dir, 'repo');
+    const env = {
+      ...process.env,
+      ...extraEnv,
+      PATH: `${fakeGh.binDir}:${process.env.PATH}`,
+      FAKE_GH_PR_NUMBER: '42',
+      FAKE_GH_PR_STATE: 'MERGED'
+    };
 
-      await mkdir(repoDir, { recursive: true });
-      await seedEngineMode(repoDir, 'shell');
+    return { args: ['pr-state', repo.repoPath], env, cleanup: fakeGh.cleanup };
+  }
 
-      const result = await runCommand(['bash', wrapperPath, repoDir, COMMAND, fixturePath, repoDir]);
+  itRoutesEngineDispatch(
+    'pr-state',
+    SHIM_SCRIPT,
+    async (repo, mode) => {
+      await seedEngineMode(repo, mode);
 
-      expect(result.code).toEqual(0);
-      expect(result.stdout).toEqual(`SHELL: ${repoDir}\n`);
-    } finally {
-      await removeTempDir(dir);
+      return preparePrState(repo);
+    },
+    {
+      shell: (result) => {
+        expect(result.code).toEqual(0);
+        expect(result.stdout).toEqual('STATE=MERGED\n');
+      },
+      native: (result) => {
+        expect(result.code).toEqual(1);
+        expect(result.stdout).toEqual('');
+        expect(result.stderr).toContain(NATIVE_TOKEN_FAILURE);
+        expect(result.stderr).not.toContain('no native implementation');
+      }
     }
+  );
+
+  describe('pr-state (engine.mode unset)', () => {
+    it('defaults to the shell implementation when engine.mode is unset', async () => {
+      const repo = await createGitFixtureRepo();
+      // Neutralizes this machine's own ambient global
+      // ~/.claude/arcanum-config.json (config_chain.sh's outermost
+      // tier, consulted whenever the repo-local tier is silent) by
+      // pointing CLAUDE_CONFIG_DIR at an empty directory, so this case
+      // genuinely exercises config_chain_read's hardcoded "shell"
+      // fallback rather than whatever engine.mode this developer's own
+      // machine happens to have configured globally.
+      const emptyConfigDir = await createTempDir('arcanum-core-afagh-dispatch-config-');
+      let cleanup;
+
+      try {
+        const prepared = await preparePrState(repo, { CLAUDE_CONFIG_DIR: emptyConfigDir });
+
+        cleanup = prepared.cleanup;
+
+        const result = await runCommand([SHIM_SCRIPT, ...prepared.args], repo.repoPath, prepared.env);
+
+        expect(result.code).toEqual(0);
+        expect(result.stdout).toEqual('STATE=MERGED\n');
+        expect(result.stderr).not.toContain(NATIVE_TOKEN_FAILURE);
+      } finally {
+        await Promise.all([repo.cleanup(), removeTempDir(emptyConfigDir), cleanup?.()]);
+      }
+    });
   });
 
-  it('routes to core/bin/arcanum when engine.mode=native, given migration-status.json\'s true flag', async () => {
-    const dir = await createTempDir('arcanum-core-afag-dispatch-');
+  describe('unknown or missing subcommand', () => {
+    ['shell', 'native'].forEach((mode) => {
+      [
+        { label: 'an unknown subcommand', args: (repoPath) => ['bogus', repoPath] },
+        { label: 'no subcommand at all', args: () => [] }
+      ].forEach(({ label, args }) => {
+        it(`prints the usage to stderr and exits 1 for ${label} (engine.mode=${mode})`, async () => {
+          const repo = await createGitFixtureRepo();
 
-    try {
-      const { wrapperPath, fixturePath } = await buildDispatchFixtures(dir);
-      const repoDir = path.join(dir, 'repo');
+          try {
+            await seedGithubLikeRepo(repo);
+            await seedEngineMode(repo, mode);
 
-      await mkdir(repoDir, { recursive: true });
-      await seedEngineMode(repoDir, 'native');
+            const result = await runCommand([SHIM_SCRIPT, ...args(repo.repoPath)], repo.repoPath);
 
-      const result = await runCommand(['bash', wrapperPath, repoDir, COMMAND, fixturePath, repoDir]);
-
-      expect(result.stdout).not.toEqual(`SHELL: ${repoDir}\n`);
-      expect(result.stdout).toEqual('');
-      expect(result.code).not.toEqual(0);
-      expect(result.stderr).not.toContain('no native implementation');
-      expect(result.stderr).toContain('unknown command');
-    } finally {
-      await removeTempDir(dir);
-    }
+            expect(result.code).toEqual(1);
+            expect(result.stdout).toEqual('');
+            // `$0` in the usage line proves the shim itself printed it,
+            // not a fallthrough into github_shell.sh.
+            expect(result.stderr).toContain(`Usage: ${SHIM_SCRIPT} <command> <repo_path> [args]`);
+            expect(result.stderr).not.toContain('github_shell');
+            expect(result.stderr).not.toContain('unknown command');
+            expect(result.stderr).not.toContain('no native implementation');
+          } finally {
+            await repo.cleanup();
+          }
+        });
+      });
+    });
   });
 });

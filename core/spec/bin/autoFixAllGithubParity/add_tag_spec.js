@@ -8,7 +8,7 @@ import {
 // entrypoint (issue #265) — see docs/agents/architecture/script-engine.md's
 // "output/exit-code contract" and
 // docs/agents/plans/265-migrate-auto-fix-all-github-entrypoint-pr-number-pr-state-pr-merge-cleanup-branch-has-shipit-label-add-tag-remove-tag-to-native-node-js/node.md.
-// Runs auto-fix-all/scripts/github.sh add-tag and
+// Runs auto-fix-all/scripts/github_shell.sh add-tag and
 // `core/bin/arcanum auto-fix-all-github-add-tag` against equivalent
 // inputs, asserting byte-identical stdout and exit code — see
 // setupParityTest/runBoth for how `gh`/`fetch` are faked on each side.

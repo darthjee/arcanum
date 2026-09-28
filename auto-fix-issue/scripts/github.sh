@@ -35,6 +35,9 @@
 #   pr-view <repo_path>                     Print URL and IS_DRAFT for the current branch's PR
 #   pr-ready <repo_path>                    Mark the current branch's PR as ready for review
 #
+# An unknown or missing subcommand prints this usage to stderr and exits
+# 1 — it never falls through to github_shell.sh.
+#
 # Output and exit code: unchanged from before this migration — see
 # github_shell.sh's own header for the full per-subcommand contract.
 
@@ -62,6 +65,12 @@ case "$SUBCOMMAND" in
     engine_dispatch "$REPO_PATH" auto-fix-issue-github-pr-ready "${SCRIPT_DIR}/github_shell_pr_ready.sh" HOME -- "${@:2}"
     ;;
   *)
-    exec bash "${SCRIPT_DIR}/github_shell.sh" "$@"
+    echo "Usage: $0 <command> <repo_path> [args]" >&2
+    echo "Commands:" >&2
+    echo "  info <repo_path>                        Print DOMAIN and REPO from git origin" >&2
+    echo "  pr-create <repo_path> <title> <file>    Create a pull request with title and body from a file" >&2
+    echo "  pr-view <repo_path>                     Print URL and IS_DRAFT for the current branch's PR" >&2
+    echo "  pr-ready <repo_path>                    Mark the current branch's PR as ready for review" >&2
+    exit 1
     ;;
 esac

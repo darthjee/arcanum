@@ -4,8 +4,10 @@
 # Usage: wait_ci_and_merge.sh <repo_path> [model_email]
 #
 # Thin orchestrator over the two existing, unmodified scripts
-# `wait_ci.sh` and `github.sh pr-merge` — no duplicated CI-polling or
-# merge logic. The point of this separate script is presentational to
+# `wait_ci.sh` and `github_shell.sh pr-merge` — no duplicated CI-polling
+# or merge logic. The merge goes straight to the shell implementation
+# (`github_shell.sh`), not the `github.sh` engine_dispatch shim, so this
+# shell implementation stays pure shell regardless of engine.mode. The point of this separate script is presentational to
 # Claude Code's own permission classifier: it exposes a single,
 # distinctly-named Bash invocation that can be allowlisted narrowly
 # (see the local/repo/global migrations in
@@ -18,7 +20,7 @@
 # Output contract, same first-line shape as wait_ci.sh's own: first
 # line "passed" means CI passed AND the merge already happened
 # internally (nothing left for the caller to do) — the second line is
-# the merged PR's URL, exactly what `github.sh pr-merge` itself prints
+# the merged PR's URL, exactly what `github_shell.sh pr-merge` prints
 # on success. First line "failed" (with subsequent lines listing the
 # failed check-run names) means CI failed and the merge was never
 # attempted — identical to wait_ci.sh's own "failed" output.
@@ -43,4 +45,4 @@ if [[ "$status" != "passed" ]]; then
 fi
 
 echo "passed"
-"${SCRIPT_DIR}/github.sh" pr-merge "$REPO_PATH" "$MODEL_EMAIL"
+"${SCRIPT_DIR}/github_shell.sh" pr-merge "$REPO_PATH" "$MODEL_EMAIL"
