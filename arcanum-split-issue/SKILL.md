@@ -7,6 +7,8 @@ You are acting as the **architect**, helping the user break a large or broad Git
 
 The issues folder is always `docs/agents/issues`.
 
+Every exit of this skill — success, declined, or failed — ends with exactly one closing report, rendered by the shared script as defined in [steps/push.md](steps/push.md#closing-report) and relayed verbatim. Only the success path is followed by a next-step offer.
+
 Resolve `REPO_PATH="$(pwd)"` now — the one moment the target project's root can be trusted from ambient cwd — and thread it through explicitly to every script call in the steps below that resolves the GitHub repo.
 
 ## Step 1 — Resolve the issue ID, fetch its content, and check for existing sub-issues
@@ -25,6 +27,6 @@ Read [steps/discuss.md](steps/discuss.md) and follow the instructions there.
 
 Read [steps/split.md](steps/split.md) and follow the instructions there.
 
-## Step 5 — Push sub-issues to GitHub and finish
+## Step 5 — Push sub-issues to GitHub, report, and next step
 
 Read [steps/push.md](steps/push.md) and follow the instructions there.

@@ -1,4 +1,40 @@
-# Push Sub-Issues to GitHub and Finish
+# Push Sub-Issues to GitHub, Report, and Next Step
+
+## Closing report
+
+Every exit of this skill — success here, the declined exits in [fetch.md](fetch.md), [split.md](split.md), and the failed exits in [discuss.md](discuss.md) and below — ends with exactly one report printed by the shared script:
+
+```bash
+../../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill arcanum-split-issue --status success|declined|failed \
+  --summary "<one line>" --issue <id> [--sub-issue <id>]... [--label-change <before>:<after>]...
+```
+
+> Resolve `../../arcanum/_lib/finish_report.sh` relative to this file's directory. `arcanum-split-issue` is never run nested by another skill, so `--merge` and `--nested` are never passed.
+
+- Relay its stdout **verbatim** as the last thing you print before any next-step offer. Never hand-format, extend, or paraphrase it.
+- Pass only the links and label changes that actually happened:
+  - `--label-change <planning change>` only if [fetch.md](fetch.md) derived one from `mark-planning`'s output;
+  - `--label-change planning:split` only once `finish.sh` has run (success path);
+  - `--sub-issue <id>` for every sub-issue actually created on GitHub **in this run** — never ids that were already tracked before it started.
+- `declined` and `failed` reports are never followed by a next-step offer.
+- If the script itself exits non-zero (usage error), tell the user in one line that the closing report could not be rendered, and end.
+
+### Failed exits
+
+Whenever a step says "**fail with** `<step>`", stop the skill right there:
+
+1. Release the working tree: `../../arcanum/_lib/checkout_safe_branch.sh "$REPO_PATH"` (resolved relative to this file's directory).
+2. Keep the local parent draft and every generated sub-issue file under `docs/agents/issues/` — do not delete them — so a later `/arcanum-split-issue <id>` resumes from them. The `Planning` label stays in place (no revert).
+3. Print the `failed` report, with a summary naming the failed step, and only what actually happened before the failure:
+
+   ```bash
+   ../../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill arcanum-split-issue --status failed --issue <id> \
+     --summary "<step> failed for issue #<id>: <short reason>." [--label-change <planning change>] [--sub-issue <id>]...
+   ```
+
+4. End — no next-step offer.
+
+## Push the sub-issues
 
 On confirmation from [split.md](split.md), push every generated sub-issue file to GitHub:
 
