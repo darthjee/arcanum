@@ -55,9 +55,11 @@ scripts/github.sh add-tag "$REPO_PATH" <id> fetched
 
 ## 3. Create the plan
 
-Read [../../auto-plan-issue/steps/run.md](../../auto-plan-issue/steps/run.md) and follow all its steps for `<id>`, carrying `REPO_PATH` forward unchanged. Its final step commits the plan files — do not commit them again here.
+Read [../../auto-plan-issue/steps/run.md](../../auto-plan-issue/steps/run.md) and follow all its steps for `<id>`, carrying `REPO_PATH` forward unchanged, **with `NESTED=true`**. Its final step commits the plan files — do not commit them again here. The nested run ends by returning a `FINISH_*` block instead of a report; do not relay or merge it, since `auto-fix-all` keeps its own `OUTCOME=...` protocol (see "Nested runs" in [docs/agents/specs/skill-finish.md](../../docs/agents/specs/skill-finish.md)). You're already running as the architect; do not spawn another `Agent(architect)` for this — just follow the steps directly.
 
-Once that finishes, swap the `fetched` tag for `working` on the live GitHub issue, to signal implementation is starting:
+If the block has `FINISH_STATUS=failed`, the plan step failed: stop processing this issue immediately and report `OUTCOME=blocked AGENT=architect ACTION="<FINISH_SUMMARY>"` at the top level, the same way a blocked step is reported elsewhere in this file — do not swap the tags below and do not continue to Step 4.
+
+Otherwise, once that finishes, swap the `fetched` tag for `working` on the live GitHub issue, to signal implementation is starting:
 
 ```bash
 scripts/github.sh remove-tag "$REPO_PATH" <id> fetched
