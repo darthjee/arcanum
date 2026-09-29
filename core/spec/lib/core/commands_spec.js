@@ -37,6 +37,7 @@ const REPO_CONTEXT_COMMANDS = [
   'auto-plan-issue-commit-plan',
   'checkout-safe-branch',
   'discuss-issue-render-issue',
+  'finish-report',
   'github-issue-create',
   'github-issue-fetch',
   'github-issue-info',
@@ -90,7 +91,7 @@ describe('COMMANDS', () => {
     expect(COMMANDS['arcanum-update-run-update-apply'].method).toBe('apply');
   });
 
-  it('sets validateRepoPath: false on the file-only auto-fix-all-queue subcommands, github-issue-info, the github-issue-mark-* family, github-issue-update, the init-claude-* family and the monitor-issues-rewrite-queue-* family', () => {
+  it('sets validateRepoPath: false on the file-only auto-fix-all-queue subcommands, finish-report, github-issue-info, the github-issue-mark-* family, github-issue-update, the init-claude-* family and the monitor-issues-rewrite-queue-* family', () => {
     const skipValidation = Object.keys(COMMANDS).filter((name) => COMMANDS[name].validateRepoPath === false);
 
     expect(skipValidation).toEqual([
@@ -99,6 +100,7 @@ describe('COMMANDS', () => {
       'auto-fix-all-queue-next',
       'auto-fix-all-queue-pop',
       'auto-fix-all-queue-wait-next',
+      'finish-report',
       'github-issue-info',
       'github-issue-mark-created',
       'github-issue-mark-enhancing',
