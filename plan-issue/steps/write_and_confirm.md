@@ -1,5 +1,36 @@
 # Write and Confirm Plan
 
+## Closing report
+
+Every exit of this skill — success below, the declined exit in [Present an overview and ask for confirmation](#abandoning-the-plan-declined), and the failed exits in [file_definition.md](file_definition.md) and below — ends with exactly one report printed by the shared script:
+
+```bash
+../../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill plan-issue --status success|declined|failed \
+  --summary "<one line>" --issue <id> [--label-change refined:ready]
+```
+
+> Resolve `../../arcanum/_lib/finish_report.sh` relative to this file's directory. `plan-issue` is never run nested by another skill, so `--merge` and `--nested` are never passed.
+
+- Relay its stdout **verbatim** as the last thing you print before any next-step offer. Never hand-format, extend, or paraphrase it.
+- Pass only the links and label changes that actually happened (`--label-change refined:ready` only once `mark-ready` has succeeded).
+- `declined` and `failed` reports are never followed by a next-step offer.
+- If the script itself exits non-zero (usage error), tell the user in one line that the closing report could not be rendered, and end.
+
+### Failed exits
+
+Whenever a step below says "**fail with** `<step>`", stop the skill right there:
+
+1. Release the working tree: `../../arcanum/_lib/checkout_safe_branch.sh "$REPO_PATH"` (resolved relative to this file's directory).
+2. Keep the plan files in `PLAN_DIR` on disk — do not delete them.
+3. Print the `failed` report, with a summary naming the failed step, and only what actually happened before the failure:
+
+   ```bash
+   ../../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill plan-issue --status failed --issue <id> \
+     --summary "<step> failed for issue #<id>: <short reason>."
+   ```
+
+4. End — no next-step offer.
+
 ## Discuss the issue with the user
 
 Based solely on the issue description (do **not** look at the code yet), write a draft plan and present it to the user.
@@ -92,7 +123,27 @@ Wait for the user's response. During this interaction:
     - **Provide the answer or specification directly** — incorporate it into the plan and confirm the update.
     - **Ask the agent to research it** — see "Analyzing the codebase" below.
 
-Repeat until the user confirms the plan is satisfactory.
+Repeat until the user confirms the plan is satisfactory. A request for changes is **not** a decline — it keeps this loop going.
+
+### Abandoning the plan (declined)
+
+If, at any point in this loop, the user explicitly abandons planning (e.g. "stop", "cancel", "drop it"):
+
+1. Keep the plan files in `PLAN_DIR` on disk and commit nothing; no label changes.
+2. Release the working tree defensively (a no-op here, since nothing was checked out yet):
+
+   ```bash
+   ../../arcanum/_lib/checkout_safe_branch.sh "$REPO_PATH"
+   ```
+
+3. Print the `declined` report (see [Closing report](#closing-report)) and relay it verbatim:
+
+   ```bash
+   ../../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill plan-issue --status declined --issue <id> \
+     --summary "Planning for issue #<id> abandoned; plan files left uncommitted."
+   ```
+
+4. End — no next-step offer.
 
 ## Analyzing the codebase
 
