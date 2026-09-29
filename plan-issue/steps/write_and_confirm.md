@@ -181,13 +181,25 @@ When the user asks you to look at the code (e.g., "check the code", "look at the
    Does this approach look correct? Anything to add or correct?
    ```
 
-## Offer to open the PR
+## Commit and publish the plan
 
-Once the plan is confirmed, ask:
+Reached once the user confirms the plan — the same way for a freshly written plan and for an existing one (`PLAN_EXISTS=true`). Always use `git -C "$REPO_PATH"`, never a bare `git`, which would operate against the Bash tool's ambient cwd instead of the target repo.
 
-```text
-Would you like to proceed and open a PR to fix this issue now?
-```
+1. **Bootstrap the branch.** Run `../../auto-fix-all/scripts/checkout_from_main.sh "$REPO_PATH" <id>` — a cross-skill reference to the same reuse-and-merge branch bootstrap script `auto-fix-all` uses (resolved relative to this file's directory). It fetches `origin`, reuses branch `issue-<id>` merged up to date with `origin/main` if it already exists locally or remotely, or creates it fresh from `origin/main` otherwise. If it exits non-zero, **fail with** `checkout_from_main.sh`. Otherwise parse `STATUS` from its output.
+   - **`STATUS=conflict`**: apply the same responsible-agent-selection approach as [`auto-fix-all/steps/handle_comment.md`](../../auto-fix-all/steps/handle_comment.md)'s "Choosing the responsible agent(s)" section, treating each conflicted path it printed like a failed check-run name — dispatch the responsible specialist(s) (or resolve it yourself, if none seem responsible) to fix the conflict, then run `git -C "$REPO_PATH" add` on the resolved paths and `git -C "$REPO_PATH" commit` with no message argument (the merge-commit message `git merge --no-edit` already prepared is reused as-is). No user interaction. If the conflict cannot be resolved, **fail with** `checkout_from_main.sh (merge conflict)`.
+   - **`STATUS=ok`**: continue directly.
 
-- If the user confirms (yes, sure, go ahead, or similar affirmative): invoke the `/auto-fix-issue <id>` skill, where `<id>` is the issue ID parsed in Step 2.
-- If the user declines: acknowledge and stop.
+   The plan files in `PLAN_DIR` (and `ISSUE_FILE`, if it was untracked) were written to the working tree before this checkout and carry over onto `issue-<id>` as untracked files.
+2. **Commit the issue file if needed.** Run `git -C "$REPO_PATH" ls-files --error-unmatch <ISSUE_FILE>`. If it exits non-zero (the issue file is not tracked on the branch), run `../../auto-new-issue/scripts/commit_issue.sh "$REPO_PATH" <ISSUE_FILE> <id> "<your AI model name>" "<your AI model noreply email>"` — a cross-skill reference to the same script `auto-new-issue` uses (resolved relative to this file's directory). It commits the issue file and pushes it. If it fails, **fail with** `commit_issue.sh`.
+3. **Commit the plan.** Run `git -C "$REPO_PATH" status --porcelain -- <PLAN_DIR>`:
+   - **Output is empty** (the plan was already committed, e.g. by an earlier `auto-plan-issue` run): skip the commit and go on to the push.
+   - **Otherwise**: run `../../auto-plan-issue/scripts/commit_plan.sh "$REPO_PATH" <PLAN_DIR> <id> "<your AI model name>" "<your AI model noreply email>"` — a cross-skill reference to the same script `auto-plan-issue` uses (resolved relative to this file's directory). It stages `PLAN_DIR`, commits and pushes. Never commit the plan by hand. If it fails, **fail with** `commit_plan.sh`.
+4. **Push.** Run `git -C "$REPO_PATH" push`, so any already-committed but unpushed issue or plan commit on `issue-<id>` is published too. If it fails, **fail with** `plan push`.
+5. **Swap labels.** Run `../../discuss-issue/scripts/github.sh mark-ready "$REPO_PATH" <id>` (resolved relative to this file's directory) to swap the `Refined` label for `Ready`, now that the issue and plan are committed and pushed. Best-effort: a failure here is not a skill failure — omit `--label-change refined:ready` from the report in that case.
+6. **Release the working tree** back to the configured safe branch, handing `issue-<id>` back for other agents sharing the same `.git`:
+
+   ```bash
+   ../../arcanum/_lib/checkout_safe_branch.sh "$REPO_PATH"
+   ```
+
+   > Resolve `../../arcanum/_lib/checkout_safe_branch.sh` relative to this file's directory.
