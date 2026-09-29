@@ -8,6 +8,15 @@ The id is always numeric and tied to a real GitHub issue — there is no local-o
 
 > Resolve `../scripts/resolve_and_fetch.sh` relative to this file's directory (i.e., the `scripts/` folder inside this skill).
 
+If the script exits non-zero with no `STATUS=` line (e.g. the dirty tracked-file working tree above), surface its error to the user, then print the `failed` closing report and end — no next-step offer, no further checkout (the working tree was never moved):
+
+```bash
+../../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill discuss-issue --status failed \
+  --summary "resolve_and_fetch.sh failed: <short reason, e.g. dirty working tree>." [--issue <id>]
+```
+
+> Resolve `../../arcanum/_lib/finish_report.sh` relative to this file's directory. Pass `--issue <id>` only if the skill arguments already contained a numeric id. Relay its stdout verbatim as the last thing you print; see [discuss_and_save.md](discuss_and_save.md#closing-report) for the report rules.
+
 The script guarantees `FILE` exists on disk once it exits `STATUS=ok` — the script handles fetching and writing it; there's nothing left for the agent to do there. The only other case is `STATUS=error` (no id given, or the GitHub issue doesn't exist).
 
 ## Interpret the output
