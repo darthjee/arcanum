@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Interactive next-step offer shown by interactive issue skills after
-# their closing report — see docs/agents/specs/skill-finish.md and
-# docs/agents/plans/660-skill-finish-discuss-issue/plan.md for the full
-# design/shared contracts. Plain bash, NOT engine-dispatched: it owns the
+# their closing report — see docs/agents/architecture/skill-finish.md
+# for the full design/contracts. Plain bash, NOT engine-dispatched: it owns the
 # prompt on /dev/tty (the arcanum/migrations/run.sh convention), never a
 # chat-mediated yes/no.
 #
