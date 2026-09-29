@@ -22,4 +22,6 @@ Once satisfied, push the current state of `FILE` to the live GitHub issue immedi
 
 > Resolve `../scripts/github.sh` relative to this file's directory.
 
-Proceed to [split.md](split.md).
+If `update` exits non-zero, **fail with** `Publish parent draft` (see [push.md](push.md#failed-exits)), passing `--label-change <planning change>` if [fetch.md](fetch.md) derived one. No sub-issue has been created yet, so pass no `--sub-issue`.
+
+Otherwise, proceed to [split.md](split.md).

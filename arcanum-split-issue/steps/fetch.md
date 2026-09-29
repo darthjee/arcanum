@@ -8,6 +8,8 @@ The id is always numeric and tied to a real GitHub issue — there is no local-o
 
 > Resolve `../../arcanum/_lib/resolve_and_fetch.sh` relative to this file's directory (i.e. the `steps/` folder inside this skill) — this skill lives at the same nesting depth as `discuss-issue`/`enhance-issue`, so it calls the promoted `_lib` copy directly instead of the `discuss-issue`-relative wrapper `enhance-issue` uses.
 
+If the script itself exits non-zero (e.g. a dirty working tree — a plain script error, not `STATUS=error`), **fail with** `Fetch` (see [push.md](push.md#failed-exits)): no label change has happened yet, so pass no `--label-change`, and pass `--issue <id>` only if the id could be parsed from the skill args.
+
 The script guarantees `FILE` exists on disk once it exits `STATUS=ok` — the script handles fetching and writing it; there's nothing left for the agent to do there. The only other case is `STATUS=error` (no id given, or the GitHub issue doesn't exist).
 
 ## Interpret the output
@@ -22,6 +24,14 @@ The script guarantees `FILE` exists on disk once it exits `STATUS=ok` — the sc
 
 > Resolve `../scripts/github.sh` relative to this file's directory. Best-effort — never blocks proceeding. Adds `Planning` and removes whichever of `Idea`/`Writting`/`Created` is present, since this skill can be invoked either before `enhance-issue` (on a bare `Idea`/`Writting` issue) or after it (on a `Created` issue).
 
+Derive the **planning change** from `mark-planning`'s output, and carry it through the rest of the run — it is passed as `--label-change <planning change>` to whichever closing report this run ends with (success, declined or failed; see [push.md](push.md#closing-report)):
+
+- `idea:planning` if it printed `Removed tag 'idea'`;
+- `writting:planning` if it printed `Removed tag 'writting'`;
+- `created:planning` if it printed `Removed tag 'created'`;
+- `:planning` if it printed `Added tag 'planning'` but removed none of them;
+- **none** if it printed no `Added tag 'planning'` line (already present, or the call failed). `mark-planning` stays best-effort: a failure here is never a skill failure; just omit the planning change from the report.
+
 Then check whether this issue already has tracked sub-issues:
 
 ```bash
@@ -30,8 +40,18 @@ Then check whether this issue already has tracked sub-issues:
 
 - **Empty/absent output** — no sub-issues tracked yet. Proceed straight to [explore.md](explore.md).
 - **Non-empty output** (a JSON array with at least one id) — tell the user this issue already has sub-issues tracked (list the ids) and ask whether to:
-  - **Skip** — the issue was already split; stop here and report the existing sub-issues, doing nothing else.
-  - **Continue** — append more sub-issues to the same parent. Proceed to [explore.md](explore.md); new sub-issue files generated later automatically continue the existing count sequence (`create_sub_issue_file.sh` scans existing files itself, it doesn't trust any count carried over from this check).
+  - **Skip** — the issue was already split; stop here, doing nothing else. Release the working tree, then print the `declined` report (relayed verbatim, see [push.md](push.md#closing-report)) listing the existing sub-issues, and end — no next-step offer:
+
+    ```bash
+    ../../arcanum/_lib/checkout_safe_branch.sh "$REPO_PATH"
+    ../../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill arcanum-split-issue --status declined --issue <id> \
+      --summary "Issue #<id> was already split; skipped." \
+      --sub-issue <existing id>... [--label-change <planning change>]
+    ```
+
+    > Resolve both scripts relative to this file's directory. Pass one `--sub-issue` per id in the tracked JSON array.
+
+  - **Continue** — append more sub-issues to the same parent. Proceed to [explore.md](explore.md); new sub-issue files generated later automatically continue the existing count sequence (`create_sub_issue_file.sh` scans existing files itself, it doesn't trust any count carried over from this check). From here on, the closing report and the next-step offer include **only the sub-issues created in this run** — never the ids that were already tracked before it.
 
 ### STATUS=error
 
