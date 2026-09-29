@@ -14,7 +14,7 @@ const WEB_DOMAIN_ALIASES = { 'ssh.github.com': 'github.com' };
  * byte-identical stdout/exit-code counterpart to
  * `arcanum/_lib/finish_report_shell.sh`. Renders the uniform
  * end-of-skill report (or, with `--nested`, the `FINISH_*` result-data
- * block) described in docs/agents/specs/skill-finish.md. Pure
+ * block) described in docs/agents/architecture/skill-finish.md. Pure
  * formatting plus local git-origin parsing: no network call and no
  * GitHub token. Any usage error throws a plain `Error`, which
  * `core/bin/arcanum` surfaces as a stderr message, empty stdout and

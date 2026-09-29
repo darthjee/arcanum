@@ -6,13 +6,12 @@ import { NATIVE_BIN, REPO_ROOT, expectParity, runCommand } from '../support/util
 
 // Parity test for the "finish-report" migrated entrypoint (issue #660)
 // — see docs/agents/architecture/script-engine.md's "output/exit-code
-// contract", docs/agents/specs/skill-finish.md and
-// docs/agents/plans/660-skill-finish-discuss-issue/plan.md's "Shared
-// contracts". Runs arcanum/_lib/finish_report_shell.sh directly (NOT
-// through the arcanum/_lib/finish_report.sh engine_dispatch shim — so
-// this test isn't circular) and `core/bin/arcanum finish-report`
-// against the same temp git repo (with a seeded `origin`), asserting
-// byte-identical stdout and exit code.
+// contract" and docs/agents/architecture/skill-finish.md. Runs
+// arcanum/_lib/finish_report_shell.sh directly (NOT through the
+// arcanum/_lib/finish_report.sh engine_dispatch shim — so this test
+// isn't circular) and `core/bin/arcanum finish-report` against the
+// same temp git repo (with a seeded `origin`), asserting byte-identical
+// stdout and exit code.
 
 const execFileAsync = promisify(execFile);
 
