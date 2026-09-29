@@ -1,19 +1,64 @@
 # Publish Back to GitHub
 
-Once the user is satisfied with the issue overall (the end of the [dialogue.md](dialogue.md) loop), push the current state of the local draft to the live GitHub issue and clean up — nothing from this skill is committed to the repo; only the live issue changes.
+Once the user is satisfied with the issue overall (the end of the [dialogue.md](dialogue.md) loop), push the current state of the local draft to the live GitHub issue, clean up, and end with the standard finish — nothing from this skill is committed to the repo; only the live issue changes.
+
+## Closing report
+
+Every exit of this skill — success here, the declined exit in [dialogue.md](dialogue.md#abandoning-the-enhancement-declined), and the failed exits in [fetch.md](fetch.md) and below — ends with exactly one report printed by the shared script:
+
+```bash
+../../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill enhance-issue --status success|declined|failed \
+  --summary "<one line>" --issue <id> [--sub-issue <id>]... [--label-change <before>:<after>]...
+```
+
+> Resolve `../../arcanum/_lib/finish_report.sh` relative to this file's directory. `enhance-issue` is never run nested by another skill, so `--merge` is never passed.
+
+- Relay its stdout **verbatim** as the last thing you print before any next-step offer. Never hand-format, extend, or paraphrase it.
+- Pass only the links and label changes that actually happened:
+  - `--label-change <enhancing change>` only if [fetch.md](fetch.md) derived one;
+  - `--label-change <created change>` only once `mark-created` has run (success path);
+  - `--sub-issue <id>` for every issue spawned with `--as-subissue` during the [dialogue.md](dialogue.md) loop, since the sub-issue exists regardless of how the run ends.
+- `declined` and `failed` reports are never followed by a next-step offer.
+- If the script itself exits non-zero (usage error), tell the user in one line that the closing report could not be rendered, and end.
+
+### Failed exits
+
+Whenever a step below says "**fail with** `<step>`", stop the skill right there:
+
+1. Release the working tree: `../../arcanum/_lib/checkout_safe_branch.sh "$REPO_PATH"` (resolved relative to this file's directory).
+2. Keep the local draft `FILE` — do not delete it — so a later `/enhance-issue <id>` resumes from it. The `Enhancing` label stays in place (no revert).
+3. Print the `failed` report, with a summary naming the failed step, and only what actually happened before the failure:
+
+   ```bash
+   ../../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill enhance-issue --status failed --issue <id> \
+     --summary "<step> failed for issue #<id>: <short reason>." [--label-change <enhancing change>] [--sub-issue <id>]...
+   ```
+
+4. End — no next-step offer.
 
 ## 1. Update the issue and swap tags
 
 ```bash
 ../scripts/github.sh update "$REPO_PATH" <id> "<Title>" <issue_file_path>
+```
+
+If `update` exits non-zero, **fail with** `Publish (update)` — no further label change happened. Otherwise run:
+
+```bash
 ../scripts/github.sh mark-created "$REPO_PATH" <id>
 ```
 
-> Resolve `../scripts/github.sh` relative to this file's directory. `$REPO_PATH` (resolved once at the top of [SKILL.md](../SKILL.md)) is a required leading argument — the script resolves the GitHub domain and repository from it explicitly, rather than from ambient `git remote get-url origin`. `mark-created` adds the `Created` label and removes `Idea`/`Writting`, if present — best-effort, it never blocks this step.
+> Resolve `../scripts/github.sh` relative to this file's directory. `$REPO_PATH` (resolved once at the top of [SKILL.md](../SKILL.md)) is a required leading argument — the script resolves the GitHub domain and repository from it explicitly, rather than from ambient `git remote get-url origin`. `mark-created` adds the `Created` label and removes `Idea`/`Writting`/`Enhancing`, if present — best-effort, it never blocks this step and is never a failure.
+
+Derive the **created change** from `mark-created`'s output:
+
+- `enhancing:created` if it printed `Removed tag 'enhancing'`;
+- otherwise `idea:created` if it printed `Removed tag 'idea'`, or `writting:created` if it printed `Removed tag 'writting'` (e.g. `mark-enhancing` had failed earlier);
+- otherwise `:created`.
 
 ## 2. Delete the local draft
 
-Delete `FILE` (the local `docs/agents/issues/<id>-...md` draft) — unlike `discuss-issue`, this skill never commits its local file; it's transient working material only, and the live GitHub issue body is now the source of truth.
+Delete `FILE` (the local `docs/agents/issues/<id>-...md` draft) — unlike `discuss-issue`, this skill never commits its local file; it's transient working material only, and the live GitHub issue body is now the source of truth. This is the only exit path that deletes the draft.
 
 ## 3. Release the working tree
 
@@ -23,6 +68,29 @@ Delete `FILE` (the local `docs/agents/issues/<id>-...md` draft) — unlike `disc
 
 > Resolve `../../arcanum/_lib/checkout_safe_branch.sh` relative to this file's directory. This is a defensive no-op today — this skill never checks out `issue-<id>` itself — but keeps the working tree in the same known-safe state every one of `enhance-issue`/`discuss-issue`/`arcanum-split-issue` leaves it in at its true end point.
 
-## 4. Confirm
+## 4. Success report
 
-Tell the user the issue has been updated on GitHub and is now tagged `Created`, ready to enter the `discuss-issue` → `plan-issue`/`auto-plan-issue` → `auto-fix-issue` pipeline.
+Print the `success` report and relay it verbatim (see [Closing report](#closing-report)):
+
+```bash
+../../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill enhance-issue --status success --issue <id> \
+  --summary "Issue #<id> enhanced and pushed to GitHub." \
+  [--label-change <enhancing change>] --label-change <created change> [--sub-issue <id>]...
+```
+
+## 5. Next step: discuss-issue
+
+Offer the next pipeline step through the shared `/dev/tty` prompt — never a chat-mediated yes/no:
+
+```bash
+../../arcanum/_lib/next_step_prompt.sh --repo "$REPO_PATH" --command "/discuss-issue <id>"
+```
+
+> Resolve `../../arcanum/_lib/next_step_prompt.sh` relative to this file's directory. It prints `CHOICE=yes` / `CHOICE=no` (exit 0), `CHOICE=chat` + `CHAT_CONTEXT=next_step` (exit 3), or nothing (exit 1, prompt unavailable).
+
+- **`CHOICE=yes`**: invoke `/discuss-issue <id>` inline, in the same session, as a **chained** top-level run — no `NESTED=true`. It prints its own report and next step.
+- **`CHOICE=no`**: end.
+- **`CHOICE=chat`** (exit 3): return to the conversation. Do not run `discuss-issue` unless the user asks for it in chat.
+- **exit 1**: say in one line that the next-step prompt was unavailable, then end.
+
+Never re-ask in chat, and never change the command that was shown.

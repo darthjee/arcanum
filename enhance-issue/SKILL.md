@@ -23,4 +23,4 @@ Read [steps/dialogue.md](steps/dialogue.md) and follow the instructions there.
 
 ## Step 4 — Publish back to GitHub
 
-Read [steps/publish.md](steps/publish.md) and follow the instructions there.
+Read [steps/publish.md](steps/publish.md) and follow the instructions there. It ends with the standard closing report and the `/discuss-issue <id>` next-step offer.
