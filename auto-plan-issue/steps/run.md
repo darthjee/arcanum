@@ -18,23 +18,37 @@ scripts/resolve_plan_paths.sh "$REPO_PATH" docs/agents/issues docs/agents/plans 
 
 > Resolve `scripts/resolve_plan_paths.sh` relative to the `auto-plan-issue` skill folder.
 
-Parse the key=value output to obtain `ISSUE_FILE`, `PLAN_DIR`, `PLAN_FILE`, and `PLAN_EXISTS`.
+If no numeric id can be parsed, or the script exits non-zero (e.g. no issue file found for `<id>`), **fail with** `resolve_plan_paths.sh` (see [Failed exits](#failed-exits)) — there is nothing to plan. Pass `--issue <id>` only if a numeric id was parsed; otherwise omit it. With `NESTED=true`, add `--nested` (see [Nested runs](#nested-runs)).
 
-- If the script fails (no issue file found for `<id>`), stop and report the error — there is nothing to plan.
+Otherwise, parse the key=value output to obtain `ISSUE_FILE`, `PLAN_DIR`, `PLAN_FILE`, and `PLAN_EXISTS`.
+
 - Read `ISSUE_FILE` to understand the issue.
-- If `PLAN_EXISTS=true`, a plan already exists for this issue. Read the existing file(s) in `PLAN_DIR` and stop — this skill never overwrites an existing plan.
+- If `PLAN_EXISTS=true`, a plan already exists for this issue. Read the existing file(s) in `PLAN_DIR`. This skill never overwrites an existing plan, so write and commit nothing, and end with the `success` report (see [Closing report](#closing-report)):
+
+  ```bash
+  ../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill auto-plan-issue --status success --issue <id> \
+    --summary "Plan for #<id> already exists; nothing was written." --next "/auto-fix-issue <id>"
+  ```
+
+  > With `NESTED=true`, drop `--next` and add `--nested`, then relay the `FINISH_*` block to your caller (see [Nested runs](#nested-runs)).
 
 ## Step 2 — Identify the project folder and explore the codebase
 
 Read [explore_codebase.md](explore_codebase.md) and follow the instructions there. Unlike the interactive `plan-issue` skill, you explore the codebase freely and without asking permission.
 
+If exploring the codebase cannot complete, **fail with** `explore codebase`, with `--issue <id>` (see [Failed exits](#failed-exits)). With `NESTED=true`, add `--nested` (see [Nested runs](#nested-runs)).
+
 ## Step 3 — Determine agent split
 
 Read [determine_agents.md](determine_agents.md) and follow the instructions there to decide whether the plan is split across specialist agents.
 
+If determining the agent split cannot complete, **fail with** `determine agents`, with `--issue <id>` (see [Failed exits](#failed-exits)). With `NESTED=true`, add `--nested` (see [Nested runs](#nested-runs)).
+
 ## Step 4 — Write the plan file(s)
 
 Read [write_plan.md](write_plan.md) and follow the instructions there to write `plan.md` and, if applicable, one file per involved agent inside `PLAN_DIR`.
+
+If writing the plan cannot complete, **fail with** `write plan`, with `--issue <id>` (see [Failed exits](#failed-exits)). With `NESTED=true`, add `--nested` (see [Nested runs](#nested-runs)).
 
 ## Step 5 — Commit the plan
 
@@ -48,9 +62,18 @@ scripts/commit_plan.sh "$REPO_PATH" <PLAN_DIR> <id> "<your AI model name>" "<you
 
 This stages every file under `PLAN_DIR` and commits them using the repo's commit message template, with `type=docs`, `scope=plan`, subject `"add implementation plan"`, and the agent fixed to `architect`. Never commit by hand — always go through this script.
 
+If it exits non-zero, **fail with** `commit_plan.sh`, with `--issue <id>` (see [Failed exits](#failed-exits)). With `NESTED=true`, add `--nested` (see [Nested runs](#nested-runs)).
+
 ## Step 6 — Done
 
-Do not ask for confirmation and do not invoke any fix/PR skill — that orchestration belongs to a separate skill. Report that the plan was written and committed, listing the file(s) created.
+Do not ask for confirmation and do not invoke any fix/PR skill — that orchestration belongs to a separate skill. Print the `success` report and relay it verbatim (see [Closing report](#closing-report)):
+
+```bash
+../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill auto-plan-issue --status success --issue <id> \
+  --summary "Plan for #<id> written and committed in <PLAN_DIR>." --next "/auto-fix-issue <id>"
+```
+
+With `NESTED=true`, drop `--next` and add `--nested` (see [Nested runs](#nested-runs)).
 
 ## Closing report
 
