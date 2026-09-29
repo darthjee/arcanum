@@ -36,4 +36,27 @@ If the digging surfaces something that deserves its own GitHub issue instead of 
 
 Return to step 2 to refresh the checklist (the item just discussed is now ✅) and present it again.
 
-Keep looping until the user says they're satisfied with the issue overall — at which point proceed to [publish.md](publish.md).
+Keep looping until the user says they're satisfied with the issue overall — at which point proceed to [publish.md](publish.md). If instead the user explicitly abandons the enhancement, follow [Abandoning the enhancement](#abandoning-the-enhancement-declined) below.
+
+## Abandoning the enhancement (declined)
+
+If, at any point in this loop, the user explicitly abandons the enhancement (e.g. "stop", "drop it", "never mind, leave the issue as is"), end the skill here. Only an explicit abandonment counts: a user who is merely not yet satisfied with one topic, or who wants to move on to another topic, has not declined — keep looping.
+
+1. Do not push anything and do not change any further label. The `Enhancing` label set in [fetch.md](fetch.md) stays in place (no revert).
+2. Keep the local draft `FILE` — do not delete it — so a later `/enhance-issue <id>` resumes from it.
+3. Release the working tree defensively:
+
+   ```bash
+   ../../arcanum/_lib/checkout_safe_branch.sh "$REPO_PATH"
+   ```
+
+4. Print the `declined` report and relay it verbatim (pass `--label-change` only if [fetch.md](fetch.md) derived an enhancing change; see [publish.md](publish.md#closing-report) for the report rules):
+
+   ```bash
+   ../../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill enhance-issue --status declined --issue <id> \
+     --summary "Enhancement of issue #<id> abandoned by the user; nothing was pushed." [--label-change <enhancing change>]
+   ```
+
+   > Resolve both scripts relative to this file's directory.
+
+5. End — no next-step offer.
