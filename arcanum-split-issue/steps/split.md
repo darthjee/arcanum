@@ -33,4 +33,12 @@ Check the reply deterministically:
 > Resolve `../../discuss-issue/scripts/confirm.sh` relative to this file's directory — reused directly rather than duplicated.
 
 - **Exits 0 (confirmed)** — proceed to [push.md](push.md).
-- **Exits 1 (declined)** — stop here. Tell the user the sub-issue files remain locally under `docs/agents/issues/` (not committed, not pushed to GitHub) and nothing else was changed; they can resume later by re-running this skill — [fetch.md](fetch.md)'s existing-sub-issues check won't trigger yet (nothing was pushed), and any already-generated files are picked up as the starting count the next time a file is created.
+- **Exits 1 (declined)** — stop here. Tell the user the sub-issue files remain locally under `docs/agents/issues/` (not committed, not pushed to GitHub) and nothing else was changed; they can resume later by re-running this skill — [fetch.md](fetch.md)'s existing-sub-issues check won't trigger yet (nothing was pushed), and any already-generated files are picked up as the starting count the next time a file is created. Then release the working tree and print the `declined` report (relayed verbatim, see [push.md](push.md#closing-report)), and end — no next-step offer:
+
+  ```bash
+  ../../arcanum/_lib/checkout_safe_branch.sh "$REPO_PATH"
+  ../../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill arcanum-split-issue --status declined --issue <id> \
+    --summary "Split of issue #<id> declined; sub-issue files kept locally." [--label-change <planning change>]
+  ```
+
+  > Resolve both scripts relative to this file's directory. Pass `--label-change <planning change>` only if [fetch.md](fetch.md) derived one; no sub-issue was created, so pass no `--sub-issue`.
