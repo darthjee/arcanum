@@ -32,6 +32,8 @@ Append the outcome to `FILE` (the local issue draft from [fetch.md](fetch.md)) �
 
 If the digging surfaces something that deserves its own GitHub issue instead of folding into `FILE`, spin it off with `../../arcanum/_lib/spawn_issue.sh "$REPO_PATH" <id> "<title>" <body_file>` rather than drafting a file to commit directly. Whether to pass `--as-subissue` is a judgment call each time: pass it when the new issue is genuinely a piece of this issue's own work breakdown, omit it (the default — a comment-only cross-reference) when it's a tangential/independent concern.
 
+Remember the `ID=` printed for every issue spawned with `--as-subissue`: each one is passed as `--sub-issue <new id>` to whichever closing report this run ends with (success, declined or failed).
+
 ## 5. Repeat or finish
 
 Return to step 2 to refresh the checklist (the item just discussed is now ✅) and present it again.
@@ -54,7 +56,7 @@ If, at any point in this loop, the user explicitly abandons the enhancement (e.g
 
    ```bash
    ../../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill enhance-issue --status declined --issue <id> \
-     --summary "Enhancement of issue #<id> abandoned by the user; nothing was pushed." [--label-change <enhancing change>]
+     --summary "Enhancement of issue #<id> abandoned by the user; nothing was pushed." [--label-change <enhancing change>] [--sub-issue <id>]...
    ```
 
    > Resolve both scripts relative to this file's directory.
