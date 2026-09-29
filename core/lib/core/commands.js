@@ -25,6 +25,8 @@
  *     mark-refined / mark-split), on `auto-monitor-issue-pr-resolve-pr-number`, on
  *     `auto-monitor-pr-monitor-pr`, on `auto-new-issue-commit-issue`, on
  *     `auto-plan-issue-commit-plan`, on `discuss-issue-render-issue`, on
+ *     `finish-report` (`validateRepoPath: false` — its shell original
+ *     only reads `origin`, and only when an issue/PR URL is printed), on
  *     the `init-claude-*` family (set-ci-ignored-patterns /
  *     setup-docs-structure / setup-templates / stamp-arcanum-version /
  *     write-label-config-replace / write-label-config-remove /
@@ -286,6 +288,12 @@ export const COMMANDS = {
     module: 'commands/discuss-issue/DiscussIssueRenderIssue.js',
     method: 'run',
     context: 'repo'
+  },
+  'finish-report': {
+    module: 'commands/shared/FinishReport.js',
+    method: 'run',
+    context: 'repo',
+    validateRepoPath: false
   },
   'github-issue-create': {
     module: 'commands/shared/GithubIssue.js',

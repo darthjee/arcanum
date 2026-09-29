@@ -41,9 +41,11 @@ Show the questions to the user and wait for their response.
 
 ## 6. Update the draft
 
-Incorporate the user's answers into the issue file (rewriting `FILE` in place, same rules as step 2).
+Incorporate the user's answers into the issue file (rewriting `FILE` in place, same rules as step 2). If the user's answer abandons the refinement instead, follow [Abandoning the refinement](#abandoning-the-refinement-declined) below.
 
 If the dialogue surfaces something that deserves its own GitHub issue instead of folding into `FILE`, spin it off with `../../arcanum/_lib/spawn_issue.sh "$REPO_PATH" <id> "<title>" <body_file>` rather than drafting a file to commit directly. Whether to pass `--as-subissue` is a judgment call each time: pass it when the new issue is genuinely a piece of this issue's own work breakdown, omit it (the default — a comment-only cross-reference) when it's a tangential/independent concern.
+
+Remember the `ID=` printed for every issue spawned with `--as-subissue`: each one is passed as `--sub-issue <new id>` to whichever closing report this run ends with (success, declined or failed), since the sub-issue exists regardless of how the run ends.
 
 ## 7. Comprehension confirmation
 
@@ -61,8 +63,53 @@ Wait for the user's free-form reply, then pass it, verbatim, to a script that de
 
 > Resolve `../scripts/confirm.sh` relative to this file's directory.
 
-- **Exit 1 (no)**: update the draft with whatever new information the reply contained, then go back to step 4 to see if new clarifying questions are warranted before asking "Did I comprehend the issue?" again.
+- **Exit 1 (no)**: update the draft with whatever new information the reply contained, then go back to step 4 to see if new clarifying questions are warranted before asking "Did I comprehend the issue?" again. A "no" here is **not** a decline — it only means the draft needs more work.
 - **Exit 0 (yes)**: proceed to "Push to GitHub" below, then to step 8.
+
+### Abandoning the refinement (declined)
+
+If, at any point in steps 5–7, the user explicitly abandons the refinement (e.g. "stop", "drop it", "never mind, leave the issue as is"), do not push anything and do not change any label. Release the working tree defensively:
+
+```bash
+../../arcanum/_lib/checkout_safe_branch.sh "$REPO_PATH"
+```
+
+Then print the `declined` report (see [Closing report](#closing-report)) and end — no next-step offer:
+
+```bash
+../../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill discuss-issue --status declined --issue <id> \
+  --summary "Refinement of issue #<id> abandoned by the user; nothing was pushed."
+```
+
+## Closing report
+
+Every exit of this skill from here on — and the early exits above — ends with exactly one report printed by the shared script:
+
+```bash
+../../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill discuss-issue --status success|declined|failed \
+  --summary "<one line>" --issue <id> [--sub-issue <id>]... [--label-change <before>:<after>]... [--merge "<block>"]
+```
+
+> Resolve `../../arcanum/_lib/finish_report.sh` relative to this file's directory.
+
+- Relay its stdout **verbatim** as the last thing you print before any next-step offer. Never hand-format, extend, or paraphrase it.
+- Pass only the links and label changes that actually happened.
+- `declined` and `failed` reports are never followed by a next-step offer.
+- If the script itself exits non-zero (usage error), tell the user in one line that the closing report could not be rendered, and end.
+
+### Failed exits
+
+Whenever a step below says "**fail with** `<step>`", stop the skill right there:
+
+1. Release the working tree: `../../arcanum/_lib/checkout_safe_branch.sh "$REPO_PATH"` (resolved relative to this file's directory).
+2. Print the `failed` report, with a summary naming the failed step, and only what actually happened before the failure (e.g. `--label-change` for the refine swap only if the push already succeeded and `mark-refined` ran):
+
+   ```bash
+   ../../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill discuss-issue --status failed --issue <id> \
+     --summary "<step> failed for issue #<id>: <short reason>." [--label-change <refine change>]
+   ```
+
+3. End — no next-step offer.
 
 ## Push to GitHub
 
@@ -70,45 +117,93 @@ Run:
 
 ```bash
 ../scripts/github.sh update "$REPO_PATH" <id> "<Title>" <issue_file_path>
+```
+
+If `update` exits non-zero, **fail with** `Push to GitHub (update)` — no label change happened. Otherwise run:
+
+```bash
 ../scripts/github.sh mark-refined "$REPO_PATH" <id>
 ```
 
-> Resolve `../scripts/github.sh` relative to this file's directory. `$REPO_PATH` (resolved once at the top of [SKILL.md](../SKILL.md)) is a required leading argument — the script resolves the GitHub domain and repository from it explicitly, rather than from ambient `git remote get-url origin`. The body is read directly from file via `--body-file`/`cat`, avoiding quoting issues with multi-line content. `mark-refined` adds the `Refined` label and removes `Created`, if present — best-effort, it never blocks this step.
+> Resolve `../scripts/github.sh` relative to this file's directory. `$REPO_PATH` (resolved once at the top of [SKILL.md](../SKILL.md)) is a required leading argument — the script resolves the GitHub domain and repository from it explicitly, rather than from ambient `git remote get-url origin`. The body is read directly from file via `--body-file`/`cat`, avoiding quoting issues with multi-line content. `mark-refined` adds the `Refined` label and removes `Created`/`Idea`/`Writting`, if present — best-effort, it never blocks this step and is never a failure.
 
-## 8. Planning confirmation
+Derive the **refine change** from `mark-refined`'s output:
 
-Only reached right after a successful push above. Ask:
+- `created:refined` if it printed `Removed tag 'created'`;
+- `idea:refined` if it printed `Removed tag 'idea'`;
+- `writting:refined` if it printed `Removed tag 'writting'`;
+- `:refined` otherwise.
 
-```text
-Would you like me to start planning this issue now?
-```
+## 8. Next step: planning
 
-Wait for the user's free-form reply, then pass it to the same script:
+Only reached right after a successful push above. Offer planning through the shared `/dev/tty` prompt — never a chat-mediated yes/no:
 
 ```bash
-../scripts/confirm.sh "<raw reply>"
+../../arcanum/_lib/next_step_prompt.sh --repo "$REPO_PATH" --command "/auto-plan-issue <id>"
 ```
 
-- **Exit 1 (no)**: finish exactly as today — the issue is already pushed to GitHub; no branch or plan is created. Then release the working tree back to the configured safe branch (defensive no-op — this path never touches `issue-<id>`):
+> Resolve `../../arcanum/_lib/next_step_prompt.sh` relative to this file's directory. It prints `CHOICE=yes` / `CHOICE=no` (exit 0), `CHOICE=chat` + `CHAT_CONTEXT=next_step` (exit 3), or nothing (exit 1, prompt unavailable).
 
-  ```bash
-  ../../arcanum/_lib/checkout_safe_branch.sh "$REPO_PATH"
-  ```
+### `CHOICE=no`, `CHOICE=chat` (exit 3), or exit 1 — push only
 
-  > Resolve `../../arcanum/_lib/checkout_safe_branch.sh` relative to this file's directory. Nothing further to do.
-- **Exit 0 (yes)**:
-  1. Run `../../auto-fix-all/scripts/checkout_from_main.sh "$REPO_PATH" <id>` — a cross-skill reference to the same reuse-and-merge branch bootstrap script `auto-fix-all` uses (resolved relative to this file's directory: `../../auto-fix-all/scripts/checkout_from_main.sh`). It fetches `origin`, reuses branch `issue-<id>` merged up to date with `origin/main` if it already exists locally or remotely, or creates it fresh from `origin/main` otherwise. Parse `STATUS` from its output.
-     - **`STATUS=conflict`**: apply the same responsible-agent-selection approach as [`auto-fix-all/steps/handle_comment.md`](../../auto-fix-all/steps/handle_comment.md)'s "Choosing the responsible agent(s)" section, treating each conflicted path it printed like a failed check-run name — dispatch the responsible specialist(s) (or resolve it yourself, as architect, if none seem responsible) to fix the conflict, then run `git -C "$REPO_PATH" add` on the resolved paths and `git -C "$REPO_PATH" commit` with no message argument (the merge-commit message `git merge --no-edit` already prepared is reused as-is) — never bare `git add`/`git commit`, which would operate against the Bash tool's ambient cwd instead of the target repo. No user interaction.
-     - **`STATUS=ok`**: continue directly.
-  2. Run `../../auto-new-issue/scripts/commit_issue.sh "$REPO_PATH" <issue_file_path> <id> "<your AI model name>" "<your AI model noreply email>"` — a cross-skill reference to the same script `auto-new-issue` uses (resolved relative to this file's directory: `../../auto-new-issue/scripts/commit_issue.sh`). This commits the already-drafted issue file into the branch and pushes it.
-  3. As the architect, read [../../auto-plan-issue/steps/run.md](../../auto-plan-issue/steps/run.md) and follow all its steps for `<id>` directly, carrying `REPO_PATH` forward unchanged — do not spawn a separate `Agent(architect)` for this, per this repo's convention for nested skill invocation (see [Agent Roster and Architect Delegation](../../docs/agents/architecture/agent-roster-and-delegation.md)). Its own Step 5 commits the plan locally but does not push.
-  4. Run `git -C "$REPO_PATH" push` to push the plan commit too — never a bare `git push`, for the same ambient-cwd reason as above.
-  5. Run `../scripts/github.sh mark-ready "$REPO_PATH" <id>` (resolved relative to this file's directory) to swap the `Refined` label for `Ready`, now that the issue + plan are committed and pushed — this is the point where the issue is actually ready for `auto-fix-all`/`auto-fix-issue` to pick up.
-  6. Report that the issue and plan are committed and pushed, and stop. Do not continue into `auto-fix-issue` in this run — implementation is a separate, later step.
-  7. Release the working tree back to the configured safe branch — this is the one real release among the three skills' closing checkout points: this path is the only one that actually leaves the working tree checked out on `issue-<id>` (via `checkout_from_main.sh` in step 1 above), so this call is what hands the branch back for other agents sharing the same `.git` to pick up:
+The issue is already pushed; no branch or plan is created.
 
-     ```bash
-     ../../arcanum/_lib/checkout_safe_branch.sh "$REPO_PATH"
-     ```
+1. Release the working tree back to the configured safe branch (defensive no-op — this path never touches `issue-<id>`):
 
-     > Resolve `../../arcanum/_lib/checkout_safe_branch.sh` relative to this file's directory.
+   ```bash
+   ../../arcanum/_lib/checkout_safe_branch.sh "$REPO_PATH"
+   ```
+
+2. Print the push-only `success` report and relay it verbatim:
+
+   ```bash
+   ../../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill discuss-issue --status success --issue <id> \
+     --summary "Issue #<id> refined and pushed to GitHub." --label-change <refine change>
+   ```
+
+3. Then, depending on the prompt result:
+   - **`CHOICE=no`**: end.
+   - **exit 1**: say in one line that the next-step prompt was unavailable, then end.
+   - **`CHOICE=chat`**: return to the conversation. Do not plan unless the user asks for it in chat.
+
+Do not show a second offer on this path.
+
+### `CHOICE=yes` — plan it
+
+1. Run `../../auto-fix-all/scripts/checkout_from_main.sh "$REPO_PATH" <id>` — a cross-skill reference to the same reuse-and-merge branch bootstrap script `auto-fix-all` uses (resolved relative to this file's directory: `../../auto-fix-all/scripts/checkout_from_main.sh`). It fetches `origin`, reuses branch `issue-<id>` merged up to date with `origin/main` if it already exists locally or remotely, or creates it fresh from `origin/main` otherwise. If it exits non-zero, **fail with** `checkout_from_main.sh` (passing the refine change). Otherwise parse `STATUS` from its output.
+   - **`STATUS=conflict`**: apply the same responsible-agent-selection approach as [`auto-fix-all/steps/handle_comment.md`](../../auto-fix-all/steps/handle_comment.md)'s "Choosing the responsible agent(s)" section, treating each conflicted path it printed like a failed check-run name — dispatch the responsible specialist(s) (or resolve it yourself, as architect, if none seem responsible) to fix the conflict, then run `git -C "$REPO_PATH" add` on the resolved paths and `git -C "$REPO_PATH" commit` with no message argument (the merge-commit message `git merge --no-edit` already prepared is reused as-is) — never bare `git add`/`git commit`, which would operate against the Bash tool's ambient cwd instead of the target repo. No user interaction. If the conflict cannot be resolved, **fail with** `checkout_from_main.sh (merge conflict)`.
+   - **`STATUS=ok`**: continue directly.
+2. Run `../../auto-new-issue/scripts/commit_issue.sh "$REPO_PATH" <issue_file_path> <id> "<your AI model name>" "<your AI model noreply email>"` — a cross-skill reference to the same script `auto-new-issue` uses (resolved relative to this file's directory: `../../auto-new-issue/scripts/commit_issue.sh`). This commits the already-drafted issue file into the branch and pushes it. If it fails, **fail with** `commit_issue.sh`.
+3. As the architect, read [../../auto-plan-issue/steps/run.md](../../auto-plan-issue/steps/run.md) and follow all its steps for `<id>` directly, carrying `REPO_PATH` forward unchanged, with `NESTED=true` — do not spawn a separate `Agent(architect)` for this, per this repo's convention for nested skill invocation (see [Agent Roster and Architect Delegation](../../docs/agents/architecture/agent-roster-and-delegation.md)). Its own Step 5 commits the plan locally but does not push.
+   - If the nested run hands back a `FINISH_*` block, keep it verbatim as `<plan block>` for the merge below. If it hands back none, there is nothing to merge.
+   - If the nested run fails — or its block has `FINISH_STATUS=failed` (or `declined`) — **fail with** `auto-plan-issue`, reporting the failure as this skill's own `failed` status. Never merge a failed block into a `success` report.
+4. Run `git -C "$REPO_PATH" push` to push the plan commit too — never a bare `git push`, for the same ambient-cwd reason as above. If it fails, **fail with** `plan push`.
+5. Run `../scripts/github.sh mark-ready "$REPO_PATH" <id>` (resolved relative to this file's directory) to swap the `Refined` label for `Ready`, now that the issue + plan are committed and pushed — this is the point where the issue is actually ready for `auto-fix-all`/`auto-fix-issue` to pick up. Best-effort: a failure here is not a skill failure (omit the `refined:ready` label change from the report in that case).
+6. Release the working tree back to the configured safe branch — this is the one real release among the three skills' closing checkout points: this path is the only one that actually leaves the working tree checked out on `issue-<id>` (via `checkout_from_main.sh` in step 1 above), so this call is what hands the branch back for other agents sharing the same `.git` to pick up:
+
+   ```bash
+   ../../arcanum/_lib/checkout_safe_branch.sh "$REPO_PATH"
+   ```
+
+   > Resolve `../../arcanum/_lib/checkout_safe_branch.sh` relative to this file's directory.
+
+7. Print the merged `success` report and relay it verbatim (`--merge` only if step 3 returned a block):
+
+   ```bash
+   ../../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill discuss-issue --status success --issue <id> \
+     --summary "Issue #<id> refined, planned, and pushed." \
+     --label-change <refine change> --label-change refined:ready [--merge "<plan block>"]
+   ```
+
+8. Offer implementation:
+
+   ```bash
+   ../../arcanum/_lib/next_step_prompt.sh --repo "$REPO_PATH" --command "/auto-fix-issue <id>"
+   ```
+
+   - **`CHOICE=yes`**: invoke `/auto-fix-issue <id>` inline, in the same session, as a **chained** top-level run — no `NESTED=true`. It prints its own report and next step.
+   - **`CHOICE=no`**: end.
+   - **`CHOICE=chat`** (exit 3): return to the conversation. Do not run `auto-fix-issue` unless the user asks for it in chat.
+   - **exit 1**: say in one line that the next-step prompt was unavailable, then end.
+
+   Never re-ask in chat, and never change the command that was shown.

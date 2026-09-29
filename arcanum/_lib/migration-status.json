@@ -78,5 +78,6 @@
   "monitor-issues-github-remove-tag": true,
   "monitor-issues-monitor-issues": true,
   "monitor-issues-rewrite-queue-pop": true,
-  "monitor-issues-rewrite-queue-push": true
+  "monitor-issues-rewrite-queue-push": true,
+  "finish-report": true
 }
