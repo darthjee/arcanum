@@ -43,7 +43,7 @@ This fetches `origin`, then either reuses branch `issue-<id>` — merging `origi
 
 ## 2. Create the issue file
 
-Read [../../auto-new-issue/steps/run.md](../../auto-new-issue/steps/run.md) and follow all its steps for `<id>`, carrying `REPO_PATH` forward unchanged. Its final step commits the issue file — do not commit it again here. You're already running as the architect; do not spawn another `Agent(architect)` for this — just follow the steps directly.
+Read [../../auto-new-issue/steps/run.md](../../auto-new-issue/steps/run.md) and follow all its steps for `<id>`, carrying `REPO_PATH` forward unchanged, **with `NESTED=true`**. Its final step commits the issue file — do not commit it again here. The nested run ends by returning a `FINISH_*` block instead of a report; do not relay or merge it, since `auto-fix-all` keeps its own `OUTCOME=...` protocol (see "Nested runs" in [docs/agents/specs/skill-finish.md](../../docs/agents/specs/skill-finish.md)). You're already running as the architect; do not spawn another `Agent(architect)` for this — just follow the steps directly.
 
 Once that finishes, push a `fetched` status tag onto the live GitHub issue, to signal it has been fetched/checked:
 
