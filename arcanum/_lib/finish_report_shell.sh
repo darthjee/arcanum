@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # Shell implementation of the "finish-report" migrated entrypoint —
-# see docs/agents/architecture/script-engine.md,
-# docs/agents/specs/skill-finish.md and
-# docs/agents/plans/660-skill-finish-discuss-issue/plan.md for the full
-# design/shared contracts. Invoked either directly (when
+# see docs/agents/architecture/skill-finish.md and
+# docs/agents/architecture/script-engine.md for the full
+# design/contracts. Invoked either directly (when
 # engine.mode=shell) or as the fallback for engine.mode=native without
 # a native implementation yet, via arcanum/_lib/finish_report.sh's
 # engine_dispatch shim — never called directly by skills.

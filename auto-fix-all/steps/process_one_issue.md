@@ -43,7 +43,7 @@ This fetches `origin`, then either reuses branch `issue-<id>` — merging `origi
 
 ## 2. Create the issue file
 
-Read [../../auto-new-issue/steps/run.md](../../auto-new-issue/steps/run.md) and follow all its steps for `<id>`, carrying `REPO_PATH` forward unchanged, **with `NESTED=true`**. Its final step commits the issue file — do not commit it again here. The nested run ends by returning a `FINISH_*` block instead of a report; do not relay or merge it, since `auto-fix-all` keeps its own `OUTCOME=...` protocol (see "Nested runs" in [docs/agents/specs/skill-finish.md](../../docs/agents/specs/skill-finish.md)). You're already running as the architect; do not spawn another `Agent(architect)` for this — just follow the steps directly.
+Read [../../auto-new-issue/steps/run.md](../../auto-new-issue/steps/run.md) and follow all its steps for `<id>`, carrying `REPO_PATH` forward unchanged, **with `NESTED=true`**. Its final step commits the issue file — do not commit it again here. The nested run ends by returning a `FINISH_*` block instead of a report; do not relay or merge it, since `auto-fix-all` keeps its own `OUTCOME=...` protocol (see "Nested runs" in [Skill Finish](../../docs/agents/architecture/skill-finish.md#nested-runs)). You're already running as the architect; do not spawn another `Agent(architect)` for this — just follow the steps directly.
 
 Once that finishes, push a `fetched` status tag onto the live GitHub issue, to signal it has been fetched/checked:
 
@@ -55,7 +55,7 @@ scripts/github.sh add-tag "$REPO_PATH" <id> fetched
 
 ## 3. Create the plan
 
-Read [../../auto-plan-issue/steps/run.md](../../auto-plan-issue/steps/run.md) and follow all its steps for `<id>`, carrying `REPO_PATH` forward unchanged, **with `NESTED=true`**. Its final step commits the plan files — do not commit them again here. The nested run ends by returning a `FINISH_*` block instead of a report; do not relay or merge it, since `auto-fix-all` keeps its own `OUTCOME=...` protocol (see "Nested runs" in [docs/agents/specs/skill-finish.md](../../docs/agents/specs/skill-finish.md)). You're already running as the architect; do not spawn another `Agent(architect)` for this — just follow the steps directly.
+Read [../../auto-plan-issue/steps/run.md](../../auto-plan-issue/steps/run.md) and follow all its steps for `<id>`, carrying `REPO_PATH` forward unchanged, **with `NESTED=true`**. Its final step commits the plan files — do not commit them again here. The nested run ends by returning a `FINISH_*` block instead of a report; do not relay or merge it, since `auto-fix-all` keeps its own `OUTCOME=...` protocol (see "Nested runs" in [Skill Finish](../../docs/agents/architecture/skill-finish.md#nested-runs)). You're already running as the architect; do not spawn another `Agent(architect)` for this — just follow the steps directly.
 
 If the block has `FINISH_STATUS=failed`, the plan step failed: stop processing this issue immediately and report `OUTCOME=blocked AGENT=architect ACTION="<FINISH_SUMMARY>"` at the top level, the same way a blocked step is reported elsewhere in this file — do not swap the tags below and do not continue to Step 4.
 
@@ -70,7 +70,7 @@ scripts/github.sh add-tag "$REPO_PATH" <id> working
 
 ## 4. Implement and open/mark-ready the PR
 
-Read [../../auto-fix-issue/steps/run.md](../../auto-fix-issue/steps/run.md) and follow all its steps for `<id>`, carrying `REPO_PATH` forward unchanged, **with `NESTED=true`**. By the end of this, the branch has been implemented, committed, pushed, and a PR exists (opened by that skill, since no PR existed yet for this fresh branch). The nested run ends by returning a `FINISH_*` block instead of a report; do not relay or merge it, since `auto-fix-all` keeps its own `OUTCOME=...` protocol (see "Nested runs" in [docs/agents/specs/skill-finish.md](../../docs/agents/specs/skill-finish.md)). You're already running as the architect; do not spawn another `Agent(architect)` for this — just follow the steps directly.
+Read [../../auto-fix-issue/steps/run.md](../../auto-fix-issue/steps/run.md) and follow all its steps for `<id>`, carrying `REPO_PATH` forward unchanged, **with `NESTED=true`**. By the end of this, the branch has been implemented, committed, pushed, and a PR exists (opened by that skill, since no PR existed yet for this fresh branch). The nested run ends by returning a `FINISH_*` block instead of a report; do not relay or merge it, since `auto-fix-all` keeps its own `OUTCOME=...` protocol (see "Nested runs" in [Skill Finish](../../docs/agents/architecture/skill-finish.md#nested-runs)). You're already running as the architect; do not spawn another `Agent(architect)` for this — just follow the steps directly.
 
 If the block has `FINISH_STATUS=failed`, the implementation step failed: stop processing this issue immediately and report `OUTCOME=blocked AGENT=architect ACTION="<FINISH_SUMMARY>"` at the top level, the same way a blocked step is reported elsewhere in this file — do not continue to Step 5.
 

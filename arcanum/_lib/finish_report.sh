@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # Thin engine_dispatch shim for the "finish-report" migrated entrypoint —
-# see docs/agents/specs/skill-finish.md,
-# docs/agents/architecture/script-engine.md and
-# docs/agents/plans/660-skill-finish-discuss-issue/plan.md for the full
-# design/shared contracts. Renders an issue skill's closing report (or,
+# see docs/agents/architecture/skill-finish.md and
+# docs/agents/architecture/script-engine.md for the full
+# design/contracts. Renders an issue skill's closing report (or,
 # with --nested, its FINISH_* result-data block) via either the shell
 # implementation (finish_report_shell.sh) or the native one
 # (core/bin/arcanum finish-report), per engine.mode /
