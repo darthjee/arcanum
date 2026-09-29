@@ -203,3 +203,31 @@ Reached once the user confirms the plan — the same way for a freshly written p
    ```
 
    > Resolve `../../arcanum/_lib/checkout_safe_branch.sh` relative to this file's directory.
+
+## Success report
+
+Print the `success` report and relay it verbatim (see [Closing report](#closing-report)) — the same summary whether the plan is new or existing:
+
+```bash
+../../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill plan-issue --status success --issue <id> \
+  --summary "Plan written and committed for issue #<id>." [--label-change refined:ready]
+```
+
+Pass `--label-change refined:ready` only if `mark-ready` succeeded.
+
+## Next step: auto-fix-issue
+
+Offer implementation through the shared `/dev/tty` prompt — never a chat-mediated yes/no:
+
+```bash
+../../arcanum/_lib/next_step_prompt.sh --repo "$REPO_PATH" --command "/auto-fix-issue <id>"
+```
+
+> Resolve `../../arcanum/_lib/next_step_prompt.sh` relative to this file's directory. It prints `CHOICE=yes` / `CHOICE=no` (exit 0), `CHOICE=chat` + `CHAT_CONTEXT=next_step` (exit 3), or nothing (exit 1, prompt unavailable).
+
+- **`CHOICE=yes`**: invoke `/auto-fix-issue <id>` inline, in the same session, as a **chained** top-level run — no `NESTED=true`. It prints its own report and next step.
+- **`CHOICE=no`**: end.
+- **`CHOICE=chat`** (exit 3): return to the conversation. Do not run `auto-fix-issue` unless the user asks for it in chat.
+- **exit 1**: say in one line that the next-step prompt was unavailable, then end.
+
+Never re-ask in chat, and never change the command that was shown.
