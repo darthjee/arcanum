@@ -70,9 +70,11 @@ scripts/github.sh add-tag "$REPO_PATH" <id> working
 
 ## 4. Implement and open/mark-ready the PR
 
-Read [../../auto-fix-issue/steps/run.md](../../auto-fix-issue/steps/run.md) and follow all its steps for `<id>`, carrying `REPO_PATH` forward unchanged. By the end of this, the branch has been implemented, committed, pushed, and a PR exists (opened by that skill, since no PR existed yet for this fresh branch).
+Read [../../auto-fix-issue/steps/run.md](../../auto-fix-issue/steps/run.md) and follow all its steps for `<id>`, carrying `REPO_PATH` forward unchanged, **with `NESTED=true`**. By the end of this, the branch has been implemented, committed, pushed, and a PR exists (opened by that skill, since no PR existed yet for this fresh branch). The nested run ends by returning a `FINISH_*` block instead of a report; do not relay or merge it, since `auto-fix-all` keeps its own `OUTCOME=...` protocol (see "Nested runs" in [docs/agents/specs/skill-finish.md](../../docs/agents/specs/skill-finish.md)). You're already running as the architect; do not spawn another `Agent(architect)` for this — just follow the steps directly.
 
-Record the issue's title and the PR URL/number it reports — you will need them below.
+If the block has `FINISH_STATUS=failed`, the implementation step failed: stop processing this issue immediately and report `OUTCOME=blocked AGENT=architect ACTION="<FINISH_SUMMARY>"` at the top level, the same way a blocked step is reported elsewhere in this file — do not continue to Step 5.
+
+Otherwise, record the issue's title (from the issue file) and the PR number from the block's `FINISH_PR` — you will need them below.
 
 ## 5. Check for pre-approval
 
