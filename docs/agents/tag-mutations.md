@@ -17,3 +17,4 @@ One row per call site, across all skills, that mutates a GitHub issue tag/label 
 | discuss-issue | 2 (discuss_and_save.md) | `discuss-issue/scripts/github.sh` | ready | refined |
 | enhance-issue | 1 (fetch.md) | `enhance-issue/scripts/github.sh` | enhancing | idea,writting |
 | enhance-issue | 4 (publish.md) | `enhance-issue/scripts/github.sh` | created | idea,writting,enhancing |
+| plan-issue | 3 (write_and_confirm.md) | `discuss-issue/scripts/github.sh` | ready | refined |
