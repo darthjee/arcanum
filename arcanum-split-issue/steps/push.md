@@ -2,7 +2,7 @@
 
 ## Closing report
 
-Every exit of this skill — success here, the declined exits in [fetch.md](fetch.md), [split.md](split.md), and the failed exits in [discuss.md](discuss.md) and below — ends with exactly one report printed by the shared script:
+Every exit of this skill — success here, the declined exits in [fetch.md](fetch.md) and [split.md](split.md), and the failed exits in [fetch.md](fetch.md), [discuss.md](discuss.md) and below — ends with exactly one report printed by the shared script:
 
 ```bash
 ../../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill arcanum-split-issue --status success|declined|failed \
@@ -54,9 +54,9 @@ Every sub-issue was created successfully (`CREATED` lists `<file>:<new_id>` pair
 ../scripts/finish.sh "$REPO_PATH" <id>
 ```
 
-> Resolve `../scripts/finish.sh` relative to this file's directory. Relabels the parent issue (`Planning` → `Split`; it stays open as a tracking issue) and deletes the local working files — the parent's own draft and every generated sub-issue file, none of which were ever committed.
+> Resolve `../scripts/finish.sh` relative to this file's directory. Relabels the parent issue (`Planning` → `Split`; it stays open as a tracking issue), deletes the local working files — the parent's own draft and every generated sub-issue file, none of which were ever committed — and releases the working tree to the safe branch.
 
-Tell the user the split is complete: parent issue `#<id>` is now labeled `Split`, and list each new sub-issue's number and title.
+Then continue to [Success report](#success-report).
 
 ### STATUS=failed
 
@@ -71,4 +71,39 @@ Tell the user to double-check GitHub directly first — the failure could be a f
 ../scripts/create_sub_issue.sh "$REPO_PATH" <id> <the failed file>
 ```
 
-Never re-run `push_sub_issues.sh` to recover from a partial failure — that would risk recreating sub-issues that already succeeded. Once every remaining file succeeds, run the finishing step above (`finish.sh`).
+> Resolve `../scripts/create_sub_issue.sh` relative to this file's directory. Prints `STATUS=ok` + `ID=<new_id>` (exit 0) on success, or `STATUS=failed` (exit 1). Add every `ID` it returns to the sub-issues created in this run.
+
+Never re-run `push_sub_issues.sh` to recover from a partial failure — that would risk recreating sub-issues that already succeeded.
+
+- **Recovery completes** (every remaining file resolved): run the finishing step above (`finish.sh`), then continue to [Success report](#success-report).
+- **The user decides to stop recovering**: **fail with** `Push sub-issues` (see [Failed exits](#failed-exits)) — pass one `--sub-issue` per sub-issue created so far in this run (from `CREATED` plus any recovered via `create_sub_issue.sh`) and `--label-change <planning change>` if [fetch.md](fetch.md) derived one. The parent stays labeled `Planning`, and the remaining local files are kept.
+
+## Success report
+
+Print the `success` report and relay it verbatim (see [Closing report](#closing-report)):
+
+```bash
+../../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill arcanum-split-issue --status success --issue <id> \
+  --summary "Issue #<id> split into <N> sub-issues." \
+  --sub-issue <new_id>... [--label-change <planning change>] --label-change planning:split
+```
+
+> Pass one `--sub-issue` per sub-issue created in this run, in creation order — every `CREATED` pair plus any recovered via `create_sub_issue.sh`. On a **Continue** run (see [fetch.md](fetch.md)), never include sub-issues that were already tracked before this run. `<N>` is the count of those new sub-issues.
+
+## Next step: enhance-issue
+
+Offer the next pipeline step once, through the shared `/dev/tty` prompt — never a chat-mediated yes/no — listing every sub-issue created in this run, in creation order, in a single prompt:
+
+```bash
+../../arcanum/_lib/next_step_prompt.sh --repo "$REPO_PATH" \
+  --command "/enhance-issue <sub-id 1>" --command "/enhance-issue <sub-id 2>" ...
+```
+
+> Resolve `../../arcanum/_lib/next_step_prompt.sh` relative to this file's directory. Pass one `--command` per new sub-issue. It prints `CHOICE=yes` / `CHOICE=no` (exit 0), `CHOICE=chat` + `CHAT_CONTEXT=next_step` (exit 3), or nothing (exit 1, prompt unavailable).
+
+- **`CHOICE=yes`**: run each `/enhance-issue <sub-id>` inline, in the same session, in the listed order, each as a **chained** top-level run — no `NESTED=true`. Each prints its own report and its own next-step offer; let that whole chain complete before starting the next sub-issue.
+- **`CHOICE=no`**: end.
+- **`CHOICE=chat`** (exit 3): return to the conversation. Do not run `enhance-issue` unless the user asks for it in chat.
+- **exit 1**: say in one line that the next-step prompt was unavailable, then end.
+
+Never re-ask in chat, and never change the commands that were shown.
