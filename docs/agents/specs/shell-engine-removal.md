@@ -33,7 +33,7 @@ Some users will never have chosen an engine. When shell is removed, arcanum reso
 
 - **Where detection runs:** a migration (once per machine, like the deprecation warning) or `engine_dispatch.sh` on first call (catches every user, including those who skip migrations).
 - **The new default when the key is absent,** including whether to flip it from `shell` to `native` in an intermediate release before removal. This is left open on purpose and is not decided here.
-- **Cleanup:** delete the `*_shell.sh` files, the shell-vs-native parity specs under `core/spec/`, and the shell branch in `engine_dispatch.sh`.
+- **Cleanup:** delete the `*_shell.sh` files, the shell-vs-native parity specs under `core/spec/`, and the shell branch in `engine_dispatch.sh`. Keep the `--native-only` path (see [Native-only entrypoints](../architecture/script-engine.md#native-only-entrypoints)): it already treats `shell` like `native`. Native-only commands have no shell side to remove and are not listed in `migration-status.json`.
 - **Docs:** update [Script Engine](../architecture/script-engine.md) and [Shared State & Configuration Files](../architecture/shared-state-and-configuration.md) to drop `shell` as a valid `engine.mode` value.
 
 ## See also

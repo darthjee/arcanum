@@ -12,6 +12,8 @@ Specialist agents are defined in `.claude/agents/`. The architect coordinates th
 | `node` | `core/`'s Node.js source/config (`core/lib/`, `core/spec/`, `core/bin/`, `core/package.json`, `core/eslint.config.mjs`) — the native counterpart of scripts migrating from bash, per [Script Engine](script-engine.md) | Whenever a migrated entrypoint's native implementation, its spec, or `core/`'s own tooling config needs to be written or edited |
 | `infra` | Docker, docker-compose, and Makefile files repo-wide (e.g. `core/Dockerfile`, `core/docker-compose.yml`, the root `Makefile`'s `core-*` targets) | Whenever the `core/` test image or a build/run target for it needs to be created or edited |
 
+**Native-only skills** (every new skill, see [Script Engine](script-engine.md#native-only-entrypoints)) split ownership three ways: `node` owns the `core/lib` command and its specs (a routing spec through the real shim, no parity spec), `scripter` owns the thin `<skill>/scripts/*.sh` shim calling `engine_dispatch --native-only`, and `skill-writer` owns `SKILL.md`.
+
 `skill-reviewer` is a **read-only** agent: it never commits, never fixes violations — it only reports findings. The architect decides what to do (usually: dispatch `scripter` to extract the flagged logic, or `skill-writer` to rewrite the surrounding skill text).
 
 ## Architect Delegation

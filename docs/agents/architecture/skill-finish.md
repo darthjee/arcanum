@@ -18,7 +18,7 @@ Every in-scope issue skill ends the same way:
 | `auto-fix-issue` | auto |
 | `auto-rewrite-issue` | auto |
 
-Out of scope: `auto-fix-all`, `auto-monitor-issue-pr`, `auto-monitor-pr`, `monitor-issues`, `push-issue-to-queue`, `arcanum-migrate`, `arcanum-update`, `init-claude`, and the `toggle-*` skills. `auto-fix-all` keeps its own `OUTCOME=...` protocol toward its coordinator. It takes part only as a **nested caller** (see [Nested runs](#nested-runs)).
+Out of scope: `auto-fix-all`, `auto-monitor-issue-pr`, `auto-monitor-pr`, `monitor-issues`, `push-issue-to-queue`, `arcanum-migrate`, `arcanum-update`, `arcanum-check-config` (a read-only, single-shot query), `init-claude`, and the `toggle-*` skills. `auto-fix-all` keeps its own `OUTCOME=...` protocol toward its coordinator. It takes part only as a **nested caller** (see [Nested runs](#nested-runs)).
 
 ## Closing report
 
@@ -223,7 +223,7 @@ Notes:
 
 - [Script Preference](script-preference.md): why the report is a script, not prose.
 - [Per-Repo Migrations](per-repo-migrations.md): the `/dev/tty` `[Y]es`/`[N]o`/`[C]hat` convention and exit-`3` hand-off.
-- [Script Engine](script-engine.md): the shim → `engine_dispatch.sh` → shell/native pattern.
+- [Script Engine](script-engine.md): the shim → `engine_dispatch.sh` → shell/native pattern, and its native-only variant (`engine_dispatch --native-only`, no shell side) used by new skills.
 - [Repo Path Threading](repo-path-threading.md): the explicit `repo_path` argument.
 - [Issue Tags](issue-tags.md): canonical tags and their GitHub labels.
 - [Cross-Skill References](cross-skill-references.md): how a caller reads another skill's `steps/run.md` directly.

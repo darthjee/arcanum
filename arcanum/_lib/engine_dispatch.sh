@@ -39,7 +39,36 @@ _engine_dispatch_native_available() {
   [[ "$value" == "true" ]] && echo "true" || echo "false"
 }
 
-# engine_dispatch <repo_path> <command> <shell_script> [--prepend-repo-path] [<env_var_name> ...] -- <args...>
+# _engine_dispatch_run_native <repo_path> <command> <prepend_repo_path> <env_count> [<env_var_name> ...] [<args...>]
+#   Runs `core/bin/arcanum <command> [<repo_path>] <args...>` under
+#   `env -i`, with PATH, ARCANUM_REPO_PATH=<repo_path> and only the
+#   <env_count> named env vars that follow (each forwarded only when set
+#   in this process's environment). <prepend_repo_path> is "true" to put
+#   <repo_path> ahead of <args...>. Everything after the <env_count>
+#   names is <args...>. Returns core/bin/arcanum's exit code. Shared by
+#   engine_dispatch's regular native branch and its --native-only mode.
+_engine_dispatch_run_native() {
+  local repo_path="$1" command="$2" prepend_repo_path="$3" env_count="$4"
+  shift 4
+
+  local env_args=() var i
+  for ((i = 0; i < env_count; i++)); do
+    var="$1"
+    shift
+    [[ -n "${!var+x}" ]] && env_args+=("${var}=${!var}")
+  done
+
+  local native_cmd=(env -i PATH="$PATH" ARCANUM_REPO_PATH="$repo_path")
+  [[ ${#env_args[@]} -gt 0 ]] && native_cmd+=("${env_args[@]}")
+  native_cmd+=("$_ENGINE_DISPATCH_NATIVE_BIN" "$command")
+  [[ "$prepend_repo_path" == "true" ]] && native_cmd+=("$repo_path")
+  [[ $# -gt 0 ]] && native_cmd+=("$@")
+
+  "${native_cmd[@]}"
+  return $?
+}
+
+# engine_dispatch <repo_path> <command> <shell_script> [--prepend-repo-path] [--native-only] [<env_var_name> ...] -- <args...>
 #   The shared dispatch guard for one migrated-entrypoint call.
 #
 #   - <repo_path>: the target repo whose engine.mode config is
@@ -96,17 +125,33 @@ _engine_dispatch_native_available() {
 #          non-zero exit here is a real native-side bug/crash and is
 #          propagated as-is, with NO fallback to <shell_script>.
 #
+#   [--native-only]: optional literal flag (recognized in the same
+#   segment as --prepend-repo-path, anywhere before `--`), for commands
+#   that have NO shell implementation at all. <shell_script> is passed as
+#   an empty string "" in this mode and is never run, and
+#   migration-status.json is NOT consulted (native-only commands are
+#   never listed there). Resolution then becomes:
+#     - docker: prints `Error: engine.mode=docker is not implemented yet
+#       for native-only command '<command>'.` on stderr and returns 1 —
+#       no fallback, nothing on stdout.
+#     - anything else (unset/shell/native): runs the exact same native
+#       invocation as step 3's "Available" case above (same env-var
+#       allowlist and --prepend-repo-path handling), propagating its exit
+#       code.
+#
 #   Exit code: whichever branch actually ran (<shell_script> or
 #   core/bin/arcanum)'s own exit code.
 engine_dispatch() {
   local repo_path="$1" command="$2" shell_script="$3"
   shift 3
 
-  local prepend_repo_path="false"
+  local prepend_repo_path="false" native_only="false"
   local env_allowlist=()
   while [[ $# -gt 0 && "$1" != "--" ]]; do
     if [[ "$1" == "--prepend-repo-path" ]]; then
       prepend_repo_path="true"
+    elif [[ "$1" == "--native-only" ]]; then
+      native_only="true"
     else
       env_allowlist+=("$1")
     fi
@@ -117,13 +162,28 @@ engine_dispatch() {
   local args=()
   [[ $# -gt 0 ]] && args=("$@")
 
-  local shell_cmd=(bash "$shell_script")
-  [[ ${#args[@]} -gt 0 ]] && shell_cmd+=("${args[@]}")
+  # Full _engine_dispatch_run_native argument list — never empty, so its
+  # expansion is bash 3.2-safe without a guard.
+  local native_call=("$repo_path" "$command" "$prepend_repo_path" "${#env_allowlist[@]}")
+  [[ ${#env_allowlist[@]} -gt 0 ]] && native_call+=("${env_allowlist[@]}")
+  [[ ${#args[@]} -gt 0 ]] && native_call+=("${args[@]}")
 
   local mode
   mode=$(cd "$repo_path" && config_chain_read "$repo_path" engine mode)
   mode="${mode//\"/}"
   mode="${mode:-shell}"
+
+  if [[ "$native_only" == "true" ]]; then
+    if [[ "$mode" == "docker" ]]; then
+      echo "Error: engine.mode=docker is not implemented yet for native-only command '${command}'." >&2
+      return 1
+    fi
+    _engine_dispatch_run_native "${native_call[@]}"
+    return $?
+  fi
+
+  local shell_cmd=(bash "$shell_script")
+  [[ ${#args[@]} -gt 0 ]] && shell_cmd+=("${args[@]}")
 
   if [[ "$mode" == "shell" ]]; then
     "${shell_cmd[@]}"
@@ -142,19 +202,6 @@ engine_dispatch() {
     return $?
   fi
 
-  local env_args=() var
-  if [[ ${#env_allowlist[@]} -gt 0 ]]; then
-    for var in "${env_allowlist[@]}"; do
-      [[ -n "${!var+x}" ]] && env_args+=("${var}=${!var}")
-    done
-  fi
-
-  local native_cmd=(env -i PATH="$PATH" ARCANUM_REPO_PATH="$repo_path")
-  [[ ${#env_args[@]} -gt 0 ]] && native_cmd+=("${env_args[@]}")
-  native_cmd+=("$_ENGINE_DISPATCH_NATIVE_BIN" "$command")
-  [[ "$prepend_repo_path" == "true" ]] && native_cmd+=("$repo_path")
-  [[ ${#args[@]} -gt 0 ]] && native_cmd+=("${args[@]}")
-
-  "${native_cmd[@]}"
+  _engine_dispatch_run_native "${native_call[@]}"
   return $?
 }

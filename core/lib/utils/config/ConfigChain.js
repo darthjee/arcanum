@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
+const TIER_NAMES = ['local', 'repo', 'global'];
+
 /**
  * Native equivalent of `arcanum/_lib/config_chain.sh`'s
  * `config_chain_read`: resolves a namespaced config key across the
@@ -72,18 +74,78 @@ class ConfigChain {
         continue;
       }
 
-      const namespaceSection = config[namespace];
-
       for (const key of keys) {
-        const value = this._resolveKey(namespaceSection, key);
+        const { set, value } = this._tierValue(config, namespace, key);
 
-        if (value !== undefined && value !== null) {
+        if (set) {
           return value;
         }
       }
     }
 
     return undefined;
+  }
+
+  /**
+   * Reports what each of the three config tiers holds for
+   * `<namespace>.<key>`, in precedence order (local, repo, global),
+   * without stopping at the first hit — shadowed tiers are reported
+   * too. Uses the same present-and-non-null rule and the same fail-open
+   * handling as `#read`: a `null`/absent value, a missing/unreadable/
+   * malformed file, or an unresolvable global path is `set: false`;
+   * an explicit empty string (`""`) is `set: true`.
+   * @param {string} [repoPath] - the target repo's local checkout path.
+   *   Falls back to the constructor-injected `repoContext`'s `repoPath`
+   *   when omitted, like `#read`.
+   * @param {string} namespace - the top-level config namespace.
+   * @param {string} key - the key (possibly a dot-separated nested path)
+   *   to resolve under `namespace`.
+   * @returns {Promise<Array<{tier: string, file: (string|null), set: boolean, value: unknown}>>}
+   *   one entry per tier, in precedence order. `file` is the tier's
+   *   absolute path (`null` for an unresolvable global path); `value`
+   *   is only present when `set` is `true`.
+   */
+  async readTiers(repoPath, namespace, key) {
+    const resolvedRepoPath = repoPath ?? this._repoContext?.repoPath;
+    const files = this._tierFiles(resolvedRepoPath);
+    const tiers = [];
+
+    for (const [index, tier] of TIER_NAMES.entries()) {
+      const file = files[index] ? path.resolve(files[index]) : null;
+      const config = file ? await this._readJson(file) : null;
+      const { set, value } = this._tierValue(config, namespace, key);
+
+      tiers.push(set ? { tier, file, set, value } : { tier, file, set });
+    }
+
+    return tiers;
+  }
+
+  /**
+   * Single source of the per-tier resolution rule shared by `#read` and
+   * `#readTiers`: resolves `<namespace>.<key>` within one tier's
+   * already-parsed content and applies the present-and-non-null check.
+   * Takes the parsed content (not the file) so `#read` parses each tier
+   * file at most once, however many keys it tries.
+   * @param {object|null} config - the tier's parsed content, or `null`
+   *   when the file is missing/unreadable/malformed/not an object.
+   * @param {string} namespace - the top-level config namespace.
+   * @param {string} key - the key (possibly a dot-separated nested path).
+   * @returns {{set: boolean, value: unknown}} `set: true` with the raw value
+   *   when present and non-null; `set: false` otherwise.
+   */
+  _tierValue(config, namespace, key) {
+    if (!config) {
+      return { set: false, value: undefined };
+    }
+
+    const value = this._resolveKey(config[namespace], key);
+
+    if (value === undefined || value === null) {
+      return { set: false, value: undefined };
+    }
+
+    return { set: true, value };
   }
 
   /**

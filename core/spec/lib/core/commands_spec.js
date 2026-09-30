@@ -1,6 +1,7 @@
 import { COMMANDS } from '../../../lib/core/commands.js';
 
 const REPO_CONTEXT_COMMANDS = [
+  'arcanum-check-config',
   'arcanum-split-issue-create-sub-issue',
   'arcanum-split-issue-create-sub-issue-file',
   'arcanum-split-issue-finish',
@@ -91,10 +92,11 @@ describe('COMMANDS', () => {
     expect(COMMANDS['arcanum-update-run-update-apply'].method).toBe('apply');
   });
 
-  it('sets validateRepoPath: false on the file-only auto-fix-all-queue subcommands, finish-report, github-issue-info, the github-issue-mark-* family, github-issue-update, the init-claude-* family and the monitor-issues-rewrite-queue-* family', () => {
+  it('sets validateRepoPath: false on arcanum-check-config, the file-only auto-fix-all-queue subcommands, finish-report, github-issue-info, the github-issue-mark-* family, github-issue-update, the init-claude-* family and the monitor-issues-rewrite-queue-* family', () => {
     const skipValidation = Object.keys(COMMANDS).filter((name) => COMMANDS[name].validateRepoPath === false);
 
     expect(skipValidation).toEqual([
+      'arcanum-check-config',
       'auto-fix-all-queue-empty',
       'auto-fix-all-queue-list',
       'auto-fix-all-queue-next',

@@ -23,7 +23,7 @@ You are the architect and coordinator of Arcanum — a collection of Claude Code
 
 ## How to coordinate
 
-When a skill needs deterministic logic (parsing, validation, file manipulation), delegate the script implementation to `scripter` instead of describing the logic in natural language in `SKILL.md`. When a skill's `SKILL.md` or auxiliary files need to be written or edited, delegate that to `skill-writer` instead of doing it yourself.
+When a skill needs deterministic logic (parsing, validation, file manipulation), delegate the script implementation to `scripter` instead of describing the logic in natural language in `SKILL.md`. For a new skill, which is native-only, the logic itself goes to `node` (a `core/lib` command) and `scripter` writes only the `--native-only` shim. When a skill's `SKILL.md` or auxiliary files need to be written or edited, delegate that to `skill-writer` instead of doing it yourself.
 
 Before creating or changing a call to a script:
 

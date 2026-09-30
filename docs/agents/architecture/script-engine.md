@@ -25,6 +25,18 @@ Fallback and failure rules, given the resolved `engine.mode` and the migration-s
 - `engine.mode=native` (or `docker`) configured, but the migration-status map says no native implementation exists yet for this entrypoint: silent fallback to the shell implementation, with a warning printed (not a hard error) — an unmigrated entrypoint should never block a caller just because native mode is configured globally.
 - `engine.mode=native` (or `docker`) configured, and a native implementation exists, but it crashes or throws at runtime: this is a real bug in the native implementation, distinct from "not implemented yet" — it fails loud, with no automatic fallback to shell. Silently falling back would mask exactly the bugs this migration needs surfaced.
 
+### Native-only entrypoints
+
+Existing entrypoints stay dual (shell + native). **New skills are native-only** (#680): their logic is a `core/lib` command with no `*_shell.sh` twin, and docker support is added later. `/arcanum-check-config` is the first one.
+
+A native-only shim calls `engine_dispatch` with the literal `--native-only` flag (in the same flag/env-var segment as `--prepend-repo-path`, before `--`) and an empty `""` in place of `<shell_script>`:
+
+- `engine.mode` unset, `shell` or `native` → runs `core/bin/arcanum <command> ...`, the same way (same `env -i` allowlist, same `--prepend-repo-path` handling) as the regular native branch. There is no shell side, so `shell` is treated like `native`.
+- `engine.mode=docker` → prints `Error: engine.mode=docker is not implemented yet for native-only command '<command>'.` on stderr and exits `1`. No fallback.
+- `arcanum/_lib/migration-status.json` is never consulted, and native-only commands are not listed in it (so they don't appear in [entrypoint-migration-status.md](entrypoint-migration-status.md)).
+
+Without `--native-only`, dispatch behaves exactly as described above.
+
 ## The centralized native entrypoint
 
 Every migrated entrypoint's native path goes through one single executable interface: `core/bin/arcanum`. It has no `.js` extension and a `#!/usr/bin/env node` shebang, so its calling convention already looks like a real CLI binary — `core/bin/arcanum <command> <args...>` — rather than a per-script `node core/lib/<script>.js` invocation. `engine_dispatch.sh` invokes it this way, passing the command name (identifying which entrypoint is being called) as the first argument, followed by that entrypoint's own arguments; `core/bin/arcanum` routes internally to the matching module under `core/lib/`.
@@ -37,7 +49,7 @@ Before invoking `core/bin/arcanum <command> <args...>`, `engine_dispatch.sh` set
 
 ## The output/exit-code contract
 
-A native implementation of a given entrypoint must be byte-identical to its shell counterpart in both stdout and exit code — the same `KEY=value` line protocol (or whatever plain-text contract the shell script already prints) and the same exit code for the same inputs. This is what lets every skill's `.md` steps stay engine-agnostic: they call a script by name and parse its documented output, never knowing or caring whether `engine_dispatch.sh` routed that call to shell or native.
+A native implementation of a given dual entrypoint must be byte-identical to its shell counterpart in both stdout and exit code — the same `KEY=value` line protocol (or whatever plain-text contract the shell script already prints) and the same exit code for the same inputs. This is what lets every skill's `.md` steps stay engine-agnostic: they call a script by name and parse its documented output, never knowing or caring whether `engine_dispatch.sh` routed that call to shell or native. A [native-only](#native-only-entrypoints) command has no shell counterpart to match: its native output is the contract.
 
 **One known intentional divergence (#333):** on the `context: 'repo'` path the native dispatcher now validates `repoPath` unconditionally, so a positional-less `core/bin/arcanum <command>` call rejects with `Error: repo_path is required` (→ `arcanum: Error: repo_path is required`, exit 1), whereas the shell wrappers short-circuit with their own per-script `Usage:` block before ever calling `engine_dispatch`. This is only observable on a direct dispatcher call that no supported wrapper or skill can produce — every `arcanum/_lib/*.sh` and `auto-fix-all/scripts/*.sh` wrapper guards an empty `REPO_PATH` itself before dispatching — so the engine-agnostic contract skills rely on is unaffected.
 
@@ -73,6 +85,7 @@ An ESLint flat config enforces: 2-space indentation, single quotes, semicolons, 
 - **JSCPD** checks duplication, informational only (not a CI gate yet).
 - **`yarn audit`** runs informationally, to catch devDependency supply-chain risk (there are no runtime dependencies to audit).
 - A **parity test is required for every migrated entrypoint** — shell vs. native, identical inputs, asserting identical stdout and exit code — in addition to that entrypoint's regular native unit tests. This is what actually enforces the output/exit-code contract above, rather than leaving it as an unchecked convention.
+- A [native-only](#native-only-entrypoints) command has no parity test. Instead, a bin-level routing spec runs its real `<skill>/scripts/*.sh` shim end to end in every `engine.mode` (e.g. `core/spec/bin/arcanumCheckConfig_spec.js`).
 - No real network calls happen in CI: `fetch` is mocked/stubbed using fixture data under `core/spec/support/fixtures/`.
 
 ## The Docker test image
@@ -92,6 +105,7 @@ The image's `CMD` (and, by extension, whatever command the `engine.mode=docker` 
 
 - Only skill entrypoints are in scope for migration: `<skill>/scripts/*.sh` and `arcanum/_lib/*.sh`. The unrelated top-level `scripts/` folder (this repo's own release/versioning tooling, e.g. `scripts/bump-version.sh`) is out of scope.
 - The `engine.mode` key's absence still defaults to `shell` today, so a repo that hasn't opted in is unaffected. Because `shell` is deprecated and will be removed, a global, skippable `instructions` migration (`arcanum/migrations/repos/next/001`, #601) warns users once per machine/account and offers to write `engine.mode` (`native` or `docker`) to the global config. See [Shell Engine Removal](../specs/shell-engine-removal.md) for the planned removal and its auto-detection rule.
+- Related to #655 (still open), which proposes an "every new entrypoint must be dual shell+native" rule. The native-only rule above replaces it for new skills; whichever of #655 / #680 lands second reconciles this doc.
 - No standalone, wholesale `_lib` migration. Native equivalents of shared bash helper logic grow inside `core/lib/` per-entrypoint need only, as each entrypoint that depends on that helper logic gets migrated — the original `arcanum/_lib/*.sh` files stay untouched for callers still running in `shell` mode.
 
 ## See also
