@@ -132,5 +132,54 @@ code=$?
 
 echo "OK: engine.mode=native with a crashing native implementation fails loud, without falling back to shell"
 
+# --- Cases 5-9: --native-only (issue #680). <shell_script> is "" and
+#     must never run; migration-status.json is never consulted. Anchored
+#     on auto-fix-all-config-get, same as cases 1/2. ---
+
+run_native_only() {
+  local label="$1"
+  shift
+  out=$(engine_dispatch "$REPO_DIR" "auto-fix-all-config-get" "" --native-only -- "$REPO_DIR" "$FIXTURE_KEY" 2>"${TMP_DIR}/${label}.stderr")
+  code=$?
+  [[ $code -eq 0 ]] || fail "${label}: expected exit 0 from the native path, got $code (stderr: $(cat "${TMP_DIR}/${label}.stderr"))"
+  [[ "$out" == "$EXPECTED_OUTPUT" ]] || fail "${label}: expected native stdout '${EXPECTED_OUTPUT}', got '${out}'"
+  [[ -s "${TMP_DIR}/${label}.stderr" ]] && fail "${label}: expected no stderr, got: $(cat "${TMP_DIR}/${label}.stderr")"
+  return 0
+}
+
+rm -f "${REPO_DIR}/.claude/state/arcanum-config.json"
+run_native_only "case5-unset"
+echo "OK: --native-only with engine.mode unset runs native"
+
+set_engine_mode "shell"
+run_native_only "case6-shell"
+echo "OK: --native-only with engine.mode=shell runs native"
+
+set_engine_mode "native"
+run_native_only "case7-native"
+echo "OK: --native-only with engine.mode=native runs native"
+
+set_engine_mode "docker"
+out=$(engine_dispatch "$REPO_DIR" "auto-fix-all-config-get" "" --native-only -- "$REPO_DIR" "$FIXTURE_KEY" 2>"${TMP_DIR}/case8.stderr")
+code=$?
+expected_err="Error: engine.mode=docker is not implemented yet for native-only command 'auto-fix-all-config-get'."
+[[ $code -eq 1 ]] || fail "case 8 (--native-only, docker): expected exit 1, got $code"
+[[ -z "$out" ]] || fail "case 8 (--native-only, docker): expected empty stdout, got '${out}'"
+[[ "$(cat "${TMP_DIR}/case8.stderr")" == "$expected_err" ]] || fail "case 8 (--native-only, docker): expected stderr '${expected_err}', got '$(cat "${TMP_DIR}/case8.stderr")'"
+echo "OK: --native-only with engine.mode=docker fails with the documented error"
+
+# Case 9: point the lib at a temporary map that marks the command
+# unavailable, then one that omits it entirely — --native-only must still
+# run native, with no fallback warning.
+set_engine_mode "native"
+REAL_MIGRATION_STATUS_FILE="$_ENGINE_DISPATCH_MIGRATION_STATUS_FILE"
+_ENGINE_DISPATCH_MIGRATION_STATUS_FILE="${TMP_DIR}/migration-status.json"
+echo '{"auto-fix-all-config-get": false}' > "$_ENGINE_DISPATCH_MIGRATION_STATUS_FILE"
+run_native_only "case9-map-false"
+echo '{}' > "$_ENGINE_DISPATCH_MIGRATION_STATUS_FILE"
+run_native_only "case9-map-absent"
+_ENGINE_DISPATCH_MIGRATION_STATUS_FILE="$REAL_MIGRATION_STATUS_FILE"
+echo "OK: --native-only ignores migration-status.json"
+
 echo "PASS: arcanum/_lib/engine_dispatch.sh — shell/native/docker dispatch guard behaves per docs/agents/architecture/script-engine.md"
 exit 0
