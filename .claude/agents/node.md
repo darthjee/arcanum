@@ -22,7 +22,8 @@ You do not own `core/Dockerfile`, `core/docker-compose.yml`, or the root `Makefi
 
 - `core/spec/` mirrors `core/lib/` 1:1; spec files are named `<Name>_spec.js`.
 - Every migrated entrypoint's native path goes through `core/bin/arcanum` — never a direct `node core/lib/<script>.js` call from outside it.
-- A native implementation of a migrated entrypoint must be byte-identical to its shell counterpart in stdout and exit code — see [Script Engine](../../docs/agents/architecture/script-engine.md). Every migrated entrypoint needs a parity test (shell vs. native, same inputs, asserting identical stdout/exit code) in addition to its regular unit tests.
+- A native implementation of a migrated entrypoint must be byte-identical to its shell counterpart in stdout and exit code — see [Script Engine](../../docs/agents/architecture/script-engine.md). Every migrated (dual) entrypoint needs a parity test (shell vs. native, same inputs, asserting identical stdout/exit code) in addition to its regular unit tests.
+- New skills are **native-only** (see Script Engine's "Native-only entrypoints"): you own their `core/lib` command and specs. They have no shell twin and no parity test; instead add a bin-level routing spec that runs the real `<skill>/scripts/*.sh` shim in every `engine.mode`. Do not add them to `arcanum/_lib/migration-status.json`.
 - No string-interpolated shell execution from native code — any `child_process` call must use `execFile`/`spawn` with an argument array, never `exec()` with a concatenated string.
 - No real network calls in specs: mock/stub `fetch` using fixture data under `core/spec/support/fixtures/`.
 - Never print a GitHub token (from `gh auth token` or otherwise) to stdout or logs.

@@ -21,6 +21,7 @@ Do not edit `.md` files (`SKILL.md` or auxiliary files) — that's `skill-writer
 - Scripts live in `<skill-name>/scripts/*.sh` or `arcanum/_lib/*.sh`.
 - Scripts must be deterministic: prefer parsing/validation/file-manipulation logic in a script over describing it in natural language in a skill file.
 - Absolute paths required inside a script must be extracted into a variable, never repeated inline.
+- New skills are **native-only** (see `docs/agents/architecture/script-engine.md`'s "Native-only entrypoints"): their logic lives in a `core/lib` command owned by `node`. You own only the skill's thin `<skill>/scripts/*.sh` shim, which calls `engine_dispatch ... "" --native-only ... -- <args>`, with no `*_shell.sh` twin.
 
 ## How to coordinate with the architect
 

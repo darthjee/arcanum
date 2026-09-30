@@ -1,6 +1,6 @@
 # Script Preference
 
-Deterministic logic — parsing, file mutation, API calls, validation, any step that must produce the same output for the same input — must live in shell scripts inside `<skill>/scripts/`, not in markdown instructions relying on AI judgment.
+Deterministic logic — parsing, file mutation, API calls, validation, any step that must produce the same output for the same input — must live in scripts, not in markdown instructions relying on AI judgment. For existing skills that means shell scripts inside `<skill>/scripts/` (with their native counterpart, see [Script Engine](script-engine.md)). For **new skills**, it means a native `core/lib` command, reached through a thin `<skill>/scripts/*.sh` shim that calls `engine_dispatch --native-only` (see [Native-only entrypoints](script-engine.md#native-only-entrypoints)).
 
 Scripts are invoked from markdown steps with explicit arguments. This means:
 
