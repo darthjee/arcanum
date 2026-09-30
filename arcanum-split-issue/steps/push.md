@@ -92,18 +92,19 @@ Print the `success` report and relay it verbatim (see [Closing report](#closing-
 
 ## Next step: enhance-issue
 
-Offer the next pipeline step once, through the shared `/dev/tty` prompt — never a chat-mediated yes/no — listing every sub-issue created in this run, in creation order, in a single prompt:
+Offer the next pipeline step once, through the shared `/dev/tty` prompt, falling back to a structured `AskUserQuestion` when no TTY is available (TTY-first with `AskUserQuestion` fallback) — never a free-text chat yes/no — listing every sub-issue created in this run, in creation order, in a single prompt:
 
 ```bash
 ../../arcanum/_lib/next_step_prompt.sh --repo "$REPO_PATH" \
   --command "/enhance-issue <sub-id 1>" --command "/enhance-issue <sub-id 2>" ...
 ```
 
-> Resolve `../../arcanum/_lib/next_step_prompt.sh` relative to this file's directory. Pass one `--command` per new sub-issue. It prints `CHOICE=yes` / `CHOICE=no` (exit 0), `CHOICE=chat` + `CHAT_CONTEXT=next_step` (exit 3), or nothing (exit 1, prompt unavailable).
+> Resolve `../../arcanum/_lib/next_step_prompt.sh` relative to this file's directory. Pass one `--command` per new sub-issue. It prints `CHOICE=yes` / `CHOICE=no` (exit 0), `CHOICE=chat` + `CHAT_CONTEXT=next_step` (exit 3), `FALLBACK=chat` + one `COMMAND=<cmd>` line per `--command`, in order (exit 4, no TTY available), or nothing with an error on stderr (exit 1, prompt failed). The full contract lives in [Next-step offer](../../docs/agents/architecture/skill-finish.md#next-step-offer-interactive-skills).
 
 - **`CHOICE=yes`**: run each `/enhance-issue <sub-id>` inline, in the same session, in the listed order, each as a **chained** top-level run — no `NESTED=true`. Each prints its own report and its own next-step offer; let that whole chain complete before starting the next sub-issue.
 - **`CHOICE=no`**: end.
 - **`CHOICE=chat`** (exit 3): return to the conversation. Do not run `enhance-issue` unless the user asks for it in chat.
-- **exit 1**: say in one line that the next-step prompt was unavailable, then end.
+- **exit 1**: say in one line that the next-step prompt failed: <stderr>, then end.
+- **exit 4** (`FALLBACK=chat`, no TTY): ask once with `AskUserQuestion` — the question names every exact command from the `COMMAND=` line(s), with options **Yes** (run all of them now, in the listed order), **No**, **Chat** — then follow the matching branch above: Yes → `CHOICE=yes`, No → `CHOICE=no`, Chat → `CHOICE=chat`. A free-text "Other" answer → `CHOICE=chat`, with the text as context; a dismissed or rejected question → `CHOICE=no`. If `AskUserQuestion` is unavailable (headless, tool denied), print "Next step: `<cmd>` (run it manually)" for each command and end.
 
-Never re-ask in chat, and never change the commands that were shown.
+Ask at most once: never re-ask after the user has answered (on the TTY or through `AskUserQuestion`), never ask with a free-text chat yes/no, and never change the commands that were shown.

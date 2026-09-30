@@ -3,7 +3,7 @@
 Every in-scope issue skill ends the same way:
 
 1. a fixed **closing report**, rendered by a shared script;
-2. then the **next step**: an offer on `/dev/tty` for interactive skills, or a `Next:` line for auto skills.
+2. then the **next step**: an offer on `/dev/tty` for interactive skills (falling back to a structured `AskUserQuestion` when no TTY is available), or a `Next:` line for auto skills.
 
 ## Scope
 
@@ -108,7 +108,7 @@ After relaying a `success` report, an interactive skill runs:
 arcanum/_lib/next_step_prompt.sh --repo <repo_path> --command "<command>" [--command "<command>"]...
 ```
 
-It follows the `arcanum-migrate` convention in [Per-Repo Migrations](per-repo-migrations.md): it owns the prompt on `/dev/tty`, never a chat-mediated yes/no. It is a plain bash script, not engine-dispatched, like `arcanum/migrations/run.sh`.
+It follows the "TTY-first with `AskUserQuestion` fallback" convention in [Per-Repo Migrations](per-repo-migrations.md#script-driven-interaction): it owns the prompt on `/dev/tty` whenever a terminal is available. When `/dev/tty` cannot be opened (as in some agent-driven sessions, where the Bash tool has no controlling terminal), it does not fail: it exits `4` with `FALLBACK=chat`, and the skill asks the same question through `AskUserQuestion`. Free-text chat yes/no stays forbidden. It is a plain bash script, not engine-dispatched, like `arcanum/migrations/run.sh`.
 
 ### Prompt
 
@@ -130,18 +130,22 @@ Input is read from `/dev/tty`, case-insensitive; `y`/`yes`, `n`/`no`, `c`/`chat`
 | `[Y]es` | `CHOICE=yes` | `0` |
 | `[N]o` | `CHOICE=no` | `0` |
 | `[C]hat` | `CHOICE=chat` then `CHAT_CONTEXT=next_step` | `3` |
-| usage error (missing `--repo`, empty or missing `--command`), `--repo` not a directory, or `/dev/tty` unreadable or closed before a valid answer | nothing; error on stderr | `1` |
+| `/dev/tty` cannot be opened | `FALLBACK=chat`, then one `COMMAND=<cmd>` line per `--command`, in the order given (verbatim) | `4` |
+| usage error (missing `--repo`, empty or missing `--command`, unknown argument), `--repo` not a directory, or `/dev/tty` closed/EOF before a valid answer | nothing; error on stderr | `1` |
 
-Exit `3` mirrors the migrations runner's `[C]hat` hand-off.
+Exit `3` mirrors the migrations runner's `[C]hat` hand-off. Argument validation runs before the TTY probe, so a usage error exits `1` even when no TTY is available — a real error is never turned into a chat question.
+
+The TTY device is overridable through `ARCANUM_TTY_DEVICE` (default `/dev/tty`). This is **test-only** — specs point it at a missing path to simulate "no TTY" — and not a user-facing setting.
 
 ### Skill-side rules
 
 - **`CHOICE=yes`**: invoke the next skill inline, in the same session. This is a **chained** run, not a nested one: the next skill runs as a top-level skill (no `NESTED=true`) and prints its own report and next step.
 - **`CHOICE=no`**: end. The report is already printed, and its command is the user's manual path.
 - **`CHOICE=chat`** (exit `3`): return to the conversation. Do not run the next step unless the user asks for it in chat.
-- **Exit `1`**: treat as `no`, and tell the user in one line that the prompt was unavailable.
+- **`FALLBACK=chat`** (exit `4`): no TTY was available. Ask with `AskUserQuestion`, naming the exact command(s) from the `COMMAND=` lines, with the options **Yes** (run it now; with several commands, run all of them in order), **No**, and **Chat**. Map the answer onto the branches above: Yes → `CHOICE=yes`, No → `CHOICE=no`, Chat → `CHOICE=chat`. A free-text "Other" answer is treated as Chat, with the text as context. A dismissed or rejected question is treated as No. If `AskUserQuestion` is unavailable (e.g. headless `claude -p`, or the tool is denied), print "Next step: `<cmd>` (run it manually)" and end.
+- **Exit `1`**: treat as `no`, and tell the user in one line that the next-step prompt failed, quoting its stderr.
 
-The skill never re-asks in chat and never changes the command that was shown.
+Apart from the exit-`4` `AskUserQuestion` fallback, the skill never re-asks in chat, and it never changes the command that was shown.
 
 ## Auto skills
 

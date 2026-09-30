@@ -2,8 +2,11 @@
 # Interactive next-step offer shown by interactive issue skills after
 # their closing report — see docs/agents/architecture/skill-finish.md
 # for the full design/contracts. Plain bash, NOT engine-dispatched: it owns the
-# prompt on /dev/tty (the arcanum/migrations/run.sh convention), never a
-# chat-mediated yes/no.
+# prompt on /dev/tty (the arcanum/migrations/run.sh convention). When /dev/tty
+# cannot be opened (e.g. inside a Claude Code session) it does not prompt and
+# instead signals the calling skill to ask via AskUserQuestion — the
+# "TTY-first with AskUserQuestion fallback" convention documented in
+# docs/agents/architecture/skill-finish.md.
 #
 # Usage:
 #   next_step_prompt.sh --repo <repo_path> --command "<command>" [--command "<command>"]...
@@ -21,12 +24,22 @@
 #   [Y]es  -> CHOICE=yes                            exit 0
 #   [N]o   -> CHOICE=no                             exit 0
 #   [C]hat -> CHOICE=chat, CHAT_CONTEXT=next_step   exit 3
-#   usage error, --repo not a directory, /dev/tty unreadable (or closed
-#   before a valid answer) -> nothing on stdout, error on stderr, exit 1
+#   /dev/tty cannot be opened -> FALLBACK=chat, then one COMMAND=<cmd> line
+#   per --command (verbatim, in the order given)    exit 4
+#   usage error, --repo not a directory, or /dev/tty closed before a valid
+#   answer -> nothing on stdout, error on stderr, exit 1
+# Argument validation runs before the TTY probe, so usage errors exit 1 even
+# when no TTY is available.
+#
+# Environment:
+#   ARCANUM_TTY_DEVICE  TEST-ONLY override of the TTY device path (defaults to
+#                       /dev/tty). Not a user-facing setting; specs point it at
+#                       a nonexistent path to simulate "no TTY".
 
 set -euo pipefail
 
-TTY_DEVICE="/dev/tty"
+# Test-only override (see header); not a user-facing setting.
+TTY_DEVICE="${ARCANUM_TTY_DEVICE:-/dev/tty}"
 
 _usage_error() {
   echo "Error: $1" >&2
@@ -60,8 +73,11 @@ done
 [[ ${#COMMANDS[@]} -gt 0 ]] || _usage_error "at least one --command is required"
 
 if ! ( exec 3< "$TTY_DEVICE" ) 2>/dev/null; then
-  echo "Error: no interactive terminal ($TTY_DEVICE) available to prompt for the next step." >&2
-  exit 1
+  echo "FALLBACK=chat"
+  for cmd in "${COMMANDS[@]}"; do
+    printf 'COMMAND=%s\n' "$cmd"
+  done
+  exit 4
 fi
 
 {
