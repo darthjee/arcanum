@@ -207,4 +207,129 @@ describe('ConfigChain', () => {
       }
     });
   });
+  describe('#readTiers', () => {
+    function localFile() {
+      return path.join(repoPath, '.claude', 'state', 'arcanum-config.json');
+    }
+
+    function repoFile() {
+      return path.join(repoPath, '.claude', 'configuration', 'arcanum-repo-config.json');
+    }
+
+    function globalFile() {
+      return path.join(globalDir, 'arcanum-config.json');
+    }
+
+    it('reports every tier with its value when all three tiers are set', async () => {
+      await writeLocalState({ git: { merge_body_mode: 'coauthors' } });
+      await writeRepoConfig({ git: { merge_body_mode: 'full' } });
+      await writeGlobalConfig({ git: { merge_body_mode: 'empty' } });
+
+      await expectAsync(newConfigChain().readTiers(repoPath, 'git', 'merge_body_mode')).toBeResolvedTo([
+        { tier: 'local', file: localFile(), set: true, value: 'coauthors' },
+        { tier: 'repo', file: repoFile(), set: true, value: 'full' },
+        { tier: 'global', file: globalFile(), set: true, value: 'empty' }
+      ]);
+    });
+
+    it('reports only the global tier as set when only it holds the value', async () => {
+      await writeGlobalConfig({ git: { merge_body_mode: 'empty' } });
+
+      await expectAsync(newConfigChain().readTiers(repoPath, 'git', 'merge_body_mode')).toBeResolvedTo([
+        { tier: 'local', file: localFile(), set: false },
+        { tier: 'repo', file: repoFile(), set: false },
+        { tier: 'global', file: globalFile(), set: true, value: 'empty' }
+      ]);
+    });
+
+    it('reports every tier as unset, without a value key, when no tier is set', async () => {
+      const tiers = await newConfigChain().readTiers(repoPath, 'git', 'merge_body_mode');
+
+      expect(tiers).toEqual([
+        { tier: 'local', file: localFile(), set: false },
+        { tier: 'repo', file: repoFile(), set: false },
+        { tier: 'global', file: globalFile(), set: false }
+      ]);
+      tiers.forEach((tier) => expect(Object.keys(tier)).not.toContain('value'));
+    });
+
+    it('treats a null value as unset', async () => {
+      await writeLocalState({ git: { merge_body_mode: null } });
+
+      const [local] = await newConfigChain().readTiers(repoPath, 'git', 'merge_body_mode');
+
+      expect(local).toEqual({ tier: 'local', file: localFile(), set: false });
+    });
+
+    it('treats an empty string as set', async () => {
+      await writeLocalState({ git: { merge_body_mode: '' } });
+
+      const [local] = await newConfigChain().readTiers(repoPath, 'git', 'merge_body_mode');
+
+      expect(local).toEqual({ tier: 'local', file: localFile(), set: true, value: '' });
+    });
+
+    it('treats a missing file and malformed JSON as unset', async () => {
+      await mkdir(path.dirname(localFile()), { recursive: true });
+      await writeFile(localFile(), '{not valid json');
+
+      const [local, repo] = await newConfigChain().readTiers(repoPath, 'git', 'merge_body_mode');
+
+      expect(local).toEqual({ tier: 'local', file: localFile(), set: false });
+      expect(repo).toEqual({ tier: 'repo', file: repoFile(), set: false });
+    });
+
+    it('reports a null global file when neither HOME nor CLAUDE_CONFIG_DIR is set', async () => {
+      const configChain = new ConfigChain({ env: {} });
+      const [, , global] = await configChain.readTiers(repoPath, 'git', 'merge_body_mode');
+
+      expect(global).toEqual({ tier: 'global', file: null, set: false });
+    });
+
+    it('uses CLAUDE_CONFIG_DIR over HOME when both are set', async () => {
+      await writeGlobalConfig({ git: { merge_body_mode: 'empty' } });
+
+      const configChain = new ConfigChain({ env: { CLAUDE_CONFIG_DIR: globalDir, HOME: repoPath } });
+      const [, , global] = await configChain.readTiers(repoPath, 'git', 'merge_body_mode');
+
+      expect(global).toEqual({ tier: 'global', file: globalFile(), set: true, value: 'empty' });
+    });
+
+    it('falls back to $HOME/.claude when CLAUDE_CONFIG_DIR is unset', async () => {
+      const configChain = new ConfigChain({ env: { HOME: globalDir } });
+      const [, , global] = await configChain.readTiers(repoPath, 'git', 'merge_body_mode');
+
+      expect(global.file).toEqual(path.join(globalDir, '.claude', 'arcanum-config.json'));
+    });
+
+    it('resolves a nested key and returns object/array values as subtrees', async () => {
+      await writeLocalState({ a: { b: { c: { deep: [1, 2] } } } });
+      await writeRepoConfig({ a: { b: { c: ['x', 'y'] } } });
+
+      const [local, repo] = await newConfigChain().readTiers(repoPath, 'a', 'b.c');
+
+      expect(local.value).toEqual({ deep: [1, 2] });
+      expect(repo.value).toEqual(['x', 'y']);
+    });
+
+    it('yields absolute file paths for a relative repoPath', async () => {
+      const relative = path.relative(process.cwd(), repoPath);
+      const tiers = await newConfigChain().readTiers(relative, 'git', 'merge_body_mode');
+
+      expect(tiers.map((tier) => tier.file)).toEqual([
+        path.resolve(localFile()), path.resolve(repoFile()), path.resolve(globalFile())
+      ]);
+      tiers.forEach((tier) => expect(path.isAbsolute(tier.file)).toBeTrue());
+    });
+
+    it('falls back to a constructor-injected repoContext when repoPath is omitted', async () => {
+      await writeLocalState({ git: { merge_body_mode: 'coauthors' } });
+
+      const repoContext = createRepoContextMock({ repoPath });
+      const configChain = new ConfigChain({ env: { CLAUDE_CONFIG_DIR: globalDir }, repoContext });
+      const [local] = await configChain.readTiers(undefined, 'git', 'merge_body_mode');
+
+      expect(local).toEqual({ tier: 'local', file: localFile(), set: true, value: 'coauthors' });
+    });
+  });
 });
