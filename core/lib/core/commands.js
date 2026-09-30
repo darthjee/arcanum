@@ -12,7 +12,9 @@
  *   module instance from the leading argument (absent ≡ `'none'`):
  *   - `'repo'` — `new ModuleClass(repoContext)` where `repoContext` is a
  *     `RepoContext` built from the leading `repoPath` argument; that leading
- *     argument is stripped from the method args. Set on the
+ *     argument is stripped from the method args. Set on
+ *     `arcanum-check-config` (`validateRepoPath: false` — the config tiers
+ *     are plain files, so the target need not be a git repo), on the
  *     `arcanum-split-issue-*` and `auto-fix-all-*` lifecycle commands
  *     (checkout-from-main / cleanup-artifacts / reply-comment / wait-ci /
  *     wait-ci-and-merge), on `spawn-issue`, on `auto-fix-issue-commit-change`,
@@ -65,6 +67,12 @@
  * @type {Object<string, CommandEntry>}
  */
 export const COMMANDS = {
+  'arcanum-check-config': {
+    module: 'commands/arcanum-check-config/ArcanumCheckConfig.js',
+    method: 'run',
+    context: 'repo',
+    validateRepoPath: false
+  },
   'arcanum-split-issue-create-sub-issue': {
     module: 'commands/arcanum-split-issue/ArcanumSplitIssueCreateSubIssue.js',
     method: 'run',
