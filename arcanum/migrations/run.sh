@@ -43,9 +43,11 @@
 # _manifest.sh for the exact three-pointer/scope gating.
 #
 # --- Form 1: `run.sh` (no subcommand) --- fully interactive, direct
-# terminal use. Prints the current version and pending list, verifies
-# /dev/tty is actually open/readable (failing fast to stderr, exit 1,
-# if not), then prompts (/dev/tty) [A]ll/[N]one/[S]elect/[C]hat:
+# terminal use. Probes the TTY device ($ARCANUM_TTY_DEVICE, default
+# /dev/tty) first; if it can't be opened (e.g. inside a Claude Code
+# session), prints only machine-readable fallback data to stdout and
+# exits 4 (see below). Otherwise prints the current version and pending
+# list, then prompts (on the TTY) [A]ll/[N]one/[S]elect/[C]hat:
 #   [A]ll     -> loops pending versions ascending, calling
 #                update_per_version.sh <version> --no-confirm for each;
 #                stops immediately if one exits 2 (halt).
@@ -57,7 +59,16 @@
 # the chain), it is re-propagated immediately (exit 3) instead of
 # falling through to the error dump.
 # If no pending versions: prints "Up to date (version <current>)." and
-# exits 0 without touching the errors file.
+# exits 0 without touching the errors file (with or without a TTY).
+# No TTY + pending versions -> stdout is exactly:
+#   FALLBACK=chat
+#   CURRENT=<committed version>
+#   LOCAL=<local version>
+#   GLOBAL=<global version>
+#   PENDING=<version>   (one line per pending version, ascending)
+# and exit 4, without resetting the errors file, so the calling skill
+# can ask All/None/Select/Chat in chat and apply the answer via Form 3.
+# See docs/agents/architecture/per-repo-migrations.md#script-driven-interaction.
 #
 # --- Form 2: `run.sh check` --- non-interactive, for skill-mediated
 # use. Only prints, never prompts/runs/touches the errors file:
@@ -81,9 +92,17 @@
 # contents are printed if non-empty. Exit code contract for forms 1 and
 # 3: 0 if the run completed without halting (even with skippable
 # errors recorded), 1 if a halt (exit-2 propagation) occurred anywhere
-# in the chain or on a usage/no-TTY/invalid-path error, 3 if [C]hat was
-# chosen at any level in the chain (propagated verbatim, unlike halt —
-# see CHAT_CONTEXT=<version>[/<file>] in the captured stdout).
+# in the chain or on a usage/invalid-semver/invalid-path error or the
+# TTY closing mid-prompt, 3 if [C]hat was chosen at any level in the
+# chain (propagated verbatim, unlike halt — see
+# CHAT_CONTEXT=<version>[/<file>] in the captured stdout), 4 (form 1
+# only) if pending versions exist but no TTY could be opened
+# (FALLBACK=chat, see above).
+#
+# Environment:
+#   ARCANUM_TTY_DEVICE  TEST-ONLY override of the TTY device path (defaults to
+#                       /dev/tty). Not a user-facing setting; specs point it at
+#                       a nonexistent path to simulate "no TTY".
 
 set -euo pipefail
 
@@ -92,6 +111,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Read by _pending_versions.sh (sourced below), which sources
 # _manifest.sh via this path and loops over "${MIGRATIONS_SCRIPT_DIR}"/repos/*/
 MIGRATIONS_SCRIPT_DIR="$SCRIPT_DIR"
+
+# Test-only override (see header); not a user-facing setting.
+TTY_DEVICE="${ARCANUM_TTY_DEVICE:-/dev/tty}"
 
 # shellcheck source=../_lib/repo_config.sh
 source "${SCRIPT_DIR}/../_lib/repo_config.sh"
@@ -233,17 +255,15 @@ _run_all() {
   return 0
 }
 
-cmd_check() {
-  local current local_current global_current
-  current="$(_resolve_current_version)" || exit 1
-  local_current="$(_resolve_current_local_version)" || exit 1
-  global_current="$(_resolve_current_global_version)" || exit 1
-
-  _pending_list "$current" "$local_current" "$global_current"
-
-  echo "CURRENT=${current}"
-  echo "LOCAL=${local_current}"
-  echo "GLOBAL=${global_current}"
+# _print_version_data <current> <local> <global>
+#   Prints the CURRENT=/LOCAL=/GLOBAL= lines followed by one PENDING=
+#   line per entry of the PENDING array (ascending), or
+#   STATUS=up_to_date when it's empty. Shared by `check` and the
+#   interactive form's no-TTY fallback so both emit identical lines.
+_print_version_data() {
+  echo "CURRENT=${1}"
+  echo "LOCAL=${2}"
+  echo "GLOBAL=${3}"
   if [[ ${#PENDING[@]} -eq 0 ]]; then
     echo "STATUS=up_to_date"
   else
@@ -252,6 +272,17 @@ cmd_check() {
       echo "PENDING=${v}"
     done
   fi
+}
+
+cmd_check() {
+  local current local_current global_current
+  current="$(_resolve_current_version)" || exit 1
+  local_current="$(_resolve_current_local_version)" || exit 1
+  global_current="$(_resolve_current_global_version)" || exit 1
+
+  _pending_list "$current" "$local_current" "$global_current"
+
+  _print_version_data "$current" "$local_current" "$global_current"
   exit 0
 }
 
@@ -309,6 +340,14 @@ cmd_interactive() {
     exit 0
   fi
 
+  # Probe the TTY before touching anything: without one, hand the
+  # choice back to the calling skill (exit 4) instead of failing.
+  if ! ( exec 3< "$TTY_DEVICE" ) 2>/dev/null; then
+    echo "FALLBACK=chat"
+    _print_version_data "$current" "$local_current" "$global_current"
+    exit 4
+  fi
+
   _reset_errors_file
 
   echo "Current version: ${current}"
@@ -320,12 +359,12 @@ cmd_interactive() {
     echo "  $v"
   done
 
-  if ! ( exec 3< /dev/tty ) 2>/dev/null; then
-    echo "Error: no interactive terminal (/dev/tty) available to prompt for [A]ll/[N]one/[S]elect/[C]hat. Use 'check'/'apply' for non-interactive use, or run this from a real terminal." >&2
+  printf '[A]ll/[N]one/[S]elect/[C]hat: '
+  local choice=""
+  if ! read -r choice < "$TTY_DEVICE"; then
+    echo "Error: the terminal (${TTY_DEVICE}) closed before a choice was read." >&2
     exit 1
   fi
-  printf '[A]ll/[N]one/[S]elect/[C]hat: '
-  read -r choice < /dev/tty
 
   local rc=0
   case "$choice" in
