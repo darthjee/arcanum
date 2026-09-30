@@ -70,6 +70,8 @@ issue_for_key() {
   echo
   echo "One row per entry point tracked in [\`arcanum/_lib/migration-status.json\`](../../../arcanum/_lib/migration-status.json) — see [Script Engine](script-engine.md) for the shell → Node.js migration this tracks. \`Migrated\` reflects the map's current boolean value; \`Issue\` is the issue that migrated it, resolved from the file's own git history where knowable, blank otherwise (never a guess)."
   echo
+  echo "Native-only commands (dispatched with \`engine_dispatch --native-only\`, e.g. \`arcanum-check-config\`) have no shell implementation, are not tracked in \`migration-status.json\`, and so never appear in this table."
+  echo
   echo "| Command | Migrated | Issue |"
   echo "| --- | --- | --- |"
 
