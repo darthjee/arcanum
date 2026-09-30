@@ -19,10 +19,11 @@ On top of that, `arcanum/_lib/engine_dispatch.sh` always assumes a `<shell_scrip
     "key": "git.authors",
     "local":  { "file": "<repo>/.claude/state/arcanum-config.json", "set": false },
     "repo":   { "file": "<repo>/.claude/configuration/arcanum-repo-config.json", "set": true, "value": ["..."] },
-    "global": { "file": "~/.claude/arcanum-config.json", "set": true, "value": ["..."] },
+    "global": { "file": "<CLAUDE_CONFIG_DIR or $HOME/.claude>/arcanum-config.json", "set": true, "value": ["..."] },
     "final":  { "value": ["..."], "source": "repo" }
   }
   ```
+  - `file` is the absolute, resolved path of each tier's file. The global tier honors `CLAUDE_CONFIG_DIR`, with `$HOME/.claude` as the fallback. When neither is set, the global `file` is `null`. Paths are never shortened to `~`.
   - `value` is the raw JSON value: a scalar when the key holds a scalar, the JSON subtree when it holds an object or array.
   - Shadowed tiers are still shown, so you can see what was overridden. A tier with no value for the key (absent, `null`, missing/unreadable/malformed file, or an unresolvable global path) gets `"set": false` and no `value`.
   - When no tier sets the key, `final` is `{ "value": null, "source": null }`. Code-level defaults (e.g. `engine.mode` → `shell` in `engine_dispatch.sh`) are **not** reported.
@@ -34,6 +35,13 @@ On top of that, `arcanum/_lib/engine_dispatch.sh` always assumes a `<shell_scrip
 - **Scope:** only the three-tier arcanum config chain. Keys in other config files (e.g. `.claude/configuration/monitor-issues.json`) are out of scope.
 
 ## Solution
+### Skill folder and ownership
+- New top-level skill folder `arcanum-check-config/`, owned like every other skill folder:
+  - `skill-writer`: `SKILL.md` (and any `steps/*.md`);
+  - `scripter`: the `scripts/` shim that calls the native-only dispatch path;
+  - `node`: the `core/lib` command and its specs.
+- Everything ships in one PR: the skill is the first user of the native-only rule, so it proves the rule works.
+
 ### Native command
 - Add a `core/lib` command registered in `core/lib/core/commands.js`, invoked through `core/bin/arcanum`.
 - Reuse `ConfigChain` (`core/lib/utils/config/ConfigChain.js`): `_tierFiles()` already returns the ordered tier paths. Add a per-tier, origin-aware read (e.g. a method returning each tier's file/set/value) and have `read()` share the same resolution code, so the logic isn't duplicated.
@@ -46,7 +54,7 @@ On top of that, `arcanum/_lib/engine_dispatch.sh` always assumes a `<shell_scrip
 - The skill's shim script uses this path. Every future native-only skill reuses it.
 
 ### Docs: new skills are native-only
-Related to #655 (still open), which adds an "every new entrypoint must be dual shell+native" rule. This issue replaces that rule with: existing entrypoints stay dual (shell + native), and **new skills are native-only, with docker added later**. Files to update:
+Related to #655 (still open). #655 is left as it is, and this issue only cross-references it: whichever of the two lands second reconciles the docs. #655 adds an "every new entrypoint must be dual shell+native" rule. This issue replaces that rule with: existing entrypoints stay dual (shell + native), and **new skills are native-only, with docker added later**. Files to update:
 - `AGENTS.md`: Stack section and the Conventions/Boundaries rules about extracting logic into `<skill>/scripts/*.sh`.
 - `docs/agents/architecture/script-engine.md`:
   - the dispatch guard, contract and parity-test sections (document the native-only path);
