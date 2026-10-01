@@ -4,7 +4,7 @@
 # docs/agents/architecture/script-engine.md and
 # docs/agents/plans/430-migrate-auto-fix-issue-github-entrypoint-to-native-node-js/plan.md
 # for the full design/shared contracts. Unlike a single-command shim
-# (commit_change.sh, create_branch.sh), this script bundles four
+# (commit_change.sh, run_checks.sh), this script bundles four
 # subcommands (info, pr-create, pr-view, pr-ready), so it must resolve
 # the right migration-status.json/COMMANDS key from $1 before calling
 # engine_dispatch, once per invocation — never for the whole script.
@@ -13,8 +13,8 @@
 # pr-create/pr-view/pr-ready only (all three resolve a GitHub token via
 # `gh`, which needs HOME to find its own auth config once native's
 # `env -i PATH="$PATH"` strips the ambient environment down); info needs
-# no env vars (git-only, no gh call), mirroring create_branch.sh's
-# no-env-var precedent for a git-only entrypoint.
+# no env vars (git-only, no gh call), following the no-env-var
+# precedent of the other read-only entrypoints (list_plan_agents.sh).
 #
 # engine_dispatch passes its OWN trailing <args...> unchanged to BOTH the
 # shell fallback and the native command — but those two need different

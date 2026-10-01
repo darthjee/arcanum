@@ -13,7 +13,7 @@
 #
 # Usage: list_plan_steps.sh <plan_dir> <agent_name>
 #
-# Unlike create_branch.sh/commit_change.sh, this entrypoint does not take
+# Unlike commit_change.sh, this entrypoint does not take
 # <repo_path> as its own argument — <plan_dir> is resolved by callers as
 # an absolute or already-repo-relative path. engine_dispatch() still
 # needs a repo_path for its config_chain_read call, so it is derived

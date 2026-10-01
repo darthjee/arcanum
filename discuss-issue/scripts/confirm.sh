@@ -13,7 +13,7 @@
 #
 # Usage: confirm.sh "<free-form reply>"
 #
-# Unlike commit_change.sh/merge_main.sh, this entrypoint does not take
+# Unlike commit_change.sh, this entrypoint does not take
 # <repo_path> as its own argument — every existing caller invokes it as
 # `confirm.sh "<reply>"`. engine_dispatch() still needs a repo_path for
 # its config_chain_read call, so it is derived here from the ambient git
