@@ -15,6 +15,7 @@
  *     argument is stripped from the method args. Set on
  *     `arcanum-check-config` (`validateRepoPath: false` — the config tiers
  *     are plain files, so the target need not be a git repo), on the
+ *     native-only `arcanum-create-issue-start` / `-publish` pair, on the
  *     `arcanum-split-issue-*` and `auto-fix-all-*` lifecycle commands
  *     (checkout-from-main / cleanup-artifacts / reply-comment / wait-ci /
  *     wait-ci-and-merge), on `spawn-issue`, on `auto-fix-issue-commit-change`,
@@ -72,6 +73,16 @@ export const COMMANDS = {
     method: 'run',
     context: 'repo',
     validateRepoPath: false
+  },
+  'arcanum-create-issue-publish': {
+    module: 'commands/arcanum-create-issue/ArcanumCreateIssuePublish.js',
+    method: 'run',
+    context: 'repo'
+  },
+  'arcanum-create-issue-start': {
+    module: 'commands/arcanum-create-issue/ArcanumCreateIssueStart.js',
+    method: 'run',
+    context: 'repo'
   },
   'arcanum-split-issue-create-sub-issue': {
     module: 'commands/arcanum-split-issue/ArcanumSplitIssueCreateSubIssue.js',

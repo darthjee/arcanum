@@ -2,6 +2,8 @@ import { COMMANDS } from '../../../lib/core/commands.js';
 
 const REPO_CONTEXT_COMMANDS = [
   'arcanum-check-config',
+  'arcanum-create-issue-publish',
+  'arcanum-create-issue-start',
   'arcanum-split-issue-create-sub-issue',
   'arcanum-split-issue-create-sub-issue-file',
   'arcanum-split-issue-finish',
