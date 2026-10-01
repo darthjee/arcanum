@@ -95,6 +95,9 @@ import { createTempDir, removeTempDir } from './tempDir.js';
 //   - `gh label create <name> -R <ref> --color <c>` / `gh label edit
 //     <name> -R <ref> --name <n> --color <c>` -> succeed (print nothing)
 //     unless `$FAKE_GH_LABEL_WRITE_FAIL` is `1`.
+//   - Whenever `$FAKE_GH_CALL_LOG` is set, every invocation's arguments
+//     are first appended to that file (one `$*` line per call), so a spec
+//     can assert exactly which `gh` calls were (or weren't) made.
 /**
  * Build the `gh auth` subcommand's case branches (`switch`, `token`).
  * @returns {string} bash source for the `auth` subcommand's case body.
@@ -321,6 +324,10 @@ function buildGhScript(authTokenAlwaysFails) {
 set -euo pipefail
 
 AUTH_TOKEN_ALWAYS_FAILS=${authTokenAlwaysFails ? '1' : '0'}
+
+if [[ -n "\${FAKE_GH_CALL_LOG:-}" ]]; then
+  printf '%s\\n' "$*" >> "$FAKE_GH_CALL_LOG"
+fi
 
 _json_flag_value() {
   local prev=""

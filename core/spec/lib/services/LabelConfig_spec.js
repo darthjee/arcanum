@@ -40,11 +40,12 @@ describe('LabelConfig', () => {
       expect(DEFAULT_LABEL_CONFIG_PATH).toEqual('.claude/state/init-claude-config.json');
     });
 
-    it('exposes the 22 frozen default pairs, in the shell order', () => {
-      expect(DEFAULT_LABEL_PAIRS.length).toEqual(22);
+    it('exposes the 23 frozen default pairs, in the shell order', () => {
+      expect(DEFAULT_LABEL_PAIRS.length).toEqual(23);
       expect(DEFAULT_LABEL_PAIRS[0]).toEqual('Bug:b60205');
       expect(DEFAULT_LABEL_PAIRS[6]).toEqual('Ready for Work:ffaa04');
       expect(DEFAULT_LABEL_PAIRS[21]).toEqual('Spawned:6a737d');
+      expect(DEFAULT_LABEL_PAIRS[22]).toEqual('Epic:fbca04');
       expect(Object.isFrozen(DEFAULT_LABEL_PAIRS)).toBeTrue();
     });
   });
@@ -167,7 +168,7 @@ describe('LabelConfig', () => {
         await seed(content);
         await labelConfig.ensureDefaults(configPath);
 
-        expect((await labelConfig.readPairs(configPath)).length).toEqual(22);
+        expect((await labelConfig.readPairs(configPath)).length).toEqual(23);
       }
     });
 

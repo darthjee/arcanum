@@ -26,7 +26,8 @@ export const LABEL_TO_TAG = {
   PR: 'pr',
   Planning: 'planning',
   Split: 'split',
-  Spawned: 'spawned'
+  Spawned: 'spawned',
+  Epic: 'epic'
 };
 
 /**
