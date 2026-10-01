@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, stat, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, stat, unlink, writeFile as fsWriteFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const DRAFTS_DIR = path.join('.claude', 'state', 'create-issue');
@@ -19,10 +19,13 @@ class DraftStore {
    * @param {string} deps.repoPath - the target repo's local checkout
    *   path.
    * @param {() => Date} [deps.now] - clock, overridable for tests.
+   * @param {typeof fsWriteFile} [deps.writeFile] - file writer used to
+   *   create drafts, overridable for tests.
    */
-  constructor({ repoPath, now = () => new Date() }) {
+  constructor({ repoPath, now = () => new Date(), writeFile = fsWriteFile }) {
     this._dir = path.resolve(repoPath, DRAFTS_DIR);
     this._now = now;
+    this._writeFile = writeFile;
   }
 
   /**
@@ -84,7 +87,7 @@ class DraftStore {
       const file = path.join(this._dir, `${stamp}${suffix}${DRAFT_EXT}`);
 
       try {
-        await writeFile(file, '', { flag: 'wx' });
+        await this._writeFile(file, '', { flag: 'wx' });
 
         return file;
       } catch (error) {

@@ -1,4 +1,4 @@
-import { chmod, mkdir, readFile, stat, utimes, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, stat, utimes, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import DraftStore from '../../../../lib/commands/arcanum-create-issue/DraftStore.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
@@ -80,14 +80,13 @@ describe('DraftStore', () => {
     });
 
     it('rethrows unexpected write errors', async () => {
-      await mkdir(dir, { recursive: true });
-      await chmod(dir, 0o500);
+      const error = Object.assign(new Error('permission denied'), { code: 'EACCES' });
+      const writeFile = jasmine.createSpy('writeFile').and.rejectWith(error);
 
-      try {
-        await expectAsync(store.create()).toBeRejectedWith(jasmine.objectContaining({ code: 'EACCES' }));
-      } finally {
-        await chmod(dir, 0o700);
-      }
+      store = new DraftStore({ repoPath, now: () => NOW, writeFile });
+
+      await expectAsync(store.create()).toBeRejectedWith(error);
+      expect(writeFile).toHaveBeenCalledTimes(1);
     });
 
     it('gives up after too many taken names', async () => {
