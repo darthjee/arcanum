@@ -5,6 +5,7 @@ import DraftStore from '../../../../lib/commands/arcanum-create-issue/DraftStore
 import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
 import TtyPrompt from '../../../../lib/utils/io/TtyPrompt.js';
 import FakeTty from '../../../support/dummies/FakeTty.js';
+import { captureRejection } from '../../../support/utils/captureRejection.js';
 import { createRepoContextMock } from '../../../support/factories/repoContextFactory.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
@@ -41,16 +42,6 @@ describe('ArcanumCreateIssueStart#run', () => {
     await utimes(file, mtime, mtime);
 
     return file;
-  }
-
-  async function failure(promise) {
-    try {
-      await promise;
-    } catch (error) {
-      return error;
-    }
-
-    throw new Error('expected a rejection');
   }
 
   const newFile = () => path.join(dir, '20261001-120000.md');
@@ -113,7 +104,7 @@ describe('ArcanumCreateIssueStart#run', () => {
     it('exits 4 with FALLBACK=chat and DRAFT lines, newest first, without a TTY', async () => {
       tty = new FakeTty({ available: false });
 
-      const error = await failure(newCommand().run());
+      const error = await captureRejection(newCommand().run());
 
       expect(error).toEqual(jasmine.any(DispatchFailure));
       expect(error.exitCode).toEqual(4);
@@ -127,7 +118,7 @@ describe('ArcanumCreateIssueStart#run', () => {
     it('exits 4 when the TTY reaches EOF before an answer', async () => {
       tty = new FakeTty({ answers: [] });
 
-      const error = await failure(newCommand().run());
+      const error = await captureRejection(newCommand().run());
 
       expect(error.exitCode).toEqual(4);
       expect(tty.closed).toBeTrue();
@@ -153,7 +144,7 @@ describe('ArcanumCreateIssueStart#run', () => {
 
     for (const { name, args } of cases) {
       it(`exits 2 on ${name}, before the preflight`, async () => {
-        const error = await failure(newCommand().run(...args));
+        const error = await captureRejection(newCommand().run(...args));
 
         expect(error.exitCode).toEqual(2);
         expect(error.stdout).toEqual('ERROR=Usage: start.sh <repo_path> [--new | --resume <draft>]\n');
@@ -162,7 +153,7 @@ describe('ArcanumCreateIssueStart#run', () => {
     }
 
     it('exits 2 on an unknown --resume draft', async () => {
-      const error = await failure(newCommand().run('--resume', 'nope.md'));
+      const error = await captureRejection(newCommand().run('--resume', 'nope.md'));
 
       expect(error.exitCode).toEqual(2);
       expect(error.stdout).toEqual('ERROR=unknown draft: nope.md\n');
@@ -174,7 +165,7 @@ describe('ArcanumCreateIssueStart#run', () => {
     it('exits 1 with STATUS=error and creates no draft', async () => {
       preflight.check.and.rejectWith(new Error('origin is not a GitHub remote: gitlab.com/a/b'));
 
-      const error = await failure(newCommand().run('--new'));
+      const error = await captureRejection(newCommand().run('--new'));
 
       expect(error.exitCode).toEqual(1);
       expect(error.stdout).toEqual('STATUS=error\nERROR=origin is not a GitHub remote: gitlab.com/a/b\n');

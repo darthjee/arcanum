@@ -51,7 +51,7 @@ matching other native GitHub-calling shims). Output and exit code pass through u
 
 | Exit | Meaning |
 | --- | --- |
-| `0` | `STATUS=new`, `STATUS=resumed` or `STATUS=ok` |
+| `0` | `STATUS=new`, `STATUS=resumed`, `STATUS=ok`, or (publish) `STATUS=declined` |
 | `1` | `STATUS=error` (start) / `STATUS=failed` (publish), plus `ERROR=<message>` |
 | `2` | Invalid input (bad args, malformed label, empty title/body, unknown `--resume` path). Nothing created. |
 | `4` | No `/dev/tty`: `FALLBACK=chat` (+ `DRAFT=` lines for start) |
@@ -60,7 +60,8 @@ matching other native GitHub-calling shims). Output and exit code pass through u
 
 | Key | Command | Meaning |
 | --- | --- | --- |
-| `STATUS` | both | `new`, `resumed`, `ok`, `error`, `failed` |
+| `STATUS` | both | `new`, `resumed`, `ok`, `declined`, `error`, `failed` |
+| `CHOICE` | publish | `no` or `chat`: the answer at prompt 5 on `/dev/tty`, with `STATUS=declined` (exit `0`, nothing created, draft kept) |
 | `FILE` | start | Draft path (`.claude/state/create-issue/<timestamp>.md`) |
 | `DRAFT` | start | `<path>\t<timestamp>\t<title or first line>`, one per draft, on exit `4` |
 | `FALLBACK` | both | Always `chat`, on exit `4` |
