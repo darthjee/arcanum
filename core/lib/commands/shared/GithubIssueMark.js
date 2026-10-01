@@ -2,17 +2,17 @@ import IssueTagger from '../../utils/issue/IssueTagger.js';
 
 /**
  * Per-subcommand tag transition table, mirroring `github_issue_shell.sh`'s
- * `cmd_mark_*` functions exactly: `add` is added first, then each of
- * `removes` is removed, in order.
- * @type {Readonly<Record<string, {add: string, removes: string[]}>>}
+ * `cmd_mark_*` functions exactly: each of `adds` is added first, then
+ * each of `removes` is removed, in order.
+ * @type {Readonly<Record<string, {adds: string[], removes: string[]}>>}
  */
 export const MARK_TRANSITIONS = Object.freeze({
-  created: Object.freeze({ add: 'created', removes: Object.freeze(['idea', 'writting', 'enhancing']) }),
-  refined: Object.freeze({ add: 'refined', removes: Object.freeze(['created', 'idea', 'writting']) }),
-  ready: Object.freeze({ add: 'ready', removes: Object.freeze(['refined']) }),
-  enhancing: Object.freeze({ add: 'enhancing', removes: Object.freeze(['idea', 'writting']) }),
-  planning: Object.freeze({ add: 'planning', removes: Object.freeze(['idea', 'writting', 'created']) }),
-  split: Object.freeze({ add: 'split', removes: Object.freeze(['planning']) })
+  created: Object.freeze({ adds: Object.freeze(['created']), removes: Object.freeze(['idea', 'writting', 'enhancing']) }),
+  refined: Object.freeze({ adds: Object.freeze(['refined']), removes: Object.freeze(['created', 'idea', 'writting']) }),
+  ready: Object.freeze({ adds: Object.freeze(['ready']), removes: Object.freeze(['refined']) }),
+  enhancing: Object.freeze({ adds: Object.freeze(['enhancing']), removes: Object.freeze(['idea', 'writting']) }),
+  planning: Object.freeze({ adds: Object.freeze(['planning']), removes: Object.freeze(['idea', 'writting', 'created']) }),
+  split: Object.freeze({ adds: Object.freeze(['split', 'epic']), removes: Object.freeze(['planning']) })
 });
 
 /**
@@ -103,9 +103,11 @@ class GithubIssueMark {
    */
   async mark(name, id) {
     const { repo } = await this._repoContext.resolve();
-    const { add, removes } = MARK_TRANSITIONS[name];
+    const { adds, removes } = MARK_TRANSITIONS[name];
 
-    await this._issueTagger.mutateTag(id, repo, 'add', add);
+    for (const tag of adds) {
+      await this._issueTagger.mutateTag(id, repo, 'add', tag);
+    }
 
     for (const tag of removes) {
       await this._issueTagger.mutateTag(id, repo, 'remove', tag);

@@ -111,25 +111,25 @@ function warning(action, tag) {
  * @returns {void}
  */
 export function itMatchesShellForMark(name) {
-  const { add, removes } = MARK_TRANSITIONS[name];
-  const mutations = [['add', add], ...removes.map((tag) => ['remove', tag])];
+  const { adds, removes } = MARK_TRANSITIONS[name];
+  const mutations = [...adds.map((tag) => ['add', tag]), ...removes.map((tag) => ['remove', tag])];
 
   describe(`github-issue-mark-${name} parity (shell vs. native)`, () => {
-    it('matches shell when the add tag is added and every remove tag is removed', async () => {
+    it('matches shell when every add tag is added and every remove tag is removed', async () => {
       const results = await runMarkBoth(name, { labels: labelsFor(removes) });
 
       expectMarkParity(results, {
-        stdout: `Added tag '${add}' to issue #${ID} on ${REPO}\n` +
+        stdout: adds.map((tag) => `Added tag '${tag}' to issue #${ID} on ${REPO}\n`).join('') +
           removes.map((tag) => `Removed tag '${tag}' from issue #${ID} on ${REPO}\n`).join(''),
         stderr: ''
       });
     });
 
     it('matches shell when every tag is already in its desired state', async () => {
-      const results = await runMarkBoth(name, { labels: labelsFor([add]) });
+      const results = await runMarkBoth(name, { labels: labelsFor(adds) });
 
       expectMarkParity(results, {
-        stdout: `Tag '${add}' already present on issue #${ID} — nothing to do.\n` +
+        stdout: adds.map((tag) => `Tag '${tag}' already present on issue #${ID} — nothing to do.\n`).join('') +
           removes.map((tag) => `Tag '${tag}' not present on issue #${ID} — nothing to do.\n`).join(''),
         stderr: ''
       });

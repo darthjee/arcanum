@@ -34,6 +34,7 @@ _LIB_TAGS_LOADED=1
 #   planning        Planning
 #   split           Split
 #   spawned         Spawned
+#   epic            Epic
 
 # _tag_label_for <canonical_tag>
 #   Echoes the GitHub label name for <canonical_tag>, or nothing if
@@ -56,6 +57,7 @@ _tag_label_for() {
     planning)       echo "Planning" ;;
     split)          echo "Split" ;;
     spawned)        echo "Spawned" ;;
+    epic)           echo "Epic" ;;
   esac
 }
 
@@ -80,6 +82,7 @@ _tag_for_label() {
     Planning) echo "planning" ;;
     Split)    echo "split" ;;
     Spawned)  echo "spawned" ;;
+    Epic)     echo "epic" ;;
   esac
 }
 

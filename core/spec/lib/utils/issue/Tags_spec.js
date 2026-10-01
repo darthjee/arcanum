@@ -14,6 +14,7 @@ describe('Tags', () => {
       expect(TAG_TO_LABEL.created).toEqual('Created');
       expect(TAG_TO_LABEL.ready_for_work).toEqual('Ready for Work');
       expect(TAG_TO_LABEL.shipit).toEqual('shipit');
+      expect(TAG_TO_LABEL.epic).toEqual('Epic');
     });
   });
 
@@ -27,12 +28,12 @@ describe('Tags', () => {
       const labels = [
         'Created', 'Ready for Work', 'shipit', 'Working', 'Question', 'Fetched',
         'Refined', 'Ready', 'Enqueued', 'Idea', 'Writting', 'Enhancing', 'PR',
-        'Planning', 'Split', 'Spawned'
+        'Planning', 'Split', 'Spawned', 'Epic'
       ];
       const expected = [
         'created', 'ready_for_work', 'shipit', 'working', 'question', 'fetched',
         'refined', 'ready', 'enqueued', 'idea', 'writting', 'enhancing', 'pr',
-        'planning', 'split', 'spawned'
+        'planning', 'split', 'spawned', 'epic'
       ];
 
       expect(Tags.extractTags(labels)).toEqual(expected);
@@ -65,6 +66,12 @@ describe('Tags', () => {
 
     it('omits absent actionable tags and ignores non-actionable ones', () => {
       expect(Tags.actionableTags(['Ready for Work', 'shipit'])).toEqual(['ready_for_work']);
+    });
+
+    it('treats epic as a non-actionable tag', () => {
+      expect(LABEL_TO_TAG.Epic).toEqual('epic');
+      expect(ACTIONABLE_TAGS).not.toContain('epic');
+      expect(Tags.actionableTags(['Epic'])).toEqual([]);
     });
 
     it('returns [] when none are present', () => {

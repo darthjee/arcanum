@@ -5,7 +5,7 @@ import path from 'node:path';
 export const DEFAULT_LABEL_CONFIG_PATH = '.claude/state/init-claude-config.json';
 
 /**
- * The 22 default `<name>:<color>` pairs, in
+ * The 23 default `<name>:<color>` pairs, in
  * `init-claude/scripts/lib/label_config.sh`'s order.
  */
 export const DEFAULT_LABEL_PAIRS = Object.freeze([
@@ -30,7 +30,8 @@ export const DEFAULT_LABEL_PAIRS = Object.freeze([
   'Automated:d93f0b',
   'Planning:c5def5',
   'Split:000000',
-  'Spawned:6a737d'
+  'Spawned:6a737d',
+  'Epic:fbca04'
 ]);
 
 const HEX_COLOR = /^[0-9A-Fa-f]{6}$/;

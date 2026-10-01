@@ -85,6 +85,18 @@ describe('LabelApplicator', () => {
       });
     });
 
+    describe('Epic carryover', () => {
+      it('drops Epic from the parent labels, keeping non-pipeline labels', async () => {
+        const execFileAsync = await runApply({ parentLabels: ['Epic', 'Bug'] });
+
+        const editCall = execFileAsync.calls.all().find((call) => call.args[1][1] === 'edit');
+
+        expect(editCall.args[1]).toEqual([
+          'issue', 'edit', '42', '-R', REPO_REF, '--add-label', 'Bug', '--add-label', 'Spawned'
+        ]);
+      });
+    });
+
     describe('edit failure', () => {
       it('warns to stderr and does not throw', async () => {
         await runApply({ editFail: true });

@@ -3,6 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import Tags from '../../lib/utils/issue/Tags.js';
 import { createGitFixtureRepo } from '../support/utils/gitFixtureRepo.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
@@ -28,6 +29,7 @@ const execFileAsync = promisify(execFile);
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const SHELL_SCRIPT = path.join(REPO_ROOT, 'arcanum', '_lib', 'spawn_issue_shell.sh');
 const NATIVE_BIN = path.join(REPO_ROOT, 'core', 'bin', 'arcanum');
+const TAGS_SH = path.join(REPO_ROOT, 'arcanum', '_lib', 'tags.sh');
 
 /**
  * Run a spawn-issue invocation (shell or native) and capture its
@@ -154,6 +156,26 @@ describe('spawn-issue parity (shell vs. native)', () => {
       } finally {
         await repo.cleanup();
       }
+    });
+  });
+
+  // Label carryover (issue #689): both sides keep a parent label only
+  // when it maps to no pipeline tag — spawn_issue_shell.sh via
+  // `_tag_for_label`, LabelApplicator.js via `Tags.extractTags`. The
+  // success path itself needs the real GitHub API (see the header), so
+  // the carryover filter is compared directly, offline.
+  describe('parent label carryover filter', () => {
+    const PARENT_LABELS = ['Epic', 'Bug', 'Feature', 'Split', 'Planning', 'Spawned', 'Ready'];
+
+    it('drops Epic (and every other pipeline label) on both sides', async () => {
+      const script = `source "${TAGS_SH}"; for label in "$@"; do ` +
+        '[[ -z "$(_tag_for_label "$label")" ]] && echo "$label"; done; true';
+      const { stdout } = await execFileAsync('bash', ['-c', script, 'carryover', ...PARENT_LABELS]);
+      const shellKept = stdout.split('\n').filter(Boolean);
+      const nativeKept = PARENT_LABELS.filter((label) => Tags.extractTags([label]).length === 0);
+
+      expect(nativeKept).toEqual(shellKept);
+      expect(shellKept).toEqual(['Bug', 'Feature']);
     });
   });
 });
