@@ -13,6 +13,7 @@ Every in-scope issue skill ends the same way:
 | `enhance-issue` | interactive |
 | `plan-issue` | interactive |
 | `arcanum-split-issue` | interactive |
+| `arcanum-create-issue` | interactive |
 | `auto-new-issue` | auto |
 | `auto-plan-issue` | auto |
 | `auto-fix-issue` | auto |
@@ -208,6 +209,7 @@ The outermost skill passes each nested block to its own `finish_report.sh` call 
 | `discuss-issue` | `/auto-plan-issue <id>`, run nested; then `/auto-fix-issue <id>` | offer (twice, see below) |
 | `plan-issue` | `/auto-fix-issue <id>` | offer |
 | `arcanum-split-issue` | `/enhance-issue <sub-id>`, one per sub-issue created in this run | offer (all in one prompt) |
+| `arcanum-create-issue` | `/arcanum-split-issue <id>` when the issue was created as an `Epic` (`EPIC=true`), otherwise `/discuss-issue <id>` | offer |
 | `auto-new-issue` | `/auto-plan-issue <id>` | `Next:` |
 | `auto-plan-issue` | `/auto-fix-issue <id>` | `Next:` |
 | `auto-fix-issue` | `/auto-monitor-issue-pr <id>` | `Next:` |
@@ -217,6 +219,7 @@ Notes:
 
 - **`discuss-issue`** has a two-phase ending. After pushing the issue, it offers `/auto-plan-issue <id>` **before** printing any report, since the report depends on the answer. On yes, it runs `auto-plan-issue` **nested** (it still owns the plan push and the `Refined` → `Ready` swap afterwards), then prints one merged report and offers `/auto-fix-issue <id>`. On no, chat, or an unavailable prompt, it prints its push-only report with no second offer.
 - **`arcanum-split-issue`** always points at `/enhance-issue`, not `/discuss-issue`: split sub-issues start as drafts, and `enhance-issue` then offers `/discuss-issue` itself. On yes, each `/enhance-issue` runs as a chained run, one after the other, each with its own report and offer. Before its success report, the skill's own `scripts/finish.sh` (the `arcanum-split-issue-finish` migrated entrypoint) relabels the parent `Planning` → `Split`, deletes the local working files and releases the working tree; the report's `planning:split` label change is passed only once it has run.
+- **`arcanum-create-issue`** picks its single next command from the `EPIC=` key printed by `scripts/publish.sh`: an Epic goes to `/arcanum-split-issue`, any other issue to `/discuss-issue`. The applied labels are named in the `success` summary rather than passed as `--label-change` (which only accepts canonical pipeline tags), and the summary says so when `shipit` was asked for but not confirmed. A `declined` report (the user abandoned the run) names the kept draft path. Answering **Chat** at the final confirmation is not an exit: the run stays open, with the draft kept and no report yet, so the user can keep refining and publish later in the same run.
 - **`auto-rewrite-issue`** processes a queue: it lists one `Next:` line per issue it rewrote, reports `success` if at least one id was rewritten (naming failed ids in the summary), `success` with no `Next:` on an empty queue, and `failed` if ids were popped but none was rewritten.
 
 ## See also
