@@ -139,7 +139,7 @@ describe('init-claude-sync-labels parity (shell vs. native)', () => {
 
     expectFullParity(results);
     expect(results.shell.code).toEqual(1);
-    expect(JSON.parse(results.shell.config).labels.length).toEqual(22);
+    expect(JSON.parse(results.shell.config).labels.length).toEqual(23);
   });
 
   it('fails non-zero after STATUS=synced when a label write fails', async () => {

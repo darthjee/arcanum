@@ -30,19 +30,20 @@ function fakeTagger() {
 
 describe('GithubIssueMark', () => {
   describe('MARK_TRANSITIONS', () => {
-    it('mirrors the cmd_mark_* add/remove table exactly', () => {
+    it('mirrors the cmd_mark_* adds/removes table exactly', () => {
       expect(MARK_TRANSITIONS).toEqual({
-        created: { add: 'created', removes: ['idea', 'writting', 'enhancing'] },
-        refined: { add: 'refined', removes: ['created', 'idea', 'writting'] },
-        ready: { add: 'ready', removes: ['refined'] },
-        enhancing: { add: 'enhancing', removes: ['idea', 'writting'] },
-        planning: { add: 'planning', removes: ['idea', 'writting', 'created'] },
-        split: { add: 'split', removes: ['planning'] }
+        created: { adds: ['created'], removes: ['idea', 'writting', 'enhancing'] },
+        refined: { adds: ['refined'], removes: ['created', 'idea', 'writting'] },
+        ready: { adds: ['ready'], removes: ['refined'] },
+        enhancing: { adds: ['enhancing'], removes: ['idea', 'writting'] },
+        planning: { adds: ['planning'], removes: ['idea', 'writting', 'created'] },
+        split: { adds: ['split', 'epic'], removes: ['planning'] }
       });
     });
 
     it('is frozen', () => {
       expect(Object.isFrozen(MARK_TRANSITIONS)).toBeTrue();
+      expect(Object.isFrozen(MARK_TRANSITIONS.created.adds)).toBeTrue();
       expect(Object.isFrozen(MARK_TRANSITIONS.created.removes)).toBeTrue();
     });
   });
@@ -53,7 +54,7 @@ describe('GithubIssueMark', () => {
     markReady: [['add', 'ready'], ['remove', 'refined']],
     markEnhancing: [['add', 'enhancing'], ['remove', 'idea'], ['remove', 'writting']],
     markPlanning: [['add', 'planning'], ['remove', 'idea'], ['remove', 'writting'], ['remove', 'created']],
-    markSplit: [['add', 'split'], ['remove', 'planning']]
+    markSplit: [['add', 'split'], ['add', 'epic'], ['remove', 'planning']]
   };
 
   Object.entries(methods).forEach(([method, sequence]) => {
