@@ -101,7 +101,7 @@ describe('next/ Epic label migrations', () => {
       expect(result.code).toEqual(0);
       expect(result.stdout).toEqual(`Created 'Epic' label on ${REPO_REF}.\n`);
       expect(await ghCalls()).toEqual([
-        `label list -R ${REPO_REF} --json name -q .[].name`,
+        `label list -R ${REPO_REF} --limit 1000 --json name -q .[].name`,
         `label create Epic -R ${REPO_REF} --color fbca04`
       ]);
     });
