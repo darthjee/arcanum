@@ -91,6 +91,7 @@ DEFAULT_LABEL_PAIRS=(
   Planning:c5def5
   Split:000000
   Spawned:6a737d
+  Epic:fbca04
 )
 
 label_config_validate_pair() {

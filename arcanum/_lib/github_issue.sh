@@ -23,7 +23,7 @@
 #   mark-ready <repo_path> <id>                 Add the Ready label and remove Refined, if present
 #   mark-enhancing <repo_path> <id>             Add the Enhancing label and remove Idea/Writting, if present
 #   mark-planning <repo_path> <id>              Add the Planning label and remove Idea/Writting/Created, if present
-#   mark-split <repo_path> <id>                 Add the Split label and remove Planning, if present
+#   mark-split <repo_path> <id>                 Add the Split and Epic labels and remove Planning, if present
 
 set -euo pipefail
 
@@ -92,7 +92,7 @@ case "$COMMAND" in
     echo "  mark-ready <repo_path> <id>                 Add the Ready label and remove Refined, if present" >&2
     echo "  mark-enhancing <repo_path> <id>             Add the Enhancing label and remove Idea/Writting, if present" >&2
     echo "  mark-planning <repo_path> <id>              Add the Planning label and remove Idea/Writting/Created, if present" >&2
-    echo "  mark-split <repo_path> <id>                 Add the Split label and remove Planning, if present" >&2
+    echo "  mark-split <repo_path> <id>                 Add the Split and Epic labels and remove Planning, if present" >&2
     exit 1
     ;;
 esac
