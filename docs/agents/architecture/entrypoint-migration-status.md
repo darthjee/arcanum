@@ -38,14 +38,12 @@ Native-only commands (dispatched with `engine_dispatch --native-only`, e.g. `arc
 | `auto-fix-all-wait-ci` | Yes | #230 |
 | `auto-fix-all-wait-ci-and-merge` | Yes | #230 |
 | `auto-fix-issue-commit-change` | Yes | #230 |
-| `auto-fix-issue-create-branch` | Yes | #230 |
 | `auto-fix-issue-github-info` | Yes | #430 |
 | `auto-fix-issue-github-pr-create` | Yes | #430 |
 | `auto-fix-issue-github-pr-ready` | Yes | #430 |
 | `auto-fix-issue-github-pr-view` | Yes | #430 |
 | `auto-fix-issue-list-plan-agents` | Yes | #230 |
 | `auto-fix-issue-list-plan-steps` | Yes | #230 |
-| `auto-fix-issue-merge-main` | Yes | #230 |
 | `auto-fix-issue-run-checks` | Yes | #230 |
 | `auto-monitor-issue-pr-resolve-pr-number` | Yes | #230 |
 | `auto-monitor-pr-monitor-pr` | Yes | #230 |

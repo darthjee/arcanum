@@ -14,7 +14,7 @@
 #
 # Usage: render_issue.sh <output_file> <title> [description] [problem] [expected_behavior] [solution] [benefits]
 #
-# Unlike commit_change.sh/merge_main.sh, this entrypoint does not take
+# Unlike commit_change.sh, this entrypoint does not take
 # <repo_path> as its own argument — every existing caller invokes it as
 # `render_issue.sh "$REPO_PATH/$FILE" "<title>" ...` with an
 # already-absolute <output_file>. engine_dispatch() still needs a
