@@ -92,6 +92,29 @@ class GithubIssueService {
   }
 
   /**
+   * Creates an issue with its labels in a single REST call and returns
+   * it, without writing anything under `docs/agents/issues/` — used by
+   * `arcanum-create-issue-publish`, whose flow never touches the local
+   * checkout (the next skill fetches the issue from GitHub). No retry:
+   * a failed request rejects once.
+   * @param {string} [repoPath] - the target repo's local checkout path;
+   *   falls back to `this._repoContext.repoPath` when omitted.
+   * @param {object} issue - the issue to create.
+   * @param {string} issue.title - the new issue's title.
+   * @param {string} issue.body - the new issue's body, used verbatim.
+   * @param {string[]} [issue.labels] - the label names to apply.
+   * @returns {Promise<{number: number, html_url: string}>} the created
+   *   issue's number and web URL.
+   * @throws {Error} `Error: could not create issue on <repo>` on a
+   *   failed request.
+   */
+  async createWithLabels(repoPath, { title, body, labels = [] }) {
+    const issue = await this.issueClient(repoPath).createIssue(title, body, labels);
+
+    return { number: issue.number, html_url: issue.html_url };
+  }
+
+  /**
    * Reads `file` as an issue body, mirroring the shell's
    * `body=$(cat "$file")`: command substitution strips ALL trailing
    * newlines, so this does too — do not just pass the raw file contents
