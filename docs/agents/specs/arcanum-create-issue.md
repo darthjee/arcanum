@@ -38,12 +38,12 @@ Out of scope:
 Implemented in: #690 (commands), #691 (skill files).
 
 - **Location**: `.claude/state/create-issue/<timestamp>.md`. `.claude/state/` is git-ignored, so the draft can never be committed by accident. The name uses a timestamp because there is no issue id or title when the draft is created. The draft survives the session, so a run can be resumed.
-- **Title**: the draft's first `#` heading line is the issue title. Everything after it is the body.
+- **Title**: the draft's first level-1 heading (`# Title`) is the issue title. Everything after it is the body.
 - **Lifecycle**:
   - Created at the start of a fresh run and updated as the dialogue goes on.
   - Deleted **only** after the GitHub issue is created successfully. The next skill (`/discuss-issue` or `/arcanum-split-issue`) fetches the issue from GitHub.
   - Kept if the user abandons the run or the GitHub create fails.
-- **Resume**: at the start of a run, if drafts exist under `.claude/state/create-issue/`, the user chooses to resume one or start fresh (prompt 1 in [Prompts](#prompts)). Each draft is listed with its timestamp, its age, and its title (or its first line when it has no `#` heading yet).
+- **Resume**: at the start of a run, if drafts exist under `.claude/state/create-issue/`, the user chooses to resume one or start fresh (prompt 1 in [Prompts](#prompts)). Each draft is listed with its timestamp, its age, and its title (or its first line when it has no level-1 heading yet).
 - **Cleanup**: none automatic. Stale drafts are listed by the resume prompt and can be deleted by hand.
 
 ## Skill flow and reuse of enhance-issue
@@ -105,7 +105,7 @@ Shim: `scripts/publish.sh <repo_path> <draft> "<title>" [--confirmed] [--shipit-
 - **Validation**: the title and the body must not be empty, and every label must be well-formed (not empty, no commas, no newlines). Otherwise exit `2` and nothing is created.
 - **Labels**: matched case-insensitively against the repo's GitHub labels, using the existing spelling, with duplicates removed. A missing label is created first (see [Edge cases](#edge-cases)) and reported as `WARNING=created label <name>`.
 - **Confirmations**: owns prompt 5 (final confirmation) and prompt 6 (`shipit`). Without a TTY, it exits `4` until it gets `--confirmed`, and, when `shipit` is among the labels, `--shipit-confirmed`. If `shipit` is not confirmed, it is dropped from the labels.
-- **Create**: the issue is created **with its labels in a single REST call**. `IssueClient.createIssue` ([`core/lib/utils/github/IssueClient.js`](../../../core/lib/utils/github/IssueClient.js)) gains a labels argument, and `GithubIssueService.create` ([`core/lib/services/GithubIssueService.js`](../../../core/lib/services/GithubIssueService.js)) is reused. An issue is never left partly labeled. The draft's `#` heading line is stripped from the body.
+- **Create**: the issue is created **with its labels in a single REST call**. `IssueClient.createIssue` ([`core/lib/utils/github/IssueClient.js`](../../../core/lib/utils/github/IssueClient.js)) gains a labels argument, and `GithubIssueService.create` ([`core/lib/services/GithubIssueService.js`](../../../core/lib/services/GithubIssueService.js)) is reused. An issue is never left partly labeled. The draft's level-1 heading is stripped from the body.
 - **Success**: deletes the draft, then prints `STATUS=ok`, `ID=<n>`, `URL=<url>`, `LABELS=<comma-separated>` and `EPIC=true|false`, plus any `WARNING=` lines. `EPIC=true` means `Epic` is among the applied labels.
 - **Failure**: exit `1`, `STATUS=failed`, `ERROR=<message>`. The draft is kept.
 
@@ -237,7 +237,7 @@ Implemented in: #690 (unless noted).
 | **The create call times out, but the issue was actually created** | No automatic retry on create, so no duplicates. On failure the draft is kept, and the error tells the user to check GitHub before running again. |
 | **The issue is created, but deleting the draft fails** | `STATUS=ok` plus `WARNING=draft not deleted: <path>`. Not a failure. |
 | **Empty title or empty body** | `publish.sh` exits `2` and creates nothing. The skill returns to the dialogue (#691). |
-| **Title in the draft** | The draft's first `#` heading line is the title. `publish.sh` gets the title as an argument and strips that line from the body. |
+| **Title in the draft** | The draft's first level-1 heading (`# Title`) is the title. `publish.sh` gets the title as an argument and strips that line from the body. |
 | **Every label removed** (including `Writting`) | Allowed. The issue is created with no labels, and `EPIC=false`. |
 | **Stale drafts pile up** | No automatic cleanup. The resume prompt lists every draft with its age, and drafts can be deleted by hand. |
 | **Git state** | The skill never commits or checks out anything. The draft lives in `.claude/state/`, so there is no safe-branch checkout and no dirty-tree check (#691). |
