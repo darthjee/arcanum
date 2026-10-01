@@ -189,6 +189,32 @@ describe('IssueClient', () => {
       expect(result).toEqual(created);
     });
 
+    it('includes the labels in the same POST body when given', async () => {
+      const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true, json: async () => ({ number: 42 }) });
+      const client = newClient(fetchFn);
+
+      await client.createIssue('My title', 'My body', ['Epic', 'Writting']);
+
+      expect(fetchFn).toHaveBeenCalledOnceWith(
+        `https://api.github.com/repos/${REPO}/issues`,
+        jasmine.objectContaining({
+          body: JSON.stringify({ title: 'My title', body: 'My body', labels: ['Epic', 'Writting'] })
+        })
+      );
+    });
+
+    it('omits the labels key when the labels list is empty', async () => {
+      const fetchFn = jasmine.createSpy().and.resolveTo({ ok: true, json: async () => ({ number: 42 }) });
+      const client = newClient(fetchFn);
+
+      await client.createIssue('My title', 'My body', []);
+
+      expect(fetchFn).toHaveBeenCalledWith(
+        `https://api.github.com/repos/${REPO}/issues`,
+        jasmine.objectContaining({ body: JSON.stringify({ title: 'My title', body: 'My body' }) })
+      );
+    });
+
     it('throws a descriptive error on a malformed (non-JSON) response', async () => {
       const fetchFn = jasmine.createSpy().and.resolveTo({
         ok: true,

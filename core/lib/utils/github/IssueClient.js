@@ -116,15 +116,20 @@ class IssueClient {
   /**
    * @param {string} title - the new issue's title.
    * @param {string} body - the new issue's body.
+   * @param {string[]} [labels] - label names applied by the same POST
+   *   (sent only when non-empty), so the issue is never left partly
+   *   labeled.
    * @returns {Promise<object>} the created issue (its `number` is used
    *   by `GithubIssue#create`).
    * @throws {Error} `Error: could not create issue on <repo>` on a
    *   failed request.
    */
-  async createIssue(title, body) {
+  async createIssue(title, body, labels = []) {
+    const payload = labels.length > 0 ? { title, body, labels } : { title, body };
+
     return this._transport.repoRequestJson(({ repo }) => `/repos/${repo}/issues`, {
       method: 'POST',
-      body: { title, body },
+      body: payload,
       message: ({ repo }) => `Error: could not create issue on ${repo}`
     });
   }

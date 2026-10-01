@@ -50,6 +50,81 @@ describe('GithubIssueService#create', () => {
   });
 });
 
+describe('GithubIssueService#createWithLabels', () => {
+  let repoPath;
+
+  beforeEach(async () => {
+    repoPath = await createTempDir();
+  });
+
+  afterEach(async () => {
+    await removeTempDir(repoPath);
+  });
+
+  function newService(fetchFn, overrides = {}) {
+    return new GithubIssueService({ ...stubDeps(), fetchFn, timeoutMs: 5, ...overrides });
+  }
+
+  it('creates the issue with its labels in a single POST and returns number/html_url', async () => {
+    const created = { number: 42, html_url: 'https://github.com/darthjee/arcanum/issues/42', title: 'T' };
+    const fetchFn = jasmine.createSpy('fetch').and.resolveTo({ ok: true, json: async () => created });
+
+    const result = await newService(fetchFn).createWithLabels(repoPath, {
+      title: 'T', body: 'B', labels: ['Epic']
+    });
+
+    expect(fetchFn).toHaveBeenCalledOnceWith(
+      'https://api.github.com/repos/darthjee/arcanum/issues',
+      jasmine.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ title: 'T', body: 'B', labels: ['Epic'] })
+      })
+    );
+    expect(result).toEqual({ number: 42, html_url: 'https://github.com/darthjee/arcanum/issues/42' });
+  });
+
+  it('omits labels when none are given', async () => {
+    const fetchFn = jasmine.createSpy('fetch').and.resolveTo({ ok: true, json: async () => ({ number: 1 }) });
+
+    await newService(fetchFn).createWithLabels(repoPath, { title: 'T', body: 'B' });
+
+    expect(fetchFn).toHaveBeenCalledWith(
+      jasmine.any(String),
+      jasmine.objectContaining({ body: JSON.stringify({ title: 'T', body: 'B' }) })
+    );
+  });
+
+  it('never writes a local issue file', async () => {
+    const fetchFn = jasmine.createSpy('fetch').and.resolveTo({ ok: true, json: async () => ({ number: 42 }) });
+
+    await newService(fetchFn).createWithLabels(repoPath, { title: 'T', body: 'B', labels: [] });
+
+    await expectAsync(readFile(path.join(repoPath, 'docs/agents/issues/42-t.md'), 'utf8')).toBeRejected();
+  });
+
+  it('falls back to `repoContext.repoPath` when no `repoPath` argument is passed', async () => {
+    const origin = {
+      resolve: jasmine.createSpy(),
+      resolveWithRef: jasmine.createSpy().and.resolveTo({ domain: 'github.com', repo: 'a/b', repoRef: 'a/b' })
+    };
+    const fetchFn = jasmine.createSpy('fetch').and.resolveTo({ ok: true, json: async () => ({ number: 1 }) });
+
+    await newService(fetchFn, { origin, repoContext: { repoPath } })
+      .createWithLabels(undefined, { title: 'T', body: 'B' });
+
+    expect(origin.resolveWithRef).toHaveBeenCalledWith(repoPath);
+  });
+
+  it('rejects once, without retrying, when the request fails', async () => {
+    const fetchFn = jasmine.createSpy('fetch').and.resolveTo({ ok: false });
+
+    await expectAsync(
+      newService(fetchFn).createWithLabels(repoPath, { title: 'T', body: 'B', labels: ['x'] })
+    ).toBeRejectedWithError('Error: could not create issue on darthjee/arcanum');
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('GithubIssueService#readBody', () => {
   let dir;
 
