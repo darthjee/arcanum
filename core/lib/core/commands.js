@@ -19,8 +19,7 @@
  *     `arcanum-split-issue-*` and `auto-fix-all-*` lifecycle commands
  *     (checkout-from-main / cleanup-artifacts / reply-comment / wait-ci /
  *     wait-ci-and-merge), on `spawn-issue`, on `auto-fix-issue-commit-change`,
- *     on `auto-fix-issue-create-branch`, on `auto-fix-issue-merge-main`, on
- *     the `auto-fix-all-github-*` family (add-tag / cleanup-branch /
+ *     on the `auto-fix-all-github-*` family (add-tag / cleanup-branch /
  *     has-shipit-label / pr-merge / pr-number / pr-state / remove-tag), on
  *     the `auto-fix-issue-github-*` family (info / pr-create / pr-view /
  *     pr-ready), on the `github-issue-*` family (create / fetch / info /
@@ -223,11 +222,6 @@ export const COMMANDS = {
     method: 'run',
     context: 'repo'
   },
-  'auto-fix-issue-create-branch': {
-    module: 'commands/auto-fix-issue/AutoFixIssueCreateBranch.js',
-    method: 'run',
-    context: 'repo'
-  },
   'auto-fix-issue-github-info': {
     module: 'commands/auto-fix-issue/AutoFixIssueGithub.js',
     method: 'info',
@@ -255,11 +249,6 @@ export const COMMANDS = {
   'auto-fix-issue-list-plan-steps': {
     module: 'commands/auto-fix-issue/AutoFixIssueListPlanSteps.js',
     method: 'run'
-  },
-  'auto-fix-issue-merge-main': {
-    module: 'commands/auto-fix-issue/AutoFixIssueMergeMain.js',
-    method: 'run',
-    context: 'repo'
   },
   'auto-fix-issue-run-checks': {
     module: 'commands/auto-fix-issue/AutoFixIssueRunChecks.js',
