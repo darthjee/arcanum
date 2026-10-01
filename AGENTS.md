@@ -12,7 +12,7 @@ Skill entrypoint scripts (`<skill>/scripts/*.sh`, `arcanum/_lib/*.sh`) are migra
 
 Most entrypoints already have a native counterpart (see [Entry Point Migration Status](docs/agents/architecture/entrypoint-migration-status.md)). However, `engine.mode` defaults to `shell`, so native only runs where a repo opts in.
 
-Existing entrypoints stay dual (shell + native). **New skills are native-only**: their logic is a `core/lib` command, reached through a thin `<skill>/scripts/*.sh` shim that calls `engine_dispatch --native-only`, with no `*_shell.sh` twin. Docker support is added later. `/arcanum-check-config` is the first one (see [Script Engine](docs/agents/architecture/script-engine.md#native-only-entrypoints)).
+Existing entrypoints stay dual (shell + native). **New skills are native-only**: their logic is a `core/lib` command, reached through a thin `<skill>/scripts/*.sh` shim that calls `engine_dispatch --native-only`, with no `*_shell.sh` twin. Docker support is added later. `/arcanum-check-config` is the first one, and `/arcanum-create-issue` follows the same pattern (see [Script Engine](docs/agents/architecture/script-engine.md#native-only-entrypoints)).
 
 ## Conventions
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. This spec belongs to epic #687 and is the contract that sub-issues #689–#692 are built against. #689 (the Epic label) and #690 (the native commands) have already shipped: their sections below describe what is now in place. The rest is not implemented yet. The spec is temporary: #693 removes it and moves the rules that still apply into [`docs/agents/architecture/`](../architecture.md).
+Proposed. This spec belongs to epic #687 and is the contract that sub-issues #689–#692 are built against. #689 (the Epic label), #690 (the native commands) and #691 (the skill files) have already shipped: their sections below describe what is now in place. The rest (#692) is not implemented yet. The spec is temporary: #693 removes it and moves the rules that still apply into [`docs/agents/architecture/`](../architecture.md).
 
 ## Goal
 
@@ -127,7 +127,7 @@ Shim: `scripts/publish.sh <repo_path> <draft> "<title>" [--confirmed] [--shipit-
 
 Implemented in: #690 (validation and create), #691 (the dialogue).
 
-- **Any label is allowed.** The user can add any label during the interview. Only the default and the suggestions are hardcoded:
+- **Any label is allowed.** The user can add any label during the interview. Only the default and the suggestions are hardcoded (they stay hardcoded rather than read from `init-claude-config.json`, decided in #691):
   - **Default**: `Writting`. Pre-selected, but can be removed.
   - **Suggested**: `Documentation`, `Feature`, `Refactor`, `Bug`, `Epic` and `shipit`.
 - **Type labels** (`Documentation`, `Feature`, `Refactor`, `Bug`): the AI suggests zero or more, in any combination, based on the discussion. The user confirms or edits them in the **Labels** checklist item.
@@ -190,8 +190,8 @@ Implemented in: #690 (script prompts), #691 (skill-side fallbacks and dialogue).
 | 1 | Resume a draft or start a new one | `start.sh`: TTY first; exit `4` → `AskUserQuestion` → rerun with `--new` or `--resume <draft>` |
 | 2 | The initial idea | Open chat (free text, not a choice) |
 | 3 | Checklist loop and digging into topics | Open dialogue, as in `enhance-issue` |
-| 4 | **Epic?** and **Labels** | `AskUserQuestion` from within the dialogue: Epic yes/no, and a multi-select of labels with the suggestions listed. These are draft choices; prompt 5 is what binds them. |
-| 5 | **Final confirmation** | `publish.sh` shows the title, the labels, whether it is an Epic, and the body size, then asks `[Y]es / [N]o / [C]hat`. Exit `4` → `AskUserQuestion` → rerun with `--confirmed`. **No** → back to the dialogue. **Chat** → return to the conversation. |
+| 4 | **Epic?** and **Labels** | `AskUserQuestion` from within the dialogue: Epic yes/no, and a multi-select of labels with the suggestions listed. These are draft choices; prompt 5 is what binds them. Since a question takes at most four options, it is one call with three questions (decided in #691): Epic yes/no, type labels (`Documentation`, `Feature`, `Refactor`, `Bug`), and other labels (`Writting`, `shipit`); any other label goes through "Other". |
+| 5 | **Final confirmation** | `publish.sh` shows the title, the labels, whether it is an Epic, and the body size, then asks `[Y]es / [N]o / [C]hat`. Exit `4` → `AskUserQuestion` → rerun with `--confirmed`. **No** → back to the dialogue. **Chat** → return to the conversation, with the draft kept and the run still open (no report yet), so the user can keep refining and publish later in the same run (decided in #691). |
 | 6 | **`shipit` confirmation** | `publish.sh`, asked only when `shipit` is among the labels, after prompt 5. Warns that this pre-approves the whole PR lifecycle, including the merge, and defaults to **No**. Exit `4` → `AskUserQuestion` → rerun with `--shipit-confirmed`. If not confirmed, the issue is created **without** `shipit`, and the closing report says so. |
 | 7 | Next step | [`arcanum/_lib/next_step_prompt.sh`](../../../arcanum/_lib/next_step_prompt.sh): `/arcanum-split-issue <id>` if `EPIC=true`, otherwise `/discuss-issue <id>`. TTY first, with the `AskUserQuestion` fallback. |
 | 8 | Abandoning | Free chat ("stop", "drop it"), as in `enhance-issue`: the draft is kept, the `declined` report is printed, and there is no next-step offer. |
@@ -209,7 +209,7 @@ Implemented in: #690 (script prompts), #691 (skill-side fallbacks and dialogue).
   - `Resume: <title or first line>` — description `<timestamp> (<age> ago), <path>`. Rerun with `--resume <path>`.
   - `Start a new issue` — description `Leave the existing drafts in place and start a fresh one.` Rerun with `--new`.
 
-`AskUserQuestion` takes at most four options. When there are more than three drafts, list the three most recent, plus `Start a new issue`. An older draft can still be picked through the free-text "Other" answer, by typing its path.
+`AskUserQuestion` takes at most four options. When there are more than three drafts, list the three most recent, plus `Start a new issue`. An older draft can still be picked through the free-text "Other" answer, by typing its path. There is no paging option (decided in #691).
 
 **Prompt 5 — final confirmation.** Asked on exit `4` from `publish.sh` without `--confirmed`.
 
@@ -260,10 +260,7 @@ Implemented in: #689–#692, each for its own part.
 
 ## Open points
 
-- **Resume list with more than three drafts.** The four-option limit of `AskUserQuestion` means older drafts are reachable only by typing their path. #691 may instead add a "Show older drafts" option that pages through the list.
 - **Where `has-label` lives natively.** Whether the native side gets a new `has-label` command with `has-shipit-label` routed to it, or keeps two registry entries sharing one implementation. Left to #692.
-- **Label suggestions source.** The suggested labels are hardcoded. Whether they should instead come from the repo's `init-claude-config.json` label list is left open; the default (`Writting`) stays hardcoded either way.
-- **Prompt 5 "Chat" vs abandon.** Choosing `Chat` returns to the conversation with the draft kept. Whether that ends the run with a `declined` report or keeps the run open for more dialogue is left to #691.
 
 ## See also
 
