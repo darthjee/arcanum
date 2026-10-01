@@ -29,8 +29,11 @@ cmd_run() {
   local repo_ref
   repo_ref="$(get_repo_ref ".")"
 
+  # `gh label list` caps at 30 labels by default; without an explicit
+  # --limit, an existing `Epic` beyond the first 30 would be missed and
+  # `gh label create` would then fail on the existing name.
   local existing
-  existing="$(gh label list -R "$repo_ref" --json name -q '.[].name')"
+  existing="$(gh label list -R "$repo_ref" --limit 1000 --json name -q '.[].name')"
 
   # GitHub label names are unique case-insensitively, so match existing
   # names case-insensitively too (same logic as init-claude's
