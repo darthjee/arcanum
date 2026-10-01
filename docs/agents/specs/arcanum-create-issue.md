@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. This spec belongs to epic #687 and is the contract that sub-issues #689–#692 are built against. #689 (the Epic label) has already shipped: its sections below describe what is now in place. The rest is not implemented yet. The spec is temporary: #693 removes it and moves the rules that still apply into [`docs/agents/architecture/`](../architecture.md).
+Proposed. This spec belongs to epic #687 and is the contract that sub-issues #689–#692 are built against. #689 (the Epic label) and #690 (the native commands) have already shipped: their sections below describe what is now in place. The rest is not implemented yet. The spec is temporary: #693 removes it and moves the rules that still apply into [`docs/agents/architecture/`](../architecture.md).
 
 ## Goal
 
@@ -83,7 +83,7 @@ Output is `KEY=value` lines on stdout. Exit codes for both commands:
 
 | Exit | Meaning |
 | --- | --- |
-| `0` | Success (`STATUS=new`, `STATUS=resumed` or `STATUS=ok`). |
+| `0` | Success (`STATUS=new`, `STATUS=resumed` or `STATUS=ok`), or `STATUS=declined` from publish. |
 | `1` | Runtime failure (`STATUS=error` or `STATUS=failed`, plus `ERROR=<message>`). |
 | `2` | Invalid input (bad arguments, malformed label, empty title or body). Nothing is created. |
 | `4` | No `/dev/tty`: `FALLBACK=chat`. The skill asks with `AskUserQuestion` and reruns with a flag. |
@@ -103,15 +103,17 @@ Shim: `scripts/start.sh <repo_path> [--new | --resume <draft>]`
 Shim: `scripts/publish.sh <repo_path> <draft> "<title>" [--confirmed] [--shipit-confirmed] <label>...`
 
 - **Validation**: the title and the body must not be empty, and every label must be well-formed (not empty, no commas, no newlines). Otherwise exit `2` and nothing is created.
-- **Labels**: matched case-insensitively against the repo's GitHub labels, using the existing spelling, with duplicates removed. A missing label is created first (see [Edge cases](#edge-cases)) and reported as `WARNING=created label <name>`.
+- **Labels**: matched case-insensitively against the repo's GitHub labels, using the existing spelling, with duplicates removed. A missing label is created first (`Epic` gets `fbca04`, any other label `ededed`; see [Edge cases](#edge-cases)) and reported as `WARNING=created label <name>`.
 - **Confirmations**: owns prompt 5 (final confirmation) and prompt 6 (`shipit`). Without a TTY, it exits `4` until it gets `--confirmed`, and, when `shipit` is among the labels, `--shipit-confirmed`. If `shipit` is not confirmed, it is dropped from the labels.
 - **Create**: the issue is created **with its labels in a single REST call**. `IssueClient.createIssue` ([`core/lib/utils/github/IssueClient.js`](../../../core/lib/utils/github/IssueClient.js)) gains a labels argument, and `GithubIssueService.create` ([`core/lib/services/GithubIssueService.js`](../../../core/lib/services/GithubIssueService.js)) is reused. An issue is never left partly labeled. The draft's level-1 heading is stripped from the body.
+- **Declined**: when the user answers **No** or **Chat** at prompt 5 on the TTY, nothing is created and the draft is kept. It prints `STATUS=declined` and `CHOICE=no` or `CHOICE=chat`, and exits `0`.
 - **Success**: deletes the draft, then prints `STATUS=ok`, `ID=<n>`, `URL=<url>`, `LABELS=<comma-separated>` and `EPIC=true|false`, plus any `WARNING=` lines. `EPIC=true` means `Epic` is among the applied labels.
 - **Failure**: exit `1`, `STATUS=failed`, `ERROR=<message>`. The draft is kept.
 
 | Key | Command | Meaning |
 | --- | --- | --- |
-| `STATUS` | both | `new`, `resumed`, `ok`, `error` or `failed` |
+| `STATUS` | both | `new`, `resumed`, `ok`, `declined`, `error` or `failed` |
+| `CHOICE` | publish | `no` or `chat`, with `STATUS=declined` |
 | `FILE` | start | The draft path |
 | `DRAFT` | start | One existing draft, on exit `4` |
 | `FALLBACK` | both | Always `chat`, on exit `4` |
@@ -258,7 +260,6 @@ Implemented in: #689–#692, each for its own part.
 
 ## Open points
 
-- **Default color for auto-created labels.** "Neutral" is not pinned down. A candidate is `ededed` (GitHub's own grey). To be fixed in #690.
 - **Resume list with more than three drafts.** The four-option limit of `AskUserQuestion` means older drafts are reachable only by typing their path. #691 may instead add a "Show older drafts" option that pages through the list.
 - **Where `has-label` lives natively.** Whether the native side gets a new `has-label` command with `has-shipit-label` routed to it, or keeps two registry entries sharing one implementation. Left to #692.
 - **Label suggestions source.** The suggested labels are hardcoded. Whether they should instead come from the repo's `init-claude-config.json` label list is left open; the default (`Writting`) stays hardcoded either way.
