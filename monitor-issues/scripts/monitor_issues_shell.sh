@@ -139,7 +139,14 @@ _poll_once() {
 
       _log "Processing #${ISSUE_ID} — tags: ${TAGS_JSON}"
 
-      # Dispatch any actionable tags found on this issue. `question` has no
+      # Epics are never dispatched: they must be split with
+      # /arcanum-split-issue first, so neither the rewrite queue (`created`)
+      # nor the auto-fix-all queue (`ready_for_work`) gets them. The check
+      # uses the already-parsed labels (no GitHub call), and leaves
+      # ISSUE_DISPATCH_FAILED=0 so updated_at/tags are still recorded below
+      # and the issue is not reconsidered until it is updated again.
+      #
+      # Otherwise, dispatch any actionable tags found on this issue. `question` has no
       # dispatched action (it needs AI judgment to answer, left to a future
       # architect-level step) and is log-only. `ready_for_work` (push to the
       # auto-fix queue) and `created` (push to the rewrite queue) are fully
@@ -148,22 +155,26 @@ _poll_once() {
       # succeeded — see below — so a failed dispatch gets retried next poll.
       local ISSUE_DISPATCH_FAILED=0
       local ACTION_TAG
-      while IFS= read -r ACTION_TAG; do
-        [[ -z "$ACTION_TAG" ]] && continue
-        case "$ACTION_TAG" in
-          question)
-            _log "Issue #${ISSUE_ID} has actionable tag 'question' — needs an answer from the agent"
-            ;;
-          created)
-            _log "Issue #${ISSUE_ID} has actionable tag 'created' — pushing to rewrite queue"
-            "$REWRITE_QUEUE_SCRIPT" push "$ISSUE_ID" || { _log "ERROR: failed to push #${ISSUE_ID} to the rewrite queue"; ISSUE_DISPATCH_FAILED=1; }
-            ;;
-          ready_for_work)
-            _log "Issue #${ISSUE_ID} has actionable tag 'ready_for_work' — pushing to auto-fix-all queue"
-            "$QUEUE_SCRIPT" push "$REPO_PATH" "$ISSUE_ID" || { _log "ERROR: failed to push #${ISSUE_ID} to the queue"; ISSUE_DISPATCH_FAILED=1; }
-            ;;
-        esac
-      done < <(actionable_tags "$LABELS")
+      if has_tag "$LABELS" epic; then
+        _log "Skipping #${ISSUE_ID}: Epic"
+      else
+        while IFS= read -r ACTION_TAG; do
+          [[ -z "$ACTION_TAG" ]] && continue
+          case "$ACTION_TAG" in
+            question)
+              _log "Issue #${ISSUE_ID} has actionable tag 'question' — needs an answer from the agent"
+              ;;
+            created)
+              _log "Issue #${ISSUE_ID} has actionable tag 'created' — pushing to rewrite queue"
+              "$REWRITE_QUEUE_SCRIPT" push "$ISSUE_ID" || { _log "ERROR: failed to push #${ISSUE_ID} to the rewrite queue"; ISSUE_DISPATCH_FAILED=1; }
+              ;;
+            ready_for_work)
+              _log "Issue #${ISSUE_ID} has actionable tag 'ready_for_work' — pushing to auto-fix-all queue"
+              "$QUEUE_SCRIPT" push "$REPO_PATH" "$ISSUE_ID" || { _log "ERROR: failed to push #${ISSUE_ID} to the queue"; ISSUE_DISPATCH_FAILED=1; }
+              ;;
+          esac
+        done < <(actionable_tags "$LABELS")
+      fi
 
       if [[ "$ISSUE_DISPATCH_FAILED" -eq 0 ]]; then
         NOW=$(date -u +%FT%TZ)

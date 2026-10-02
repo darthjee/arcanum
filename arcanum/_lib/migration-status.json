@@ -34,7 +34,7 @@
   "auto-fix-all-github-pr-state": true,
   "auto-fix-all-github-pr-merge": true,
   "auto-fix-all-github-cleanup-branch": true,
-  "auto-fix-all-github-has-shipit-label": true,
+  "auto-fix-all-github-has-label": true,
   "auto-fix-all-github-add-tag": true,
   "auto-fix-all-github-remove-tag": true,
   "auto-fix-all-queue-save": true,

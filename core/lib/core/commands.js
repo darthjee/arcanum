@@ -20,7 +20,7 @@
  *     (checkout-from-main / cleanup-artifacts / reply-comment / wait-ci /
  *     wait-ci-and-merge), on `spawn-issue`, on `auto-fix-issue-commit-change`,
  *     on the `auto-fix-all-github-*` family (add-tag / cleanup-branch /
- *     has-shipit-label / pr-merge / pr-number / pr-state / remove-tag), on
+ *     has-label / pr-merge / pr-number / pr-state / remove-tag), on
  *     the `auto-fix-issue-github-*` family (info / pr-create / pr-view /
  *     pr-ready), on the `github-issue-*` family (create / fetch / info /
  *     update / mark-created / mark-enhancing / mark-planning / mark-ready /
@@ -137,9 +137,9 @@ export const COMMANDS = {
     method: 'cleanupBranch',
     context: 'repo'
   },
-  'auto-fix-all-github-has-shipit-label': {
+  'auto-fix-all-github-has-label': {
     module: 'commands/auto-fix-all/AutoFixAllGithub.js',
-    method: 'hasShipitLabel',
+    method: 'hasLabel',
     context: 'repo'
   },
   'auto-fix-all-github-pr-merge': {

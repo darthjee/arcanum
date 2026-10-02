@@ -17,12 +17,18 @@ const STATE = path.join('.claude', 'state');
 const ISSUES = [
   { number: 7, title: 'Seven', updatedAt: '2026-01-02T00:00:00Z', labels: ['Question', 'Created', 'Ready for Work'] },
   { number: 8, title: 'Eight', updatedAt: '2026-01-02T00:00:00Z', labels: ['Bug'] },
-  { number: 9, title: 'Nine', updatedAt: '2026-01-02T00:00:00Z', labels: ['Created'] }
+  { number: 9, title: 'Nine', updatedAt: '2026-01-02T00:00:00Z', labels: ['Created'] },
+  // Epics (issue #692): never dispatched, but their state is recorded.
+  { number: 10, title: 'Ten', updatedAt: '2026-01-02T00:00:00Z', labels: ['Ready for Work', 'Epic'] },
+  { number: 11, title: 'Eleven', updatedAt: '2026-01-02T00:00:00Z', labels: ['Created', 'Epic'] }
 ];
+const IDS = ISSUES.map(({ number }) => `#${number}`);
 const FILES = [
   'issue-7.json',
   'issue-8.json',
   'issue-9.json',
+  'issue-10.json',
+  'issue-11.json',
   'auto-fix-all-queue.json',
   'monitor-issues-rewrite-queue.json'
 ].map((name) => path.join(STATE, name));
@@ -32,7 +38,7 @@ const FILES = [
  * @returns {boolean} whether every returned issue has been handled.
  */
 function cycleDone(stdout) {
-  return ['#7', '#8', '#9'].every((id) => new RegExp(`(Processed ${id} |Skipping ${id} |Skipping updated_at write for ${id} )`).test(stdout));
+  return IDS.every((id) => new RegExp(`(Processed ${id} |Skipping ${id} |Skipping updated_at write for ${id} )`).test(stdout));
 }
 
 /**
@@ -75,6 +81,21 @@ describe('monitor-issues-monitor-issues parity (shell vs. native)', () => {
       expect(native.timedOut).toBeFalse();
       expect(stripTimestamps(native.stdout)).toEqual(stripTimestamps(shell.stdout));
       expect(shell.stdout).toContain('Processed #7 — updated_at recorded');
+
+      for (const id of ['10', '11']) {
+        expect(shell.stdout).toContain(`Skipping #${id}: Epic`);
+        expect(shell.stdout).toContain(`Processed #${id} — updated_at recorded`);
+        expect(shell.stdout).not.toContain(`Issue #${id} has actionable tag`);
+        expect(await readOptional(ctx.shellRepo.repoPath, path.join(STATE, `issue-${id}.json`))).toContain('updated_at');
+      }
+
+      for (const queue of ['auto-fix-all-queue.json', 'monitor-issues-rewrite-queue.json']) {
+        const content = await readOptional(ctx.shellRepo.repoPath, path.join(STATE, queue));
+        const ids = JSON.parse(content || '[]').map((entry) => String(entry?.id ?? entry));
+
+        expect(ids).withContext(queue).not.toContain('10');
+        expect(ids).withContext(queue).not.toContain('11');
+      }
 
       for (const file of FILES) {
         const shellContent = await readOptional(ctx.shellRepo.repoPath, file);

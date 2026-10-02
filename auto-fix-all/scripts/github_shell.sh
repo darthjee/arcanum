@@ -8,7 +8,9 @@
 #   pr-state <repo_path>                Print STATE=<OPEN|MERGED|CLOSED> for the current branch's PR
 #   pr-merge <repo_path> [model_email]  Squash-merge the current branch's PR, print its URL
 #   cleanup-branch <repo_path> <id>     Delete the issue's remote and local branch, switch back to main
-#   has-shipit-label <repo_path> <id>   Exit 0 if GitHub issue <id> has a "shipit" label, else exit 1
+#   has-label <repo_path> <id> <name>   Exit 0 if GitHub issue <id> has a label equal to <name>
+#                                       (case-insensitive, whole name, literal match), else exit 1
+#   has-shipit-label <repo_path> <id>   Alias for `has-label <repo_path> <id> shipit`
 #   add-tag <repo_path> <id> <tag>      Add a single tag to GitHub issue <id>, mapped to
 #                                       a real GitHub label via the canonical-tag/
 #                                       label-name table in `arcanum/_lib/tags.sh`.
@@ -185,11 +187,10 @@ cmd_cleanup_branch() {
   git branch -D "$branch"
 }
 
-cmd_has_shipit_label() {
-  local repo_path="${1:-}"
-  local id="${2:-}"
-  [[ -n "$repo_path" && -n "$id" ]] || {
-    echo "Usage: $0 has-shipit-label <repo_path> <id>" >&2
+cmd_has_label() {
+  local repo_path="${1:-}" id="${2:-}" name="${3:-}"
+  [[ -n "$repo_path" && -n "$id" && -n "$name" ]] || {
+    echo "Usage: $0 has-label <repo_path> <id> <name>" >&2
     exit 1
   }
 
@@ -200,7 +201,9 @@ cmd_has_shipit_label() {
   local labels
   labels=$(gh issue view "$id" -R "$repo_ref" --json labels -q '.labels[].name' 2>/dev/null) || exit 1
 
-  echo "$labels" | grep -qiE '^shipit$'
+  # Literal (-F), case-insensitive (-i), whole-line (-x) match — <name> is
+  # never interpreted as a regex.
+  echo "$labels" | grep -qixF -- "$name"
 }
 
 cmd_add_tag() {
@@ -232,7 +235,7 @@ cmd_remove_tag() {
 }
 
 case "${1:-}" in
-  pr-number|pr-state|pr-merge|cleanup-branch|has-shipit-label|add-tag|remove-tag)
+  pr-number|pr-state|pr-merge|cleanup-branch|has-label|has-shipit-label|add-tag|remove-tag)
     repo_path_enter "${2:-}"
     ;;
 esac
@@ -242,7 +245,8 @@ case "${1:-}" in
   pr-state)          shift; cmd_pr_state "$@" ;;
   pr-merge)          shift; cmd_pr_merge "$@" ;;
   cleanup-branch)    shift; cmd_cleanup_branch "$@" ;;
-  has-shipit-label)  shift; cmd_has_shipit_label "$@" ;;
+  has-label)         shift; cmd_has_label "$@" ;;
+  has-shipit-label)  shift; cmd_has_label "${1:-}" "${2:-}" shipit ;;
   add-tag)           shift; cmd_add_tag "$@" ;;
   remove-tag)        shift; cmd_remove_tag "$@" ;;
   *)
@@ -252,7 +256,8 @@ case "${1:-}" in
     echo "  pr-state <repo_path>                Print STATE=<OPEN|MERGED|CLOSED> for the current branch's PR" >&2
     echo "  pr-merge <repo_path> [model_email]  Squash-merge the current branch's PR, print its URL" >&2
     echo "  cleanup-branch <repo_path> <id>     Delete the issue's remote and local branch, switch back to main" >&2
-    echo "  has-shipit-label <repo_path> <id>   Exit 0 if GitHub issue <id> has a 'shipit' label, else exit 1" >&2
+    echo "  has-label <repo_path> <id> <name>   Exit 0 if GitHub issue <id> has a label equal to <name> (case-insensitive, literal), else exit 1" >&2
+    echo "  has-shipit-label <repo_path> <id>   Alias for 'has-label <repo_path> <id> shipit'" >&2
     echo "  add-tag <repo_path> <id> <tag>      Add a single tag to GitHub issue <id>, mapped to a real GitHub label via arcanum/_lib/tags.sh" >&2
     echo "  remove-tag <repo_path> <id> <tag>   Remove a single tag from GitHub issue <id>, mapped to a real GitHub label via arcanum/_lib/tags.sh" >&2
     exit 1

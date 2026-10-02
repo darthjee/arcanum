@@ -171,7 +171,7 @@ if (mode === 'success') {
   // https://api.github.com/user` (coauthors mode's merger-login lookup),
   // `PUT .../pulls/<number>/merge`, `DELETE .../git/refs/heads/<branch>`
   // (pr-merge's post-merge branch delete), and the same issue-labels GET/
-  // POST/DELETE trio `queue` mode above already drives (has-shipit-label/
+  // POST/DELETE trio `queue` mode above already drives (has-label/
   // add-tag/remove-tag). Env vars mirror fakeGhBin.js's own `FAKE_GH_*`
   // names (as `FAKE_FETCH_*`) so the same scenario seeds both sides of a
   // parity comparison identically.

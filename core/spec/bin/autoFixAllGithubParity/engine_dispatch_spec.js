@@ -12,7 +12,7 @@ const NATIVE_TOKEN_FAILURE = 'could not obtain GitHub token via gh auth token';
 
 // Routing test for the real auto-fix-all/scripts/github.sh
 // engine_dispatch router (issue #656) — unlike the sibling
-// pr_number/pr_state/pr_merge/cleanup_branch/has_shipit_label/add_tag/
+// pr_number/pr_state/pr_merge/cleanup_branch/has_label/add_tag/
 // remove_tag specs in this directory (which all bypass the shim, running
 // github_shell.sh directly), this file exercises the real github.sh shim
 // itself, proving it resolves each subcommand's own
@@ -109,6 +109,41 @@ describe('auto-fix-all-github engine_dispatch routing (via the real github.sh sh
       } finally {
         await Promise.all([repo.cleanup(), removeTempDir(emptyConfigDir), cleanup?.()]);
       }
+    });
+  });
+
+  // `has-label` and its `has-shipit-label` alias (issue #692) share the
+  // single `auto-fix-all-github-has-label` key: in native mode both must
+  // reach `AutoFixAllGithub#hasLabel`, which fails at token resolution
+  // and (by contract) exits 1 silently — whereas the shell side, with the
+  // same fake `gh` labels, would exit 0. An empty stderr also rules out
+  // engine_dispatch's "no native implementation" error.
+  describe('has-label / has-shipit-label (engine.mode=native)', () => {
+    [
+      { subcommand: 'has-label', args: ['5', 'Epic'] },
+      { subcommand: 'has-shipit-label', args: ['5'] }
+    ].forEach(({ subcommand, args }) => {
+      it(`routes ${subcommand} to the native has-label command`, async () => {
+        const repo = await createGitFixtureRepo();
+        const fakeGh = await createFakeGhBin({ authTokenAlwaysFails: true });
+
+        try {
+          await seedGithubLikeRepo(repo);
+          await seedEngineMode(repo, 'native');
+
+          const result = await runCommand(
+            [SHIM_SCRIPT, subcommand, repo.repoPath, ...args],
+            repo.repoPath,
+            { ...process.env, PATH: `${fakeGh.binDir}:${process.env.PATH}`, FAKE_GH_ISSUE_LABELS: 'Epic\nshipit' }
+          );
+
+          expect(result.code).toEqual(1);
+          expect(result.stdout).toEqual('');
+          expect(result.stderr).toEqual('');
+        } finally {
+          await Promise.all([repo.cleanup(), fakeGh.cleanup()]);
+        }
+      });
     });
   });
 
