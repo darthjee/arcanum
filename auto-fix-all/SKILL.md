@@ -29,7 +29,30 @@ Get the next id (blocks until the queue has one — if it's currently empty, it 
 scripts/queue.sh wait-next "$REPO_PATH"
 ```
 
-Call this id `<id>`. Spawn:
+Call this id `<id>`. Before spawning anything, check whether it is an Epic:
+
+```bash
+scripts/github.sh has-label "$REPO_PATH" <id> Epic
+```
+
+- **Exit 0 (Epic)**: print `Skipped #<id>: Epic (split it with /arcanum-split-issue)` and pop it:
+
+  ```bash
+  scripts/queue.sh pop "$REPO_PATH"
+  ```
+
+  Then run the same finish check as the `merged` branch in Step 3:
+
+  ```bash
+  scripts/queue.sh empty "$REPO_PATH" && scripts/config.sh is-enabled "$REPO_PATH" finish_on_empty_queue
+  ```
+
+  If it exits 0, go to Step 4. Otherwise go back to the start of Step 2. Do not ask the user anything, do not change any label, and do not schedule a `clear_context` wakeup.
+- **Any non-zero exit**: treat it as not an Epic (a label-fetch failure must not block the queue) and continue with the spawn below.
+
+This check runs before every spawn, so re-invocations (`clear_context`, `pending`) also re-check the id at the front of the queue. That is intended.
+
+Spawn:
 
 > Agent(subagent_type: "architect", prompt: "Read steps/process_one_issue.md (resolved relative to the `auto-fix-all` skill folder) and follow it for issue `<id>`. REPO_PATH: `<resolved_path>`. Report OUTCOME=merged, OUTCOME=closed PR_NUMBER=`<n>`, OUTCOME=blocked AGENT=`<agent-name>` ACTION=`<description>`, or OUTCOME=pending PR_NUMBER=`<n>`.")
 
@@ -99,6 +122,6 @@ The PR isn't at a terminal state yet — nothing to do until it is. Do **not** p
 
 ## Step 4 — Done
 
-This skill runs forever by design — Step 2 blocks and waits whenever the queue is empty instead of stopping, so issues pushed onto the queue later are still picked up. This step is reached either when the run is stopped externally (e.g. the user interrupts it) or when the queue emptied with `finish_on_empty_queue` on (Step 3 above): report a summary at that point, for each ID processed so far, of the final PR URL and outcome (merged/skipped). No separate message distinguishes the `finish_on_empty_queue` case from an externally-interrupted run.
+This skill runs forever by design — Step 2 blocks and waits whenever the queue is empty instead of stopping, so issues pushed onto the queue later are still picked up. This step is reached either when the run is stopped externally (e.g. the user interrupts it) or when the queue emptied with `finish_on_empty_queue` on (Step 3 above): report a summary at that point, for each ID processed so far, of the final PR URL and outcome (merged/skipped). Ids skipped as Epics in Step 2 are listed as `skipped (Epic)` and have no PR URL. No separate message distinguishes the `finish_on_empty_queue` case from an externally-interrupted run.
 
 Do not ask for confirmation at any point except the two explicit questions above, for the `closed` and `blocked` outcomes.
