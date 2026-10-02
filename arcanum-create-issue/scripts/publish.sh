@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Thin engine_dispatch shim for the "arcanum-create-issue-publish" entrypoint —
-# see docs/agents/specs/arcanum-create-issue.md ("Native commands",
-# "Label rules"), docs/agents/architecture/script-engine.md and
-# docs/agents/plans/690-create-issue-native-command/plan.md for the full
+# see docs/agents/architecture/arcanum-create-issue.md ("Native commands",
+# "Label rules") and docs/agents/architecture/script-engine.md for the full
 # design/shared contracts. Creates the GitHub issue from a draft file,
 # applies (and, if missing, creates) its labels, then deletes the draft.
 #
