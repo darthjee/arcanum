@@ -54,7 +54,7 @@ describe('ResolveAndFetch', () => {
     });
 
     describe('malformed input', () => {
-      const cases = ['', '   ', '#abc', '#193 - title', 'bare title', '#', '193', '# 1'];
+      const cases = ['', '   ', '#abc', '#193 - title', 'bare title', '#', '# 1', '193 - title'];
 
       cases.forEach((argString) => {
         it(`returns STATUS=error for '${argString}'`, async () => {
@@ -62,7 +62,7 @@ describe('ResolveAndFetch', () => {
 
           const output = await resolveAndFetch.run(issuesFolder, argString);
 
-          expect(output).toEqual(`STATUS=error\nERROR=Error: invalid input '${argString}' — expected '#<id>'\n`);
+          expect(output).toEqual(`STATUS=error\nERROR=Error: invalid input '${argString}' — expected '<id>' or '#<id>'\n`);
         });
       });
     });
@@ -94,6 +94,19 @@ describe('ResolveAndFetch', () => {
         expect(githubIssue.fetch).not.toHaveBeenCalled();
       });
 
+      ['42', '  42  '].forEach((argString) => {
+        it(`resolves the bare id '${argString}' the same as '#42'`, async () => {
+          await writeFile(path.join(repoPath, issuesFolder, '42_my_cool_issue.md'), 'content\n');
+          const githubIssue = { fetch: jasmine.createSpy('fetch') };
+          const resolveAndFetch = buildResolveAndFetch({ githubIssue });
+
+          const output = await resolveAndFetch.run(issuesFolder, argString);
+
+          expect(output).toEqual('STATUS=ok\nID=42\nTITLE=My Cool Issue\nFILE=docs/agents/issues/42_my_cool_issue.md\n');
+          expect(githubIssue.fetch).not.toHaveBeenCalled();
+        });
+      });
+
       it('derives TITLE from a dash-separated filename', async () => {
         await writeFile(path.join(repoPath, issuesFolder, '7-some-title-here.md'), 'content\n');
         const resolveAndFetch = buildResolveAndFetch();
@@ -122,6 +135,28 @@ describe('ResolveAndFetch', () => {
           'STATUS=ok\nID=9\nTITLE=Fresh Issue\nFILE=docs/agents/issues/9-fresh-issue.md\nDOMAIN=github.com\nREPO=darthjee/arcanum\n'
         );
         expect(githubIssue.fetch).toHaveBeenCalledWith(repoPath, '9');
+      });
+
+      ['42', '  42  '].forEach((argString) => {
+        it(`fetches the bare id '${argString}' the same as '#42'`, async () => {
+          const fetched = {
+            title: 'Fresh Issue',
+            file: 'docs/agents/issues/42-fresh-issue.md',
+            domain: 'github.com',
+            repo: 'darthjee/arcanum'
+          };
+          const bareFetch = { fetch: jasmine.createSpy('fetch').and.resolveTo(fetched) };
+          const hashFetch = { fetch: jasmine.createSpy('fetch').and.resolveTo(fetched) };
+
+          const bareOutput = await buildResolveAndFetch({ githubIssue: bareFetch }).run(issuesFolder, argString);
+          const hashOutput = await buildResolveAndFetch({ githubIssue: hashFetch }).run(issuesFolder, '#42');
+
+          expect(bareOutput).toEqual(
+            'STATUS=ok\nID=42\nTITLE=Fresh Issue\nFILE=docs/agents/issues/42-fresh-issue.md\nDOMAIN=github.com\nREPO=darthjee/arcanum\n'
+          );
+          expect(bareOutput).toEqual(hashOutput);
+          expect(bareFetch.fetch).toHaveBeenCalledWith(repoPath, '42');
+        });
       });
 
       it('returns STATUS=error with ID set on a GitHub fetch failure', async () => {
