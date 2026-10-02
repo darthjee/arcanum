@@ -21,7 +21,7 @@ const CREATE_HINT = 'check GitHub before running again: the issue may have been 
  * labels against the repo's (creating missing ones), creates the issue
  * with every label in one REST call (no retry), and deletes the draft
  * only on success. See the "`arcanum-create-issue-publish`" section of
- * docs/agents/specs/arcanum-create-issue.md for the output/exit-code
+ * docs/agents/architecture/arcanum-create-issue.md for the output/exit-code
  * contract; prompt 5's No/Chat answers print `STATUS=declined` plus
  * `CHOICE=no|chat` (exit `0`, nothing created).
  */

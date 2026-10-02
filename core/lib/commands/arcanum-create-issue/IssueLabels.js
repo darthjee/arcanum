@@ -5,8 +5,8 @@ const DEFAULT_COLOR = 'ededed';
 
 /**
  * Label rules for `arcanum-create-issue-publish` (see "Label rules" and
- * "Edge cases" in docs/agents/specs/arcanum-create-issue.md): validation,
- * case-insensitive dedupe, `Epic`/`shipit` detection, and matching the
+ * "Edge cases" in docs/agents/architecture/arcanum-create-issue.md):
+ * validation, case-insensitive dedupe, `Epic`/`shipit` detection, and matching the
  * requested labels against the repo's GitHub labels — reusing the
  * existing spelling and creating any missing label (`Epic` → `fbca04`,
  * anything else → `ededed`) before the issue is created.
