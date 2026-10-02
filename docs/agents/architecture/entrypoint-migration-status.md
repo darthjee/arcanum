@@ -22,7 +22,7 @@ Native-only commands (dispatched with `engine_dispatch --native-only`, e.g. `arc
 | `auto-fix-all-config-toggle` | Yes | #261 |
 | `auto-fix-all-github-add-tag` | Yes | #656 |
 | `auto-fix-all-github-cleanup-branch` | Yes | #656 |
-| `auto-fix-all-github-has-shipit-label` | Yes | #656 |
+| `auto-fix-all-github-has-label` | Yes | #692 |
 | `auto-fix-all-github-pr-merge` | Yes | #656 |
 | `auto-fix-all-github-pr-number` | Yes | #656 |
 | `auto-fix-all-github-pr-state` | Yes | #656 |

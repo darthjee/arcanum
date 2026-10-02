@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. This spec belongs to epic #687 and is the contract that sub-issues #689–#692 are built against. #689 (the Epic label), #690 (the native commands) and #691 (the skill files) have already shipped: their sections below describe what is now in place. The rest (#692) is not implemented yet. The spec is temporary: #693 removes it and moves the rules that still apply into [`docs/agents/architecture/`](../architecture.md).
+Proposed. This spec belongs to epic #687 and is the contract that sub-issues #689–#692 are built against. #689 (the Epic label), #690 (the native commands), #691 (the skill files) and #692 (automation skips Epics) have all shipped: their sections below describe what is now in place. The spec is temporary: #693 removes it and moves the rules that still apply into [`docs/agents/architecture/`](../architecture.md).
 
 ## Goal
 
@@ -155,15 +155,15 @@ See the `epic` paragraph in [Issue Tags](../architecture/issue-tags.md).
 
 Implemented in: #692.
 
-Three checks. Labels can change after an issue is queued, so the check after the pop in `auto-fix-all` is the one that decides.
+Three checks. Labels can change after an issue is queued, so the check in `auto-fix-all` is the one that decides.
 
 | Where | Check | Behavior on `Epic` |
 | --- | --- | --- |
-| `monitor-issues` | `has_tag epic` on the tags it already parsed in the poll (no extra call) | Does not push the issue to the `auto-fix-all` queue, even if it is labeled `Ready for Work`. Logs `Skipping #N: Epic`. |
+| `monitor-issues` | `has_tag epic` on the tags it already parsed in the poll (no extra call) | Runs before the actionable-tag dispatch. Does not push the issue to the `auto-fix-all` queue (even if it is labeled `Ready for Work`) or to the rewrite queue (even if it is labeled `Created`). Logs `Skipping #N: Epic`. The issue's `updated_at` and tags are still recorded, so it is not reconsidered until it is updated again. |
 | `/push-issue-to-queue` | One `has-label` call per id | Refuses that id with `#N is an Epic — split it with /arcanum-split-issue`. The other ids are still pushed. |
-| `auto-fix-all`, after each pop | One `has-label` call | Drops the issue from the queue, prints `Skipped #N: Epic (split it with /arcanum-split-issue)`, and continues with the next id. No user interaction and no label changes. |
+| `auto-fix-all`, after `wait-next` and before the `architect` is spawned (the queue is peeked, then popped) | One `has-label` call | Pops the issue from the queue, prints `Skipped #N: Epic (split it with /arcanum-split-issue)`, and continues with the next id. No user interaction and no label changes. |
 
-- `auto-fix-all/scripts/github.sh has-shipit-label` is generalized to `has-label <repo_path> <id> <name>`, exit `0` when the issue has the label (case-insensitive) and `1` when it does not. `has-shipit-label <repo_path> <id>` stays as a thin alias for `has-label <repo_path> <id> shipit`. Shell and native change together.
+- `auto-fix-all/scripts/github.sh has-shipit-label` is generalized to `has-label <repo_path> <id> <name>`, exit `0` when the issue has the label (case-insensitive) and `1` when it does not. `has-shipit-label <repo_path> <id>` stays as a thin alias for `has-label <repo_path> <id> shipit`. Shell and native change together. Any non-zero exit is treated as "not an Epic" by the skills, so a label-fetch failure never blocks the queue.
 - `queue.sh push` itself makes no GitHub calls.
 
 ## Migration
@@ -260,7 +260,7 @@ Implemented in: #689–#692, each for its own part.
 
 ## Open points
 
-- **Where `has-label` lives natively.** Whether the native side gets a new `has-label` command with `has-shipit-label` routed to it, or keeps two registry entries sharing one implementation. Left to #692.
+- **Where `has-label` lives natively.** Resolved in #692: one `auto-fix-all-github-has-label` command (`AutoFixAllGithub#hasLabel`). `has-shipit-label` is a `github.sh`-only alias that dispatches to the same key with `shipit` as the label name; it has no registry entry, native method or `migration-status.json` key of its own.
 
 ## See also
 
