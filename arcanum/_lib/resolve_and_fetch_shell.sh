@@ -25,8 +25,8 @@
 # GitHub issue exist."
 # Usage: resolve_and_fetch_shell.sh <repo_path> <issues_folder> <arg_string>
 #
-# Input grammar: <arg_string> must match '^#[0-9]+$' (surrounding
-# whitespace trimmed). Anything else is STATUS=error.
+# Input grammar: <arg_string> must match '^#?[0-9]+$', i.e. '<id>' or
+# '#<id>' (surrounding whitespace trimmed). Anything else is STATUS=error.
 #
 # Output (key=value lines):
 #   STATUS=ok      ID, TITLE, FILE always set; DOMAIN, REPO set only when
@@ -67,14 +67,14 @@ title_from_filename() {
     | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) tolower(substr($i,2)); print}'
 }
 
-# --- Parse the simplified '#<id>' input grammar ---
+# --- Parse the simplified '<id>' or '#<id>' input grammar ---
 
 TRIMMED="$ARG_STRING"
 TRIMMED="${TRIMMED#"${TRIMMED%%[![:space:]]*}"}"
 TRIMMED="${TRIMMED%"${TRIMMED##*[![:space:]]}"}"
 
-if [[ ! "$TRIMMED" =~ ^#([0-9]+)$ ]]; then
-  ERROR_MSG="Error: invalid input '${ARG_STRING}' — expected '#<id>'"
+if [[ ! "$TRIMMED" =~ ^#?([0-9]+)$ ]]; then
+  ERROR_MSG="Error: invalid input '${ARG_STRING}' — expected '<id>' or '#<id>'"
   printf 'STATUS=error\nERROR=%s\n' "$ERROR_MSG"
   exit 0
 fi

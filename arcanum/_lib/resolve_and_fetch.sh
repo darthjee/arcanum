@@ -2,9 +2,9 @@
 # Thin engine_dispatch shim for the "resolve-and-fetch" migrated
 # entrypoint — see docs/agents/architecture/script-engine.md and
 # docs/agents/plans/193-migrate-resolve-and-fetch-sh-to-a-native--node-js--implementation/plan.md
-# for the full design/shared contracts. Resolves an issue id ('#<id>')
-# and guarantees its content exists locally, fetching from GitHub when
-# needed, via either the shell implementation
+# for the full design/shared contracts. Resolves an issue id
+# ('<id>' or '#<id>') and guarantees its content exists locally,
+# fetching from GitHub when needed, via either the shell implementation
 # (resolve_and_fetch_shell.sh) or the native one (core/bin/arcanum),
 # per engine.mode / arcanum/_lib/migration-status.json.
 #
