@@ -13,7 +13,7 @@ import TagMutationService, { defaultIssueTaggerFactory } from '../../services/Ta
  * per-call `TagMutationService`, both built off that bundle — the
  * context-bound pieces are rebuilt per call, but always off the same
  * `RepoContext`), an `issueTaggerFactory` for the per-call `IssueTagger`
- * (`hasShipitLabel` plus the tag-mutation service), and a
+ * (`hasLabel` plus the tag-mutation service), and a
  * `BranchCleanup` for local-git branch teardown — see
  * `docs/agents/plans/284-refactor-core-lib-autofixallgithub-js/`,
  * `docs/agents/plans/292-reduce-size-of-properations/`,
@@ -36,7 +36,7 @@ class AutoFixAllGithub {
    *   `execFileAsync`/`fetchFn`/`timeoutMs` knobs are consulted on this
    *   path.
    * @param {(bundle: object) => object} [deps.issueTaggerFactory] - builds an
-   *   `IssueTagger` (used by `addTag`/`removeTag`/`hasShipitLabel`) from
+   *   `IssueTagger` (used by `addTag`/`removeTag`/`hasLabel`) from
    *   a per-call `RepoContext` bundle — see `#_issueTagger`. A factory,
    *   not a pre-built instance, since the context-bound `IssueTagger` is
    *   rebuilt per call.
@@ -141,28 +141,31 @@ class AutoFixAllGithub {
   }
 
   /**
-   * `github.sh has-shipit-label`: wraps `IssueTagger#hasLabel` with the
-   * caller-facing `DispatchFailure('', 1)` around any failure (repo/
-   * token/label-fetch) or an absent label — `IssueTagger#hasLabel`
-   * itself only throws a plain `Error`, so this facade owns that
-   * conversion.
+   * `github.sh has-label`: wraps `IssueTagger#hasLabel` (a
+   * case-insensitive, whole-name, literal match) with the caller-facing
+   * `DispatchFailure('', 1)` around any failure (repo/token/label-fetch)
+   * or an absent label — `IssueTagger#hasLabel` itself only throws a
+   * plain `Error`, so this facade owns that conversion. The
+   * `has-shipit-label` alias in `github.sh` dispatches here with
+   * `name = 'shipit'`.
    * @param {string} id - the numeric issue id.
-   * @returns {Promise<string>} `''` when the issue has a `shipit` label.
+   * @param {string} name - the label name to look for.
+   * @returns {Promise<string>} `''` when the issue has the label.
    */
-  async hasShipitLabel(id) {
-    if (!this._repoContext.repoPath || !id) {
-      throw new Error('Usage: github.sh has-shipit-label <repo_path> <id>');
+  async hasLabel(id, name) {
+    if (!this._repoContext.repoPath || !id || !name) {
+      throw new Error('Usage: github.sh has-label <repo_path> <id> <name>');
     }
 
-    let hasShipit;
+    let found;
 
     try {
-      hasShipit = await this._issueTagger().hasLabel(id, 'shipit');
+      found = await this._issueTagger().hasLabel(id, name);
     } catch {
       throw new DispatchFailure('', 1);
     }
 
-    if (!hasShipit) {
+    if (!found) {
       throw new DispatchFailure('', 1);
     }
 
