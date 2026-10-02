@@ -1,6 +1,6 @@
 ---
 name: arcanum-split-issue
-description: Breaks a single GitHub issue into several sub-issues through interactive dialogue, generating one local draft file per sub-issue, then pushing each as a real GitHub issue linked to the parent via GitHub's native sub-issue relationship. Usage: /arcanum-split-issue #19
+description: Breaks a single GitHub issue into several sub-issues through interactive dialogue, generating one local draft file per sub-issue, then pushing each as a real GitHub issue linked to the parent via GitHub's native sub-issue relationship. Usage: /arcanum-split-issue <id> or /arcanum-split-issue #<id>
 ---
 
 You are acting as the **architect**, helping the user break a large or broad GitHub issue into smaller, independently workable sub-issues that then flow individually through the existing `enhance-issue` → `discuss-issue` → `plan-issue`/`auto-plan-issue` → `auto-fix-issue` pipeline. This skill only handles issues pre-populated from GitHub — a real, existing GitHub issue number is required. Follow the steps below precisely and in order.
