@@ -40,7 +40,9 @@ function formatTimestamp(date) {
  * actionable tags in-process — `created` to the rewrite queue
  * (`MonitorIssuesRewriteQueue#push`), `ready_for_work` to the auto-fix
  * queue (`AutoFixAllQueue#push`, which also marks it enqueued),
- * `question` log-only. The issue's `updated_at`/`tags` state is only
+ * `question` log-only. An Epic (`epic` tag) is skipped before dispatch
+ * (`Skipping #<id>: Epic`, nothing pushed) but its state is still
+ * recorded, so it is not reconsidered until updated again. The issue's `updated_at`/`tags` state is only
  * recorded when every dispatch succeeded, so a failed dispatch is
  * retried on the next poll. Runs until killed; `SIGINT`/`SIGTERM`
  * remove `.claude/state/issue-monitor.lock` and exit 130/143, matching
@@ -185,19 +187,12 @@ class MonitorIssuesMonitorIssues {
     }
 
     const labels = issue.labels.map((label) => label.name);
-    const tagsJson = JSON.stringify(Tags.extractTags(labels), null, 2);
+    const tags = Tags.extractTags(labels);
+    const tagsJson = JSON.stringify(tags, null, 2);
 
     this._log(`Processing #${id} — tags: ${tagsJson}`);
 
-    let failed = false;
-
-    for (const tag of Tags.actionableTags(labels)) {
-      if (!await this._dispatch(id, tag)) {
-        failed = true;
-      }
-    }
-
-    if (failed) {
+    if (!await this._dispatchAll(id, labels, tags)) {
       this._log(`Skipping updated_at write for #${id} — a dispatched action failed; will retry next poll`);
 
       return;
@@ -206,6 +201,34 @@ class MonitorIssuesMonitorIssues {
     await this._issueStateService.set(id, 'updated_at', formatTimestamp(this._clock()));
     await this._issueStateService.setJson(id, 'tags', tagsJson);
     this._log(`Processed #${id} — updated_at recorded`);
+  }
+
+  /**
+   * Dispatches every actionable tag of the issue, unless it is an Epic:
+   * an Epic is logged as skipped and nothing is dispatched (it must be
+   * split with `/arcanum-split-issue` first), which still counts as
+   * success so its state is recorded.
+   * @param {string} id - the issue id.
+   * @param {string[]} labels - the issue's GitHub label names.
+   * @param {string[]} tags - the canonical tags already parsed from `labels`.
+   * @returns {Promise<boolean>} `false` when any dispatch failed.
+   */
+  async _dispatchAll(id, labels, tags) {
+    if (tags.includes('epic')) {
+      this._log(`Skipping #${id}: Epic`);
+
+      return true;
+    }
+
+    let ok = true;
+
+    for (const tag of Tags.actionableTags(labels)) {
+      if (!await this._dispatch(id, tag)) {
+        ok = false;
+      }
+    }
+
+    return ok;
   }
 
   /**
