@@ -11,7 +11,7 @@ const MAX_NAME_ATTEMPTS = 100;
  * resolving a `--resume` path, reading a draft's title/body, and
  * deleting a draft after a successful publish. Shared by
  * `ArcanumCreateIssueStart` and `ArcanumCreateIssuePublish`. See the
- * "Draft file" section of docs/agents/specs/arcanum-create-issue.md.
+ * "Draft file" section of docs/agents/architecture/arcanum-create-issue.md.
  */
 class DraftStore {
   /**

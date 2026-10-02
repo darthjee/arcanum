@@ -20,7 +20,7 @@ const AGE_UNITS = [
  * exist and no `--new`/`--resume` flag was given, or falling back to
  * exit `4` with one `DRAFT=` line per draft when there is no TTY. See
  * the "`arcanum-create-issue-start`" section of
- * docs/agents/specs/arcanum-create-issue.md for the output/exit-code
+ * docs/agents/architecture/arcanum-create-issue.md for the output/exit-code
  * contract.
  */
 class ArcanumCreateIssueStart {

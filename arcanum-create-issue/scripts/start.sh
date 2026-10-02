@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # Thin engine_dispatch shim for the "arcanum-create-issue-start" entrypoint —
-# see docs/agents/specs/arcanum-create-issue.md ("Native commands"),
-# docs/agents/architecture/script-engine.md and
-# docs/agents/plans/690-create-issue-native-command/plan.md for the full
-# design/shared contracts. Starts a new issue draft or resumes an existing
-# one under .claude/state/create-issue/.
+# see docs/agents/architecture/arcanum-create-issue.md ("Native commands")
+# and docs/agents/architecture/script-engine.md for the full design/shared
+# contracts. Starts a new issue draft or resumes an existing one under
+# .claude/state/create-issue/.
 #
 # Native-only: this command has NO shell implementation (no *_shell.sh
 # twin) and is not tracked in arcanum/_lib/migration-status.json. It is
