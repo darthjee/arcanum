@@ -2,7 +2,7 @@ import GithubIssue from './GithubIssue.js';
 import IssueFileLocator from '../../utils/file/IssueFileLocator.js';
 import SafeBranch from './SafeBranch.js';
 
-const ID_PATTERN = /^#([0-9]+)$/;
+const ID_PATTERN = /^#?([0-9]+)$/;
 
 /**
  * Native implementation of the `resolve-and-fetch` migrated entrypoint
@@ -41,7 +41,7 @@ class ResolveAndFetch {
    * `STATUS=` line, non-zero exit).
    * @param {string} issuesFolder - the local issues folder to search
    *   for an existing `<id>_*`/`<id>-*` file, relative to `repoPath`.
-   * @param {string} argString - the raw `#<id>` input.
+   * @param {string} argString - the raw `<id>` or `#<id>` input.
    * @returns {Promise<string>} the `STATUS=...`/`KEY=value...` output.
    */
   async run(issuesFolder, argString) {
@@ -52,7 +52,7 @@ class ResolveAndFetch {
     const id = this._parseId(argString);
 
     if (!id) {
-      return `STATUS=error\nERROR=Error: invalid input '${argString}' — expected '#<id>'\n`;
+      return `STATUS=error\nERROR=Error: invalid input '${argString}' — expected '<id>' or '#<id>'\n`;
     }
 
     const existing = await this._issueFile.findExisting(issuesFolder, id);
@@ -75,8 +75,8 @@ class ResolveAndFetch {
   /**
    * @param {string} argString - the raw input.
    * @returns {string|null} the numeric id, or null if `argString`
-   *   doesn't match the simplified `^#[0-9]+$` (whitespace-trimmed)
-   *   grammar.
+   *   doesn't match the `^#?[0-9]+$` (whitespace-trimmed) grammar —
+   *   the leading `#` is optional.
    */
   _parseId(argString) {
     const trimmed = (argString || '').trim();
