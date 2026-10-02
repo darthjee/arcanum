@@ -99,6 +99,29 @@ describe('MonitorIssuesMonitorIssues (dispatch)', () => {
     expect(issueStateService.setJson).not.toHaveBeenCalled();
   });
 
+  [
+    { label: 'Ready for Work', tag: 'ready_for_work' },
+    { label: 'Created', tag: 'created' }
+  ].forEach(({ label, tag }) => {
+    it(`skips dispatch for an Epic with ${label}, but still records updated_at and tags`, async () => {
+      const { monitor, stdout, rewriteQueue, autoFixQueue, issueStateService } = createMonitor(dir, {
+        issues: [issue(11, [label, 'Epic'])]
+      });
+
+      await monitor.run();
+
+      const tagsJson = JSON.stringify([tag, 'epic'], null, 2);
+
+      expect(stdout()).toContain(logLine('Skipping #11: Epic'));
+      expect(stdout()).not.toContain('has actionable tag');
+      expect(rewriteQueue.push).not.toHaveBeenCalled();
+      expect(autoFixQueue.push).not.toHaveBeenCalled();
+      expect(issueStateService.set).toHaveBeenCalledWith('11', 'updated_at', '2026-01-02T03:04:05Z');
+      expect(issueStateService.setJson).toHaveBeenCalledWith('11', 'tags', tagsJson);
+      expect(stdout()).toContain(logLine('Processed #11 — updated_at recorded'));
+    });
+  });
+
   it('processes every returned issue independently', async () => {
     const { monitor, issueStateService } = createMonitor(dir, {
       issues: [issue(1, []), issue(2, ['Created'], '2026-01-01T00:00:00Z'), issue(3, [])],

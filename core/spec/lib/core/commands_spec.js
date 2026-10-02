@@ -12,7 +12,7 @@ const REPO_CONTEXT_COMMANDS = [
   'auto-fix-all-cleanup-artifacts',
   'auto-fix-all-github-add-tag',
   'auto-fix-all-github-cleanup-branch',
-  'auto-fix-all-github-has-shipit-label',
+  'auto-fix-all-github-has-label',
   'auto-fix-all-github-pr-merge',
   'auto-fix-all-github-pr-number',
   'auto-fix-all-github-pr-state',

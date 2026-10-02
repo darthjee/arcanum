@@ -67,7 +67,7 @@ import { createTempDir, removeTempDir } from './tempDir.js';
 //     `$FAKE_GH_ISSUE_VIEW_FAIL` is `1` — used by
 //     tag_mutate.sh's `tag_mutate_add_label`/`tag_mutate_remove_label`
 //     (queue_save_shell.sh's/queue_push_shell.sh's `_mark_enqueued`, and
-//     `github.sh`'s `cmd_has_shipit_label`/`cmd_add_tag`/`cmd_remove_tag`).
+//     `github.sh`'s `cmd_has_label`/`cmd_add_tag`/`cmd_remove_tag`).
 //   - `gh issue list -R <ref> [--author <x>] --state open --json
 //     number,title,updatedAt,labels --search ... --limit 100` -> prints
 //     `$FAKE_GH_ISSUE_LIST_JSON` (default `[]`), ignoring the filters;

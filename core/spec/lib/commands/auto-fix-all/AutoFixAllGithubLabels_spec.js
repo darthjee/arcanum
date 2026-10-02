@@ -7,32 +7,51 @@ import {
 import { captureRejection } from '../../../support/utils/captureRejection.js';
 
 describe('AutoFixAllGithub (label subcommands)', () => {
-  describe('#hasShipitLabel', () => {
+  describe('#hasLabel', () => {
+    const USAGE = 'Usage: github.sh has-label <repo_path> <id> <name>';
+
     it('rejects when repoPath is missing', async () => {
       const github = createAutoFixAllGithub({ repoPath: '' });
 
-      await expectAsync(github.hasShipitLabel('5')).toBeRejectedWithError(
-        'Usage: github.sh has-shipit-label <repo_path> <id>'
-      );
+      await expectAsync(github.hasLabel('5', 'Epic')).toBeRejectedWithError(USAGE);
     });
 
     it('rejects when id is missing', async () => {
       const github = createAutoFixAllGithub();
 
-      await expectAsync(github.hasShipitLabel()).toBeRejectedWithError(
-        'Usage: github.sh has-shipit-label <repo_path> <id>'
-      );
+      await expectAsync(github.hasLabel(undefined, 'Epic')).toBeRejectedWithError(USAGE);
     });
 
-    it('resolves for a case-insensitive exact "shipit" label match', async () => {
-      const github = createAutoFixAllGithub({ fetchFn: fakeGithubFetch({ labels: ['Shipit', 'Other'] }) });
+    it('rejects when name is missing', async () => {
+      const github = createAutoFixAllGithub();
 
-      await expectAsync(github.hasShipitLabel('5')).toBeResolvedTo('');
+      await expectAsync(github.hasLabel('5')).toBeRejectedWithError(USAGE);
+    });
+
+    it('resolves for an exact label match', async () => {
+      const github = createAutoFixAllGithub({ fetchFn: fakeGithubFetch({ labels: ['Epic', 'Other'] }) });
+
+      await expectAsync(github.hasLabel('5', 'Epic')).toBeResolvedTo('');
+    });
+
+    it('resolves for a case-insensitive label match', async () => {
+      const github = createAutoFixAllGithub({ fetchFn: fakeGithubFetch({ labels: ['ShipIt', 'Other'] }) });
+
+      await expectAsync(github.hasLabel('5', 'shipit')).toBeResolvedTo('');
+    });
+
+    it('rejects with an empty-stdout DispatchFailure (exit 1) when only a partial match exists', async () => {
+      const github = createAutoFixAllGithub({ fetchFn: fakeGithubFetch({ labels: ['Epics'] }) });
+      const thrown = await captureRejection(github.hasLabel('5', 'Epic'));
+
+      expect(thrown).toBeInstanceOf(DispatchFailure);
+      expect(thrown.stdout).toEqual('');
+      expect(thrown.exitCode).toEqual(1);
     });
 
     it('rejects with an empty-stdout DispatchFailure (exit 1) when the label is absent', async () => {
       const github = createAutoFixAllGithub({ fetchFn: fakeGithubFetch({ labels: ['Other'] }) });
-      const thrown = await captureRejection(github.hasShipitLabel('5'));
+      const thrown = await captureRejection(github.hasLabel('5', 'Epic'));
 
       expect(thrown).toBeInstanceOf(DispatchFailure);
       expect(thrown.stdout).toEqual('');
@@ -41,7 +60,7 @@ describe('AutoFixAllGithub (label subcommands)', () => {
 
     it('rejects with an empty-stdout DispatchFailure (exit 1) when the labels fetch fails', async () => {
       const github = createAutoFixAllGithub({ fetchFn: fakeGithubFetch({ issueViewFails: true }) });
-      const thrown = await captureRejection(github.hasShipitLabel('5'));
+      const thrown = await captureRejection(github.hasLabel('5', 'Epic'));
 
       expect(thrown).toBeInstanceOf(DispatchFailure);
       expect(thrown.stdout).toEqual('');
