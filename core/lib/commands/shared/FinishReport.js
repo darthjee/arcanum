@@ -1,13 +1,11 @@
 import { TAG_TO_LABEL } from '../../utils/issue/Tags.js';
+import Origin from '../../utils/git/Origin.js';
 
 const STATUSES = new Set(['success', 'declined', 'failed']);
 const NUMERIC_ID_PATTERN = /^[0-9]+$/;
 const VALUE_FLAGS = new Set([
   '--skill', '--status', '--summary', '--issue', '--pr', '--sub-issue', '--label-change', '--next', '--merge'
 ]);
-// GitHub's ssh-over-443 host has no web UI of its own — its URLs live
-// on `github.com`.
-const WEB_DOMAIN_ALIASES = { 'ssh.github.com': 'github.com' };
 
 /**
  * Native implementation of the `finish-report` migrated entrypoint —
@@ -334,7 +332,7 @@ class FinishReport {
    */
   async _baseUrl() {
     const { domain, repo } = await this._repoContext.resolve();
-    const webDomain = WEB_DOMAIN_ALIASES[domain] ?? domain;
+    const webDomain = Origin.normalizeDomain(domain);
 
     return `https://${webDomain}/${repo}`;
   }
