@@ -18,6 +18,7 @@ Every in-scope issue skill ends the same way:
 | `auto-plan-issue` | auto |
 | `auto-fix-issue` | auto |
 | `auto-rewrite-issue` | auto |
+| `auto-resolve-issue` | auto |
 
 Out of scope: `auto-fix-all`, `auto-monitor-issue-pr`, `auto-monitor-pr`, `monitor-issues`, `push-issue-to-queue`, `arcanum-migrate`, `arcanum-update`, `arcanum-check-config` (a read-only, single-shot query), `init-claude`, and the `toggle-*` skills. `auto-fix-all` keeps its own `OUTCOME=...` protocol toward its coordinator. It takes part only as a **nested caller** (see [Nested runs](#nested-runs)).
 
@@ -156,7 +157,7 @@ Auto skills never prompt. On `success` they pass the next command(s) as `--next`
 
 A run is **nested** when another skill executes it as a step of its own flow, reading its `steps/run.md` directly. Current nested callers:
 
-- `auto-fix-all/steps/process_one_issue.md` runs `auto-new-issue`, `auto-plan-issue` and `auto-fix-issue`;
+- `auto-resolve-issue/steps/process_one_issue.md` (run by `auto-resolve-issue`, and by `auto-fix-all` for each queued issue) runs `auto-new-issue`, `auto-plan-issue` and `auto-fix-issue`;
 - `discuss-issue/steps/discuss_and_save.md` §8 runs `auto-plan-issue`.
 
 Only the outermost skill prints a report.
@@ -214,12 +215,14 @@ The outermost skill passes each nested block to its own `finish_report.sh` call 
 | `auto-plan-issue` | `/auto-fix-issue <id>` | `Next:` |
 | `auto-fix-issue` | `/auto-monitor-issue-pr <id>` | `Next:` |
 | `auto-rewrite-issue` | `/discuss-issue <id>`, one per rewritten issue | `Next:` |
+| `auto-resolve-issue` | none | - |
 
 Notes:
 
 - **`discuss-issue`** has a two-phase ending. After pushing the issue, it offers `/auto-plan-issue <id>` **before** printing any report, since the report depends on the answer. On yes, it runs `auto-plan-issue` **nested** (it still owns the plan push and the `Refined` → `Ready` swap afterwards), then prints one merged report and offers `/auto-fix-issue <id>`. On no, chat, or an unavailable prompt, it prints its push-only report with no second offer.
 - **`arcanum-split-issue`** always points at `/enhance-issue`, not `/discuss-issue`: split sub-issues start as drafts, and `enhance-issue` then offers `/discuss-issue` itself. On yes, each `/enhance-issue` runs as a chained run, one after the other, each with its own report and offer. Before its success report, the skill's own `scripts/finish.sh` (the `arcanum-split-issue-finish` migrated entrypoint) relabels the parent `Planning` → `Split`, deletes the local working files and releases the working tree; the report's `planning:split` label change is passed only once it has run.
 - **`arcanum-create-issue`** picks its single next command from the `EPIC=` key printed by `scripts/publish.sh`: an Epic goes to `/arcanum-split-issue`, any other issue to `/discuss-issue`. The applied labels are named in the `success` summary rather than passed as `--label-change` (which only accepts canonical pipeline tags), and the summary says so when `shipit` was asked for but not confirmed. A `declined` report (the user abandoned the run) names the kept draft path. Answering **Chat** at the final confirmation is not an exit: the run stays open, with the draft kept and no report yet, so the user can keep refining and publish later in the same run.
+- **`auto-resolve-issue`** ends with `success` once the PR is merged, `declined` for an Epic or when the user stops after a closed PR or a blocked dispatch, and `failed` when no id was given. It passes no `--next`: a merged PR is the end of the pipeline. Its `pending` reschedule via `ScheduleWakeup` is not an exit and prints no report. Like `auto-fix-all`, it reads the spawned architect's `OUTCOME=...` rather than merging nested `FINISH_*` blocks.
 - **`auto-rewrite-issue`** processes a queue: it lists one `Next:` line per issue it rewrote, reports `success` if at least one id was rewritten (naming failed ids in the summary), `success` with no `Next:` on an empty queue, and `failed` if ids were popped but none was rewritten.
 
 ## See also

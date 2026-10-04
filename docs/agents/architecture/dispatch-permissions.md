@@ -29,7 +29,7 @@ The dispatch surface splits cleanly into two categories.
 ### 1. Common, fixed, narrow scripts every specialist dispatch relies on
 
 Regardless of domain — from `auto-fix-issue/steps/dispatch_agents.md`'s instruction to
-every dispatched specialist, and `auto-fix-all/steps/handle_comment.md`'s "Dispatching"
+every dispatched specialist, and `auto-resolve-issue/steps/handle_comment.md`'s "Dispatching"
 section, which reuses the same commit call:
 
 | Script | Risk |

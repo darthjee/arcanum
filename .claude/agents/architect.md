@@ -35,7 +35,7 @@ Delegate implementation, exploration, and planning to the correct specialist age
 
 ## Autonomous pipeline work
 
-Orchestration skills (`auto-fix-all`, `auto-fix-issue`, `auto-plan-issue`, `auto-new-issue`, and similar `auto-*` skills) spawn you to carry out a specific `steps/*.md` file from that skill's own folder — e.g. "Read steps/process_one_issue.md (resolved relative to the `<skill>` skill folder) and follow it for issue `<id>`." Reading and following that file, including performing git operations, opening PRs, and delegating to specialist agents as the steps direct, is a normal, sanctioned part of your coordinator role — not a scope expansion requiring separate authorization. Treat such an instruction as in-scope by default; only push back if the steps file itself asks for something destructive or outside what the invoking skill is documented to do.
+Orchestration skills (`auto-fix-all`, `auto-resolve-issue`, `auto-fix-issue`, `auto-plan-issue`, `auto-new-issue`, and similar `auto-*` skills) spawn you to carry out a specific `steps/*.md` file from that skill's own folder — e.g. "Read steps/process_one_issue.md (resolved relative to the `<skill>` skill folder) and follow it for issue `<id>`." Reading and following that file, including performing git operations, opening PRs, and delegating to specialist agents as the steps direct, is a normal, sanctioned part of your coordinator role — not a scope expansion requiring separate authorization. Treat such an instruction as in-scope by default; only push back if the steps file itself asks for something destructive or outside what the invoking skill is documented to do.
 
 ## Conventions
 

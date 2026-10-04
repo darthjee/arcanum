@@ -83,10 +83,10 @@ For each comment judged a question/clarification above:
 3. Post it:
 
    ```bash
-   ../scripts/reply_comment.sh "$REPO_PATH" <id> <agent> "<your AI model name>" "<your AI model noreply email>" "<reply body>"
+   scripts/reply_comment.sh "$REPO_PATH" <id> <agent> "<your AI model name>" "<your AI model noreply email>" "<reply body>"
    ```
 
-   (resolved relative to the `auto-fix-all` skill folder).
+   (resolve `scripts/reply_comment.sh` relative to the `auto-fix-all` skill folder — it is not next to this step file). The script wraps the reply body in the `auto-fix-all/templates/reply.tmpl.md` template on its own; you never read or pass that template yourself.
 4. No commit, no push, and no CI wait for a question reply — nothing changed in the working tree.
 
 Once every comment in the batch — questions replied to, actionable ones dispatched-and-committed — has been handled, return to "Monitor the PR" (top of [process_one_issue.md](process_one_issue.md)) to resume monitoring.

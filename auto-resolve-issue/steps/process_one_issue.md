@@ -1,6 +1,6 @@
 # Process One Issue Through to a Terminal Outcome
 
-You are the **architect**, processing a single issue id (`<id>`, given in `ARGUMENTS`) for the `auto-fix-all` pipeline. Run this entire file to completion and then report one of:
+You are the **architect**, processing a single issue id (`<id>`, given in `ARGUMENTS`) for the per-issue pipeline (run by `auto-resolve-issue`, and by `auto-fix-all` for each queued issue). Run this entire file to completion and then report one of:
 
 ```text
 OUTCOME=merged
@@ -43,7 +43,7 @@ This fetches `origin`, then either reuses branch `issue-<id>` — merging `origi
 
 ## 2. Create the issue file
 
-Read [../../auto-new-issue/steps/run.md](../../auto-new-issue/steps/run.md) and follow all its steps for `<id>`, carrying `REPO_PATH` forward unchanged, **with `NESTED=true`**. Its final step commits the issue file — do not commit it again here. The nested run ends by returning a `FINISH_*` block instead of a report; do not relay or merge it, since `auto-fix-all` keeps its own `OUTCOME=...` protocol (see "Nested runs" in [Skill Finish](../../docs/agents/architecture/skill-finish.md#nested-runs)). You're already running as the architect; do not spawn another `Agent(architect)` for this — just follow the steps directly.
+Read [../../auto-new-issue/steps/run.md](../../auto-new-issue/steps/run.md) and follow all its steps for `<id>`, carrying `REPO_PATH` forward unchanged, **with `NESTED=true`**. Its final step commits the issue file — do not commit it again here. The nested run ends by returning a `FINISH_*` block instead of a report; do not relay or merge it, since the per-issue pipeline keeps its own `OUTCOME=...` protocol (see "Nested runs" in [Skill Finish](../../docs/agents/architecture/skill-finish.md#nested-runs)). You're already running as the architect; do not spawn another `Agent(architect)` for this — just follow the steps directly.
 
 Once that finishes, push a `fetched` status tag onto the live GitHub issue, to signal it has been fetched/checked:
 
@@ -51,11 +51,11 @@ Once that finishes, push a `fetched` status tag onto the live GitHub issue, to s
 scripts/github.sh add-tag "$REPO_PATH" <id> fetched
 ```
 
-> Resolve `scripts/github.sh` relative to the `auto-fix-all` skill folder. This is `auto-fix-all`-specific pipeline signaling — it does not belong in `auto-new-issue/steps/run.md` itself, since that flow is also read by the manual `/new-issue` skill.
+> Resolve `scripts/github.sh` relative to the `auto-fix-all` skill folder. This is per-issue pipeline signaling — it does not belong in `auto-new-issue/steps/run.md` itself, since that flow is also read by the manual `/new-issue` skill.
 
 ## 3. Create the plan
 
-Read [../../auto-plan-issue/steps/run.md](../../auto-plan-issue/steps/run.md) and follow all its steps for `<id>`, carrying `REPO_PATH` forward unchanged, **with `NESTED=true`**. Its final step commits the plan files — do not commit them again here. The nested run ends by returning a `FINISH_*` block instead of a report; do not relay or merge it, since `auto-fix-all` keeps its own `OUTCOME=...` protocol (see "Nested runs" in [Skill Finish](../../docs/agents/architecture/skill-finish.md#nested-runs)). You're already running as the architect; do not spawn another `Agent(architect)` for this — just follow the steps directly.
+Read [../../auto-plan-issue/steps/run.md](../../auto-plan-issue/steps/run.md) and follow all its steps for `<id>`, carrying `REPO_PATH` forward unchanged, **with `NESTED=true`**. Its final step commits the plan files — do not commit them again here. The nested run ends by returning a `FINISH_*` block instead of a report; do not relay or merge it, since the per-issue pipeline keeps its own `OUTCOME=...` protocol (see "Nested runs" in [Skill Finish](../../docs/agents/architecture/skill-finish.md#nested-runs)). You're already running as the architect; do not spawn another `Agent(architect)` for this — just follow the steps directly.
 
 If the block has `FINISH_STATUS=failed`, the plan step failed: stop processing this issue immediately and report `OUTCOME=blocked AGENT=architect ACTION="<FINISH_SUMMARY>"` at the top level, the same way a blocked step is reported elsewhere in this file — do not swap the tags below and do not continue to Step 4.
 
@@ -66,11 +66,11 @@ scripts/github.sh remove-tag "$REPO_PATH" <id> fetched
 scripts/github.sh add-tag "$REPO_PATH" <id> working
 ```
 
-> Resolve `scripts/github.sh` relative to the `auto-fix-all` skill folder. Same rationale as above — this belongs in `auto-fix-all`'s own flow, not in `auto-plan-issue/steps/run.md`, since that flow is also read by the manual `/plan-issue` skill.
+> Resolve `scripts/github.sh` relative to the `auto-fix-all` skill folder. Same rationale as above — this belongs in the per-issue pipeline's own flow, not in `auto-plan-issue/steps/run.md`, since that flow is also read by the manual `/plan-issue` skill.
 
 ## 4. Implement and open/mark-ready the PR
 
-Read [../../auto-fix-issue/steps/run.md](../../auto-fix-issue/steps/run.md) and follow all its steps for `<id>`, carrying `REPO_PATH` forward unchanged, **with `NESTED=true`**. By the end of this, the branch has been implemented, committed, pushed, and a PR exists (opened by that skill, since no PR existed yet for this fresh branch). The nested run ends by returning a `FINISH_*` block instead of a report; do not relay or merge it, since `auto-fix-all` keeps its own `OUTCOME=...` protocol (see "Nested runs" in [Skill Finish](../../docs/agents/architecture/skill-finish.md#nested-runs)). You're already running as the architect; do not spawn another `Agent(architect)` for this — just follow the steps directly.
+Read [../../auto-fix-issue/steps/run.md](../../auto-fix-issue/steps/run.md) and follow all its steps for `<id>`, carrying `REPO_PATH` forward unchanged, **with `NESTED=true`**. By the end of this, the branch has been implemented, committed, pushed, and a PR exists (opened by that skill, since no PR existed yet for this fresh branch). The nested run ends by returning a `FINISH_*` block instead of a report; do not relay or merge it, since the per-issue pipeline keeps its own `OUTCOME=...` protocol (see "Nested runs" in [Skill Finish](../../docs/agents/architecture/skill-finish.md#nested-runs)). You're already running as the architect; do not spawn another `Agent(architect)` for this — just follow the steps directly.
 
 If the block has `FINISH_STATUS=failed`, the implementation step failed: stop processing this issue immediately and report `OUTCOME=blocked AGENT=architect ACTION="<FINISH_SUMMARY>"` at the top level, the same way a blocked step is reported elsewhere in this file — do not continue to Step 5.
 
@@ -141,6 +141,8 @@ Reached only from "Monitor the PR" → `approved` — a human approved the PR vi
    scripts/cleanup_artifacts.sh "$REPO_PATH" <issue_file> <plan_dir> <id> "<your AI model name>" "<your AI model noreply email>"
    ```
 
+   > Resolve `scripts/cleanup_artifacts.sh` relative to the `auto-fix-all` skill folder.
+
    `<issue_file>` and `<plan_dir>` are the same paths resolved by `../auto-plan-issue/scripts/resolve_plan_paths.sh "$REPO_PATH" docs/agents/issues docs/agents/plans <id>` (re-run it here, resolved relative to the `auto-plan-issue` skill folder, if you no longer have them at hand).
 2. Wait for CI:
 
@@ -148,6 +150,8 @@ Reached only from "Monitor the PR" → `approved` — a human approved the PR vi
    scripts/wait_ci.sh "$REPO_PATH"
    ```
 
+   > Resolve `scripts/wait_ci.sh` relative to the `auto-fix-all` skill folder.
+   >
    > **NEVER use `ScheduleWakeup`, a self-waking loop, or any other polling mechanism to wait for CI.** Always call `scripts/wait_ci.sh` directly and let it block. When invoking it via the Bash tool, set `timeout: 600000` (10 minutes — the tool's maximum) so the call cannot time out before CI finishes.
 
    This blocks until every check-run registered on the PR's head commit completes, regardless of which CI provider runs them. The first output line is `passed` or `failed`; on `failed`, subsequent lines are the names of the failed check-runs.
@@ -158,7 +162,7 @@ Reached only from "Monitor the PR" → `approved` — a human approved the PR vi
 scripts/github.sh pr-merge "$REPO_PATH" "<your AI model noreply email>"
 ```
 
-> The trailing `<your AI model noreply email>` argument is optional — `pr-merge` only uses it to exclude your own `Co-Authored-By` line from the generated body when `git.merge_body_mode` is `coauthors` and `git.omit_model_coauthor` is `true` (see `arcanum/_lib/merge_body.sh`). Passing it is harmless in every other mode.
+> Resolve `scripts/github.sh` relative to the `auto-fix-all` skill folder. The trailing `<your AI model noreply email>` argument is optional — `pr-merge` only uses it to exclude your own `Co-Authored-By` line from the generated body when `git.merge_body_mode` is `coauthors` and `git.omit_model_coauthor` is `true` (see `arcanum/_lib/merge_body.sh`). Passing it is harmless in every other mode.
 
 Run cleanup (the script infers the branch name from the issue ID):
 
@@ -187,6 +191,8 @@ Reached only from "Check for pre-approval" above, when `has-shipit-label` exits 
    ```bash
    scripts/cleanup_artifacts.sh "$REPO_PATH" <issue_file> <plan_dir> <id> "<your AI model name>" "<your AI model noreply email>"
    ```
+
+   > Resolve `scripts/cleanup_artifacts.sh` relative to the `auto-fix-all` skill folder.
 
    `<issue_file>` and `<plan_dir>` are the same paths resolved by `../auto-plan-issue/scripts/resolve_plan_paths.sh "$REPO_PATH" docs/agents/issues docs/agents/plans <id>` (re-run it here, resolved relative to the `auto-plan-issue` skill folder, if you no longer have them at hand).
 2. Wait for CI, then merge if it passes — one combined call:

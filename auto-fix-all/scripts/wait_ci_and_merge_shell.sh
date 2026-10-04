@@ -15,7 +15,7 @@
 # without loosening confirmation for the normal, human-review-approved
 # merge path, which still calls `wait_ci.sh` then a separate
 # `github.sh pr-merge` Bash invocation, unmodified and still classifier-
-# confirmed (see auto-fix-all/steps/process_one_issue.md).
+# confirmed (see auto-resolve-issue/steps/process_one_issue.md).
 #
 # Output contract, same first-line shape as wait_ci.sh's own: first
 # line "passed" means CI passed AND the merge already happened

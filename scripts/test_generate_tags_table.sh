@@ -23,6 +23,11 @@
 #      mark-complete) renders "-" / "-" without a lookup.
 #   6. A github.sh mark-<x> call with no matching cmd_mark_<x> function
 #      makes the generator fail loudly (non-zero exit, error on stderr).
+#   7. A script path that does not exist in the call site's own skill
+#      folder resolves to another skill's folder when the same markdown
+#      file carries a "Resolve `<token>` relative to the `<other-skill>`
+#      skill folder" note (mirroring auto-resolve-issue's
+#      process_one_issue.md calling auto-fix-all's scripts/github.sh).
 
 set -uo pipefail
 
@@ -241,6 +246,48 @@ grep -qF "no cmd_mark_missing() function" <<< "$OUTPUT_4" \
   || fail "expected a 'no cmd_mark_missing() function' error, got: ${OUTPUT_4}"
 
 echo "OK: a github.sh mark-* verb with no cmd_mark_* function fails loudly"
+
+# --- Fixture repo 3: cross-skill resolution note ---
+
+NOTE_REPO="${TMP_DIR}/note-fixture-repo"
+build_fixture_repo "$NOTE_REPO"
+mkdir -p "${NOTE_REPO}/skill-owner/scripts" "${NOTE_REPO}/skill-borrower/steps"
+touch "${NOTE_REPO}/skill-owner/scripts/github.sh"
+
+cat > "${NOTE_REPO}/skill-borrower/SKILL.md" <<'EOF'
+---
+name: skill-borrower
+description: fixture
+---
+
+## Step 1 — Borrow
+
+Read [steps/borrow.md](steps/borrow.md) and follow it.
+EOF
+
+cat > "${NOTE_REPO}/skill-borrower/steps/borrow.md" <<'EOF'
+```bash
+scripts/github.sh add-tag "$REPO_PATH" <id> borrowed
+```
+
+> Resolve `scripts/github.sh` relative to the `skill-owner` skill folder.
+EOF
+
+OUTPUT_5="$("${NOTE_REPO}/scripts/generate_tags_table.sh" 2>&1)" \
+  || fail "generator exited non-zero on resolution-note fixture: ${OUTPUT_5}"
+
+NOTE_TABLE="${NOTE_REPO}/docs/agents/tag-mutations.md"
+
+# Assertion 7: entrypoint resolved via the note to the owning skill.
+# Literal backticks in the patterns, not shell expansions.
+# shellcheck disable=SC2016
+grep -qF '| `skill-owner/scripts/github.sh` | borrowed |' "$NOTE_TABLE" \
+  || fail "expected the resolution note to resolve to skill-owner/scripts/github.sh, got:\n$(cat "$NOTE_TABLE")"
+# shellcheck disable=SC2016
+grep -qF '`skill-borrower/scripts/github.sh`' "$NOTE_TABLE" \
+  && fail "expected no skill-borrower/scripts/github.sh fallback guess, got:\n$(cat "$NOTE_TABLE")"
+
+echo "OK: a 'Resolve ... relative to the <skill> skill folder' note resolves the entrypoint to that skill"
 
 echo "PASS: scripts/generate_tags_table.sh's parsing/table/review-json logic behaves as expected"
 exit 0

@@ -149,14 +149,40 @@ build_step_map() {
   done < "$skill_md"
 }
 
+# --- Print, one per line in file order, every <other-skill> named by a
+#     "Resolve `<token>` relative to the `<other-skill>` skill folder"
+#     note in <md_file>. The token is matched literally (no regex). ---
+resolution_note_skills() {
+  local md_file="$1" token="$2"
+  local prefix="Resolve \`${token}\` relative to the \`"
+  local line rest
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ "$line" == *"$prefix"* ]] || continue
+    rest="${line#*"$prefix"}"
+    if [[ "$rest" =~ ^([A-Za-z0-9_.-]+)\`[[:space:]]+skill[[:space:]]+folder ]]; then
+      printf '%s\n' "${BASH_REMATCH[1]}"
+    fi
+  done < "$md_file"
+}
+
 # --- Resolve the entrypoint script path token to a real file, relative to
 #     REPO_ROOT for display. Tries (in order): relative to the skill
 #     folder, relative to the matched file's own directory, relative to
-#     the repo root. ---
+#     the repo root, then relative to any other skill folder named by an
+#     explicit note in the same markdown file of the form
+#     "Resolve `<token>` relative to the `<other-skill>` skill folder"
+#     (first such note whose target exists on disk wins). ---
 resolve_entrypoint() {
-  local skill_dir="$1" md_dir="$2" token="$3"
+  local skill_dir="$1" md_dir="$2" token="$3" md_file="${4:-}"
   local base_dir candidate resolved_dir
-  for base_dir in "$skill_dir" "$md_dir" "$REPO_ROOT"; do
+  local -a bases=("$skill_dir" "$md_dir" "$REPO_ROOT")
+  local note_skill
+  if [[ -n "$md_file" && -f "$md_file" ]]; then
+    while IFS= read -r note_skill; do
+      [[ -n "$note_skill" ]] && bases+=("${REPO_ROOT}/${note_skill}")
+    done < <(resolution_note_skills "$md_file" "$token")
+  fi
+  for base_dir in "${bases[@]}"; do
     candidate="${base_dir}/${token}"
     if [[ -f "$candidate" ]]; then
       resolved_dir="$(cd "$(dirname "$candidate")" && pwd)"
@@ -230,6 +256,9 @@ scan_file() {
   fi
 
   local line
+  # resolve_entrypoint only reads $md_file (resolution-note lookup), never
+  # writes it.
+  # shellcheck disable=SC2094
   while IFS= read -r line || [[ -n "$line" ]]; do
     [[ "$line" =~ $VERB_REGEX ]] || continue
 
@@ -240,7 +269,7 @@ scan_file() {
     [[ -n "$argstr" ]] || continue
 
     local entrypoint
-    entrypoint="$(resolve_entrypoint "$skill_dir" "$md_dir" "$token")"
+    entrypoint="$(resolve_entrypoint "$skill_dir" "$md_dir" "$token" "$md_file")"
 
     local tags_added tags_removed
     if [[ "$verb" == "add-tag" ]]; then
