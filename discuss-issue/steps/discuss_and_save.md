@@ -201,12 +201,12 @@ Do not show a second offer on this path.
 8. Offer implementation:
 
    ```bash
-   ../../arcanum/_lib/next_step_prompt.sh --repo "$REPO_PATH" --command "/auto-fix-issue <id>"
+   ../../arcanum/_lib/next_step_prompt.sh --repo "$REPO_PATH" --command "/auto-resolve-issue <id>"
    ```
 
-   - **`CHOICE=yes`**: invoke `/auto-fix-issue <id>` inline, in the same session, as a **chained** top-level run — no `NESTED=true`. It prints its own report and next step.
+   - **`CHOICE=yes`**: invoke `/auto-resolve-issue <id>` inline, in the same session, as a **chained** top-level run — no `NESTED=true`. It prints its own report and next step.
    - **`CHOICE=no`**: end.
-   - **`CHOICE=chat`** (exit 3): return to the conversation. Do not run `auto-fix-issue` unless the user asks for it in chat.
+   - **`CHOICE=chat`** (exit 3): return to the conversation. Do not run `auto-resolve-issue` unless the user asks for it in chat.
    - **exit 1**: say in one line that the next-step prompt failed: <stderr>, then end.
    - **exit 4** (`FALLBACK=chat`, no TTY): ask once with `AskUserQuestion` — the question names the exact command from the `COMMAND=` line(s), with options **Yes** (run it now), **No**, **Chat** — then follow the matching branch above: Yes → `CHOICE=yes`, No → `CHOICE=no`, Chat → `CHOICE=chat`. A free-text "Other" answer → `CHOICE=chat`, with the text as context; a dismissed or rejected question → `CHOICE=no`. If `AskUserQuestion` is unavailable (headless, tool denied), print "Next step: `<cmd>` (run it manually)" for each command and end.
 

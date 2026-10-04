@@ -27,7 +27,7 @@ Otherwise, parse the key=value output to obtain `ISSUE_FILE`, `PLAN_DIR`, `PLAN_
 
   ```bash
   ../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill auto-plan-issue --status success --issue <id> \
-    --summary "Plan for #<id> already exists; nothing was written." --next "/auto-fix-issue <id>"
+    --summary "Plan for #<id> already exists; nothing was written." --next "/auto-resolve-issue <id>"
   ```
 
   > With `NESTED=true`, drop `--next` and add `--nested`, then relay the `FINISH_*` block to your caller (see [Nested runs](#nested-runs)).
@@ -70,7 +70,7 @@ Do not ask for confirmation and do not invoke any fix/PR skill — that orchestr
 
 ```bash
 ../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill auto-plan-issue --status success --issue <id> \
-  --summary "Plan for #<id> written and committed in <PLAN_DIR>." --next "/auto-fix-issue <id>"
+  --summary "Plan for #<id> written and committed in <PLAN_DIR>." --next "/auto-resolve-issue <id>"
 ```
 
 With `NESTED=true`, drop `--next` and add `--nested` (see [Nested runs](#nested-runs)).
@@ -81,7 +81,7 @@ Every exit of this skill ends with exactly one report printed by the shared scri
 
 ```bash
 ../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill auto-plan-issue --status success|failed \
-  --summary "<one line>" [--issue <id>] [--next "/auto-fix-issue <id>"] [--nested]
+  --summary "<one line>" [--issue <id>] [--next "/auto-resolve-issue <id>"] [--nested]
 ```
 
 > Resolve `../arcanum/_lib/finish_report.sh` relative to the `auto-plan-issue` skill folder, the same folder the `scripts/...` calls in these steps resolve against. This skill never asks the user anything, so there is no `declined` status. It changes no labels, so `--label-change` is never passed.
