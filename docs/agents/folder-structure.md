@@ -7,7 +7,8 @@
 | `auto-new-issue/` | Skill `/auto-new-issue` — autonomously creates a new issue file (no user interaction), committing and syncing with GitHub automatically. |
 | `auto-plan-issue/` | Skill `/auto-plan-issue` — autonomously writes an issue's implementation plan, splitting across specialist agents when there are any. |
 | `auto-fix-issue/` | Skill `/auto-fix-issue` — autonomously implements a planned issue, dispatching specialist agents in parallel and opening/marking the PR ready. |
-| `auto-fix-all/` | Skill `/auto-fix-all` — orchestrates the full pipeline (issue → plan → fix → monitoring) for a queue of IDs, one at a time, reacting to comments, approvals, CI failures, and PR closures until the queue is empty. |
+| `auto-resolve-issue/` | Skill `/auto-resolve-issue` — runs the full per-issue pipeline (issue → plan → fix → monitoring → merge) for a single issue, with no queue. Owns the per-issue steps (`steps/process_one_issue.md`, `steps/handle_comment.md`), which still call the scripts in `auto-fix-all/scripts/`. |
+| `auto-fix-all/` | Skill `/auto-fix-all` — queue wrapper around `auto-resolve-issue`'s per-issue step: runs the full pipeline for a queue of IDs, one at a time, until the queue is empty. Hosts the pipeline's scripts (`scripts/`) and the PR reply template (`templates/reply.tmpl.md`). |
 | `init-claude/` | Skill `/init-claude` — sets up AGENTS.md/CLAUDE.md/copilot-instructions.md and the project's docs structure. |
 | `arcanum-split-issue/` | Skill `/arcanum-split-issue` — breaks a broad issue into several sub-issues through interactive dialogue, generates one local file per sub-issue, then publishes each one as a real GitHub issue, linked to the parent issue via GitHub's native sub-issue relationship. |
 | `new-issue/` | Skill `/new-issue` — creates a new issue file. |
