@@ -1,9 +1,11 @@
-const GITHUB_DOMAIN = 'github.com';
+import Origin from '../../utils/git/Origin.js';
 
 /**
  * The `/arcanum-create-issue` GitHub preflight: `origin` must resolve to
  * a `github.com` remote and a GitHub token must be obtainable (`gh` is
- * authenticated). The token itself is never returned or printed.
+ * authenticated). GitHub host aliases such as `ssh.github.com` (SSH over
+ * port 443) count as GitHub (see `Origin.normalizeDomain`). The token
+ * itself is never returned or printed.
  */
 class GithubPreflight {
   /**
@@ -24,7 +26,7 @@ class GithubPreflight {
     try {
       const { domain, repo } = await this._repoContext.resolve();
 
-      if (domain !== GITHUB_DOMAIN) {
+      if (!Origin.isGithub(domain)) {
         throw new Error(`origin is not a GitHub remote: ${domain}/${repo}`);
       }
 
