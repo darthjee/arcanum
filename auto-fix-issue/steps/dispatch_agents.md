@@ -44,7 +44,7 @@ Before drafting the instruction, determine whether this agent's plan is split in
 >    - `<id>`: the issue number.
 >    - `<agent>`: your own agent name (the same one used as `subagent_type`).
 >    - `<AI model name>` and `<AI model email>`: the model you are running on and its canonical noreply email (e.g. `Claude Sonnet 4.6` / `noreply@anthropic.com`).
->    - `<optional comment_url>`: only pass this when the commit addresses a specific PR comment carried over from `auto-fix-all/steps/handle_comment.md` (its `url`); omit it for the initial implementation commits, same as the optional `<body>`.
+>    - `<optional comment_url>`: only pass this when the commit addresses a specific PR comment carried over from `auto-resolve-issue/steps/handle_comment.md` (its `url`); omit it for the initial implementation commits, same as the optional `<body>`.
 >    - Resolve `scripts/commit_change.sh` relative to the `auto-fix-issue` skill folder.
 >    - You may split your work into multiple atomic commits, each through this script, if the plan has multiple independent steps.
 >
@@ -86,7 +86,7 @@ Before drafting the instruction, determine whether this agent's plan is split in
 >    - `<id>`: the issue number.
 >    - `<agent>`: your own agent name (the same one used as `subagent_type`).
 >    - `<AI model name>` and `<AI model email>`: the model you are running on and its canonical noreply email (e.g. `Claude Sonnet 4.6` / `noreply@anthropic.com`).
->    - `<optional comment_url>`: only pass this when the commit addresses a specific PR comment carried over from `auto-fix-all/steps/handle_comment.md` (its `url`); omit it otherwise, same as the optional `<body>`.
+>    - `<optional comment_url>`: only pass this when the commit addresses a specific PR comment carried over from `auto-resolve-issue/steps/handle_comment.md` (its `url`); omit it otherwise, same as the optional `<body>`.
 >    - Resolve `scripts/commit_change.sh` relative to the `auto-fix-issue` skill folder.
 >
 > Do not ask for confirmation. Report back with: what you implemented (per step), what files you changed, whether all tests and lint checks passed, and the commit hash(es) you produced (one per step, plus any fix-up commits).
