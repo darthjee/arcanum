@@ -22,6 +22,17 @@ describe('GithubPreflight#check', () => {
     expect(token).toHaveBeenCalled();
   });
 
+  it('passes for an ssh.github.com origin with a token', async () => {
+    const token = jasmine.createSpy('get').and.resolveTo('secret');
+    const preflight = newPreflight({
+      resolve: jasmine.createSpy().and.resolveTo({ domain: 'ssh.github.com', repo: 'a/b' }),
+      token
+    });
+
+    await expectAsync(preflight.check()).toBeResolvedTo(undefined);
+    expect(token).toHaveBeenCalled();
+  });
+
   it('fails for a non-GitHub origin without asking for a token', async () => {
     const token = jasmine.createSpy('get');
     const preflight = newPreflight({

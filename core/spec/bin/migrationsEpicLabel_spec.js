@@ -5,20 +5,20 @@ import { createFakeGhBin } from '../support/utils/fakeGhBin.js';
 import { createGitFixtureRepo } from '../support/utils/gitFixtureRepo.js';
 import { REPO_ROOT, runCommand } from '../support/utils/runCommand.js';
 
-// Contract spec for the `next/001` and `next/002` repo migrations that
-// provision the `Epic:fbca04` label (issue #689). NOT a parity spec: the
-// migration scripts have no native counterpart. Each script runs with
-// cwd = a temp git repo whose `origin` is github.com-shaped, with the
+// Contract spec for the `1.2.0/001` and `1.2.0/002` repo migrations that
+// provision the `Epic:fbca04` label (issue #689; released in 1.2.0).
+// NOT a parity spec: the migration scripts have no native counterpart.
+// Each script runs with cwd = a temp git repo whose `origin` is github.com-shaped, with the
 // fake `gh` (spec/support/utils/fakeGhBin.js) first on `PATH` and its
 // `FAKE_GH_CALL_LOG` recording every `gh` invocation — no network.
 
-const MIGRATIONS_DIR = path.join(REPO_ROOT, 'arcanum', 'migrations', 'repos', 'next');
+const MIGRATIONS_DIR = path.join(REPO_ROOT, 'arcanum', 'migrations', 'repos', '1.2.0');
 const SCRIPT_001 = path.join(MIGRATIONS_DIR, '001.sh');
 const SCRIPT_002 = path.join(MIGRATIONS_DIR, '002.sh');
 const REPO_REF = 'darthjee/arcanum-github-fixture';
 const CONFIG = '.claude/state/init-claude-config.json';
 
-describe('next/ Epic label migrations', () => {
+describe('1.2.0/ Epic label migrations', () => {
   let repo;
   let fakeGh;
   let callLog;
