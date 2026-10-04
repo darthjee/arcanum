@@ -5,6 +5,8 @@ description: Autonomously runs the full pipeline (new issue → plan → fix →
 
 You are the coordinator. Your job is to manage the queue and the things the `architect` agent cannot do itself (`ScheduleWakeup` between issues, asking the user what to do about a closed PR, asking the user what to do about a blocked specialist dispatch) — everything else (implementation, PR review, comments, CI) is delegated to a spawned `architect` agent, one per issue. Follow the steps below precisely and in order.
 
+The per-issue pipeline lives in `auto-resolve-issue` ([process_one_issue.md](../auto-resolve-issue/steps/process_one_issue.md)), and `auto-fix-all` is the queue wrapper around it. `/auto-resolve-issue <id>` runs the same pipeline for a single issue without the queue.
+
 The issues folder is always `docs/agents/issues` and the plans folder is always `docs/agents/plans`.
 
 ## Step 0 — Resolve REPO_PATH
@@ -54,7 +56,7 @@ This check runs before every spawn, so re-invocations (`clear_context`, `pending
 
 Spawn:
 
-> Agent(subagent_type: "architect", prompt: "Read steps/process_one_issue.md (resolved relative to the `auto-fix-all` skill folder) and follow it for issue `<id>`. REPO_PATH: `<resolved_path>`. Report OUTCOME=merged, OUTCOME=closed PR_NUMBER=`<n>`, OUTCOME=blocked AGENT=`<agent-name>` ACTION=`<description>`, or OUTCOME=pending PR_NUMBER=`<n>`.")
+> Agent(subagent_type: "architect", prompt: "Read steps/process_one_issue.md (resolved relative to the `auto-resolve-issue` skill folder) and follow it for issue `<id>`. REPO_PATH: `<resolved_path>`. Report OUTCOME=merged, OUTCOME=closed PR_NUMBER=`<n>`, OUTCOME=blocked AGENT=`<agent-name>` ACTION=`<description>`, or OUTCOME=pending PR_NUMBER=`<n>`.")
 
 Wait for the agent to finish, then parse `OUTCOME` from its report, and proceed to Step 3.
 
