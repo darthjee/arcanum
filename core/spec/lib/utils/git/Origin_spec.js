@@ -46,6 +46,10 @@ const remoteUrlFixtures = [
     domain: 'github.com',
     repo: 'darthjee/arcanum'
   }],
+  ['parses an ssh.github.com ssh-over-443 origin url, keeping the raw domain', 'ssh://git@ssh.github.com:443/darthjee/arcanum.git\n', {
+    domain: 'ssh.github.com',
+    repo: 'darthjee/arcanum'
+  }],
   ['parses an ssh:// origin url without a user', 'ssh://github.com/darthjee/arcanum.git\n', {
     domain: 'github.com',
     repo: 'darthjee/arcanum'
@@ -81,6 +85,34 @@ function repoPathResolutionCases(methodName, buildExpected) {
 }
 
 describe('Origin', () => {
+  describe('.normalizeDomain', () => {
+    it('maps ssh.github.com to github.com', () => {
+      expect(Origin.normalizeDomain('ssh.github.com')).toBe('github.com');
+    });
+
+    it('leaves github.com unchanged', () => {
+      expect(Origin.normalizeDomain('github.com')).toBe('github.com');
+    });
+
+    it('leaves an unknown host unchanged', () => {
+      expect(Origin.normalizeDomain('github.enterprise.example.com')).toBe('github.enterprise.example.com');
+    });
+  });
+
+  describe('.isGithub', () => {
+    it('is true for github.com', () => {
+      expect(Origin.isGithub('github.com')).toBeTrue();
+    });
+
+    it('is true for ssh.github.com', () => {
+      expect(Origin.isGithub('ssh.github.com')).toBeTrue();
+    });
+
+    it('is false for an unknown host', () => {
+      expect(Origin.isGithub('github.enterprise.example.com')).toBeFalse();
+    });
+  });
+
   describe('#resolve', () => {
     remoteUrlFixtures.forEach(([description, url, expected]) => {
       it(description, async () => {
@@ -120,6 +152,16 @@ describe('Origin', () => {
 
       await expectAsync(origin.resolveWithRef('/repo')).toBeResolvedTo({
         domain: 'github.com',
+        repo: 'darthjee/arcanum',
+        repoRef: 'darthjee/arcanum'
+      });
+    });
+
+    it('leaves the repoRef unqualified for an ssh.github.com origin, keeping the raw domain', async () => {
+      const origin = originWithStdout('ssh://git@ssh.github.com:443/darthjee/arcanum.git\n');
+
+      await expectAsync(origin.resolveWithRef('/repo')).toBeResolvedTo({
+        domain: 'ssh.github.com',
         repo: 'darthjee/arcanum',
         repoRef: 'darthjee/arcanum'
       });

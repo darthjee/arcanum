@@ -4,6 +4,14 @@ import { promisify } from 'node:util';
 const defaultExecFileAsync = promisify(execFile);
 
 /**
+ * GitHub host aliases, mapped to their canonical web/API domain.
+ * `ssh.github.com` is GitHub's SSH-over-443 host: it has no web UI or
+ * API of its own, so it is treated as `github.com` everywhere a
+ * GitHub-ness decision, `gh -R` repo reference, or web URL is built.
+ */
+const GITHUB_DOMAIN_ALIASES = Object.freeze({ 'ssh.github.com': 'github.com' });
+
+/**
  * Resolves a git repo's `origin` remote into a GitHub domain and
  * owner/repo path, mirroring `arcanum/_lib/origin.sh`'s
  * `get_domain`/`get_repo_path` (`_load_origin`'s ssh/https parsing).
@@ -20,6 +28,25 @@ class Origin {
   constructor({ execFileAsync = defaultExecFileAsync, repoContext } = {}) {
     this._execFileAsync = execFileAsync;
     this._repoContext = repoContext;
+  }
+
+  /**
+   * Normalize a git remote host into its canonical GitHub domain.
+   * @param {string} domain - the raw remote host (e.g. `ssh.github.com`).
+   * @returns {string} the aliased domain (e.g. `github.com`), or `domain`
+   *   unchanged when it has no alias.
+   */
+  static normalizeDomain(domain) {
+    return GITHUB_DOMAIN_ALIASES[domain] ?? domain;
+  }
+
+  /**
+   * Whether a git remote host is github.com (including its aliases).
+   * @param {string} domain - the raw remote host.
+   * @returns {boolean} true when `domain` normalizes to `github.com`.
+   */
+  static isGithub(domain) {
+    return Origin.normalizeDomain(domain) === 'github.com';
   }
 
   /**
@@ -76,8 +103,11 @@ class Origin {
   /**
    * Resolve `<repoPath>`'s `origin` remote into `{ domain, repo,
    * repoRef }`, where `repoRef` is the (possibly domain-qualified) repo
-   * reference used in error/success messages, mirroring `origin.sh`'s
-   * `get_repo_ref`.
+   * reference used in error/success messages and `gh -R`. Mirrors
+   * `origin.sh`'s `get_repo_ref`, except that the github.com decision uses
+   * the normalized domain (see `normalizeDomain`): an `ssh.github.com`
+   * remote yields the bare `<owner>/<repo>` here, while bash still
+   * domain-qualifies it (issue #453). The returned `domain` stays raw.
    * @param {string} [repoPath] - the target repo's local checkout path;
    *   falls back to `this._repoContext.repoPath` when omitted (see
    *   `resolve()`). An explicitly passed `repoPath` wins over the
@@ -87,7 +117,7 @@ class Origin {
    */
   async resolveWithRef(repoPath) {
     const { domain, repo } = await this.resolve(repoPath);
-    const repoRef = domain === 'github.com' ? repo : `${domain}/${repo}`;
+    const repoRef = Origin.isGithub(domain) ? repo : `${domain}/${repo}`;
 
     return { domain, repo, repoRef };
   }
