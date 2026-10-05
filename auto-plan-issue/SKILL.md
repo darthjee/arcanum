@@ -12,3 +12,5 @@ Spawn:
 > Agent(subagent_type: "architect", prompt: "Read steps/run.md (resolved relative to the `auto-plan-issue` skill folder) and follow it. ARGUMENTS: `<raw skill arguments>` REPO_PATH: `<resolved_path>`")
 
 Wait for the agent to finish, then relay its final report to the user verbatim — do not summarize or reinterpret it.
+
+If the report's last line is `AUTO_NEXT=<cmd>` (only a top-level run whose `next_step.auto.auto-plan-issue` is `true` prints it; see the Auto-next section of steps/run.md), relay everything above that line, but not the line itself. Then invoke `<cmd>` (always `/loop /auto-resolve-issue <id>`) inline, in the same session, through the `loop` skill (`Skill(loop, "/auto-resolve-issue <id>")`), as a **chained** top-level run — no `NESTED=true`. It prints its own report.

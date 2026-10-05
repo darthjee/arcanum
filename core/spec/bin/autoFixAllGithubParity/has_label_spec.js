@@ -68,10 +68,10 @@ describe('auto-fix-all-github parity (shell vs. native) — has-label', () => {
     });
   });
 
-  it('matches shell exit code (1) when the label fetch fails', async () => {
+  it('matches shell exit code (2) when the label fetch fails', async () => {
     await expectHasLabelParity({
       args: ['5', 'Epic'],
-      code: 1,
+      code: 2,
       ghVars: { FAKE_GH_ISSUE_LABELS: 'Epic', FAKE_GH_ISSUE_VIEW_FAIL: '1' },
       fetchVars: { FAKE_FETCH_ISSUE_LABELS: 'Epic', FAKE_FETCH_ISSUE_VIEW_FAIL: '1' }
     });

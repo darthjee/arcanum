@@ -23,14 +23,14 @@ If no numeric id can be parsed, or the script exits non-zero (e.g. no issue file
 Otherwise, parse the key=value output to obtain `ISSUE_FILE`, `PLAN_DIR`, `PLAN_FILE`, and `PLAN_EXISTS`.
 
 - Read `ISSUE_FILE` to understand the issue.
-- If `PLAN_EXISTS=true`, a plan already exists for this issue. Read the existing file(s) in `PLAN_DIR`. This skill never overwrites an existing plan, so write and commit nothing, and end with the `success` report (see [Closing report](#closing-report)):
+- If `PLAN_EXISTS=true`, a plan already exists for this issue. Read the existing file(s) in `PLAN_DIR`. This skill never overwrites an existing plan, so write and commit nothing. On a top-level run, first run [Auto-next](#auto-next). Then end with the `success` report (see [Closing report](#closing-report)):
 
   ```bash
   ../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill auto-plan-issue --status success --issue <id> \
-    --summary "Plan for #<id> already exists; nothing was written." --next "/auto-resolve-issue <id>"
+    --summary "Plan for #<id> already exists; nothing was written." --next "/loop /auto-resolve-issue <id>"
   ```
 
-  > With `NESTED=true`, drop `--next` and add `--nested`, then relay the `FINISH_*` block to your caller (see [Nested runs](#nested-runs)).
+  > With `NESTED=true`, skip [Auto-next](#auto-next), drop `--next` and add `--nested`, then relay the `FINISH_*` block to your caller (see [Nested runs](#nested-runs)).
 
 ## Step 2 — Identify the project folder and explore the codebase
 
@@ -66,14 +66,35 @@ If it exits non-zero, **fail with** `commit_plan.sh`, with `--issue <id>` (see [
 
 ## Step 6 — Done
 
-Do not ask for confirmation and do not invoke any fix/PR skill — that orchestration belongs to a separate skill. Print the `success` report and relay it verbatim (see [Closing report](#closing-report)):
+Do not ask for confirmation and do not invoke any fix/PR skill — that orchestration belongs to a separate skill. The one exception is the opt-in chain in [Auto-next](#auto-next), which only hands `/loop /auto-resolve-issue <id>` on when `next_step.auto.auto-plan-issue` is `true`.
+
+On a top-level run, first run [Auto-next](#auto-next). Then print the `success` report and relay it verbatim (see [Closing report](#closing-report)):
 
 ```bash
 ../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill auto-plan-issue --status success --issue <id> \
-  --summary "Plan for #<id> written and committed in <PLAN_DIR>." --next "/auto-resolve-issue <id>"
+  --summary "Plan for #<id> written and committed in <PLAN_DIR>." --next "/loop /auto-resolve-issue <id>"
 ```
 
-With `NESTED=true`, drop `--next` and add `--nested` (see [Nested runs](#nested-runs)).
+With `NESTED=true`, skip [Auto-next](#auto-next), drop `--next` and add `--nested` (see [Nested runs](#nested-runs)).
+
+## Auto-next
+
+Used by both success exits (Step 1's "plan already exists" path and Step 6), **only on a top-level run**. A nested run (`NESTED=true`) never calls `auto_next.sh` and never chains: it returns its `FINISH_*` block as usual.
+
+Before printing the success report, run:
+
+```bash
+scripts/auto_next.sh "$REPO_PATH" <id>
+```
+
+> Resolve `scripts/auto_next.sh` relative to the `auto-plan-issue` skill folder. It decides whether to chain: it checks that HEAD is `issue-<id>`, reads `next_step.auto.auto-plan-issue`, and pushes the plan commit before agreeing to chain. It prints `CHAIN=yes`, or `CHAIN=no` plus `REASON=branch|config|push`, and exits `0`. On a usage error or a failed config read it prints nothing on stdout, an error on stderr, and exits `1`. When it chains, its stderr carries the `auto-continuing: ...` notice.
+
+Then print the success report as usual (`--next "/loop /auto-resolve-issue <id>"`), and:
+
+- **`CHAIN=yes`**: print the `auto-continuing: ...` notice line from its stderr, then the report, then one last line, exactly `AUTO_NEXT=/loop /auto-resolve-issue <id>`. The coordinator in [SKILL.md](../SKILL.md) reads that line and runs the chain (see there). Do not invoke `/loop` or `auto-resolve-issue` yourself.
+- **`CHAIN=no` with `REASON=push`**: after the report, add one line saying the plan push failed so the chain was skipped, quoting the git error from its stderr. Then end.
+- **`CHAIN=no`** (any other reason): end after the report, as without Auto-next.
+- **exit `1`**: after the report, add one line saying the auto-next check failed, quoting its stderr. Then end.
 
 ## Closing report
 
@@ -81,12 +102,12 @@ Every exit of this skill ends with exactly one report printed by the shared scri
 
 ```bash
 ../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill auto-plan-issue --status success|failed \
-  --summary "<one line>" [--issue <id>] [--next "/auto-resolve-issue <id>"] [--nested]
+  --summary "<one line>" [--issue <id>] [--next "/loop /auto-resolve-issue <id>"] [--nested]
 ```
 
 > Resolve `../arcanum/_lib/finish_report.sh` relative to the `auto-plan-issue` skill folder, the same folder the `scripts/...` calls in these steps resolve against. This skill never asks the user anything, so there is no `declined` status. It changes no labels, so `--label-change` is never passed.
 
-- Relay its stdout **verbatim** as the last thing you print. Never hand-format, extend, or paraphrase it.
+- Relay its stdout **verbatim** as the last thing you print (only the [Auto-next](#auto-next) line or note may follow it). Never hand-format, extend, or paraphrase it.
 - Pass only what actually happened: `--issue <id>` only once an id is known.
 - `failed` reports never carry `--next`.
 - If the script itself exits non-zero (usage error), say in one line that the closing report could not be rendered, and end.

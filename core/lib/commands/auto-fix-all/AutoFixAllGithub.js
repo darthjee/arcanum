@@ -143,9 +143,10 @@ class AutoFixAllGithub {
   /**
    * `github.sh has-label`: wraps `IssueTagger#hasLabel` (a
    * case-insensitive, whole-name, literal match) with the caller-facing
-   * `DispatchFailure('', 1)` around any failure (repo/token/label-fetch)
-   * or an absent label — `IssueTagger#hasLabel` itself only throws a
-   * plain `Error`, so this facade owns that conversion. The
+   * exit codes: `DispatchFailure('', 1)` for an absent label and
+   * `DispatchFailure('', 2)` when the labels could not be determined
+   * (repo/token/label-fetch failure) — `IssueTagger#hasLabel` itself only
+   * throws a plain `Error`, so this facade owns that conversion. The
    * `has-shipit-label` alias in `github.sh` dispatches here with
    * `name = 'shipit'`.
    * @param {string} id - the numeric issue id.
@@ -162,7 +163,7 @@ class AutoFixAllGithub {
     try {
       found = await this._issueTagger().hasLabel(id, name);
     } catch {
-      throw new DispatchFailure('', 1);
+      throw new DispatchFailure('', 2);
     }
 
     if (!found) {
