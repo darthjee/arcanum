@@ -139,12 +139,14 @@ Derive the **refine change** from `mark-refined`'s output:
 Only reached right after a successful push above. Offer planning through the shared `/dev/tty` prompt, falling back to a structured `AskUserQuestion` when no TTY is available (TTY-first with `AskUserQuestion` fallback) — never a free-text chat yes/no:
 
 ```bash
-../../arcanum/_lib/next_step_prompt.sh --repo "$REPO_PATH" --command "/auto-plan-issue <id>"
+../../arcanum/_lib/next_step_prompt.sh --repo "$REPO_PATH" --command "/auto-plan-issue <id>" --auto-key discuss-issue
 ```
 
-> Resolve `../../arcanum/_lib/next_step_prompt.sh` relative to this file's directory. It prints `CHOICE=yes` / `CHOICE=no` (exit 0), `CHOICE=chat` + `CHAT_CONTEXT=next_step` (exit 3), `FALLBACK=chat` + one `COMMAND=<cmd>` line per `--command`, in order (exit 4, no TTY available), or nothing with an error on stderr (exit 1, prompt failed). The full contract lives in [Next-step offer](../../docs/agents/architecture/skill-finish.md#next-step-offer-interactive-skills).
+> Resolve `../../arcanum/_lib/next_step_prompt.sh` relative to this file's directory. It prints `CHOICE=yes` / `CHOICE=no` (exit 0) — with `--auto-key` and `next_step.auto.<skill>` set to `true`, `CHOICE=yes` followed by `AUTO=true` (exit 0, no prompt, an `auto-continuing: ...` notice on stderr) — `CHOICE=chat` + `CHAT_CONTEXT=next_step` (exit 3), `FALLBACK=chat` + one `COMMAND=<cmd>` line per `--command`, in order (exit 4, no TTY available), or nothing with an error on stderr (exit 1, prompt failed). The full contract lives in [Next-step offer](../../docs/agents/architecture/skill-finish.md#next-step-offer-interactive-skills).
 
 On **exit 4** (`FALLBACK=chat`, no TTY), ask once with `AskUserQuestion` before picking a path below — the question names the exact command from the `COMMAND=` line, with options **Yes** (plan it now), **No**, **Chat** — and treat the answer as the matching choice: Yes → `CHOICE=yes` (plan it), No → `CHOICE=no` (push only), Chat → `CHOICE=chat` (push only). A free-text "Other" answer → `CHOICE=chat`, with the text as context; a dismissed or rejected question → `CHOICE=no`. If `AskUserQuestion` is unavailable (headless, tool denied), take the push-only path and, in step 3, print "Next step: `/auto-plan-issue <id>` (run it manually)" and end.
+
+On **`CHOICE=yes` with `AUTO=true`** (`next_step.auto.discuss-issue` is `true`), relay the `auto-continuing: ...` stderr notice line to the user, then take the plan-it path exactly as on `CHOICE=yes`.
 
 ### `CHOICE=no`, `CHOICE=chat` (exit 3, or mapped from exit 4), or exit 1 — push only
 
@@ -171,7 +173,7 @@ The issue is already pushed; no branch or plan is created.
 
 Do not show a second offer on this path.
 
-### `CHOICE=yes` (or mapped from exit 4) — plan it
+### `CHOICE=yes` (with or without `AUTO=true`, or mapped from exit 4) — plan it
 
 1. Run `../../auto-fix-all/scripts/checkout_from_main.sh "$REPO_PATH" <id>` — a cross-skill reference to the same reuse-and-merge branch bootstrap script `auto-fix-all` uses (resolved relative to this file's directory: `../../auto-fix-all/scripts/checkout_from_main.sh`). It fetches `origin`, reuses branch `issue-<id>` merged up to date with `origin/main` if it already exists locally or remotely, or creates it fresh from `origin/main` otherwise. If it exits non-zero, **fail with** `checkout_from_main.sh` (passing the refine change). Otherwise parse `STATUS` from its output.
    - **`STATUS=conflict`**: apply the same responsible-agent-selection approach as [`auto-resolve-issue/steps/handle_comment.md`](../../auto-resolve-issue/steps/handle_comment.md)'s "Choosing the responsible agent(s)" section, treating each conflicted path it printed like a failed check-run name — dispatch the responsible specialist(s) (or resolve it yourself, as architect, if none seem responsible) to fix the conflict, then run `git -C "$REPO_PATH" add` on the resolved paths and `git -C "$REPO_PATH" commit` with no message argument (the merge-commit message `git merge --no-edit` already prepared is reused as-is) — never bare `git add`/`git commit`, which would operate against the Bash tool's ambient cwd instead of the target repo. No user interaction. If the conflict cannot be resolved, **fail with** `checkout_from_main.sh (merge conflict)`.
@@ -201,12 +203,15 @@ Do not show a second offer on this path.
 8. Offer implementation:
 
    ```bash
-   ../../arcanum/_lib/next_step_prompt.sh --repo "$REPO_PATH" --command "/auto-resolve-issue <id>"
+   ../../arcanum/_lib/next_step_prompt.sh --repo "$REPO_PATH" --command "/loop /auto-resolve-issue <id>" --auto-key auto-plan-issue
    ```
 
-   - **`CHOICE=yes`**: invoke `/auto-resolve-issue <id>` inline, in the same session, as a **chained** top-level run — no `NESTED=true`. It prints its own report and next step.
+   > Same output contract as the first offer above. The `next_step.auto.auto-plan-issue` key names the step that just finished (a plan exists), so it gates this offer.
+
+   - **`CHOICE=yes`**: invoke `/loop /auto-resolve-issue <id>` inline, in the same session, through the `loop` skill (`Skill(loop, "/auto-resolve-issue <id>")`), as a **chained** top-level run — no `NESTED=true`. It prints its own report and next step.
+   - **`CHOICE=yes` with `AUTO=true`**: relay the `auto-continuing: ...` stderr notice line to the user, then proceed exactly as on `CHOICE=yes` (a chained top-level run, never `NESTED=true`).
    - **`CHOICE=no`**: end.
-   - **`CHOICE=chat`** (exit 3): return to the conversation. Do not run `auto-resolve-issue` unless the user asks for it in chat.
+   - **`CHOICE=chat`** (exit 3): return to the conversation. Do not run `/loop /auto-resolve-issue <id>` unless the user asks for it in chat.
    - **exit 1**: say in one line that the next-step prompt failed: <stderr>, then end.
    - **exit 4** (`FALLBACK=chat`, no TTY): ask once with `AskUserQuestion` — the question names the exact command from the `COMMAND=` line(s), with options **Yes** (run it now), **No**, **Chat** — then follow the matching branch above: Yes → `CHOICE=yes`, No → `CHOICE=no`, Chat → `CHOICE=chat`. A free-text "Other" answer → `CHOICE=chat`, with the text as context; a dismissed or rejected question → `CHOICE=no`. If `AskUserQuestion` is unavailable (headless, tool denied), print "Next step: `<cmd>` (run it manually)" for each command and end.
 
