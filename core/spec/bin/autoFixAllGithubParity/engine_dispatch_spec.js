@@ -115,7 +115,8 @@ describe('auto-fix-all-github engine_dispatch routing (via the real github.sh sh
   // `has-label` and its `has-shipit-label` alias (issue #692) share the
   // single `auto-fix-all-github-has-label` key: in native mode both must
   // reach `AutoFixAllGithub#hasLabel`, which fails at token resolution
-  // and (by contract) exits 1 silently — whereas the shell side, with the
+  // and (by contract, issue #715: labels could not be determined) exits 2
+  // silently — whereas the shell side, with the
   // same fake `gh` labels, would exit 0. An empty stderr also rules out
   // engine_dispatch's "no native implementation" error.
   describe('has-label / has-shipit-label (engine.mode=native)', () => {
@@ -137,7 +138,7 @@ describe('auto-fix-all-github engine_dispatch routing (via the real github.sh sh
             { ...process.env, PATH: `${fakeGh.binDir}:${process.env.PATH}`, FAKE_GH_ISSUE_LABELS: 'Epic\nshipit' }
           );
 
-          expect(result.code).toEqual(1);
+          expect(result.code).toEqual(2);
           expect(result.stdout).toEqual('');
           expect(result.stderr).toEqual('');
         } finally {

@@ -58,13 +58,13 @@ describe('AutoFixAllGithub (label subcommands)', () => {
       expect(thrown.exitCode).toEqual(1);
     });
 
-    it('rejects with an empty-stdout DispatchFailure (exit 1) when the labels fetch fails', async () => {
+    it('rejects with an empty-stdout DispatchFailure (exit 2) when the labels fetch fails', async () => {
       const github = createAutoFixAllGithub({ fetchFn: fakeGithubFetch({ issueViewFails: true }) });
       const thrown = await captureRejection(github.hasLabel('5', 'Epic'));
 
       expect(thrown).toBeInstanceOf(DispatchFailure);
       expect(thrown.stdout).toEqual('');
-      expect(thrown.exitCode).toEqual(1);
+      expect(thrown.exitCode).toEqual(2);
     });
   });
 
