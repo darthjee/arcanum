@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Top-level chain decision for the auto-plan-issue skill — see
-# docs/agents/specs/skill-auto-next.md and
-# docs/agents/plans/715-auto-next-skill-wiring/plan.md for the full
+# docs/agents/architecture/skill-finish.md#next-step-map for the full
 # design/shared contracts. Plain bash, NOT engine-dispatched (like
 # arcanum/_lib/next_step_prompt.sh, which it calls). Called only by a
 # top-level auto-plan-issue run (never with NESTED=true), on both success

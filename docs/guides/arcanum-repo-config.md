@@ -60,7 +60,7 @@ behavior directly:
 | `git.email` | string (`{agent}` template) | — | local → repo → global | Per-agent commit-author email pattern used by `commit_change.sh`/`commit_issue.sh`/`commit_plan.sh` (see `arcanum/_lib/agent_email.sh`). See [`arcanum-global-config.md`](arcanum-global-config.md). |
 | `git.safe_branch` | string | `origin/main` | local state only | The ref `arcanum/_lib/safe_branch.sh` checks out via `enhance-issue`/`discuss-issue`/`arcanum-split-issue`. See [Branch Bootstrap and Merge Conflicts](../agents/architecture/branch-bootstrap-and-merge-conflicts.md). |
 | `git.omit_model_coauthor` | boolean | `false` | local → repo → global | When `true`, `auto-fix-issue`/`auto-new-issue`/`auto-plan-issue`'s commit scripts (`commit_change.sh`, `commit_issue.sh`, `commit_plan.sh`) skip emitting the model's `Co-Authored-By` trailer, keeping only the agent's own line. Resolved through the full 3-tier chain, same as `git.email` — see [`arcanum-global-config.md`](arcanum-global-config.md). |
-| `git.merge_body_mode` | string (`empty`/`full`/`coauthors`) | `empty` | local → repo → global | Controls the squash-merge commit body used by `auto-fix-all`'s `github.sh pr-merge` (`cmd_pr_merge`, see `arcanum/_lib/merge_body.sh`). `empty` keeps today's behavior (`--body ""`); `full` omits `--body` so GitHub/`gh` picks its own default squash body; `coauthors` builds `--body` from the deduped `Co-authored-by:` trailers found across the PR's commits (excluding the merger's own login, and the model's own line when `git.omit_model_coauthor` is `true`), falling back to `full`'s behavior if the resulting list is empty. An unrecognized value warns to stderr and falls back to `empty`. Resolved through the full 3-tier chain, same as `git.email`/`git.omit_model_coauthor` — see [`arcanum-global-config.md`](arcanum-global-config.md). Seeded, optionally, by three per-scope migrations (`arcanum/migrations/repos/next/`, `applies_to`: `local`/`repo`/`global`). |
+| `git.merge_body_mode` | string (`empty`/`full`/`coauthors`) | `empty` | local → repo → global | Controls the squash-merge commit body used by `auto-fix-all`'s `github.sh pr-merge` (`cmd_pr_merge`, see `arcanum/_lib/merge_body.sh`). `empty` keeps today's behavior (`--body ""`); `full` omits `--body` so GitHub/`gh` picks its own default squash body; `coauthors` builds `--body` from the deduped `Co-authored-by:` trailers found across the PR's commits (excluding the merger's own login, and the model's own line when `git.omit_model_coauthor` is `true`), falling back to `full`'s behavior if the resulting list is empty. An unrecognized value warns to stderr and falls back to `empty`. Resolved through the full 3-tier chain, same as `git.email`/`git.omit_model_coauthor` — see [`arcanum-global-config.md`](arcanum-global-config.md). Seeded, optionally, by three per-scope migrations (`arcanum/migrations/repos/0.16.1/001`–`003`, `applies_to`: `local`/`repo`/`global`). |
 
 A `next_step`-namespaced key per skill lets a next-step offer
 continue automatically instead of prompting:
@@ -69,14 +69,16 @@ continue automatically instead of prompting:
 | --- | --- | --- | --- | --- |
 | `next_step.auto.enhance-issue` | boolean | `false` | local → repo → global | When `true`, `enhance-issue`'s `/discuss-issue <id>` offer is skipped and the command runs automatically. |
 | `next_step.auto.discuss-issue` | boolean | `false` | local → repo → global | When `true`, `discuss-issue`'s first offer (`/auto-plan-issue <id>`) is skipped and the command runs automatically. |
-| `next_step.auto.auto-plan-issue` | boolean | `false` | local → repo → global | When `true`, the `/auto-resolve-issue <id>` offer made once a plan exists (`auto-plan-issue`, `discuss-issue`'s second offer, `plan-issue`) is skipped and the command runs automatically. |
+| `next_step.auto.auto-plan-issue` | boolean | `false` | local → repo → global | When `true`, the `/loop /auto-resolve-issue <id>` offer made once a plan exists (`auto-plan-issue`, `discuss-issue`'s second offer, `plan-issue`) is skipped and the command runs automatically. |
 
 Only the JSON boolean `true` enables a key; the string `"true"` or any
 other value counts as `false`. Each key is read by
 `arcanum/_lib/next_step_prompt.sh --auto-key <skill>` (see
-[Skill Finish](../agents/architecture/skill-finish.md#auto-next)). The
-keys take effect once the skills pass `--auto-key`, which is tracked
-by #715. Run `/arcanum-check-config next_step.auto.<skill>` to see
+[Skill Finish](../agents/architecture/skill-finish.md#auto-next)). To
+set them, run `/init-claude` (its auto-next step writes repo config)
+or `/arcanum-migrate`, which offers three skippable migrations, one
+per tier (local, repo, global), each asking `[Y]es/[N]o/[S]kip` per
+key. An explicit `false` shadows a `true` in a lower tier. Run `/arcanum-check-config next_step.auto.<skill>` to see
 which tier a value resolves from.
 
 ## A third, global tier on top of this pair

@@ -56,9 +56,14 @@ there.
 
 ## Which keys use it
 
-Today, only `git.email` — the per-agent commit-author email pattern
-used by `commit_change.sh`/`commit_issue.sh`/`commit_plan.sh` (see
-`arcanum/_lib/agent_email.sh`) — is wired into the global chain. Other
+`git.email` — the per-agent commit-author email pattern used by
+`commit_change.sh`/`commit_issue.sh`/`commit_plan.sh` (see
+`arcanum/_lib/agent_email.sh`) — is wired into the global chain, along
+with `git.omit_model_coauthor`, `git.merge_body_mode` and the
+`next_step.auto.<skill>` keys (see
+[`arcanum-repo-config.md`](arcanum-repo-config.md)). For the latter,
+`/arcanum-migrate` offers a skippable global-tier migration that asks
+`[Y]es/[N]o/[S]kip` per key. Other
 namespaced keys (e.g. `auto-fix-all`'s `ignored_check_patterns`) still
 only read the two per-repo files; they may adopt the global chain later,
 feature by feature.

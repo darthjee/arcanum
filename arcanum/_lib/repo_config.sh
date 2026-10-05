@@ -108,7 +108,10 @@ repo_config_seed() {
 #   same file, so they must share a lock). Ensures <new_file> exists
 #   (seeding from <legacy_file> under <namespace> if needed, same rule
 #   as repo_config_seed), then sets .<namespace>.<key> = <json_value>
-#   on top, atomically.
+#   on top, atomically. A dotted <key> (e.g. "auto.enhance-issue") is
+#   a nested path, mirroring repo_config_read: missing intermediate
+#   objects are created and sibling keys are kept. A flat key (no dot)
+#   is a plain top-level key under <namespace>.
 repo_config_write() {
   local new_file="$1" legacy_file="$2" namespace="$3" key="$4" json_value="$5"
   mkdir -p "$(dirname "$new_file")"
@@ -123,7 +126,7 @@ repo_config_write() {
   fi
 
   jq --arg ns "$namespace" --arg k "$key" --argjson v "$json_value" \
-    '.[$ns] = ((.[$ns] // {}) | .[$k] = $v)' <<<"$base" > "${new_file}.tmp"
+    '.[$ns] = ((.[$ns] // {}) | setpath(($k | split(".")); $v))' <<<"$base" > "${new_file}.tmp"
   mv "${new_file}.tmp" "$new_file"
 
   _release_lock

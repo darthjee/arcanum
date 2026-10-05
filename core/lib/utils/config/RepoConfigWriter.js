@@ -30,13 +30,19 @@ class RepoConfigWriter {
    * Mirrors `repo_config_write <new_file> <legacy_file> <namespace>
    * <key> <json_value>`: under `<newFile>.lock`, seeds `.<namespace>`
    * from the full contents of `legacyFile` when `newFile` lacks it,
-   * then sets `.<namespace>.<key> = value`.
+   * then sets `.<namespace>.<key> = value`. A dotted `key` (e.g.
+   * `auto.enhance-issue`) is a nested path under `namespace`, mirroring
+   * the shell's `setpath(($k | split(".")); $v)`: missing intermediate
+   * objects are created and sibling keys are kept. A flat key behaves
+   * as a plain `.<namespace>[key] = value`.
    * @param {object} args - the write's arguments.
    * @param {string} args.newFile - the namespaced config file's path.
-   * @param {string} args.legacyFile - the legacy, feature-specific
-   *   config file's path (only read, as a seed).
+   * @param {string} [args.legacyFile] - the legacy, feature-specific
+   *   config file's path (only read, as a seed); empty/absent when the
+   *   namespace has no legacy file (the shell's `""`).
    * @param {string} args.namespace - the top-level namespace key.
-   * @param {string} args.key - the key to set under `namespace`.
+   * @param {string} args.key - the key (or dot-separated path) to set
+   *   under `namespace`.
    * @param {*} args.value - the JSON-serializable value to set.
    * @returns {Promise<void>} resolves once written and unlocked.
    */
@@ -52,7 +58,7 @@ class RepoConfigWriter {
         }
       }
 
-      this._setNamespaced(config, namespace, key, value);
+      this._setNamespaced(config, namespace, key.split('.'), value);
 
       return config;
     });
@@ -73,7 +79,7 @@ class RepoConfigWriter {
       const config = await this._readBase(file);
 
       if (namespace) {
-        this._setNamespaced(config, namespace, 'version', version);
+        this._setNamespaced(config, namespace, ['version'], version);
       } else {
         config.version = version;
       }
@@ -138,12 +144,17 @@ class RepoConfigWriter {
 
   /**
    * Mirrors `jq --slurpfile legacy <legacyFile> '... $legacy[0]'`.
-   * @param {string} legacyFile - the legacy config file's path.
+   * @param {string} [legacyFile] - the legacy config file's path; an
+   *   empty/absent path never exists.
    * @returns {Promise<{exists: boolean, value: *}>} whether the legacy
    *   file exists, and its first JSON value (`null` when empty).
    * @throws {Error} when the legacy file exists but is not valid JSON.
    */
   async _readLegacy(legacyFile) {
+    if (!legacyFile) {
+      return { exists: false, value: undefined };
+    }
+
     let raw;
 
     try {
@@ -164,25 +175,64 @@ class RepoConfigWriter {
   }
 
   /**
-   * Mirrors jq's `.[$ns] = ((.[$ns] // {}) | .[$k] = $v)`.
+   * Mirrors jq's `.[$ns] = ((.[$ns] // {}) | setpath($path; $v))`.
    * @param {object} config - the config object, mutated in place.
    * @param {string} namespace - the namespace key.
-   * @param {string} key - the key to set under `namespace`.
+   * @param {string[]} keyPath - the path to set under `namespace`.
    * @param {*} value - the value to set.
    * @returns {void}
    * @throws {Error} when `.<namespace>` holds a non-object value.
    */
-  _setNamespaced(config, namespace, key, value) {
+  _setNamespaced(config, namespace, keyPath, value) {
     let section = config[namespace];
 
     if (section === undefined || section === null || section === false) {
       section = {};
-    } else if (typeof section !== 'object' || Array.isArray(section)) {
+    } else if (!RepoConfigWriter._isObject(section)) {
       throw new Error(`Cannot index .${namespace}: not a JSON object`);
     }
 
-    section[key] = value;
+    RepoConfigWriter._setPath(section, keyPath, value, namespace);
     config[namespace] = section;
+  }
+
+  /**
+   * Mirrors jq's `setpath`: walks `keyPath` from `target`, creating a
+   * `{}` for every missing or `null` intermediate, then sets the leaf.
+   * @param {object} target - the object to set the path in, mutated.
+   * @param {string[]} keyPath - the (non-empty) path to set.
+   * @param {unknown} value - the leaf value.
+   * @param {string} prefix - the path walked so far, for error messages.
+   * @returns {void}
+   * @throws {Error} when an intermediate holds a non-object value.
+   */
+  static _setPath(target, keyPath, value, prefix) {
+    const [head, ...rest] = keyPath;
+
+    if (rest.length === 0) {
+      target[head] = value;
+      return;
+    }
+
+    const current = `${prefix}.${head}`;
+    let child = target[head];
+
+    if (child === undefined || child === null) {
+      child = {};
+    } else if (!RepoConfigWriter._isObject(child)) {
+      throw new Error(`Cannot index .${current}: not a JSON object`);
+    }
+
+    RepoConfigWriter._setPath(child, rest, value, current);
+    target[head] = child;
+  }
+
+  /**
+   * @param {unknown} value - any parsed JSON value.
+   * @returns {boolean} whether `value` is a (non-array) JSON object.
+   */
+  static _isObject(value) {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 }
 

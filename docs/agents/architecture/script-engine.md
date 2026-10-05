@@ -27,7 +27,7 @@ Fallback and failure rules, given the resolved `engine.mode` and the migration-s
 
 ### Native-only entrypoints
 
-Existing entrypoints stay dual (shell + native). **New skills are native-only** (#680): their logic is a `core/lib` command with no `*_shell.sh` twin, and docker support is added later. `/arcanum-check-config` is the first one; `/arcanum-create-issue`'s `arcanum-create-issue-start` and `arcanum-create-issue-publish` commands (#690) follow the same pattern.
+Existing entrypoints stay dual (shell + native). **New skills are native-only** (#680): their logic is a `core/lib` command with no `*_shell.sh` twin, and docker support is added later. `/arcanum-check-config` is the first one; `/arcanum-create-issue`'s `arcanum-create-issue-start` and `arcanum-create-issue-publish` commands (#690) follow the same pattern, as does init-claude's `init-claude-set-next-step-auto` (#716, shim `init-claude/scripts/set_next_step_auto.sh`).
 
 A native-only shim calls `engine_dispatch` with the literal `--native-only` flag (in the same flag/env-var segment as `--prepend-repo-path`, before `--`) and an empty `""` in place of `<shell_script>`:
 

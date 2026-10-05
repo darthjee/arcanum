@@ -89,6 +89,10 @@ global_config_read() {
 #   Ensures the file's parent directory exists (mkdir -p), creating the
 #   file fresh if absent, then sets .<namespace>.<key> = <json_value>
 #   on top, preserving any other namespaces/content already present.
+#   A dotted <key> (e.g. "auto.enhance-issue") is a nested path,
+#   mirroring global_config_read: missing intermediate objects are
+#   created and sibling keys are kept. A flat key (no dot) is a plain
+#   top-level key under <namespace>.
 #   Default file permissions (644) — no extra restriction.
 #
 #   Degrades silently (warns on stderr, writes nothing, still exits 0)
@@ -122,7 +126,7 @@ global_config_write() {
   fi
 
   jq --arg ns "$namespace" --arg k "$key" --argjson v "$json_value" \
-    '.[$ns] = ((.[$ns] // {}) | .[$k] = $v)' <<<"$base" > "${file}.tmp"
+    '.[$ns] = ((.[$ns] // {}) | setpath(($k | split(".")); $v))' <<<"$base" > "${file}.tmp"
   mv "${file}.tmp" "$file"
 
   _release_lock
