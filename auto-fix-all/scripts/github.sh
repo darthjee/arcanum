@@ -33,7 +33,10 @@
 #   pr-merge <repo_path> [model_email]  Squash-merge the current branch's PR, print its URL
 #   cleanup-branch <repo_path> <id>     Delete the issue's remote and local branch, switch back to main
 #   has-label <repo_path> <id> <name>   Exit 0 if GitHub issue <id> has a label equal to <name>
-#                                       (case-insensitive, whole name, literal match), else exit 1
+#                                       (case-insensitive, whole name, literal match); exit 1
+#                                       if none matches (or on usage error); exit 2 if the
+#                                       labels could not be determined (gh user setup, repo
+#                                       ref resolution or `gh issue view` failed)
 #   has-shipit-label <repo_path> <id>   Alias for `has-label <repo_path> <id> shipit`
 #   add-tag <repo_path> <id> <tag>      Add a single tag to GitHub issue <id>
 #   remove-tag <repo_path> <id> <tag>   Remove a single tag from GitHub issue <id>
@@ -91,7 +94,7 @@ case "$SUBCOMMAND" in
     echo "  pr-state <repo_path>                Print STATE=<OPEN|MERGED|CLOSED> for the current branch's PR" >&2
     echo "  pr-merge <repo_path> [model_email]  Squash-merge the current branch's PR, print its URL" >&2
     echo "  cleanup-branch <repo_path> <id>     Delete the issue's remote and local branch, switch back to main" >&2
-    echo "  has-label <repo_path> <id> <name>   Exit 0 if GitHub issue <id> has a label equal to <name> (case-insensitive, literal), else exit 1" >&2
+    echo "  has-label <repo_path> <id> <name>   Exit 0 if GitHub issue <id> has a label equal to <name> (case-insensitive, literal); exit 1 if none matches, exit 2 if labels could not be determined" >&2
     echo "  has-shipit-label <repo_path> <id>   Alias for 'has-label <repo_path> <id> shipit'" >&2
     echo "  add-tag <repo_path> <id> <tag>      Add a single tag to GitHub issue <id>, mapped to a real GitHub label via arcanum/_lib/tags.sh" >&2
     echo "  remove-tag <repo_path> <id> <tag>   Remove a single tag from GitHub issue <id>, mapped to a real GitHub label via arcanum/_lib/tags.sh" >&2
