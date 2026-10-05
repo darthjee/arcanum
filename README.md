@@ -142,9 +142,11 @@ Arcanum configuration keys are resolved through a 3-tier chain, in order of prec
 | `monitor-issues.clear_context` | Clears context between `monitor-issues` cycles. |
 | `plan-issues.max-retry-count` | Max retries for GitHub issue creation in `arcanum/_lib/spawn_issue.sh` (default: 5). |
 | `plan-issues.error-sleep-time` | Seconds to sleep between retries in `arcanum/_lib/spawn_issue.sh` (default: 5). |
-| `next_step.auto.enhance-issue` | When `true`, skips `enhance-issue`'s `/discuss-issue` offer and runs it automatically (default: `false`; takes effect once #715 wires it in). |
-| `next_step.auto.discuss-issue` | When `true`, skips `discuss-issue`'s `/auto-plan-issue` offer and runs it automatically (default: `false`; takes effect once #715 wires it in). |
-| `next_step.auto.auto-plan-issue` | When `true`, skips the `/auto-resolve-issue` offer made once a plan exists and runs it automatically (default: `false`; takes effect once #715 wires it in). |
+| `next_step.auto.enhance-issue` | When `true`, skips `enhance-issue`'s `/discuss-issue` offer and runs it automatically (default: `false`). |
+| `next_step.auto.discuss-issue` | When `true`, skips `discuss-issue`'s `/auto-plan-issue` offer and runs it automatically (default: `false`). |
+| `next_step.auto.auto-plan-issue` | When `true`, skips the `/loop /auto-resolve-issue` offer made once a plan exists and runs it automatically (default: `false`). |
+
+The `next_step.auto.<skill>` keys can be set through `/init-claude` (writes repo config) or `/arcanum-migrate` (one skippable migration per tier: local, repo, global).
 
 **Example, showing every key together:**
 
