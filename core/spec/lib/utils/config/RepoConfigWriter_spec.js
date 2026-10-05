@@ -124,6 +124,17 @@ describe('RepoConfigWriter', () => {
       });
     });
 
+    it('skips seeding when no legacy file is given', async () => {
+      spyOn(writer._fs, 'readFile').and.callThrough();
+
+      await writePatterns({ legacyFile: '' });
+
+      expect(writer._fs.readFile).not.toHaveBeenCalledWith('', 'utf8');
+      expect(JSON.parse(await readFile(newFile, 'utf8'))).toEqual({
+        'auto-fix-all': { ignored_check_patterns: ['a', 'b'] }
+      });
+    });
+
     it('does not reseed when the namespace already exists', async () => {
       await seedFile(newFile, '{"auto-fix-all":{"kept":true}}');
       await seedFile(legacyFile, '{"legacy_key":1}');
@@ -186,6 +197,85 @@ describe('RepoConfigWriter', () => {
       await spied.write({ newFile, legacyFile, namespace: 'n', key: 'k', value: 1 });
 
       expect(renameSpy).toHaveBeenCalledWith(`${newFile}.tmp`, newFile);
+    });
+
+    describe('with a dotted key', () => {
+      /**
+       * @param {string} key - the dotted key under `next_step`.
+       * @param {unknown} value - the value to write.
+       * @returns {Promise<void>} resolves once written.
+       */
+      function writeNextStep(key, value) {
+        return writer.write({ newFile, legacyFile, namespace: 'next_step', key, value });
+      }
+
+      it('creates the missing intermediate objects', async () => {
+        await writeNextStep('auto.enhance-issue', true);
+
+        expect(await readFile(newFile, 'utf8')).toEqual(
+          '{\n  "next_step": {\n    "auto": {\n      "enhance-issue": true\n    }\n  }\n}\n'
+        );
+      });
+
+      it('keeps sibling keys at every level', async () => {
+        await seedFile(newFile, JSON.stringify({
+          version: '1.0.0',
+          next_step: { other: 1, auto: { 'discuss-issue': false } }
+        }));
+
+        await writeNextStep('auto.enhance-issue', true);
+
+        expect(await readFile(newFile, 'utf8')).toEqual(`${JSON.stringify({
+          version: '1.0.0',
+          next_step: { other: 1, auto: { 'discuss-issue': false, 'enhance-issue': true } }
+        }, null, 2)}\n`);
+      });
+
+      it('replaces an existing leaf in place', async () => {
+        await seedFile(newFile, '{"next_step":{"auto":{"enhance-issue":true,"discuss-issue":true}}}');
+
+        await writeNextStep('auto.enhance-issue', false);
+
+        expect(JSON.parse(await readFile(newFile, 'utf8'))).toEqual({
+          next_step: { auto: { 'enhance-issue': false, 'discuss-issue': true } }
+        });
+      });
+
+      it('treats a null intermediate as {}', async () => {
+        await seedFile(newFile, '{"next_step":{"auto":null}}');
+
+        await writeNextStep('auto.enhance-issue', true);
+
+        expect(JSON.parse(await readFile(newFile, 'utf8'))).toEqual({
+          next_step: { auto: { 'enhance-issue': true } }
+        });
+      });
+
+      it('creates several levels of nesting', async () => {
+        await writeNextStep('a.b.c', 1);
+
+        expect(JSON.parse(await readFile(newFile, 'utf8'))).toEqual({ next_step: { a: { b: { c: 1 } } } });
+      });
+
+      ['"x"', '[1]', '3', 'false'].forEach((raw) => {
+        it(`rejects when an intermediate holds ${raw}, releasing the lock`, async () => {
+          await seedFile(newFile, `{"next_step":{"auto":${raw}}}`);
+
+          await expectAsync(writeNextStep('auto.enhance-issue', true))
+            .toBeRejectedWithError('Cannot index .next_step.auto: not a JSON object');
+          expect(existsSync(`${newFile}.lock`)).toBeFalse();
+        });
+      });
+
+      it('leaves a flat key as a plain key under the namespace', async () => {
+        await seedFile(newFile, '{"next_step":{"auto":{"enhance-issue":true}}}');
+
+        await writeNextStep('flat', 'v');
+
+        expect(JSON.parse(await readFile(newFile, 'utf8'))).toEqual({
+          next_step: { auto: { 'enhance-issue': true }, flat: 'v' }
+        });
+      });
     });
   });
 
