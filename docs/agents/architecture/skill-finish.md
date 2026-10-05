@@ -107,10 +107,23 @@ Output and exit codes:
 After relaying a `success` report, an interactive skill runs:
 
 ```bash
-arcanum/_lib/next_step_prompt.sh --repo <repo_path> --command "<command>" [--command "<command>"]...
+arcanum/_lib/next_step_prompt.sh --repo <repo_path> --command "<command>" [--command "<command>"]... [--auto-key <skill>] [--no-prompt]
 ```
 
 It follows the "TTY-first with `AskUserQuestion` fallback" convention in [Per-Repo Migrations](per-repo-migrations.md#script-driven-interaction): it owns the prompt on `/dev/tty` whenever a terminal is available. When `/dev/tty` cannot be opened (as in some agent-driven sessions, where the Bash tool has no controlling terminal), it does not fail: it exits `4` with `FALLBACK=chat`, and the skill asks the same question through `AskUserQuestion`. Free-text chat yes/no stays forbidden. It is a plain bash script, not engine-dispatched, like `arcanum/migrations/run.sh`.
+
+### Auto-next
+
+Two optional flags let a next-step offer be skipped from config:
+
+- **`--auto-key <skill>`** reads `next_step.auto.<skill>` through `config_chain_read <repo_path> next_step auto.<skill>` (`arcanum/_lib/config_chain.sh`: local state, then repo config, then global config; see [Shared State & Configuration Files](shared-state-and-configuration.md#the-next_step-namespace)). `config_chain_read` prints compact JSON, so only the JSON boolean `true` enables it. Absent, `null`, `false`, the string `"true"`, or any other value counts as disabled.
+  - **Enabled**: the script prints `auto-continuing: <cmd> (next_step.auto.<skill>=true)` on **stderr** (`<cmd>` is the first `--command`, verbatim), then `CHOICE=yes` and `AUTO=true` on stdout, and exits `0`. `/dev/tty` is never probed.
+  - **Disabled**: behavior is unchanged (the TTY prompt, or the exit-`4` `FALLBACK=chat` path).
+- **`--no-prompt`** never prompts and never probes `/dev/tty`. It is meant for auto skills, which must never block on a prompt. With `--auto-key` and the key enabled, the output is the same as `--auto-key` alone (notice, `CHOICE=yes`, `AUTO=true`). Otherwise (key disabled, or no `--auto-key`), it prints `CHOICE=no` and exits `0`.
+
+Argument validation still runs first: a usage error exits `1` before any config read or TTY probe. The notice goes to stderr so stdout keeps its key=value protocol, and `AUTO=true` is the only new stdout line, always right after `CHOICE=yes`.
+
+The flags only take effect once a skill passes them: wiring `--auto-key` into the skills that make next-step offers is tracked by #715, so until then every offer still prompts.
 
 ### Prompt
 
@@ -130,18 +143,21 @@ Input is read from `/dev/tty`, case-insensitive; `y`/`yes`, `n`/`no`, `c`/`chat`
 | Choice | stdout | Exit |
 | --- | --- | --- |
 | `[Y]es` | `CHOICE=yes` | `0` |
+| `--auto-key` key enabled (with or without `--no-prompt`) | `CHOICE=yes` then `AUTO=true`; notice on stderr | `0` |
+| `--no-prompt`, key disabled or no `--auto-key` | `CHOICE=no` | `0` |
 | `[N]o` | `CHOICE=no` | `0` |
 | `[C]hat` | `CHOICE=chat` then `CHAT_CONTEXT=next_step` | `3` |
 | `/dev/tty` cannot be opened | `FALLBACK=chat`, then one `COMMAND=<cmd>` line per `--command`, in the order given (verbatim) | `4` |
-| usage error (missing `--repo`, empty or missing `--command`, unknown argument), `--repo` not a directory, or `/dev/tty` closed/EOF before a valid answer | nothing; error on stderr | `1` |
+| usage error (missing `--repo`, empty or missing `--command`, empty or missing `--auto-key` value, unknown argument), `--repo` not a directory, or `/dev/tty` closed/EOF before a valid answer | nothing; error on stderr | `1` |
 
-Exit `3` mirrors the migrations runner's `[C]hat` hand-off. Argument validation runs before the TTY probe, so a usage error exits `1` even when no TTY is available — a real error is never turned into a chat question.
+Exit `3` mirrors the migrations runner's `[C]hat` hand-off. Argument validation runs before any config read and before the TTY probe, so a usage error exits `1` even when no TTY is available — a real error is never turned into a chat question.
 
 The TTY device is overridable through `ARCANUM_TTY_DEVICE` (default `/dev/tty`). This is **test-only** — specs point it at a missing path to simulate "no TTY" — and not a user-facing setting.
 
 ### Skill-side rules
 
 - **`CHOICE=yes`**: invoke the next skill inline, in the same session. This is a **chained** run, not a nested one: the next skill runs as a top-level skill (no `NESTED=true`) and prints its own report and next step.
+- **`CHOICE=yes` with `AUTO=true`**: handled exactly like `[Y]es` (a chained run). The skill relays the stderr notice line to the user, so the automatic hop is visible.
 - **`CHOICE=no`**: end. The report is already printed, and its command is the user's manual path.
 - **`CHOICE=chat`** (exit `3`): return to the conversation. Do not run the next step unless the user asks for it in chat.
 - **`FALLBACK=chat`** (exit `4`): no TTY was available. Ask with `AskUserQuestion`, naming the exact command(s) from the `COMMAND=` lines, with the options **Yes** (run it now; with several commands, run all of them in order), **No**, and **Chat**. Map the answer onto the branches above: Yes → `CHOICE=yes`, No → `CHOICE=no`, Chat → `CHOICE=chat`. A free-text "Other" answer is treated as Chat, with the text as context. A dismissed or rejected question is treated as No. If `AskUserQuestion` is unavailable (e.g. headless `claude -p`, or the tool is denied), print "Next step: `<cmd>` (run it manually)" and end.
