@@ -30,7 +30,8 @@
  *     `finish-report` (`validateRepoPath: false` — its shell original
  *     only reads `origin`, and only when an issue/PR URL is printed), on
  *     the `init-claude-*` family (set-ci-ignored-patterns /
- *     setup-docs-structure / setup-templates / stamp-arcanum-version /
+ *     set-next-step-auto (native-only) / setup-docs-structure /
+ *     setup-templates / stamp-arcanum-version /
  *     write-label-config-replace / write-label-config-remove /
  *     write-label-config-add / sync-labels — all
  *     `validateRepoPath: false`, since their shell originals never
@@ -363,6 +364,12 @@ export const COMMANDS = {
   },
   'init-claude-set-ci-ignored-patterns': {
     module: 'commands/init-claude/InitClaudeSetCiIgnoredPatterns.js',
+    method: 'run',
+    context: 'repo',
+    validateRepoPath: false
+  },
+  'init-claude-set-next-step-auto': {
+    module: 'commands/init-claude/InitClaudeSetNextStepAuto.js',
     method: 'run',
     context: 'repo',
     validateRepoPath: false
