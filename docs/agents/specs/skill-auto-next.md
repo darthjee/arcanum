@@ -2,10 +2,10 @@
 
 ## Status
 
-Proposed. Nothing in this spec is implemented yet. It is tracked by #712 and implemented by its sub-issues:
+Partly implemented. It is tracked by #712 and implemented by its sub-issues:
 
-- #714: `arcanum/_lib/next_step_prompt.sh` flags and the config keys;
-- #715: wiring the keys into the skills that make next-step offers;
+- #714 (implemented): `arcanum/_lib/next_step_prompt.sh` flags and the config keys;
+- #715 (implemented): wiring the keys into the skills that make next-step offers, documented in [Skill Finish](../architecture/skill-finish.md#next-step-map);
 - #716: the init-claude settings step and the migrations. #716 also removes this spec once the feature is documented in the architecture docs.
 
 ## Goal
@@ -36,7 +36,7 @@ The keys live under the `next_step` namespace, at `next_step.auto.<skill>`:
 | --- | --- | --- |
 | `next_step.auto.enhance-issue` | `/discuss-issue <id>` | `enhance-issue/steps/publish.md` |
 | `next_step.auto.discuss-issue` | `/auto-plan-issue <id>` (discuss-issue's first offer) | `discuss-issue/steps/discuss_and_save.md` |
-| `next_step.auto.auto-plan-issue` | `/auto-resolve-issue <id>` | `auto-plan-issue/steps/run.md` (top-level `Next:` line), `discuss-issue/steps/discuss_and_save.md` (second offer), `plan-issue/steps/write_and_confirm.md` |
+| `next_step.auto.auto-plan-issue` | `/loop /auto-resolve-issue <id>` | `auto-plan-issue/steps/run.md` (top-level `Next:` line), `discuss-issue/steps/discuss_and_save.md` (second offer), `plan-issue/steps/write_and_confirm.md` |
 
 The `auto-plan-issue` key names the step that just finished (a plan exists), not the skill printing the offer. That is why it covers three offers: `auto-plan-issue`'s own top-level `Next:` line, discuss-issue's second offer (made after its nested plan), and `plan-issue`'s offer.
 
@@ -59,7 +59,9 @@ Calling skills treat `CHOICE=yes` with `AUTO=true` exactly like a user's `[Y]es`
 
 ## Epic rule
 
-enhance-issue never auto-chains for an issue labeled `Epic`. Before passing `--auto-key enhance-issue`, it checks with `auto-fix-all/scripts/github.sh has-label <repo_path> <id> Epic`. On exit 0, it omits `--auto-key`, so an Epic always gets the normal offer.
+enhance-issue never auto-chains for an issue labeled `Epic`. Before passing `--auto-key enhance-issue`, it checks with `auto-fix-all/scripts/github.sh has-label <repo_path> <id> Epic`. It passes `--auto-key enhance-issue` only on exit 1 (labels fetched, no `Epic`). On exit 0 (an Epic) it omits `--auto-key`, so an Epic always gets the normal offer.
+
+The check fails safe: `has-label` exits 2 when the labels could not be determined (gh user setup, repo resolution or `gh issue view` failed), and enhance-issue omits `--auto-key` on exit 2 too, so an error never enables auto-chaining. Other `has-label` callers keep treating any non-zero exit as "not an Epic".
 
 ## Chained versus nested
 
@@ -73,11 +75,14 @@ enhance-issue never auto-chains for an issue labeled `Epic`. Before passing `--a
 
 - **`plan-issue`** commits and pushes the plan on `issue-<id>` (through `commit_plan.sh`) before its offer.
 - **discuss-issue** pushes the nested plan on `issue-<id>`, then releases the working tree through `checkout_safe_branch.sh`, before its second offer.
-- **Top-level `auto-plan-issue`**: `commit_plan.sh` commits on the current HEAD without pushing. From a detached `origin/main`, the plan commit would be left behind. Rule: a top-level `auto-plan-issue` auto-chains only when HEAD is the `issue-<id>` branch. Otherwise it does not chain, and prints its normal `Next: /auto-resolve-issue <id>` line.
+- **Top-level `auto-plan-issue`**: `commit_plan.sh` commits on the current HEAD without pushing. From a detached `origin/main`, the plan commit would be left behind. Rule: a top-level `auto-plan-issue` auto-chains only when HEAD is the `issue-<id>` branch. Otherwise it does not chain, and prints its normal `Next: /loop /auto-resolve-issue <id>` line.
+- **Push before chaining**: a top-level `auto-plan-issue` that chains pushes the plan commit (`git -C <repo_path> push`) first. If the push fails, it does not chain and keeps the normal `Next:` line. The branch check, the config read (`next_step_prompt.sh --no-prompt --auto-key auto-plan-issue`) and the push live in `auto-plan-issue/scripts/auto_next.sh <repo_path> <id>`, which prints `CHAIN=yes`, or `CHAIN=no` with `REASON=branch|config|push`. It runs on both success exits (plan written, and plan already exists), and only at top level.
 
 ## Chaining `auto-resolve-issue`
 
 A chained `auto-resolve-issue` is invoked through Claude Code's `loop` skill, as `/loop /auto-resolve-issue <id>`, so its `ScheduleWakeup` keeps monitoring a pending PR. The auto-continuing notice shows that exact command.
+
+The `/loop` form is the offered command itself, including for a manual `[Y]es` and in `auto-plan-issue`'s `Next:` line, so the offer, the notice and what actually runs are always the same command.
 
 Note: discuss-issue's second offer is already `/auto-resolve-issue <id>` on `main` (since #710). Older wording in #712 and #713 that says `/auto-fix-issue` is out of date.
 
