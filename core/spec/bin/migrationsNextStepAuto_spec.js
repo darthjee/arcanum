@@ -7,10 +7,12 @@ import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
 const execFileAsync = promisify(execFile);
 
-// Contract spec for the `next/001`–`003` repo migrations that offer to
+// Contract spec for the `2.0.0/001`–`003` repo migrations that offer to
 // seed the `next_step.auto.<skill>` keys in the local, repo and global
-// config tiers (issue #716). NOT a parity spec: the migration scripts
-// have no native counterpart. Their interactive path reads `/dev/tty`,
+// config tiers (issue #716). Each migration path is one full string
+// literal so `scripts/bump-version.sh` can rewrite it on release.
+// NOT a parity spec: the migration scripts have no native counterpart.
+// Their interactive path reads `/dev/tty`,
 // so every `run` here is spawned `detached` (a new session via
 // setsid(2), with no controlling terminal), which makes `/dev/tty`
 // unopenable — the "no TTY" branch under test. A sanity case asserts
@@ -23,8 +25,11 @@ const execFileAsync = promisify(execFile);
 // rather than run, since the scripts would block prompting on it. The
 // `config` and unknown-subcommand cases always run.
 
-const MIGRATIONS_DIR = path.join(REPO_ROOT, 'arcanum', 'migrations', 'repos', 'next');
-const SCRIPTS = ['001', '002', '003'].map((id) => [id, path.join(MIGRATIONS_DIR, `${id}.sh`)]);
+const SCRIPTS = [
+  ['001', path.join(REPO_ROOT, 'arcanum/migrations/repos/2.0.0/001.sh')],
+  ['002', path.join(REPO_ROOT, 'arcanum/migrations/repos/2.0.0/002.sh')],
+  ['003', path.join(REPO_ROOT, 'arcanum/migrations/repos/2.0.0/003.sh')]
+];
 const TTY_PROBE = ['bash', '-c', 'if ( exec 3< /dev/tty ) 2>/dev/null; then echo open; else echo closed; fi'];
 const TTY_PENDING_REASON =
   'a detached process can still open /dev/tty in this environment, so the no-TTY branch cannot be exercised';
@@ -63,7 +68,7 @@ async function listFiles(dir) {
     .map((entry) => path.relative(dir, path.join(entry.parentPath, entry.name)));
 }
 
-describe('next/ auto-next migrations', () => {
+describe('2.0.0 auto-next migrations', () => {
   let ttyHidden;
   let repoPath;
   let homeDir;
