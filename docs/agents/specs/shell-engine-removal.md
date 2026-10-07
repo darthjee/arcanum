@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. Nothing in this spec is implemented yet. The deprecation was announced by the global `instructions` migration `arcanum/migrations/repos/next/001` (#601), which warns users once per machine/account and offers to set `engine.mode` in their global config.
+Proposed. Nothing in this spec is implemented yet. The deprecation was announced by the global `instructions` migration `arcanum/migrations/repos/1.0.1/001` (#601), which warns users once per machine/account and offers to set `engine.mode` in their global config.
 
 ## Goal
 

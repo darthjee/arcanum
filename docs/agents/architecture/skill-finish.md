@@ -123,7 +123,7 @@ Two optional flags let a next-step offer be skipped from config:
 
 Argument validation still runs first: a usage error exits `1` before any config read or TTY probe. The notice goes to stderr so stdout keeps its key=value protocol, and `AUTO=true` is the only new stdout line, always right after `CHOICE=yes`.
 
-Which skill passes which key is listed in the [Next-step map](#next-step-map). With every key absent or `false`, every offer behaves exactly as without the flags. The keys are set through init-claude's `setup_auto_next.md` step (repo config) or the three `/arcanum-migrate` migrations in `arcanum/migrations/repos/next/` (local, repo and global); see [Shared State & Configuration Files](shared-state-and-configuration.md#the-next_step-namespace).
+Which skill passes which key is listed in the [Next-step map](#next-step-map). With every key absent or `false`, every offer behaves exactly as without the flags. The keys are set through init-claude's `setup_auto_next.md` step (repo config) or the three `/arcanum-migrate` migrations `arcanum/migrations/repos/2.0.0/001.sh`, `002.sh` and `003.sh` (local, repo and global); see [Shared State & Configuration Files](shared-state-and-configuration.md#the-next_step-namespace).
 
 ### Prompt
 
