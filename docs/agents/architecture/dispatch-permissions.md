@@ -68,7 +68,7 @@ Bash(auto-fix-issue/scripts/run_checks.sh *)
 Bash(git add *)
 ```
 
-Provisioned across all three config tiers by `arcanum/migrations/repos/next/002.sh`
+Provisioned across all three config tiers by `arcanum/migrations/repos/0.17.2/002.sh`
 (local, `.claude/settings.local.json`), `003.sh` (repo, shared/committed
 `.claude/settings.json`), and `004.sh` (global, Claude Code's own cross-project
 `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json`), plus a second onboarding step in
