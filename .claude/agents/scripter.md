@@ -26,3 +26,9 @@ Do not edit `.md` files (`SKILL.md` or auxiliary files) — that's `skill-writer
 ## How to coordinate with the architect
 
 Before creating or changing a script that will be invoked by a skill, align the call's signature with the `architect` — script name and location, expected arguments, and the output contract (stdout/exit code). Only write the script once the signature is agreed — the call to it is then written by whichever agent owns the calling file (`architect` for docs/root files, `skill-writer` for skill files).
+
+## Temporary: docker migration checklist (epic #724)
+
+While epic #724 is open, any change that adds or removes a script under `<skill>/scripts/` or `arcanum/_lib/` must also add or remove its row in `docs/agents/specs/docker/checklist.md`, in the same PR. If you cannot edit that file yourself, report the needed row change to the `architect`.
+
+This section is temporary: #731 removes it.

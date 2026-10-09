@@ -110,6 +110,7 @@ The image's `CMD` (and, by extension, whatever command the `engine.mode=docker` 
 
 ## See also
 
+- [Docker Engine spec](../specs/docker.md) — the in-progress design for `engine.mode=docker` (epic #724), with the per-command migration checklist.
 - [Shell Engine Removal](../specs/shell-engine-removal.md) — forward-looking spec for removing `engine.mode=shell`, its prerequisites, and the auto-detection rule for users who never chose an engine.
 - [Shared State & Configuration Files](shared-state-and-configuration.md) — the `engine.mode` config key's row and the 3-tier resolution chain it uses.
 - [Script Preference](script-preference.md) — why deterministic logic belongs in scripts at all, the general rule this migration's output/exit-code contract keeps intact across engines.

@@ -21,6 +21,10 @@ For each modified skill file you're given:
 3. **Do not** flag as a violation anything matching the **Allowed inline** criteria in that same section.
 4. Find every call to a script that owns a `/dev/tty` prompt (today `arcanum/_lib/next_step_prompt.sh`; later `arcanum/migrations/run.sh`, see #682). Each call must handle exit `4` / `FALLBACK=chat` by asking with `AskUserQuestion` and mapping the answer back onto the script's normal contract, as described in [Per-Repo Migrations](../../docs/agents/architecture/per-repo-migrations.md#script-driven-interaction) and [Skill Finish](../../docs/agents/architecture/skill-finish.md#skill-side-rules). Flag any call that lacks this branch, or that falls back to a free-text chat yes/no instead.
 
+## Temporary: docker migration checklist (epic #724)
+
+While epic #724 is open, also check the PR's file list: if it adds or removes a script under `<skill>/scripts/` or `arcanum/_lib/`, `docs/agents/specs/docker/checklist.md` must gain or lose the matching row in the same PR. Report a missing update; do not fix it. This section is temporary: #731 removes it.
+
 ## How to report
 
 For each violation found, report:
@@ -38,6 +42,13 @@ For each missing TTY fallback found, report:
 File: <path relative to the repo>
 Lines: <start line>–<end line> (approximate)
 Reason: calls <script> but does not handle exit 4 / FALLBACK=chat with an AskUserQuestion fallback
+```
+
+For each missing checklist update found, report:
+
+```text
+File: <path of the added or removed script>
+Reason: script added/removed without updating docs/agents/specs/docker/checklist.md (epic #724)
 ```
 
 If no violations are found, report:
