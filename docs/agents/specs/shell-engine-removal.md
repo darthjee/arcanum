@@ -13,7 +13,7 @@ Remove `engine.mode=shell`, every `*_shell.sh` implementation, and the shell bra
 The removal issue must not start until all of these hold:
 
 - Every entry in `arcanum/_lib/migration-status.json` is `true`, meaning every entrypoint is migrated.
-- `engine.mode=docker` is actually implemented in `engine_dispatch.sh`. Today it prints a warning and falls back to shell.
+- `engine.mode=docker` is actually implemented in `engine_dispatch.sh`. Today it prints a warning and falls back to shell. The [Docker Engine spec](docker.md) (epic #724) delivers it.
 - The deprecation migration (`next/001`, #601) has shipped in at least one prior release, so users have had a chance to choose.
 
 ## Auto-detection rule
@@ -39,5 +39,6 @@ Some users will never have chosen an engine. When shell is removed, arcanum reso
 ## See also
 
 - [Script Engine](../architecture/script-engine.md): the shell/native/docker dispatch design.
+- [Docker Engine spec](docker.md): the in-progress design for `engine.mode=docker`, a prerequisite of this removal.
 - [Per-Repo Migrations](../architecture/per-repo-migrations.md): how `global`-scoped `instructions` migrations work.
 - [Global Config guide](../../guides/arcanum-global-config.md): the global config file and its resolution.

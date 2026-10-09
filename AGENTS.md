@@ -59,7 +59,7 @@ All project documentation lives under [`docs/agents/`](docs/agents/):
 | [Flow](docs/agents/flow.md) | Main runtime flow of the application. |
 | [Plans](docs/agents/plans/) | Implementation plans for ongoing or upcoming features. |
 | [Issues](docs/agents/issues/) | Detailed specs for open issues. |
-| [Specs](docs/agents/specs/) | Forward-looking designs that guide future work, not yet implemented. |
+| [Specs](docs/agents/specs.md) | Index of every spec in `docs/agents/specs/`: forward-looking designs that guide future work, not yet implemented. |
 
 ### Issues (`docs/agents/issues/`)
 
@@ -90,3 +90,14 @@ docs/agents/specs/<topic>.md
 ```
 
 Example: `docs/agents/specs/shell-engine-removal.md`.
+
+A large spec may be split into an index file plus parts, in a folder named after the topic:
+
+```text
+docs/agents/specs/<topic>.md          # index: status, goal, decisions, links to each part
+docs/agents/specs/<topic>/<part>.md   # one file per part
+```
+
+Example: `docs/agents/specs/docker.md` with its parts under `docs/agents/specs/docker/`.
+
+Every spec is listed in [`docs/agents/specs.md`](docs/agents/specs.md), the permanent specs index. Add an entry there when you create a spec, and remove it when the spec is removed.
