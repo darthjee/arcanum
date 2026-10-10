@@ -12,6 +12,7 @@
   },
   "scripts": {
     "test": "c8 jasmine",
+    "test:docker": "jasmine --config=spec/support/jasmine-docker.json",
     "lint": "eslint .",
     "duplication": "jscpd --config .jscpd.json"
   },
