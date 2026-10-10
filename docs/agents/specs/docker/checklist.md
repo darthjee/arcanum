@@ -38,7 +38,7 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 | command | script | kind | status | credentials | mounts | env | issue | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `checkout-safe-branch` | `arcanum/_lib/checkout_safe_branch.sh` | dispatched | ☐ | git-push (ssh) | gitconfig:ro, remote | GIT_CONFIG_GLOBAL, remote | | |
-| `finish-report` | `arcanum/_lib/finish_report.sh` | dispatched | ☐ | none | — | — | | |
+| `finish-report` | `arcanum/_lib/finish_report.sh` | dispatched | ✅ | none | — | — | #745 | |
 | `github-issue-create` | `arcanum/_lib/github_issue.sh` `create` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro, args:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
 | `github-issue-fetch` | `arcanum/_lib/github_issue.sh` `fetch` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
 | `github-issue-info` | `arcanum/_lib/github_issue.sh` `info` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
@@ -49,14 +49,14 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 | `github-issue-mark-refined` | `arcanum/_lib/github_issue.sh` `mark-refined` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
 | `github-issue-mark-split` | `arcanum/_lib/github_issue.sh` `mark-split` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
 | `github-issue-update` | `arcanum/_lib/github_issue.sh` `update` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro, args:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
-| `issue-state` | `arcanum/_lib/issue_state.sh` | dispatched | ☐ | none | — | — | | |
-| `list-agents` | `arcanum/_lib/list_agents.sh` | dispatched | ☐ | none | — | — | | |
+| `issue-state` | `arcanum/_lib/issue_state.sh` | dispatched | ✅ | none | — | — | #745 | |
+| `list-agents` | `arcanum/_lib/list_agents.sh` | dispatched | ✅ | none | — | — | #745 | |
 | `permission-grant-add` | `arcanum/_lib/permission_grant.sh` `add` | dispatched | ☐ | none | args:rw | — | | |
 | `resolve-and-fetch` | `arcanum/_lib/resolve_and_fetch.sh` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
-| `resolve-id-and-file` | `arcanum/_lib/resolve_id_and_file.sh` | dispatched | ☐ | none | — | — | | |
-| `resolve-plan-paths` | `arcanum/_lib/resolve_plan_paths.sh` | dispatched | ☐ | none | — | — | | |
+| `resolve-id-and-file` | `arcanum/_lib/resolve_id_and_file.sh` | dispatched | ✅ | none | — | — | #745 | |
+| `resolve-plan-paths` | `arcanum/_lib/resolve_plan_paths.sh` | dispatched | ✅ | none | — | — | #745 | |
 | `spawn-issue` | `arcanum/_lib/spawn_issue.sh` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro, args:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
-| `dispatch-fixture-crash` | — | dispatched | ☐ | none | — | — | | Test fixture (`core/lib/commands/shared/DispatchFixture.js`), no shim. |
+| `dispatch-fixture-crash` | — | dispatched | ✅ | none | — | — | #745 | Test fixture (`core/lib/commands/shared/DispatchFixture.js`), no shim. No shim-level routing spec: covered by the dispatch-level specs and a parity case under `core/spec/docker/`. |
 
 ## arcanum-check-config
 
@@ -93,10 +93,10 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `auto-fix-all-checkout-from-main` | `auto-fix-all/scripts/checkout_from_main.sh` | dispatched | ☐ | git-push (ssh) | gitconfig:ro, remote | GIT_CONFIG_GLOBAL, remote | | |
 | `auto-fix-all-cleanup-artifacts` | `auto-fix-all/scripts/cleanup_artifacts.sh` | dispatched | ☐ | git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, remote | | |
-| `auto-fix-all-config-get` | `auto-fix-all/scripts/config.sh` `get` | dispatched | ☐ | none | — | — | | |
-| `auto-fix-all-config-is-enabled` | `auto-fix-all/scripts/config.sh` `is-enabled` | dispatched | ☐ | none | — | — | | |
-| `auto-fix-all-config-set` | `auto-fix-all/scripts/config.sh` `set` | dispatched | ☐ | none | — | — | | |
-| `auto-fix-all-config-toggle` | `auto-fix-all/scripts/config.sh` `toggle` | dispatched | ☐ | none | — | — | | |
+| `auto-fix-all-config-get` | `auto-fix-all/scripts/config.sh` `get` | dispatched | ✅ | none | — | — | #745 | |
+| `auto-fix-all-config-is-enabled` | `auto-fix-all/scripts/config.sh` `is-enabled` | dispatched | ✅ | none | — | — | #745 | |
+| `auto-fix-all-config-set` | `auto-fix-all/scripts/config.sh` `set` | dispatched | ✅ | none | — | — | #745 | |
+| `auto-fix-all-config-toggle` | `auto-fix-all/scripts/config.sh` `toggle` | dispatched | ✅ | none | — | — | #745 | |
 | `auto-fix-all-github-add-tag` | `auto-fix-all/scripts/github.sh` `add-tag` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
 | `auto-fix-all-github-cleanup-branch` | `auto-fix-all/scripts/github.sh` `cleanup-branch` | dispatched | ☐ | git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, remote | | |
 | `auto-fix-all-github-has-label` | `auto-fix-all/scripts/github.sh` `has-label`, `has-shipit-label` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
@@ -104,13 +104,13 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 | `auto-fix-all-github-pr-number` | `auto-fix-all/scripts/github.sh` `pr-number` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
 | `auto-fix-all-github-pr-state` | `auto-fix-all/scripts/github.sh` `pr-state` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
 | `auto-fix-all-github-remove-tag` | `auto-fix-all/scripts/github.sh` `remove-tag` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
-| `auto-fix-all-queue-empty` | `auto-fix-all/scripts/queue.sh` `empty` | dispatched | ☐ | none | — | — | | Credentials corrected from `gh` in #726: it never touches GitHub (only `save`/`push` tag issues). |
-| `auto-fix-all-queue-list` | `auto-fix-all/scripts/queue.sh` `list` | dispatched | ☐ | none | — | — | | Credentials corrected from `gh` in #726: it never touches GitHub (only `save`/`push` tag issues). |
-| `auto-fix-all-queue-next` | `auto-fix-all/scripts/queue.sh` `next` | dispatched | ☐ | none | — | — | | Credentials corrected from `gh` in #726: it never touches GitHub (only `save`/`push` tag issues). |
-| `auto-fix-all-queue-pop` | `auto-fix-all/scripts/queue.sh` `pop` | dispatched | ☐ | none | — | — | | Credentials corrected from `gh` in #726: it never touches GitHub (only `save`/`push` tag issues). |
+| `auto-fix-all-queue-empty` | `auto-fix-all/scripts/queue.sh` `empty` | dispatched | ✅ | none | — | — | #745 | Credentials corrected from `gh` in #726: it never touches GitHub (only `save`/`push` tag issues). |
+| `auto-fix-all-queue-list` | `auto-fix-all/scripts/queue.sh` `list` | dispatched | ✅ | none | — | — | #745 | Credentials corrected from `gh` in #726: it never touches GitHub (only `save`/`push` tag issues). |
+| `auto-fix-all-queue-next` | `auto-fix-all/scripts/queue.sh` `next` | dispatched | ✅ | none | — | — | #745 | Credentials corrected from `gh` in #726: it never touches GitHub (only `save`/`push` tag issues). |
+| `auto-fix-all-queue-pop` | `auto-fix-all/scripts/queue.sh` `pop` | dispatched | ✅ | none | — | — | #745 | Credentials corrected from `gh` in #726: it never touches GitHub (only `save`/`push` tag issues). |
 | `auto-fix-all-queue-push` | `auto-fix-all/scripts/queue.sh` `push` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
 | `auto-fix-all-queue-save` | `auto-fix-all/scripts/queue.sh` `save` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
-| `auto-fix-all-queue-wait-next` | `auto-fix-all/scripts/queue.sh` `wait-next` | dispatched | ☐ | none | — | — | | Credentials corrected from `gh` in #726: it never touches GitHub (only `save`/`push` tag issues). Blocks until the queue has an entry. |
+| `auto-fix-all-queue-wait-next` | `auto-fix-all/scripts/queue.sh` `wait-next` | dispatched | ✅ | none | — | — | #745 | Credentials corrected from `gh` in #726: it never touches GitHub (only `save`/`push` tag issues). Blocks until the queue has an entry. The parity case seeds the queue first, so the blocking call returns at once. |
 | `auto-fix-all-reply-comment` | `auto-fix-all/scripts/reply_comment.sh` | dispatched | ☐ | gh, git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN, remote | | |
 | `auto-fix-all-wait-ci` | `auto-fix-all/scripts/wait_ci.sh` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | Blocks until CI completes. |
 | `auto-fix-all-wait-ci-and-merge` | `auto-fix-all/scripts/wait_ci_and_merge.sh` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | Blocks until CI completes. |
@@ -120,12 +120,12 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 | command | script | kind | status | credentials | mounts | env | issue | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `auto-fix-issue-commit-change` | `auto-fix-issue/scripts/commit_change.sh` | dispatched | ☐ | git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, remote | | |
-| `auto-fix-issue-github-info` | `auto-fix-issue/scripts/github.sh` `info` | dispatched | ☐ | none | — | — | | |
+| `auto-fix-issue-github-info` | `auto-fix-issue/scripts/github.sh` `info` | dispatched | ✅ | none | — | — | #745 | |
 | `auto-fix-issue-github-pr-create` | `auto-fix-issue/scripts/github.sh` `pr-create` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro, args:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
 | `auto-fix-issue-github-pr-ready` | `auto-fix-issue/scripts/github.sh` `pr-ready` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
 | `auto-fix-issue-github-pr-view` | `auto-fix-issue/scripts/github.sh` `pr-view` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
-| `auto-fix-issue-list-plan-agents` | `auto-fix-issue/scripts/list_plan_agents.sh` | dispatched | ☐ | none | — | — | | |
-| `auto-fix-issue-list-plan-steps` | `auto-fix-issue/scripts/list_plan_steps.sh` | dispatched | ☐ | none | — | — | | |
+| `auto-fix-issue-list-plan-agents` | `auto-fix-issue/scripts/list_plan_agents.sh` | dispatched | ✅ | none | — | — | #745 | |
+| `auto-fix-issue-list-plan-steps` | `auto-fix-issue/scripts/list_plan_steps.sh` | dispatched | ✅ | none | — | — | #745 | |
 | `auto-fix-issue-run-checks` | `auto-fix-issue/scripts/run_checks.sh` | dispatched | n/a | inherits target | host-only | — | | Host-only (decided in #727): runs the target project's own `.claude/scripts/check_<agent>.sh`, whose toolchain the image doesn't have. Its credentials and mounts are the target project's. |
 
 ## auto-monitor-issue-pr
@@ -156,17 +156,17 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 
 | command | script | kind | status | credentials | mounts | env | issue | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `discuss-issue-confirm` | `discuss-issue/scripts/confirm.sh` | dispatched | ☐ | none | — | — | | |
+| `discuss-issue-confirm` | `discuss-issue/scripts/confirm.sh` | dispatched | ✅ | none | — | — | #745 | |
 | `discuss-issue-render-issue` | `discuss-issue/scripts/render_issue.sh` | dispatched | ☐ | none | args:rw | — | | |
 
 ## init-claude
 
 | command | script | kind | status | credentials | mounts | env | issue | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `init-claude-set-ci-ignored-patterns` | `init-claude/scripts/set_ci_ignored_patterns.sh` | dispatched | ☐ | none | — | — | | |
-| `init-claude-set-next-step-auto` | `init-claude/scripts/set_next_step_auto.sh` | native-only | ☐ | none | — | — | | |
-| `init-claude-setup-docs-structure` | `init-claude/scripts/setup_docs_structure.sh` | dispatched | ☐ | none | — | — | | |
-| `init-claude-setup-templates` | `init-claude/scripts/setup_templates.sh` | dispatched | ☐ | none | — | — | | |
+| `init-claude-set-ci-ignored-patterns` | `init-claude/scripts/set_ci_ignored_patterns.sh` | dispatched | ✅ | none | — | — | #745 | |
+| `init-claude-set-next-step-auto` | `init-claude/scripts/set_next_step_auto.sh` | native-only | ✅ | none | — | — | #745 | |
+| `init-claude-setup-docs-structure` | `init-claude/scripts/setup_docs_structure.sh` | dispatched | ✅ | none | — | — | #745 | |
+| `init-claude-setup-templates` | `init-claude/scripts/setup_templates.sh` | dispatched | ✅ | none | — | — | #745 | |
 | `init-claude-stamp-arcanum-version` | `init-claude/scripts/stamp_arcanum_version.sh` | dispatched | ☐ | none | global-config:ro | CLAUDE_CONFIG_DIR | | |
 | `init-claude-sync-labels` | `init-claude/scripts/sync_labels.sh` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro, args:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
 | `init-claude-write-label-config-add` | `init-claude/scripts/write_label_config.sh` `add` | dispatched | ☐ | none | args:rw | — | | |
@@ -177,14 +177,14 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 
 | command | script | kind | status | credentials | mounts | env | issue | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `monitor-issues-config-get` | `monitor-issues/scripts/config.sh` `get` | dispatched | ☐ | none | — | — | | |
-| `monitor-issues-config-is-enabled` | `monitor-issues/scripts/config.sh` `is-enabled` | dispatched | ☐ | none | — | — | | |
-| `monitor-issues-config-set` | `monitor-issues/scripts/config.sh` `set` | dispatched | ☐ | none | — | — | | |
-| `monitor-issues-config-toggle` | `monitor-issues/scripts/config.sh` `toggle` | dispatched | ☐ | none | — | — | | |
+| `monitor-issues-config-get` | `monitor-issues/scripts/config.sh` `get` | dispatched | ✅ | none | — | — | #745 | |
+| `monitor-issues-config-is-enabled` | `monitor-issues/scripts/config.sh` `is-enabled` | dispatched | ✅ | none | — | — | #745 | |
+| `monitor-issues-config-set` | `monitor-issues/scripts/config.sh` `set` | dispatched | ✅ | none | — | — | #745 | |
+| `monitor-issues-config-toggle` | `monitor-issues/scripts/config.sh` `toggle` | dispatched | ✅ | none | — | — | #745 | |
 | `monitor-issues-github-remove-tag` | `monitor-issues/scripts/github.sh` `remove-tag` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
 | `monitor-issues-monitor-issues` | `monitor-issues/scripts/monitor_issues.sh` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | Long-running polling loop. |
-| `monitor-issues-rewrite-queue-pop` | `monitor-issues/scripts/rewrite_queue.sh` `pop` | dispatched | ☐ | none | — | — | | |
-| `monitor-issues-rewrite-queue-push` | `monitor-issues/scripts/rewrite_queue.sh` `push` | dispatched | ☐ | none | — | — | | |
+| `monitor-issues-rewrite-queue-pop` | `monitor-issues/scripts/rewrite_queue.sh` `pop` | dispatched | ✅ | none | — | — | #745 | |
+| `monitor-issues-rewrite-queue-push` | `monitor-issues/scripts/rewrite_queue.sh` `push` | dispatched | ✅ | none | — | — | #745 | |
 
 ## Not routed through dispatch (pending #733)
 
