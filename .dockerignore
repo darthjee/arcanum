@@ -1,0 +1,28 @@
+# Build-context filter for `docker build -f core/Dockerfile <install root>`
+# (see core/Dockerfile and docs/agents/specs/docker/image.md).
+#
+# The context is the install root, from either a dev checkout or a zip
+# install, and must yield the release-zip file set. Keep the first block
+# in sync with EXCLUDES in scripts/build_release_zip.sh.
+
+# Mirrors scripts/build_release_zip.sh EXCLUDES.
+AGENTS.md
+CLAUDE.md
+.claude/
+docs/
+!docs/guides/
+.github/
+ISSUE_TEMPLATE.md
+.gitignore
+scripts/
+arcanum.version
+
+# Not in git, or never wanted in the image.
+.git
+arcanum.json
+**/node_modules/
+coverage/
+**/coverage/
+synced/
+dist/
+**/.DS_Store
