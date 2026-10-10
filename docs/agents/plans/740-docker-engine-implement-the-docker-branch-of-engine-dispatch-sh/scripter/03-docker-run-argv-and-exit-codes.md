@@ -1,0 +1,14 @@
+# docker run argv, mounts, env and exit codes
+
+Build and run the `docker run` argv in `engine_dispatch_docker.sh`, exactly in the order the shared contract gives:
+
+- **Fixed flags**: `--rm -i --init --label arcanum.dispatch=1 --user "$(id -u):$(id -g)" --read-only --tmpfs /tmp:rw,exec,mode=1777 --cap-drop ALL --security-opt no-new-privileges -w <repo> -v <repo>:<repo>`. Never `-t`, never `--name`.
+- **Repo-derived mounts**: when `<repo>/.git` is a file, the git common dir (`git -C <repo> rev-parse --path-format=absolute --git-common-dir`) `rw`. When `config_chain_read <repo> engine log.location` is set and outside the repo, that directory `rw`.
+- **`--needs`**: `global-config` → `CLAUDE_CONFIG_DIR` (else `$HOME/.claude`) exported and passed as `-e CLAUDE_CONFIG_DIR`, with `<dir>/arcanum-config.json:ro` mounted only if it exists. `gitconfig` → resolve `$GIT_CONFIG_GLOBAL`, else `~/.gitconfig`, else `${XDG_CONFIG_HOME:-~/.config}/git/config`. Mount the first one that exists `ro`, export it and pass `-e GIT_CONFIG_GLOBAL`. `gh` → token from `GH_TOKEN`/`GITHUB_TOKEN`, else `gh auth token --hostname <host> [--user <ghuser>]` (host and ghuser via `origin.sh`). On github.com it is `-e GH_TOKEN`; otherwise it is `-e GH_HOST -e GH_ENTERPRISE_TOKEN`. No token: proceed without one. `remote` → ssh remote: agent socket (Linux: `$SSH_AUTH_SOCK` → `/run/arcanum/ssh-agent.sock`; macOS (`uname` = Darwin): `/run/host-services/ssh-auth.sock`), `~/.ssh/known_hosts:ro`, `-e SSH_AUTH_SOCK -e GIT_SSH_COMMAND`. https remote: the gh token as above, plus the credential-helper `GIT_CONFIG_*` entries.
+- **`--path-arg`**: the case table in `dispatch.md` → "Argument path declaration": absent or empty arguments are ignored. A relative path is resolved against `$PWD`, and the container argv gets the absolute path when it falls outside the repo. Paths inside the repo add nothing. Outside the repo, `ro` mounts the file and `rw` mounts its parent directory; a missing file or parent is not mounted. Collapse equal or nested sources into one `-v`, where an `rw` parent wins over an `ro` file under it.
+- **Env**: export the values in dispatch's own process, then add `-e NAME` only. Fixed: `ARCANUM_IN_DOCKER=1`, `ARCANUM_REPO_PATH`, `GIT_CONFIG_COUNT` plus `safe.directory=<repo>` (and `=<common dir>` for a worktree), followed by any credential-helper entries. Next come the `--needs` env, then each allowlisted name that is set, except `HOME` and `PATH`.
+- **Exit codes**: return the `docker run` exit code unchanged, with streams untouched (stdin attached). On 125/126/127, let Docker's stderr pass through, print the row-4 warning with reason `docker run failed with <code>`, and run `_engine_dispatch_run_native` exactly once.
+
+## Files to Change
+
+- `arcanum/_lib/engine_dispatch_docker.sh` — argv builder, mount/env helpers, run + 125–127 fallback.
