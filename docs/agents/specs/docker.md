@@ -52,7 +52,8 @@ In dependency order: #725 → #726, #727 → #728 → #729 → #730 → #731 →
 | #726 | Spec: docker image, mounts and environment | architect (`infra` consulted) | #725 | Done |
 | #727 | Spec: docker dispatch and testing | architect | #725 | Done |
 | #733 | Decide docker handling for scripts not routed through `engine_dispatch` | architect (`scripter` consulted) | #725 | Open |
-| #728 | Build the runtime Docker image (plus the release-CI multi-arch publishing job, unless split into a new sub-issue) | infra | #726 | Open |
+| #728 | Build the runtime Docker image | infra | #726 | Open |
+| #737 | Publish the multi-arch runtime Docker image from release CI | infra | #728 | Open |
 | #729 | Docker branch of `engine_dispatch.sh` with a pilot entrypoint | scripter (+ node if needed) | #727, #728 | Open |
 | #730 | Migrate remaining entrypoints to docker (placeholder for batches) | scripter / node | #729 | Open |
 | #731 | Promote docker engine design into architecture docs | architect | all of the above | Open |
@@ -74,7 +75,7 @@ Each is resolved by the part/issue named:
 - **Concurrency:** resolved. No fixed container names, `--rm` and `--init` with signal proxying so an interrupt leaves no container behind, and a label for the rare hard-kill orphan. See [dispatch.md](docker/dispatch.md#concurrency) (#727). That the lock system works across host and container processes is settled in [mounts.md](docker/mounts.md#shared-state-and-locks) (#726).
 - **Non-dispatched scripts:** sourced libraries, thin wrappers, non-dispatched entrypoints, install/update bootstraps. Decided in #733.
 - **Host-only commands:** #726 marks `arcanum-update-run-update-*` as host-only and proposes the same for `auto-fix-issue-run-checks` (see the [checklist](docker/checklist.md)). Resolved: all three are `host-only`, and dispatch knows it from their `"host-only"` value in `migration-status.json`. See [dispatch.md](docker/dispatch.md#migration-of-existing-values) (#727).
-- **Image publishing:** the release-CI job that pushes `darthjee/arcanum:<version>` has no sub-issue yet. It is follow-up work under #728, or a new sub-issue of #724. See [image.md](docker/image.md#distribution-and-versioning).
+- **Image publishing:** the release-CI job that pushes `darthjee/arcanum:<version>` is #737. It needs an arm64 `darthjee/node` base first. See [image.md](docker/image.md#distribution-and-versioning).
 - **Known limitations:** commit signing, git hooks that need host tools, and included git config files (see [mounts.md](docker/mounts.md#known-limitations)). #729 decides whether each one makes a command fall back to native.
 - **Argument paths:** resolved. A shim declares path arguments with `--path-arg=<index>:<ro|rw>`. See [dispatch.md](docker/dispatch.md#argument-path-declaration) (#727).
 

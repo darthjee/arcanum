@@ -34,11 +34,13 @@
 #
 # Excludes core/Dockerfile from the Opengrep (Semgrep-based) engine only —
 # Hadolint and the other tools keep analysing it. Opengrep's
-# missing-user / missing-user-entrypoint rules flag the file because it
-# has no USER directive, which is intentional: the entrypoint must start
-# as root to `chown` the mount points (the core_node_modules volume and,
-# on Linux, the bind-mounted repo root), then drops to `node` via `su`
-# before running CMD — see core/docker-entrypoint.sh. Inline `nosemgrep`
+# missing-user / missing-user-entrypoint rules flag the file because its
+# `test` stage has no USER directive, which is intentional: the test
+# entrypoint must start as root to `chown` the mount points (the
+# core_node_modules volume and, on Linux, the bind-mounted repo root),
+# then drops to `node` via `su` before running CMD — see
+# core/docker-entrypoint.sh. The suppression is only needed for the
+# `test` stage: the `runtime` stage sets `USER 1000:1000` (#728). Inline `nosemgrep`
 # suppression is not honoured by Codacy. The engine key is `opengrep`,
 # the tool's shortName in Codacy's API (api/v3/tools) and the name listed
 # in Codacy's configuration-file docs. See issues #494 and #604.
