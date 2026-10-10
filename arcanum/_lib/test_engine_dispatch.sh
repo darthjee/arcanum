@@ -71,7 +71,7 @@ set_engine_mode() {
 
 # --- Case 1: engine.mode=shell -> always runs the shell fixture,
 #     regardless of what migration-status.json says for
-#     auto-fix-all-config-get (it says `true`) ---
+#     auto-fix-all-config-get (it says `"native"`) ---
 
 set_engine_mode "shell"
 
@@ -85,7 +85,7 @@ code=$?
 echo "OK: engine.mode=shell runs the shell fixture directly"
 
 # --- Case 2: engine.mode=native, migration-status.json says
-#     auto-fix-all-config-get:true -> runs the NATIVE path (core/bin/
+#     auto-fix-all-config-get:"native" -> runs the NATIVE path (core/bin/
 #     arcanum auto-fix-all-config-get); stdout/exit code must byte-match
 #     the shell fixture's (the parity assertion — the shared contract
 #     with node) ---
@@ -118,7 +118,7 @@ code=$?
 echo "OK: engine.mode=native with no migration-status.json entry falls back to shell, with a stderr warning"
 
 # --- Case 4: engine.mode=native, migration-status.json says
-#     dispatch-fixture-crash:true -> native path invoked and it crashes
+#     dispatch-fixture-crash:"native" -> native path invoked and it crashes
 #     -> dispatcher fails loud, no fallback to the shell fixture's
 #     output (dispatch-fixture-crash itself is out of scope for #340,
 #     tracked by #342 — only the shared $FIXTURE_SCRIPT/$REPO_DIR it

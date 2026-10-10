@@ -24,19 +24,38 @@ _ENGINE_DISPATCH_MIGRATION_STATUS_FILE="${_ENGINE_DISPATCH_LIB_DIR}/migration-st
 # config_chain_read below).
 _ENGINE_DISPATCH_NATIVE_BIN="$(cd "${_ENGINE_DISPATCH_LIB_DIR}/../.." && pwd)/core/bin/arcanum"
 
-# _engine_dispatch_native_available <command>
-#   Prints "true" if <command> maps to `true` in migration-status.json,
-#   "false" for a `false` mapping, a missing key, or a missing/malformed
-#   map file (native-not-available is always the safe default). Always
-#   exits 0.
-_engine_dispatch_native_available() {
-  local command="$1"
-  [[ -f "$_ENGINE_DISPATCH_MIGRATION_STATUS_FILE" ]] || { echo "false"; return 0; }
+# _engine_dispatch_status <command> <native_only>
+#   The single reader of migration-status.json
+#   ($_ENGINE_DISPATCH_MIGRATION_STATUS_FILE). Prints exactly one line,
+#   one of `shell`, `native`, `docker`, `host-only`, and always exits 0.
+#   <native_only> is "true" for a --native-only entrypoint (one with no
+#   shell implementation), "false" otherwise.
+#
+#   - A known enum value is printed as-is, except that `shell` becomes
+#     `native` when <native_only> is "true".
+#   - A legacy boolean maps `true` -> `native`, `false` -> `shell`
+#     (`native` when <native_only> is "true").
+#   - Anything else (missing key, unknown string, number, null, object,
+#     missing file, malformed JSON) -> the safe default: `shell`, or
+#     `native` when <native_only> is "true".
+_engine_dispatch_status() {
+  local command="$1" native_only="$2"
+  local default="shell"
+  [[ "$native_only" == "true" ]] && default="native"
 
-  local value
-  value=$(jq -r --arg cmd "$command" '.[$cmd] // false' \
-    "$_ENGINE_DISPATCH_MIGRATION_STATUS_FILE" 2>/dev/null)
-  [[ "$value" == "true" ]] && echo "true" || echo "false"
+  local value=""
+  if [[ -f "$_ENGINE_DISPATCH_MIGRATION_STATUS_FILE" ]]; then
+    value=$(jq -r --arg cmd "$command" \
+      '.[$cmd] | if type == "string" then . elif type == "boolean" then (if . then "true" else "false" end) else "" end' \
+      "$_ENGINE_DISPATCH_MIGRATION_STATUS_FILE" 2>/dev/null) || value=""
+  fi
+
+  case "$value" in
+    shell) echo "$default" ;;
+    native | docker | host-only) echo "$value" ;;
+    true) echo "native" ;;
+    *) echo "$default" ;;
+  esac
 }
 
 # _engine_dispatch_run_native <repo_path> <command> <prepend_repo_path> <env_count> [<env_var_name> ...] [<args...>]
@@ -113,10 +132,13 @@ _engine_dispatch_run_native() {
 #     2. docker: always falls back to <shell_script>, with a warning on
 #        stderr — the actual Docker execution path is out of scope for
 #        now (#192); treated identically to "not available" below.
-#     3. native: consults migration-status.json for <command>.
-#        - Not available: falls back to <shell_script>, with a warning
-#          on stderr (not a hard error).
-#        - Available: invokes `core/bin/arcanum <command> [<repo_path>] <args...>`
+#     3. native: reads <command>'s status from migration-status.json via
+#        _engine_dispatch_status (a string enum: `shell`, `native`,
+#        `docker` or `host-only`; a missing/unknown entry reads as
+#        `shell`).
+#        - Status `shell` (no native implementation yet): falls back to
+#          <shell_script>, with a warning on stderr (not a hard error).
+#        - Any other status (`native`, `docker`, `host-only`): invokes `core/bin/arcanum <command> [<repo_path>] <args...>`
 #          (the leading `<repo_path>` present only when
 #          --prepend-repo-path was given) with the explicit env-var
 #          allowlist above (`env -i`, PATH and ARCANUM_REPO_PATH
@@ -130,12 +152,13 @@ _engine_dispatch_run_native() {
 #   that have NO shell implementation at all. <shell_script> is passed as
 #   an empty string "" in this mode and is never run, and
 #   migration-status.json is NOT consulted (native-only commands are
-#   never listed there). Resolution then becomes:
+#   listed with a non-`shell` status, but this path does not consult the
+#   map yet (docker branch, #729)). Resolution then becomes:
 #     - docker: prints `Error: engine.mode=docker is not implemented yet
 #       for native-only command '<command>'.` on stderr and returns 1 —
 #       no fallback, nothing on stdout.
 #     - anything else (unset/shell/native): runs the exact same native
-#       invocation as step 3's "Available" case above (same env-var
+#       invocation as step 3's non-`shell` case above (same env-var
 #       allowlist and --prepend-repo-path handling), propagating its exit
 #       code.
 #
@@ -196,7 +219,7 @@ engine_dispatch() {
     return $?
   fi
 
-  if [[ "$(_engine_dispatch_native_available "$command")" != "true" ]]; then
+  if [[ "$(_engine_dispatch_status "$command" false)" == "shell" ]]; then
     echo "Warning: no native implementation of '${command}' yet (arcanum/_lib/migration-status.json) — falling back to the shell implementation." >&2
     "${shell_cmd[@]}"
     return $?
