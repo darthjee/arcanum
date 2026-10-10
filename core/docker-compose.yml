@@ -5,7 +5,11 @@
 services:
   core:
     build:
-      context: .
+      # The install root, so the same core/Dockerfile also builds the
+      # `runtime` target (see the root .dockerignore).
+      context: ..
+      dockerfile: core/Dockerfile
+      target: test
     volumes:
       - ../:/home/node/app
       - core_node_modules:/home/node/app/core/node_modules

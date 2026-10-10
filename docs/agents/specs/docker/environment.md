@@ -58,7 +58,7 @@ Rows with `git-push (ssh)` in `credentials` (any `fetch`, `push` or `pull` again
 - **No agent:** when `SSH_AUTH_SOCK` is unset (Linux) or the agent has no keys, the command runs anyway and git fails the way it would natively.
 - ssh needs a passwd entry for the uid. That is the image's job (see [image.md](image.md#runtime-user-and-entrypoint)).
 
-**https remote:** git authenticates with the gh token. Dispatch passes `GH_TOKEN` (as above) and points git's credential helper at gh through `GIT_CONFIG_COUNT` env: first an empty `credential.helper`, which clears any host helper such as `osxkeychain` that doesn't exist in the container, then `credential.helper=!gh auth git-credential`. This is what `gh auth setup-git` would write, without writing any file. #728/#729 may move it into the entrypoint instead, but it must not need a writable git config.
+**https remote:** git authenticates with the gh token. Dispatch passes `GH_TOKEN` (as above) and points git's credential helper at gh through `GIT_CONFIG_COUNT` env: first an empty `credential.helper`, which clears any host helper such as `osxkeychain` that doesn't exist in the container, then `credential.helper=!gh auth git-credential`. This is what `gh auth setup-git` would write, without writing any file. It stays in dispatch env: the #728 entrypoint does not set it.
 
 ## Nested-call marker
 
@@ -82,7 +82,7 @@ Set for every row, never listed in the checklist:
 | `GIT_CONFIG_COUNT`, `GIT_CONFIG_KEY_<n>`, `GIT_CONFIG_VALUE_<n>` | `safe.directory=<repo path>`, plus `safe.directory=<git common dir>` for a worktree | git's ownership check on macOS (see [mounts.md](mounts.md#file-ownership)). `remote` rows with an https remote add the credential-helper entries above |
 | `HOSTNAME` | the container id (set by Docker) | unique lock instance ids (see [mounts.md](mounts.md#shared-state-and-locks)) |
 
-The passwd-entry mechanism may add its own variables (for example `LD_PRELOAD`, `NSS_WRAPPER_PASSWD`, `NSS_WRAPPER_GROUP`). Those are set by the image entrypoint, not by dispatch.
+The passwd-entry mechanism (`nss_wrapper`, see [image.md](image.md#runtime-user-and-entrypoint)) adds its own variables: `LD_PRELOAD`, `NSS_WRAPPER_PASSWD` and `NSS_WRAPPER_GROUP`. Those are set by the image entrypoint, not by dispatch.
 
 ## Container infrastructure env
 
