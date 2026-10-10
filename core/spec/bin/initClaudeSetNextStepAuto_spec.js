@@ -1,8 +1,10 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, realpath, rm } from 'node:fs/promises';
 import path from 'node:path';
-import { notDockerReadyWarning } from '../support/factories/engineDispatchDockerSetup.js';
+import {
+  dockerUnavailableWarning, expectRepoMountOnlyRun, runCalls
+} from '../support/factories/engineDispatchDockerSetup.js';
 import { seedEngineMode } from '../support/utils/engineMode.js';
-import { createFakeDockerBin } from '../support/utils/fakeDockerBin.js';
+import { DOCKER_PRESETS, createFakeDockerBin } from '../support/utils/fakeDockerBin.js';
 import { REPO_ROOT, runCommand } from '../support/utils/runCommand.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
@@ -16,15 +18,19 @@ const SHIM_SCRIPT = path.join(REPO_ROOT, 'init-claude', 'scripts', 'set_next_ste
 // core/bin/arcanum in every non-docker engine.mode, and that under
 // engine.mode=docker it follows the native-only rule of
 // docs/agents/specs/docker/dispatch.md: with its real
-// migration-status.json status (`native`, not docker-ready yet) it runs
-// native on the host with the row-3 warning, never reaching docker.
+// migration-status.json status (`docker`, batch 1 of #745) it reaches
+// `docker run` (a passthrough fake `docker`) with only the repo mount
+// and no extra env; with Docker unavailable it falls back to native on
+// the host with the "Docker is unavailable" warning. The real container
+// is compared with native in core/spec/docker/ (local only).
 describe('init-claude-set-next-step-auto native-only routing (via the real set_next_step_auto.sh shim)', () => {
   let repoPath;
   let configFile;
   let env;
 
   beforeEach(async () => {
-    repoPath = await createTempDir('arcanum-core-next-step-auto-repo-');
+    // realpath'd: docker mounts are compared against this exact path.
+    repoPath = await realpath(await createTempDir('arcanum-core-next-step-auto-repo-'));
     configFile = path.join(repoPath, '.claude', 'configuration', 'arcanum-repo-config.json');
     env = { PATH: process.env.PATH, HOME: repoPath };
   });
@@ -85,25 +91,57 @@ describe('init-claude-set-next-step-auto native-only routing (via the real set_n
     });
   });
 
-  it('runs native on the host with the not-docker-ready warning when engine.mode is docker', async () => {
-    const fakeDocker = await createFakeDockerBin();
+  describe('with engine.mode docker', () => {
+    let fakeDocker;
+    let native;
 
-    try {
-      await seedEngineMode({ repoPath }, 'docker');
+    /**
+     * Records the native run to compare against, then builds the fake
+     * `docker`, puts it first on `PATH` and seeds `engine.mode=docker`
+     * on a fresh repo config.
+     * @param {object} [options] - `createFakeDockerBin` options.
+     * @returns {Promise<void>} resolves once ready.
+     */
+    async function useFakeDocker(options) {
+      await seedEngineMode({ repoPath }, 'native');
+      native = await runShim(repoPath, 'enhance-issue', 'true');
+      await rm(configFile);
+
+      fakeDocker = await createFakeDockerBin(options);
       env = { ...env, PATH: `${fakeDocker.binDir}${path.delimiter}${env.PATH}` };
+      await seedEngineMode({ repoPath }, 'docker');
+    }
 
-      const result = await runShim(repoPath, 'enhance-issue', 'true');
+    afterEach(async () => {
+      await fakeDocker.cleanup();
+    });
 
-      expect(result).toEqual({
-        stdout: 'NEXT_STEP_AUTO=enhance-issue=true\n',
-        stderr: notDockerReadyWarning('init-claude-set-next-step-auto'),
-        code: 0
+    it('runs in docker with only the repo mount and no extra env', async () => {
+      await useFakeDocker({ mode: 'passthrough' });
+      const docker = await runShim(repoPath, 'enhance-issue', 'true');
+
+      expect(native).toEqual({ stdout: 'NEXT_STEP_AUTO=enhance-issue=true\n', stderr: '', code: 0 });
+      expect(docker).toEqual(native);
+      expect(await writtenConfig()).toEqual({ next_step: { auto: { 'enhance-issue': true } } });
+      expectRepoMountOnlyRun(
+        await fakeDocker.readCalls(),
+        repoPath,
+        ['init-claude-set-next-step-auto', repoPath, 'enhance-issue', 'true']
+      );
+    });
+
+    it('falls back to native on the host with the Docker-unavailable warning when the daemon is down', async () => {
+      await useFakeDocker({ inspect: DOCKER_PRESETS.daemonDown });
+      const docker = await runShim(repoPath, 'enhance-issue', 'true');
+
+      expect(docker).toEqual({
+        stdout: native.stdout,
+        stderr: dockerUnavailableWarning('daemon not reachable', 'init-claude-set-next-step-auto'),
+        code: native.code
       });
       expect(await writtenConfig()).toEqual({ next_step: { auto: { 'enhance-issue': true } } });
-      expect(await fakeDocker.readCalls()).toEqual([]);
-    } finally {
-      await fakeDocker.cleanup();
-    }
+      expect(runCalls(await fakeDocker.readCalls())).toEqual([]);
+    });
   });
 
   [[], ['REPO'], ['REPO', 'enhance-issue']].forEach((args) => {

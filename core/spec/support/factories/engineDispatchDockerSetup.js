@@ -70,6 +70,15 @@ export function fixedRunFlags(repoPath) {
 }
 
 /**
+ * The `-e` names every `docker run` carries for a plain (non-worktree)
+ * repo and no `--needs`, sorted: the fixed env plus one
+ * `safe.directory` git config pair.
+ */
+export const FIXED_ENV_NAMES = [
+  'ARCANUM_IN_DOCKER', 'ARCANUM_REPO_PATH', 'GIT_CONFIG_COUNT', 'GIT_CONFIG_KEY_0', 'GIT_CONFIG_VALUE_0'
+];
+
+/**
  * Splits one logged `docker run` argv into its parts.
  * @param {string[]} argv - the argv after `docker` (starting with `run`).
  * @returns {{flags: string[], image: string, after: string[], mounts: string[], envNames: string[]}}
@@ -114,6 +123,32 @@ export function subcommands(calls) {
  */
 export function runCalls(calls) {
   return calls.filter(({ argv }) => argv[0] === 'run');
+}
+
+/**
+ * Asserts the fake docker saw exactly one `docker run`, shaped like
+ * every batch-1 command's (no `--needs`, no `--path-arg`, no extra env):
+ * the fixed flags, only the repo mount, only the fixed `-e` names, and
+ * `after` following the image.
+ * @param {object[]} calls - the fake docker's logged calls.
+ * @param {string} repoPath - the repo path the shim dispatched with.
+ * @param {string[]} after - the expected argv after the image
+ *   (`<command> <args...>`).
+ * @returns {void}
+ */
+export function expectRepoMountOnlyRun(calls, repoPath, after) {
+  const runs = runCalls(calls);
+
+  expect(runs.length).withContext('docker run calls').toEqual(1);
+  if (runs.length !== 1) return;
+
+  const run = splitRunArgv(runs[0].argv);
+  const fixed = fixedRunFlags(repoPath);
+
+  expect(run.flags.slice(0, fixed.length)).toEqual(fixed);
+  expect(run.mounts).toEqual([`${repoPath}:${repoPath}`]);
+  expect([...run.envNames].sort()).toEqual(FIXED_ENV_NAMES);
+  expect(run.after).toEqual(after);
 }
 
 /**

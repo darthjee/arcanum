@@ -7,6 +7,12 @@
 # (config_<subcommand>_shell.sh) or the native one (core/bin/arcanum), per
 # engine.mode / arcanum/_lib/migration-status.json.
 #
+# Under engine.mode=docker they run core/bin/arcanum inside the container,
+# now that their migration-status.json status is `"docker"` (#745), with
+# only the repo mount (no `--needs`). If docker is unavailable,
+# engine_dispatch falls back to native on the host with a warning — see
+# docs/agents/specs/docker/dispatch.md.
+#
 # Usage: config.sh get <repo_path> <key>
 #        config.sh is-enabled <repo_path> <key>
 #        config.sh set <repo_path> <key> true|false

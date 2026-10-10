@@ -285,3 +285,21 @@ export const itWithGh = gatedIt('ARCANUM_DOCKER_PARITY_GH', 'needs a gh token re
 
 /** `it` that runs only when `ARCANUM_DOCKER_PARITY_SSH=1` (an ssh agent and an ssh remote). */
 export const itWithSsh = gatedIt('ARCANUM_DOCKER_PARITY_SSH', 'needs an ssh agent and an ssh remote');
+
+/**
+ * On Linux, asserts every file the docker run created or changed is
+ * owned by the host uid (`snapshotTree` fingerprints end with
+ * ` uid=<n>` there). A no-op elsewhere: Docker Desktop maps ownership
+ * on macOS, so `snapshotTree` records no uid.
+ * @param {{dockerFiles: object}} parity - a `runDockerParity` result.
+ * @returns {void}
+ */
+export function expectHostOwned({ dockerFiles }) {
+  if (process.platform !== 'linux') return;
+
+  Object.values(dockerFiles).forEach(({ changed }) => {
+    Object.entries(changed).forEach(([file, fingerprint]) => {
+      expect(fingerprint.endsWith(` uid=${process.getuid()}`)).withContext(file).toBeTrue();
+    });
+  });
+}

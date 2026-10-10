@@ -6,6 +6,14 @@
 # via either the shell implementation (queue_<subcommand>_shell.sh) or the
 # native one (core/bin/arcanum), per engine.mode / arcanum/_lib/migration-status.json.
 #
+# Under engine.mode=docker, next/wait-next/pop/empty/list run
+# core/bin/arcanum inside the container, now that their
+# migration-status.json status is `"docker"` (#745), with only the repo
+# mount (no `--needs`). If docker is unavailable, engine_dispatch falls
+# back to native on the host with a warning — see
+# docs/agents/specs/docker/dispatch.md. save/push are not in that batch
+# and keep their current status.
+#
 # State is stored in .claude/state/auto-fix-all-queue.json — a JSON array of
 # entry objects (currently just {"id": "<id>"} each), so future fields (e.g.
 # issue metadata or auto-fix-all options) can be added to an entry without
