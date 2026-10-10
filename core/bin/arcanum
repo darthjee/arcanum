@@ -17,6 +17,24 @@ import DispatchFailure from '../lib/utils/errors/DispatchFailure.js';
 
 const [command, ...args] = process.argv.slice(2);
 
+// Exit codes 125-127 are reserved for Docker itself: engine_dispatch.sh
+// reads a `docker run` exit in that range as "Docker failed" and falls
+// back to the host (see docs/agents/specs/docker/dispatch.md -> "Exit
+// codes and streams"). A command must never surface one of them, so a
+// DispatchFailure asking for 125, 126 or 127 exits 1 instead.
+const DOCKER_RESERVED_EXIT_CODES = [125, 126, 127];
+
+/**
+ * @param {?number} exitCode - the exit code a DispatchFailure requested.
+ * @returns {number} the process exit code to use (defaults to 1, and
+ *   remaps the Docker-reserved 125-127 to 1).
+ */
+function failureExitCode(exitCode) {
+  const code = exitCode ?? 1;
+
+  return DOCKER_RESERVED_EXIT_CODES.includes(code) ? 1 : code;
+}
+
 new Dispatcher(command, args)
   .dispatch()
   .then((output) => {
@@ -27,7 +45,7 @@ new Dispatcher(command, args)
   .catch((error) => {
     if (error instanceof DispatchFailure) {
       process.stdout.write(error.stdout);
-      process.exitCode = error.exitCode ?? 1;
+      process.exitCode = failureExitCode(error.exitCode);
       return;
     }
 

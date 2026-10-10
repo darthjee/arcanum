@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { createGitFixtureRepo } from '../support/utils/gitFixtureRepo.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
@@ -14,6 +14,9 @@ const binPath = path.join(
   'bin',
   'arcanum'
 );
+const dispatchFailurePreload = pathToFileURL(
+  path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'support', 'utils', 'dispatchFailurePreload.js')
+).href;
 
 /**
  * Invoke `core/bin/arcanum` with the given arguments as a plain argv
@@ -76,7 +79,48 @@ async function readFileIfExists(filePath) {
   }
 }
 
+/**
+ * Invoke `core/bin/arcanum` with `Dispatcher#dispatch` stubbed (via
+ * `dispatchFailurePreload.js`) to reject with a `DispatchFailure`
+ * requesting `exitCode`.
+ * @param {number} exitCode - the exit code the DispatchFailure requests.
+ * @returns {Promise<{stdout: string, stderr: string, code: number}>} the process result.
+ */
+async function runWithDispatchFailure(exitCode) {
+  try {
+    const { stdout, stderr } = await execFileAsync(
+      process.execPath,
+      ['--import', dispatchFailurePreload, binPath, 'any-command'],
+      { env: { ...process.env, ARCANUM_TEST_DISPATCH_FAILURE_CODE: String(exitCode) } }
+    );
+
+    return { stdout, stderr, code: 0 };
+  } catch (error) {
+    return { stdout: error.stdout, stderr: error.stderr, code: error.code };
+  }
+}
+
 describe('bin/arcanum', () => {
+  // Exit codes 125-127 are reserved for Docker (see
+  // docs/agents/specs/docker/dispatch.md -> "Exit codes and streams").
+  describe('DispatchFailure exit-code contract', () => {
+    [125, 126, 127].forEach((exitCode) => {
+      it(`maps a DispatchFailure exit code ${exitCode} to 1, still printing the stdout payload`, async () => {
+        const result = await runWithDispatchFailure(exitCode);
+
+        expect(result).toEqual({ stdout: 'STATUS=failed\n', stderr: '', code: 1 });
+      });
+    });
+
+    [1, 3, 4, 124, 128].forEach((exitCode) => {
+      it(`passes a DispatchFailure exit code ${exitCode} through unchanged`, async () => {
+        const result = await runWithDispatchFailure(exitCode);
+
+        expect(result).toEqual({ stdout: 'STATUS=failed\n', stderr: '', code: exitCode });
+      });
+    });
+  });
+
   describe('a known command that crashes (dispatch-fixture-crash)', () => {
     it('exits non-zero and prints nothing to stdout, with no fallback output', async () => {
       const { stdout, code } = await runArcanum(['dispatch-fixture-crash']);
