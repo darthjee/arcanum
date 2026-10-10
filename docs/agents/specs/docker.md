@@ -46,7 +46,7 @@ Scripts not routed through `engine_dispatch.sh` (sourced libraries, thin wrapper
 
 ## Sub-issue map
 
-In dependency order: #725 → #726, #727 → #728 → #729 → #730 → #731 → #732. #733 runs alongside the spec phase.
+In dependency order: #725 → #726, #727 → #728 → #729 → #730 → #745 → #746 → #747 → #748, #749 → #731 → #732. #733 runs alongside the spec phase.
 
 | Issue | Title | Owner | Depends on | Status |
 | --- | --- | --- | --- | --- |
@@ -57,7 +57,12 @@ In dependency order: #725 → #726, #727 → #728 → #729 → #730 → #731 →
 | #728 | Build the runtime Docker image | infra | #726 | Done |
 | #737 | Publish the multi-arch runtime Docker image from release CI | infra | #728 | Open |
 | #729 | Docker branch of `engine_dispatch.sh` with a pilot entrypoint | scripter (+ node if needed) | #727, #728 | Done (#739, #740, #741) |
-| #730 | Migrate remaining entrypoints to docker (placeholder for batches) | scripter / node | #729 | Open |
+| #730 | Migrate remaining entrypoints to docker (placeholder for batches) | architect | #729 | Done (batches: #745, #746, #747, #748, #749) |
+| #745 | Docker engine: migrate local commands without credentials (batch 1) | scripter / node | #729 | Open |
+| #746 | Docker engine: migrate local commands with path arguments or global config (batch 2) | scripter / node | #745 | Open |
+| #747 | Docker engine: migrate GitHub API commands (batch 3) | scripter / node | #746 | Open |
+| #748 | Docker engine: migrate git remote commands (batch 4) | scripter / node | #747 | Open |
+| #749 | Docker engine: migrate TTY-owning native-only commands (batch 5) | scripter / node | #747 | Open |
 | #731 | Promote docker engine design into architecture docs | architect | all of the above | Open |
 | #732 | Remove docker spec docs | architect | #731 | Open |
 
