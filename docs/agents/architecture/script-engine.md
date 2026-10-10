@@ -32,10 +32,23 @@ Existing entrypoints stay dual (shell + native). **New skills are native-only** 
 A native-only shim calls `engine_dispatch` with the literal `--native-only` flag (in the same flag/env-var segment as `--prepend-repo-path`, before `--`) and an empty `""` in place of `<shell_script>`:
 
 - `engine.mode` unset, `shell` or `native` → runs `core/bin/arcanum <command> ...`, the same way (same `env -i` allowlist, same `--prepend-repo-path` handling) as the regular native branch. There is no shell side, so `shell` is treated like `native`.
-- `engine.mode=docker` → prints `Error: engine.mode=docker is not implemented yet for native-only command '<command>'.` on stderr and exits `1`. No fallback.
-- Native-only commands **are** listed in `arcanum/_lib/migration-status.json`, as `"native"`, `"docker"` or `"host-only"`, never `"shell"`, so they appear in [entrypoint-migration-status.md](entrypoint-migration-status.md). The `--native-only` path does not consult the map yet; it starts doing so when the docker branch lands (#729).
+- `engine.mode=docker` → follows the docker [resolution order](../specs/docker/dispatch.md#resolution-order) using its map entry, minus the `shell` row: not docker-ready or Docker unavailable means native on the host, with a warning (see [Native-only commands](../specs/docker/dispatch.md#native-only-commands)).
+- Native-only commands **are** listed in `arcanum/_lib/migration-status.json`, as `"native"`, `"docker"` or `"host-only"`, never `"shell"`, so they appear in [entrypoint-migration-status.md](entrypoint-migration-status.md). Only the `docker` mode consults the map for them.
 
 Without `--native-only`, dispatch behaves exactly as described above.
+
+### Docker declarations: `--needs` and `--path-arg`
+
+Two more single-token flags go in the same segment before `--`, both repeatable and ignored outside the container path (so adding them changes nothing under `shell` or `native`):
+
+- `--needs=<tag>[,<tag>...]`: the extra mounts and env a container call needs. Tags: `global-config`, `gitconfig`, `gh`, `remote`.
+- `--path-arg=<index>:<ro|rw>`: marks `<args...>[index]` (1-based, after `--`, never counting the `--prepend-repo-path` repo path) as a file path to mount: the file itself for `ro`, its parent directory for `rw`.
+
+An unknown tag or a malformed value prints `Error: engine_dispatch: invalid <flag> '<value>'.` on stderr and returns `1`. What each tag mounts and forwards, and how path arguments are resolved, is in [Per-command declarations](../specs/docker/dispatch.md#per-command-declarations).
+
+### The docker branch
+
+Under `engine.mode=docker`, `engine_dispatch.sh` (with its docker-only helpers in `arcanum/_lib/engine_dispatch_docker.sh`) runs commands whose status is `"docker"` in a per-call `docker run` of `darthjee/arcanum:<version>`, and falls back to the host with a one-line warning otherwise. A call made from inside the container (`ARCANUM_IN_DOCKER=1`) always runs directly there, whatever `engine.mode` says. The resolution order, the availability check, the image pull/build, the `docker run` shape and the exit-code rules are defined in [Docker Engine: Dispatch](../specs/docker/dispatch.md).
 
 ## The centralized native entrypoint
 

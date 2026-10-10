@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Standalone coverage for arcanum/_lib/engine_dispatch.sh — the shell/
-# native/docker dispatch guard (issue #192, see
+# native/docker dispatch guard (issues #192 and #729, see
 # docs/agents/architecture/script-engine.md and
 # docs/agents/plans/192-.../plan.md for the full design/shared
 # contracts this exercises).
@@ -159,19 +159,23 @@ set_engine_mode "native"
 run_native_only "case7-native"
 echo "OK: --native-only with engine.mode=native runs native"
 
+# Case 8: engine.mode=docker, --native-only. The real map says
+# `"native"` (not docker-ready) for auto-fix-all-config-get, so this
+# runs native on the host with the row-3 warning — no hard error, and
+# no docker call.
 set_engine_mode "docker"
 out=$(engine_dispatch "$REPO_DIR" "auto-fix-all-config-get" "" --native-only -- "$REPO_DIR" "$FIXTURE_KEY" 2>"${TMP_DIR}/case8.stderr")
 code=$?
-expected_err="Error: engine.mode=docker is not implemented yet for native-only command 'auto-fix-all-config-get'."
-[[ $code -eq 1 ]] || fail "case 8 (--native-only, docker): expected exit 1, got $code"
-[[ -z "$out" ]] || fail "case 8 (--native-only, docker): expected empty stdout, got '${out}'"
+expected_err="Warning: 'auto-fix-all-config-get' is not docker-ready yet (arcanum/_lib/migration-status.json) — falling back to the native implementation on the host."
+[[ $code -eq 0 ]] || fail "case 8 (--native-only, docker): expected exit 0, got $code"
+[[ "$out" == "$EXPECTED_OUTPUT" ]] || fail "case 8 (--native-only, docker): expected native stdout '${EXPECTED_OUTPUT}', got '${out}'"
 [[ "$(cat "${TMP_DIR}/case8.stderr")" == "$expected_err" ]] || fail "case 8 (--native-only, docker): expected stderr '${expected_err}', got '$(cat "${TMP_DIR}/case8.stderr")'"
-echo "OK: --native-only with engine.mode=docker fails with the documented error"
+echo "OK: --native-only with engine.mode=docker and a not-docker-ready status runs native on the host, with the row-3 warning"
 
 # Case 9: point the lib at temporary maps that mark the command `shell`
 # (no native implementation), a legacy `false`, then omit it entirely.
-# This path does not consult the map yet (docker branch, #729), so
-# --native-only must still run native, with no fallback warning.
+# Under engine.mode=native, --native-only never consults the map, so it
+# must still run native, with no fallback warning.
 set_engine_mode "native"
 REAL_MIGRATION_STATUS_FILE="$_ENGINE_DISPATCH_MIGRATION_STATUS_FILE"
 _ENGINE_DISPATCH_MIGRATION_STATUS_FILE="${TMP_DIR}/migration-status.json"
@@ -269,6 +273,54 @@ assert_status "k-native" true native "missing file"
 
 _ENGINE_DISPATCH_MIGRATION_STATUS_FILE="$REAL_MIGRATION_STATUS_FILE"
 echo "OK: _engine_dispatch_status follows the reading rule for every map state"
+
+# --- Case 12: engine.mode=docker, driven by temporary maps — the
+#     resolution rows that need no Docker daemon. `native` -> row-3
+#     warning + native; `shell` -> row-3b warning + shell; `docker` with
+#     no `docker` on PATH -> row-4 `docker not found` warning + native
+#     (for a dual and a native-only entrypoint); `host-only` -> native,
+#     no warning. ---
+
+set_engine_mode "docker"
+_ENGINE_DISPATCH_MIGRATION_STATUS_FILE="${TMP_DIR}/migration-status.json"
+
+# A PATH with every executable the host has, except `docker`.
+NO_DOCKER_BIN="${TMP_DIR}/no-docker-bin"
+mkdir -p "$NO_DOCKER_BIN"
+IFS=':' read -r -a path_dirs <<< "$PATH"
+for dir in "${path_dirs[@]}"; do
+  [[ -d "$dir" ]] || continue
+  for exe in "$dir"/*; do
+    name="$(basename "$exe")"
+    [[ "$name" == "docker" || -e "${NO_DOCKER_BIN}/${name}" ]] && continue
+    [[ -f "$exe" && -x "$exe" ]] && ln -s "$exe" "${NO_DOCKER_BIN}/${name}"
+  done
+done
+
+row3="Warning: 'auto-fix-all-config-get' is not docker-ready yet (arcanum/_lib/migration-status.json) — falling back to the native implementation on the host."
+row3b="$expected_warn"
+row4="Warning: Docker is unavailable (docker not found) — running 'auto-fix-all-config-get' natively on the host. Fix Docker or change engine.mode."
+
+run_docker_mode() {
+  local label="$1" status="$2" expected_stderr="$3" path="$4"
+  shift 4
+  echo "{\"auto-fix-all-config-get\": \"${status}\"}" > "$_ENGINE_DISPATCH_MIGRATION_STATUS_FILE"
+  out=$(PATH="$path" engine_dispatch "$REPO_DIR" "auto-fix-all-config-get" "$@" -- "$REPO_DIR" "$FIXTURE_KEY" 2>"${TMP_DIR}/${label}.stderr")
+  code=$?
+  [[ $code -eq 0 ]] || fail "${label}: expected exit 0, got $code (stderr: $(cat "${TMP_DIR}/${label}.stderr"))"
+  [[ "$out" == "$EXPECTED_OUTPUT" ]] || fail "${label}: expected stdout '${EXPECTED_OUTPUT}', got '${out}'"
+  [[ "$(cat "${TMP_DIR}/${label}.stderr")" == "$expected_stderr" ]] || fail "${label}: expected stderr '${expected_stderr}', got '$(cat "${TMP_DIR}/${label}.stderr")'"
+  return 0
+}
+
+run_docker_mode "case12-native" native "$row3" "$PATH" "$FIXTURE_SCRIPT"
+run_docker_mode "case12-shell" shell "$row3b" "$PATH" "$FIXTURE_SCRIPT"
+run_docker_mode "case12-host-only" host-only "" "$PATH" "$FIXTURE_SCRIPT"
+run_docker_mode "case12-no-docker" docker "$row4" "$NO_DOCKER_BIN" "$FIXTURE_SCRIPT" --needs=gh --path-arg=1:ro
+run_docker_mode "case12-no-docker-native-only" docker "$row4" "$NO_DOCKER_BIN" "" --native-only
+
+_ENGINE_DISPATCH_MIGRATION_STATUS_FILE="$REAL_MIGRATION_STATUS_FILE"
+echo "OK: engine.mode=docker follows the resolution order (rows 2, 3, 3b and 4) without a Docker daemon"
 
 echo "PASS: arcanum/_lib/engine_dispatch.sh — shell/native/docker dispatch guard behaves per docs/agents/architecture/script-engine.md"
 exit 0

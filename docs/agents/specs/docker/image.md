@@ -66,7 +66,7 @@ Refreshing a pin is a normal PR. Pins change the image content, so they only rea
 3. **Local build:** if the pull fails (offline, no such tag), dispatch builds the image from the install itself, `docker build -f core/Dockerfile --target runtime --build-arg ARCANUM_VERSION=<version> -t darthjee/arcanum:<version> <install root>`, and uses it.
 4. **Docker unavailable:** if both fail, that counts as "Docker unavailable" and dispatch falls back to native on the host, with the warning described in [docker.md](../docker.md#decisions-so-far).
 
-A dev install with no exact version (a git clone between tags, like a contributor's checkout) skips the pull and builds locally as `darthjee/arcanum:local-<short HEAD>`. Uncommitted changes are not detected. How a contributor forces a rebuild is #729's call.
+A dev install with no exact version (a git clone between tags, like a contributor's checkout) skips the pull and builds locally as `darthjee/arcanum:local-<short HEAD>`. Uncommitted changes are not detected: they never change the tag, so a contributor testing local edits must remove the image first. `docker rmi darthjee/arcanum:local-<short HEAD>` does that, and the next docker dispatch rebuilds it.
 
 Rules:
 
