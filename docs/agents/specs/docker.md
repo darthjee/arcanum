@@ -87,5 +87,5 @@ While epic #724 is open, any PR that adds or removes a script under `<skill>/scr
 
 - [Script Engine](../architecture/script-engine.md): the shell/native/docker dispatch design and `engine.mode`.
 - [Shell Engine Removal](shell-engine-removal.md): needs a working docker mode as a prerequisite.
-- [Entrypoint Migration Status](../architecture/entrypoint-migration-status.md): how dual entrypoints are tracked in `migration-status.json`.
+- [Entrypoint Migration Status](../architecture/entrypoint-migration-status.md): how dispatch commands are tracked in `migration-status.json`.
 - [Specs index](../specs.md): every current spec.
