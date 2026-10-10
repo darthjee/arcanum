@@ -68,7 +68,7 @@ Native commands sometimes call another dispatched shim (for example `ArcanumSpli
 - When `engine_dispatch.sh` sees `ARCANUM_IN_DOCKER=1`, it runs the native implementation directly, whatever `engine.mode` says, and never starts a container from inside one. The image has no Docker CLI and no socket, so it couldn't anyway. That rule is what keeps it fast and correct.
 - A nested call runs under `env -i` like any native call, which would drop the marker and everything else on this page. So inside the container, `_engine_dispatch_run_native` also forwards the [container infrastructure env](#container-infrastructure-env) on top of the command's own allowlist.
 
-The dispatch-side mechanics (where the check sits, and what happens to native-only and not-yet-docker-ready commands nested inside the container) belong to [dispatch.md](dispatch.md) (#727).
+The dispatch-side mechanics (where the check sits, and what happens to native-only and not-yet-docker-ready commands nested inside the container) are in [dispatch.md](dispatch.md#nested-call-guard).
 
 ## Fixed env
 

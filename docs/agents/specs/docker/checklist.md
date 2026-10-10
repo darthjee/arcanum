@@ -4,9 +4,9 @@ Part of the [Docker Engine spec](../docker.md) (epic #724). This checklist track
 
 ## How to use it
 
-- There is one row per **dispatch command**: every key of `arcanum/_lib/migration-status.json`, plus every native-only command (shims calling `engine_dispatch ... --native-only`). This is the name `engine_dispatch` receives, and therefore the key the docker-readiness lookup uses (#727). A per-subcommand router produces several rows that share one `script`.
+- There is one row per **dispatch command**: every key of `arcanum/_lib/migration-status.json`, plus every native-only command (shims calling `engine_dispatch ... --native-only`). This is the name `engine_dispatch` receives, and therefore its key in `migration-status.json`, which dispatch reads to decide whether the command is docker-ready (see [dispatch.md](dispatch.md#docker-readiness-source-of-truth)). A per-subcommand router produces several rows that share one `script`.
 - There is one table per skill folder, so a batch PR touches a single section. The last section lists the scripts that are not routed through `engine_dispatch.sh`, one row per file, pending #733.
-- **This checklist is hand-maintained.** Each implementation PR ticks its own rows (`status` ✅, plus `issue`) in the same PR. While epic #724 is open, any PR that adds or removes a script under `<skill>/scripts/` or `arcanum/_lib/` also adds or removes its row here.
+- **This checklist is hand-maintained.** Each implementation PR ticks its own rows (`status` ✅, plus `issue`) in the same PR, and flips each ticked command's `migration-status.json` value to `"docker"` in that same PR. The evidence a row needs before it is ticked is in [testing.md](testing.md#ticking-a-checklist-row). `host-only` rows have status `n/a` and map to `"host-only"`. While epic #724 is open, any PR that adds or removes a script under `<skill>/scripts/` or `arcanum/_lib/` also adds or removes its row here.
 - The repo mount (plus the git common dir for worktrees and the log location) and the fixed env from [environment.md](environment.md#fixed-env) are implicit for every row and not repeated in `mounts`/`env`.
 
 ## Columns
@@ -21,7 +21,7 @@ Part of the [Docker Engine spec](../docker.md) (epic #724). This checklist track
 | `mounts` | Extra mounts beyond the implicit ones (repo, git common dir for worktrees, log location): `global-config:ro`, `gitconfig:ro`, `remote`, `args:ro`/`args:rw`, `host-only`, or `—` for none. Derived by the rule in [mounts.md](mounts.md#deriving-the-checklist-mounts-column). `?` means not determinable yet. |
 | `env` | Extra env vars beyond the command's existing `engine_dispatch` allowlist and the fixed env every row gets: `CLAUDE_CONFIG_DIR`, `GIT_CONFIG_GLOBAL`, `GH_TOKEN`, `remote`, or `—` for none. Derived by the rule in [environment.md](environment.md#deriving-the-checklist-env-column). |
 | `issue` | The issue that made the command docker-ready. |
-| `notes` | Free text, e.g. TTY-owning, long-running. |
+| `notes` | Free text, e.g. TTY-owning, long-running. A TTY-owning command always takes its exit-4 `FALLBACK=chat` path under docker (see [dispatch.md](dispatch.md#tty)). |
 
 The initial `credentials` values come from each `engine_dispatch` call's env allowlist (`HOME` forwarded usually means `gh` or git remote access), reviewed by hand against the shell implementation.
 
@@ -68,8 +68,8 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 
 | command | script | kind | status | credentials | mounts | env | issue | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `arcanum-create-issue-publish` | `arcanum-create-issue/scripts/publish.sh` | native-only | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | TTY-owning. |
-| `arcanum-create-issue-start` | `arcanum-create-issue/scripts/start.sh` | native-only | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | TTY-owning. |
+| `arcanum-create-issue-publish` | `arcanum-create-issue/scripts/publish.sh` | native-only | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | TTY-owning: always exit 4 `FALLBACK=chat` under docker. |
+| `arcanum-create-issue-start` | `arcanum-create-issue/scripts/start.sh` | native-only | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | TTY-owning: always exit 4 `FALLBACK=chat` under docker. |
 
 ## arcanum-split-issue
 
@@ -84,8 +84,8 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 
 | command | script | kind | status | credentials | mounts | env | issue | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `arcanum-update-run-update-apply` | `arcanum-update/scripts/run_update.sh` `apply` | dispatched | ☐ | none | host-only | — | | Host-only: updates the host install itself, and `ClaudeContext#validateInstall` ties it to the running install. |
-| `arcanum-update-run-update-check` | `arcanum-update/scripts/run_update.sh` `check` | dispatched | ☐ | none | host-only | — | | Host-only: inspects the host install, not the image's copy. |
+| `arcanum-update-run-update-apply` | `arcanum-update/scripts/run_update.sh` `apply` | dispatched | n/a | none | host-only | — | | Host-only: updates the host install itself, and `ClaudeContext#validateInstall` ties it to the running install. |
+| `arcanum-update-run-update-check` | `arcanum-update/scripts/run_update.sh` `check` | dispatched | n/a | none | host-only | — | | Host-only: inspects the host install, not the image's copy. |
 
 ## auto-fix-all
 
@@ -126,7 +126,7 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 | `auto-fix-issue-github-pr-view` | `auto-fix-issue/scripts/github.sh` `pr-view` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
 | `auto-fix-issue-list-plan-agents` | `auto-fix-issue/scripts/list_plan_agents.sh` | dispatched | ☐ | none | — | — | | |
 | `auto-fix-issue-list-plan-steps` | `auto-fix-issue/scripts/list_plan_steps.sh` | dispatched | ☐ | none | — | — | | |
-| `auto-fix-issue-run-checks` | `auto-fix-issue/scripts/run_checks.sh` | dispatched | ☐ | inherits target | host-only | — | | Proposed host-only: runs the target project's own `.claude/scripts/check_<agent>.sh`, whose toolchain the image doesn't have. Its credentials and mounts are the target project's. Final call in #727/#733. |
+| `auto-fix-issue-run-checks` | `auto-fix-issue/scripts/run_checks.sh` | dispatched | n/a | inherits target | host-only | — | | Host-only (decided in #727): runs the target project's own `.claude/scripts/check_<agent>.sh`, whose toolchain the image doesn't have. Its credentials and mounts are the target project's. |
 
 ## auto-monitor-issue-pr
 

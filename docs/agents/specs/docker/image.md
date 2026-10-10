@@ -2,7 +2,7 @@
 
 Part of the [Docker Engine spec](../docker.md) (epic #724). Written in #726, implemented in #728.
 
-This part defines the image that `engine.mode=docker` runs commands in: how it is built, who it runs as, how it is pinned, and how dispatch gets a copy matching the installed arcanum version. Mounts are in [mounts.md](mounts.md), env vars and credentials in [environment.md](environment.md), and the `docker run` invocation itself in [dispatch.md](dispatch.md) (#727).
+This part defines the image that `engine.mode=docker` runs commands in: how it is built, who it runs as, how it is pinned, and how dispatch gets a copy matching the installed arcanum version. Mounts are in [mounts.md](mounts.md), env vars and credentials in [environment.md](environment.md), and the `docker run` invocation itself in [dispatch.md](dispatch.md#docker-run-invocation-shape).
 
 ## Strategy: one shared base, two targets
 
@@ -41,7 +41,7 @@ The container always runs as the host user: dispatch passes `--user "$(id -u):$(
 An arbitrary uid has no `/etc/passwd` entry in the image. What that means:
 
 - **arcanum's own code** never looks the user up (no `whoami`, `getent`, `os.userInfo()`), and must keep it that way.
-- **`HOME`** is set to a writable path that does not depend on the uid: `ENV HOME=/tmp/arcanum-home`, created at start, with `/tmp` a tmpfs (see [dispatch.md](dispatch.md), #727, for `--tmpfs`/`--read-only`). `gh` and `git` write small caches under it. Nothing in it persists between calls.
+- **`HOME`** is set to a writable path that does not depend on the uid: `ENV HOME=/tmp/arcanum-home`, created at start, with `/tmp` a tmpfs (dispatch passes `--read-only` and `--tmpfs /tmp`, see [dispatch.md](dispatch.md#docker-run-invocation-shape)). `gh` and `git` write small caches under it. Nothing in it persists between calls.
 - **OpenSSH does look the user up:** `ssh` aborts with `No user exists for uid` when `getpwuid` fails, so `git` over SSH breaks without an entry. The image therefore provides a passwd/group entry for the running uid at start. The recommended mechanism is `nss_wrapper` (pinned `libnss-wrapper`): the entrypoint writes a one-line passwd and group file under `$HOME` and sets `LD_PRELOAD`, `NSS_WRAPPER_PASSWD` and `NSS_WRAPPER_GROUP`. A writable `/etc/passwd` is rejected. #728 makes the final choice, but it must not need root and must survive nested `env -i` calls (see [environment.md](environment.md#container-infrastructure-env)).
 - **git `safe.directory`:** on Linux, bind-mounted files keep the host uid, which is also the container uid, so git's dubious-ownership check passes. On macOS Docker Desktop, ownership inside the container is mapped by the file-sharing layer and may not match. Dispatch therefore always sets `safe.directory` for exactly the repo path and the git common dir (never `*`), through `GIT_CONFIG_COUNT` env, not by writing any config file. See [environment.md](environment.md#fixed-env).
 
@@ -78,5 +78,5 @@ Rules:
 
 - **Architectures:** the published manifest covers `linux/amd64` and `linux/arm64`, so Apple Silicon Macs and arm64 Linux hosts run natively with no emulation. A local build always targets the host's own architecture.
 - **Linux:** containers run on the host kernel. Bind mounts are native, and uids pass through unchanged. Overhead is mostly `docker run` startup.
-- **macOS Docker Desktop:** containers run in a Linux VM. Bind mounts go through the file-sharing layer (virtiofs by default, gRPC FUSE on older setups), which is slower for many small file operations and maps ownership (see [mounts.md](mounts.md#file-ownership)). Mounted paths must be inside Docker Desktop's shared directories, which by default include `/Users`, `/Volumes`, `/private`, `/tmp` and `/var/folders`. The per-call cost on macOS is part of the performance open point in [dispatch.md](dispatch.md) (#727).
+- **macOS Docker Desktop:** containers run in a Linux VM. Bind mounts go through the file-sharing layer (virtiofs by default, gRPC FUSE on older setups), which is slower for many small file operations and maps ownership (see [mounts.md](mounts.md#file-ownership)). Mounted paths must be inside Docker Desktop's shared directories, which by default include `/Users`, `/Volumes`, `/private`, `/tmp` and `/var/folders`. The per-call cost on macOS is part of the benchmark in [dispatch.md](dispatch.md#per-call-docker-run-and-when-to-revisit-it).
 - **Windows:** out of scope. Arcanum's scripts target macOS and Linux.
