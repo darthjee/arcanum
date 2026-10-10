@@ -2,7 +2,7 @@
 
 ## Status
 
-In progress, tracked by epic [#724](https://github.com/darthjee/arcanum/issues/724). Phase 1 (spec) is under way: this index and the [migration checklist](docker/checklist.md) exist, and the other parts are stubs until their sub-issues land. No docker execution path is implemented yet. Today `arcanum/_lib/engine_dispatch.sh` only warns and falls back to shell for dual entrypoints, and errors out for native-only commands. Update this section as each phase completes.
+In progress, tracked by epic [#724](https://github.com/darthjee/arcanum/issues/724). Phase 1 (spec) is under way: this index, the [migration checklist](docker/checklist.md), and the [image](docker/image.md), [mounts](docker/mounts.md) and [environment](docker/environment.md) parts are written (#725, #726). [dispatch.md](docker/dispatch.md) and [testing.md](docker/testing.md) are stubs until #727 lands. No docker execution path is implemented yet. Today `arcanum/_lib/engine_dispatch.sh` only warns and falls back to shell for dual entrypoints, and errors out for native-only commands. Update this section as each phase completes.
 
 ## Goal
 
@@ -48,11 +48,11 @@ In dependency order: #725 → #726, #727 → #728 → #729 → #730 → #731 →
 
 | Issue | Title | Owner | Depends on | Status |
 | --- | --- | --- | --- | --- |
-| #725 | Spec: docker index and migration checklist | architect | — | In progress |
-| #726 | Spec: docker image, mounts and environment | architect (`infra` consulted) | #725 | Open |
+| #725 | Spec: docker index and migration checklist | architect | — | Done |
+| #726 | Spec: docker image, mounts and environment | architect (`infra` consulted) | #725 | Done |
 | #727 | Spec: docker dispatch and testing | architect | #725 | Open |
 | #733 | Decide docker handling for scripts not routed through `engine_dispatch` | architect (`scripter` consulted) | #725 | Open |
-| #728 | Build the runtime Docker image | infra | #726 | Open |
+| #728 | Build the runtime Docker image (plus the release-CI multi-arch publishing job, unless split into a new sub-issue) | infra | #726 | Open |
 | #729 | Docker branch of `engine_dispatch.sh` with a pilot entrypoint | scripter (+ node if needed) | #727, #728 | Open |
 | #730 | Migrate remaining entrypoints to docker (placeholder for batches) | scripter / node | #729 | Open |
 | #731 | Promote docker engine design into architecture docs | architect | all of the above | Open |
@@ -65,14 +65,17 @@ Each is resolved by the part/issue named:
 - **TTY handling:** whether `/dev/tty`-owning scripts run with `docker run -it` or always take the exit-4 `FALLBACK=chat` path. See [dispatch.md](docker/dispatch.md) (#727), and #733 for non-dispatched TTY scripts such as `next_step_prompt.sh`.
 - **Performance:** `docker run` adds startup overhead (roughly 0.3–1s per call, more on macOS Docker Desktop), and one skill run makes many script calls, more so in `auto-fix-all` loops. Choose between per-call `docker run` and a long-lived container with `docker exec`, against a rough target of under 1s overhead per call on Linux, by benchmarking a few hot scripts. See [dispatch.md](docker/dispatch.md) (#727).
 - **Docker-readiness source of truth:** what dispatch reads to decide whether a command is docker-ready. See [dispatch.md](docker/dispatch.md) (#727).
-- **Worktrees and path identity:** mount the repo at the same absolute path, plus the git common dir for worktrees. See [mounts.md](docker/mounts.md) (#726).
-- **File ownership:** files written into the repo stay owned by the host user. `core/docker-entrypoint.sh`'s `chown` must not run against a user's repo. See [mounts.md](docker/mounts.md) and [image.md](docker/image.md) (#726).
-- **Credentials:** `gh` auth (mounted config vs. `GH_TOKEN`) and git push over SSH (agent forwarding). See [environment.md](docker/environment.md) (#726).
-- **Platforms:** macOS Docker Desktop vs. Linux, arm64 vs. amd64. See [image.md](docker/image.md) (#726).
-- **Nested calls:** a command that shells out to another dispatched script must not start a container from inside the container (e.g. via a marker env var). See [environment.md](docker/environment.md) (#726) and [dispatch.md](docker/dispatch.md) (#727).
+- **Worktrees and path identity:** resolved. Every mount uses the same absolute path, and the git common dir is mounted for worktrees. See [mounts.md](docker/mounts.md#path-identity) (#726).
+- **File ownership:** resolved. The container runs as `--user $(id -u):$(id -g)`, and the `runtime` target has no root phase, so `core/docker-entrypoint.sh` stays test-only. See [mounts.md](docker/mounts.md#file-ownership) and [image.md](docker/image.md#runtime-user-and-entrypoint) (#726).
+- **Credentials:** resolved. A host-resolved `GH_TOKEN` passed by env (`~/.config/gh` never mounted), SSH agent forwarding plus `known_hosts:ro` for ssh remotes, and the gh credential helper for https remotes. See [environment.md](docker/environment.md#gh-credentials) (#726).
+- **Platforms:** resolved. A multi-arch (amd64 + arm64) image, with the macOS Docker Desktop differences documented. See [image.md](docker/image.md#platforms) (#726). The macOS per-call cost stays part of **Performance**.
+- **Nested calls:** environment half resolved. `ARCANUM_IN_DOCKER=1` is always set in the container, and nested `env -i` calls keep it along with the container infrastructure env. See [environment.md](docker/environment.md#nested-call-marker) (#726). The dispatch-side check is still open in [dispatch.md](docker/dispatch.md) (#727).
 - **Exit codes and streams:** pass through the exact exit code (including 3/4), keep stdout and stderr separate, and never confuse Docker's own failures (125–127) with script exit codes. See [dispatch.md](docker/dispatch.md) (#727).
-- **Concurrency:** no fixed container names, and the lock system keeps working across host and container processes. See [dispatch.md](docker/dispatch.md) (#727).
+- **Concurrency:** no fixed container names. That the lock system works across host and container processes is settled in [mounts.md](docker/mounts.md#shared-state-and-locks) (#726). The rest is in [dispatch.md](docker/dispatch.md) (#727).
 - **Non-dispatched scripts:** sourced libraries, thin wrappers, non-dispatched entrypoints, install/update bootstraps. Decided in #733.
+- **Host-only commands:** #726 marks `arcanum-update-run-update-*` as host-only and proposes the same for `auto-fix-issue-run-checks` (see the [checklist](docker/checklist.md)). How dispatch knows a command is host-only is part of the docker-readiness source of truth in [dispatch.md](docker/dispatch.md) (#727).
+- **Image publishing:** the release-CI job that pushes `darthjee/arcanum:<version>` has no sub-issue yet. It is follow-up work under #728, or a new sub-issue of #724. See [image.md](docker/image.md#distribution-and-versioning).
+- **Known limitations:** commit signing, git hooks that need host tools, and included git config files (see [mounts.md](docker/mounts.md#known-limitations)). #729 decides whether each one makes a command fall back to native.
 
 ## Maintenance rule (drift)
 
