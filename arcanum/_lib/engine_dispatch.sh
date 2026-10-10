@@ -93,6 +93,7 @@ _engine_dispatch_run_native() {
     [[ -n "${!var+x}" ]] && env_args+=("${var}=${!var}")
   done
 
+  # shellcheck disable=SC2031  # only _engine_dispatch_docker_run's subshell sets it
   if [[ "${ARCANUM_IN_DOCKER:-}" == "1" ]]; then
     while IFS= read -r var; do
       [[ -n "${!var+x}" ]] && env_args+=("${var}=${!var}")
@@ -235,6 +236,7 @@ engine_dispatch() {
   [[ ${#args[@]} -gt 0 ]] && shell_cmd+=("${args[@]}")
 
   local status
+  # shellcheck disable=SC2031  # only _engine_dispatch_docker_run's subshell sets it
   if [[ "${ARCANUM_IN_DOCKER:-}" == "1" ]]; then
     status=$(_engine_dispatch_status "$command" "$native_only")
     if [[ "$status" == "shell" ]]; then
@@ -272,7 +274,7 @@ engine_dispatch() {
     local ref reason code
     ref=$(_engine_dispatch_docker_image_ref)
     if reason=$(_engine_dispatch_docker_available "$ref"); then
-      _engine_dispatch_docker_run
+      _engine_dispatch_docker_run "$ref"
       code=$?
       case "$code" in
         125 | 126 | 127) reason="docker run failed with ${code}" ;;

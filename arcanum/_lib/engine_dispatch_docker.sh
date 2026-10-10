@@ -13,6 +13,8 @@
 
 # shellcheck source=lock.sh
 source "${_ENGINE_DISPATCH_LIB_DIR}/lock.sh"
+# shellcheck source=origin.sh
+source "${_ENGINE_DISPATCH_LIB_DIR}/origin.sh"
 
 # The image repository dispatch pulls/builds (`<repository>:<version>`).
 _ENGINE_DISPATCH_DOCKER_REPOSITORY="darthjee/arcanum"
@@ -177,9 +179,274 @@ _engine_dispatch_docker_available() {
   return 0
 }
 
-# _engine_dispatch_docker_run
-#   Runs the call in a container (implemented in a later step); returns
-#   docker run's exit code.
-_engine_dispatch_docker_run() {
-  return 125
+# Fixed in-container paths for the forwarded SSH agent socket
+# (docs/agents/specs/docker/environment.md#git-remote-access).
+_ENGINE_DISPATCH_DOCKER_LINUX_SSH_SOCK="/run/arcanum/ssh-agent.sock"
+_ENGINE_DISPATCH_DOCKER_MACOS_SSH_SOCK="/run/host-services/ssh-auth.sock"
+
+# _engine_dispatch_docker_abs_path <path>
+#   Prints <path> made absolute against $PWD (unchanged when already
+#   absolute), with `.`/`..` resolved when its directory exists. Never
+#   resolves symlinks, so it compares against <repo_path> as given.
+_engine_dispatch_docker_abs_path() {
+  local p="$1"
+  if [[ "$p" == /* ]]; then
+    echo "$p"
+  elif [[ -d "${PWD}/${p}" ]]; then
+    (cd "${PWD}/${p}" && pwd)
+  elif [[ -d "$(dirname "${PWD}/${p}")" ]]; then
+    echo "$(cd "$(dirname "${PWD}/${p}")" && pwd)/$(basename "$p")"
+  else
+    echo "${PWD}/${p}"
+  fi
 }
+
+# _engine_dispatch_docker_inside <path> <dir>
+#   Exits 0 when <path> is <dir> itself or nested under it.
+_engine_dispatch_docker_inside() {
+  local path="$1" dir="${2%/}"
+  [[ "$path" == "$dir" || "$path" == "$dir"/* ]]
+}
+
+# _engine_dispatch_docker_gh_token <repo_path>
+#   Prints the gh token resolved on the host: GH_TOKEN, else
+#   GITHUB_TOKEN, else `gh auth token --hostname <host> [--user
+#   <ghuser>]` (host and ghuser via origin.sh). Prints nothing when no
+#   token can be obtained; never prompts, always exits 0.
+_engine_dispatch_docker_gh_token() {
+  local repo_path="$1"
+  if [[ -n "${GH_TOKEN:-}" ]]; then
+    echo "$GH_TOKEN"
+    return 0
+  fi
+  if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+    echo "$GITHUB_TOKEN"
+    return 0
+  fi
+  command -v gh >/dev/null 2>&1 || return 0
+  local host ghuser cmd=(gh auth token)
+  host=$(get_domain "$repo_path" 2>/dev/null) || host=""
+  ghuser=$(cd "$repo_path" 2>/dev/null && get_gh_user)
+  [[ -n "$host" ]] && cmd+=(--hostname "$host")
+  [[ -n "$ghuser" ]] && cmd+=(--user "$ghuser")
+  "${cmd[@]}" </dev/null 2>/dev/null || true
+}
+
+# _engine_dispatch_docker_run <ref>
+#   Runs this call in a `darthjee/arcanum` container and returns
+#   `docker run`'s exit code unchanged (stdin attached, stdout/stderr
+#   untouched). Reads engine_dispatch's own locals (bash dynamic
+#   scoping): repo_path, command, prepend_repo_path, env_allowlist,
+#   needs_tags, path_args and args.
+#
+#   argv, in order (docs/agents/specs/docker/dispatch.md "`docker run`
+#   invocation shape"): the fixed flags; `-v <repo>:<repo>`; the git
+#   common dir (worktrees) and log directory mounts; the --needs mounts;
+#   the --path-arg mounts (equal or nested sources collapsed); `-e NAME`
+#   entries (fixed env, --needs env, then each set allowlisted name
+#   except HOME and PATH); <ref>; then exactly what
+#   _engine_dispatch_run_native passes to core/bin/arcanum (command,
+#   optional repo path, args — relative path args that the container's
+#   working directory would resolve differently made absolute).
+#
+#   Runs in a subshell: the values behind every `-e NAME` are exported
+#   there only (never in argv), so nothing leaks into the caller.
+# shellcheck disable=SC2154  # engine_dispatch's locals, via dynamic scoping
+_engine_dispatch_docker_run() (
+  local ref="$1"
+  local repo="${repo_path%/}"
+
+  # shellcheck disable=SC2054  # the commas belong to the --tmpfs value
+  local run_args=(run --rm -i --init --label arcanum.dispatch=1
+    --user "$(id -u):$(id -g)"
+    --read-only --tmpfs /tmp:rw,exec,mode=1777
+    --cap-drop ALL --security-opt no-new-privileges
+    -w "$repo_path" -v "${repo_path}:${repo_path}")
+
+  local env_names=() git_config=()
+  local name
+
+  # --- Repo-derived mounts and safe.directory entries ---
+  git_config+=("safe.directory" "$repo_path")
+  if [[ -f "${repo}/.git" ]]; then
+    local common_dir
+    common_dir=$(git -C "$repo_path" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || common_dir=""
+    if [[ -n "$common_dir" ]]; then
+      run_args+=(-v "${common_dir}:${common_dir}")
+      git_config+=("safe.directory" "$common_dir")
+    fi
+  fi
+
+  local log_dir
+  log_dir=$(cd "$repo_path" && config_chain_read "$repo_path" engine log.location)
+  log_dir="${log_dir#\"}"
+  log_dir="${log_dir%\"}"
+  if [[ -n "$log_dir" ]]; then
+    [[ "$log_dir" != /* ]] && log_dir="${repo}/${log_dir}"
+    if [[ -d "$log_dir" ]] && ! _engine_dispatch_docker_inside "$log_dir" "$repo"; then
+      run_args+=(-v "${log_dir}:${log_dir}")
+    fi
+  fi
+
+  # --- --needs ---
+  local tags=" "
+  [[ ${#needs_tags[@]} -gt 0 ]] && tags=" ${needs_tags[*]} "
+  local needs_env=() gh_needed="false"
+
+  if [[ "$tags" == *" global-config "* ]]; then
+    export CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-${HOME:-}/.claude}"
+    local global_file="${CLAUDE_CONFIG_DIR}/arcanum-config.json"
+    [[ -f "$global_file" ]] && run_args+=(-v "${global_file}:${global_file}:ro")
+    needs_env+=(CLAUDE_CONFIG_DIR)
+  fi
+
+  if [[ "$tags" == *" gitconfig "* ]]; then
+    local candidate git_global=""
+    for candidate in "${GIT_CONFIG_GLOBAL:-}" "${HOME:-}/.gitconfig" "${XDG_CONFIG_HOME:-${HOME:-}/.config}/git/config"; do
+      if [[ -n "$candidate" && -f "$candidate" ]]; then
+        git_global="$candidate"
+        break
+      fi
+    done
+    if [[ -n "$git_global" ]]; then
+      run_args+=(-v "${git_global}:${git_global}:ro")
+      export GIT_CONFIG_GLOBAL="$git_global"
+      needs_env+=(GIT_CONFIG_GLOBAL)
+    fi
+  fi
+
+  [[ "$tags" == *" gh "* ]] && gh_needed="true"
+
+  if [[ "$tags" == *" remote "* ]]; then
+    local origin_url
+    origin_url=$(git -C "$repo_path" remote get-url origin 2>/dev/null) || origin_url=""
+    if [[ "$origin_url" == git@* || "$origin_url" == ssh://* ]]; then
+      if [[ "$(uname)" == "Darwin" ]]; then
+        run_args+=(-v "${_ENGINE_DISPATCH_DOCKER_MACOS_SSH_SOCK}:${_ENGINE_DISPATCH_DOCKER_MACOS_SSH_SOCK}")
+        export SSH_AUTH_SOCK="$_ENGINE_DISPATCH_DOCKER_MACOS_SSH_SOCK"
+        needs_env+=(SSH_AUTH_SOCK)
+      elif [[ -n "${SSH_AUTH_SOCK:-}" ]]; then
+        run_args+=(-v "${SSH_AUTH_SOCK}:${_ENGINE_DISPATCH_DOCKER_LINUX_SSH_SOCK}")
+        export SSH_AUTH_SOCK="$_ENGINE_DISPATCH_DOCKER_LINUX_SSH_SOCK"
+        needs_env+=(SSH_AUTH_SOCK)
+      fi
+      local known_hosts="${HOME:-}/.ssh/known_hosts"
+      [[ -f "$known_hosts" ]] && run_args+=(-v "${known_hosts}:${known_hosts}:ro")
+      export GIT_SSH_COMMAND="ssh -o UserKnownHostsFile=${known_hosts} -o StrictHostKeyChecking=yes"
+      needs_env+=(GIT_SSH_COMMAND)
+    elif [[ "$origin_url" == http://* || "$origin_url" == https://* ]]; then
+      gh_needed="true"
+      git_config+=("credential.helper" "" "credential.helper" "!gh auth git-credential")
+    fi
+  fi
+
+  if [[ "$gh_needed" == "true" ]]; then
+    local token host
+    token=$(_engine_dispatch_docker_gh_token "$repo_path")
+    host=$(get_domain "$repo_path" 2>/dev/null) || host=""
+    if [[ -n "$host" && "$host" != "github.com" ]]; then
+      export GH_HOST="$host"
+      needs_env+=(GH_HOST)
+      if [[ -n "$token" ]]; then
+        export GH_ENTERPRISE_TOKEN="$token"
+        needs_env+=(GH_ENTERPRISE_TOKEN)
+      fi
+    elif [[ -n "$token" ]]; then
+      export GH_TOKEN="$token"
+      needs_env+=(GH_TOKEN)
+    fi
+  fi
+
+  # --- --path-arg mounts and argv rewrites ---
+  local container_args=()
+  [[ ${#args[@]} -gt 0 ]] && container_args=("${args[@]}")
+  local pa_src=() pa_mode=()
+  local spec idx mode arg abs src j merged
+  if [[ ${#path_args[@]} -gt 0 ]]; then
+    for spec in "${path_args[@]}"; do
+      idx="${spec%%:*}"
+      mode="${spec#*:}"
+      [[ $idx -le ${#container_args[@]} ]] || continue
+      arg="${container_args[idx - 1]}"
+      [[ -n "$arg" ]] || continue
+      abs=$(_engine_dispatch_docker_abs_path "$arg")
+      if _engine_dispatch_docker_inside "$abs" "$repo"; then
+        # Inside the repo: no mount; a relative path only needs
+        # rewriting when the shim's $PWD is not the container's
+        # working directory (the repo).
+        [[ "$arg" != /* && "${PWD%/}" != "$repo" ]] && container_args[idx - 1]="$abs"
+        continue
+      fi
+      [[ "$arg" != /* ]] && container_args[idx - 1]="$abs"
+      if [[ "$mode" == "ro" ]]; then
+        [[ -e "$abs" ]] || continue
+        src="$abs"
+      else
+        src="$(dirname "$abs")"
+        [[ -d "$src" ]] || continue
+      fi
+
+      merged="false"
+      for ((j = 0; j < ${#pa_src[@]}; j++)); do
+        [[ -n "${pa_src[j]}" ]] || continue
+        if [[ "$src" == "${pa_src[j]}" ]]; then
+          [[ "$mode" == "rw" ]] && pa_mode[j]="rw"
+          merged="true"
+          break
+        fi
+        if [[ "$src" == "${pa_src[j]}"/* ]] && [[ "${pa_mode[j]}" == "rw" || "$mode" == "ro" ]]; then
+          merged="true"
+          break
+        fi
+        if [[ "${pa_src[j]}" == "$src"/* ]] && [[ "$mode" == "rw" || "${pa_mode[j]}" == "ro" ]]; then
+          pa_src[j]=""
+        fi
+      done
+      if [[ "$merged" == "false" ]]; then
+        pa_src+=("$src")
+        pa_mode+=("$mode")
+      fi
+    done
+  fi
+  for ((j = 0; j < ${#pa_src[@]}; j++)); do
+    [[ -n "${pa_src[j]}" ]] || continue
+    if [[ "${pa_mode[j]}" == "ro" ]]; then
+      run_args+=(-v "${pa_src[j]}:${pa_src[j]}:ro")
+    else
+      run_args+=(-v "${pa_src[j]}:${pa_src[j]}")
+    fi
+  done
+
+  # --- Env: fixed, then --needs, then the allowlist (names only) ---
+  export ARCANUM_IN_DOCKER=1
+  export ARCANUM_REPO_PATH="$repo_path"
+  env_names+=(ARCANUM_IN_DOCKER ARCANUM_REPO_PATH GIT_CONFIG_COUNT)
+  export GIT_CONFIG_COUNT=$((${#git_config[@]} / 2))
+  for ((j = 0; j < GIT_CONFIG_COUNT; j++)); do
+    export "GIT_CONFIG_KEY_${j}=${git_config[j * 2]}"
+    export "GIT_CONFIG_VALUE_${j}=${git_config[j * 2 + 1]}"
+    env_names+=("GIT_CONFIG_KEY_${j}" "GIT_CONFIG_VALUE_${j}")
+  done
+  [[ ${#needs_env[@]} -gt 0 ]] && env_names+=("${needs_env[@]}")
+
+  if [[ ${#env_allowlist[@]} -gt 0 ]]; then
+    for name in "${env_allowlist[@]}"; do
+      [[ "$name" == "HOME" || "$name" == "PATH" ]] && continue
+      [[ -n "${!name+x}" ]] || continue
+      case " ${env_names[*]} " in
+        *" ${name} "*) continue ;;
+      esac
+      export "${name?}"
+      env_names+=("$name")
+    done
+  fi
+  for name in "${env_names[@]}"; do
+    run_args+=(-e "$name")
+  done
+
+  run_args+=("$ref" "$command")
+  [[ "$prepend_repo_path" == "true" ]] && run_args+=("$repo_path")
+  [[ ${#container_args[@]} -gt 0 ]] && run_args+=("${container_args[@]}")
+
+  docker "${run_args[@]}"
+)
