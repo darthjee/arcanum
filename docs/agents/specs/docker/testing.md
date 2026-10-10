@@ -1,6 +1,6 @@
 # Docker Engine: Testing
 
-Part of the [Docker Engine spec](../docker.md) (epic #724). Written in #727, implemented in #729.
+Part of the [Docker Engine spec](../docker.md) (epic #724). Written in #727, implemented in #729 (sub-issues #740 and #741).
 
 This part defines how `engine.mode=docker` is tested: what CI covers without a Docker daemon, what only runs locally against a real container, and what evidence a [checklist](checklist.md) row needs before it goes ✅. The behavior under test is in [dispatch.md](dispatch.md).
 
@@ -47,7 +47,7 @@ Cases, each asserting stdout, stderr (including the exact warning line) and exit
 
 ### Shim-level specs
 
-`core/spec/support/sharedExamples/engineDispatchRouting.js`'s `itRoutesEngineDispatch` gains an optional `docker` assertion. When given, it adds a third `it` that seeds `engine.mode=docker` and puts a passthrough fake `docker` first on `PATH`. The pilot entrypoint (#729), and every command flipped to `"docker"` after it, passes a `docker` callback in its existing routing spec. That proves its real shim reaches `docker run` with the mounts and env its checklist row lists, through its own `--needs`/`--path-arg` declarations.
+`core/spec/support/sharedExamples/engineDispatchRouting.js`'s `itRoutesEngineDispatch` gains an optional `docker` assertion. When given, it adds a third `it` that seeds `engine.mode=docker` and puts a passthrough fake `docker` first on `PATH`. The pilot entrypoint, `arcanum-check-config` (#741), and every command flipped to `"docker"` after it, passes a `docker` callback in its existing routing spec. That proves its real shim reaches `docker run` with the mounts and env its checklist row lists, through its own `--needs`/`--path-arg` declarations.
 
 `core/spec/bin/arcanumCheckConfig_spec.js`'s docker case changes from "fails without a fallback" to the native-only rule in [dispatch.md](dispatch.md#native-only-commands).
 
@@ -68,7 +68,7 @@ Real container against native on the host, for the same command and inputs. For 
 How it runs:
 
 - **Location:** `core/spec/docker/**/*_spec.js`, outside the default `jasmine.json` globs, with its own config `core/spec/support/jasmine-docker.json`. `yarn test` never picks them up.
-- **Make target:** `make docker-parity`, next to the `core-*` targets in the root `Makefile`. It builds the `runtime` target as `darthjee/arcanum:local-test` (`docker build -f core/Dockerfile --target runtime …`, see [image.md](image.md#what-the-runtime-target-bakes-in)) and then runs the parity config with node on the **host**, since the specs need the host's Docker CLI. It can't run inside the `core-test` container, which has no Docker. #729 adds the target, the config and the pilot's case.
+- **Make target:** `make docker-parity`, next to the `core-*` targets in the root `Makefile`. It builds the `runtime` target as `darthjee/arcanum:local-test` (`docker build -f core/Dockerfile --target runtime …`, see [image.md](image.md#what-the-runtime-target-bakes-in)) and then runs the parity config with node on the **host**, since the specs need the host's Docker CLI. It can't run inside the `core-test` container, which has no Docker. #741 added the target, the config (run by `yarn test:docker`) and the pilot's case.
 - **Image under test:** the specs call dispatch through the same `bash -c` wrapper as the dispatch-level specs and set the image tag there (a sourced variable, like the status file, never an env hook in production code), so they never pull a published image.
 - **Fixtures:** the existing ones. `createGitFixtureRepo` (with a worktree variant), the per-command parity setups under `core/spec/support/factories/`, and `tempDir.js` for argument paths outside the repo.
 - **Credentials:** cases that need `gh` or a git remote are opt-in. They run only when `ARCANUM_DOCKER_PARITY_GH=1` (with a token resolvable on the host and a sandbox repo) or `ARCANUM_DOCKER_PARITY_SSH=1` (with an agent and an ssh remote) is set, and are marked pending otherwise. A fake GitHub API can't reach into the container, so these are the only way to check the gh/ssh wiring for real. Fake `gh` binaries don't help either: the image has its own `gh`.
