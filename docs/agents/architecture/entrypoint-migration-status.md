@@ -8,7 +8,7 @@ Native-only commands (dispatched with `engine_dispatch --native-only`, e.g. `arc
 
 | Command | Status | Issue |
 | --- | --- | --- |
-| `arcanum-check-config` | `native` | #739 |
+| `arcanum-check-config` | `docker` | #739 |
 | `arcanum-create-issue-publish` | `native` | #739 |
 | `arcanum-create-issue-start` | `native` | #739 |
 | `arcanum-split-issue-create-sub-issue` | `native` | #230 |
