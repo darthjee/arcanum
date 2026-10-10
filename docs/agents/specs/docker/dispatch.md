@@ -154,7 +154,7 @@ The root filesystem is read-only: everything the command may write is a mount or
 
 Per-call `docker run` is the default. A long-lived container with `docker exec` would save startup time, but its mounts and env are fixed when it is created, while every call here needs its own `--path-arg` mounts, credentials and allowlist. It would also share `/tmp` and `HOME` between calls and need a lifecycle owner. So it is only worth that cost if startup is clearly too slow.
 
-#741 delivered the measuring tool: `scripts/docker_benchmark.sh`, run with `make docker-benchmark` (`--cold` for the single cold run). Its numbers are recorded in #741's PR:
+Issue #741 delivered the measuring tool: `scripts/docker_benchmark.sh`, run with `make docker-benchmark` (`--cold` for the single cold run). Its numbers are recorded in #741's PR:
 
 - **Commands:** `issue-state get` (local file, no credentials), `resolve-plan-paths` (filesystem only), `auto-fix-all-config-get` (config chain) and `github-issue-info` (gh plus network, measured with a fake API or against a sandbox repo, so only the overhead is compared). The last three need not be docker-ready to be benchmarked: the benchmark runs them through a local build of the `runtime` image directly.
 - **Platforms:** Linux (native Docker Engine) and macOS (Docker Desktop, virtiofs).
