@@ -19,12 +19,19 @@ source "${_ENGINE_DISPATCH_LIB_DIR}/config_chain.sh"
 source "${_ENGINE_DISPATCH_LIB_DIR}/engine_dispatch_docker.sh"
 
 _ENGINE_DISPATCH_MIGRATION_STATUS_FILE="${_ENGINE_DISPATCH_LIB_DIR}/migration-status.json"
-# core/bin/arcanum lives two levels up from arcanum/_lib
-# (arcanum/_lib -> arcanum -> repo root -> core/bin/arcanum) — this is
+# The arcanum install root is two levels up from arcanum/_lib
+# (arcanum/_lib -> arcanum -> install root; core/bin/arcanum lives
+# under it, and it is the docker build context) — this is
 # arcanum's OWN installation layout, unrelated to <repo_path> (the
 # *target* repo being operated on, threaded through only for
 # config_chain_read below).
-_ENGINE_DISPATCH_NATIVE_BIN="$(cd "${_ENGINE_DISPATCH_LIB_DIR}/../.." && pwd)/core/bin/arcanum"
+_ENGINE_DISPATCH_INSTALL_ROOT="$(cd "${_ENGINE_DISPATCH_LIB_DIR}/../.." && pwd)"
+_ENGINE_DISPATCH_NATIVE_BIN="${_ENGINE_DISPATCH_INSTALL_ROOT}/core/bin/arcanum"
+# The docker image reference. Empty (the default) means "resolve from
+# $_ENGINE_DISPATCH_INSTALL_ROOT" (darthjee/arcanum:<version>, see
+# _engine_dispatch_docker_image_ref); a non-empty value is used as-is.
+# Specs override both variables after sourcing.
+_ENGINE_DISPATCH_DOCKER_IMAGE=""
 
 # _engine_dispatch_status <command> <native_only>
 #   The single reader of migration-status.json
@@ -262,8 +269,9 @@ engine_dispatch() {
         ;;
     esac
 
-    local reason code
-    if reason=$(_engine_dispatch_docker_unavailable_reason); then
+    local ref reason code
+    ref=$(_engine_dispatch_docker_image_ref)
+    if reason=$(_engine_dispatch_docker_available "$ref"); then
       _engine_dispatch_docker_run
       code=$?
       case "$code" in

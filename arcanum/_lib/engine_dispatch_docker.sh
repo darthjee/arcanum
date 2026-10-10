@@ -11,6 +11,12 @@
 # This file is meant to be SOURCED (by engine_dispatch.sh), not executed
 # directly.
 
+# shellcheck source=lock.sh
+source "${_ENGINE_DISPATCH_LIB_DIR}/lock.sh"
+
+# The image repository dispatch pulls/builds (`<repository>:<version>`).
+_ENGINE_DISPATCH_DOCKER_REPOSITORY="darthjee/arcanum"
+
 # The `--needs=<tag>` values engine_dispatch accepts.
 _ENGINE_DISPATCH_DOCKER_NEEDS_TAGS="global-config gitconfig gh remote"
 
@@ -63,12 +69,109 @@ _engine_dispatch_docker_infra_env_names() {
   fi
 }
 
-# _engine_dispatch_docker_unavailable_reason
-#   Prints the row-4 <reason> and exits 1 when Docker can't run this
-#   call; prints nothing and exits 0 when it can.
-_engine_dispatch_docker_unavailable_reason() {
+# _engine_dispatch_docker_install_version
+#   Prints the arcanum install's version, resolved from
+#   $_ENGINE_DISPATCH_INSTALL_ROOT the way InstallVersion /
+#   stamp_arcanum_version_shell.sh do: arcanum.json `.version` (zip
+#   install), else the exact git tag on HEAD (git-clone install, `.git`
+#   a directory), else `local-<short HEAD>` (a dev install between tags,
+#   or a worktree). Prints `local-unknown` when nothing resolves.
+_engine_dispatch_docker_install_version() {
+  local root="$_ENGINE_DISPATCH_INSTALL_ROOT" version=""
+  if [[ -f "${root}/arcanum.json" ]]; then
+    version="$(jq -r '.version // empty' "${root}/arcanum.json" 2>/dev/null || true)"
+  elif [[ -d "${root}/.git" ]]; then
+    version="$(git -C "$root" describe --tags --exact-match HEAD 2>/dev/null || true)"
+  fi
+  if [[ -z "$version" ]]; then
+    local short
+    short="$(git -C "$root" rev-parse --short HEAD 2>/dev/null || true)"
+    version="local-${short:-unknown}"
+  fi
+  echo "$version"
+}
+
+# _engine_dispatch_docker_image_ref
+#   Prints the image reference for this call:
+#   $_ENGINE_DISPATCH_DOCKER_IMAGE as-is when non-empty, else
+#   `darthjee/arcanum:<install version>`.
+_engine_dispatch_docker_image_ref() {
+  if [[ -n "${_ENGINE_DISPATCH_DOCKER_IMAGE:-}" ]]; then
+    echo "$_ENGINE_DISPATCH_DOCKER_IMAGE"
+    return 0
+  fi
+  echo "${_ENGINE_DISPATCH_DOCKER_REPOSITORY}:$(_engine_dispatch_docker_install_version)"
+}
+
+# _engine_dispatch_docker_inspect <ref>
+#   Prints `present`, `missing` or `daemon` — the outcome of one
+#   `docker image inspect`. Its stdout never reaches dispatch's stdout.
+_engine_dispatch_docker_inspect() {
+  local ref="$1" err
+  if err=$(docker image inspect --format '{{.Id}}' "$ref" 2>&1 >/dev/null); then
+    echo "present"
+  elif [[ "$err" == *"Cannot connect to the Docker daemon"* ]]; then
+    echo "daemon"
+  else
+    echo "missing"
+  fi
+}
+
+# _engine_dispatch_docker_acquire_image <ref>
+#   Pulls <ref> (unless it is a `darthjee/arcanum:local-` ref), else
+#   builds it from $_ENGINE_DISPATCH_INSTALL_ROOT, under the image lock
+#   (${XDG_CACHE_HOME:-$HOME/.cache}/arcanum/image.lock) so concurrent
+#   first calls don't race. Re-inspects once the lock is held, since
+#   another caller may have finished meanwhile. Progress goes to stderr
+#   only. Exits 0 when the image is present afterwards, 1 otherwise. The
+#   lock is released on every path.
+_engine_dispatch_docker_acquire_image() {
+  local ref="$1"
+  local lock_dir="${XDG_CACHE_HOME:-${HOME:-}/.cache}/arcanum"
+  mkdir -p "$lock_dir" 2>/dev/null || return 1
+  local LOCK_FILE="${lock_dir}/image.lock"
+
+  _acquire_lock
+  local rc=1
+  if [[ "$(_engine_dispatch_docker_inspect "$ref")" == "present" ]]; then
+    rc=0
+  else
+    if [[ "$ref" != "${_ENGINE_DISPATCH_DOCKER_REPOSITORY}:local-"* ]]; then
+      echo "Info: pulling ${ref} (first docker call for this version)…" >&2
+      docker pull "$ref" >&2 && rc=0
+    fi
+    if [[ $rc -ne 0 ]]; then
+      local root="$_ENGINE_DISPATCH_INSTALL_ROOT"
+      echo "Info: building ${ref}…" >&2
+      docker build -f "${root}/core/Dockerfile" --target runtime \
+        --build-arg "ARCANUM_VERSION=${ref##*:}" -t "$ref" "$root" >&2 && rc=0
+    fi
+  fi
+  _release_lock
+  return $rc
+}
+
+# _engine_dispatch_docker_available <ref>
+#   The Docker availability check (docs/agents/specs/docker/dispatch.md
+#   "Docker availability check"). Exits 0, printing nothing, when <ref>
+#   can run; otherwise prints the row-4 <reason> (`docker not found`,
+#   `daemon not reachable`, `image <ref> unavailable`) and exits 1. The
+#   image lock is taken only when a pull or build is actually needed.
+_engine_dispatch_docker_available() {
+  local ref="$1"
   if ! command -v docker >/dev/null 2>&1; then
     echo "docker not found"
+    return 1
+  fi
+  case "$(_engine_dispatch_docker_inspect "$ref")" in
+    present) return 0 ;;
+    daemon)
+      echo "daemon not reachable"
+      return 1
+      ;;
+  esac
+  if ! _engine_dispatch_docker_acquire_image "$ref"; then
+    echo "image ${ref} unavailable"
     return 1
   fi
   return 0
