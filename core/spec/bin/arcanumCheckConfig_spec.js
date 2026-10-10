@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { seedEngineMode } from '../support/utils/engineMode.js';
+import { createFakeDockerBin } from '../support/utils/fakeDockerBin.js';
 import { REPO_ROOT, runCommand } from '../support/utils/runCommand.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
@@ -12,8 +13,10 @@ const SHIM_SCRIPT = path.join(REPO_ROOT, 'arcanum-check-config', 'scripts', 'che
 // is no shell twin, so there is no shell-vs-native parity spec: this
 // spec instead proves the shim reaches core/bin/arcanum in every
 // non-docker engine.mode (and that CLAUDE_CONFIG_DIR survives the
-// native path's `env -i`), and that engine.mode=docker fails without a
-// fallback.
+// native path's `env -i`), and that under engine.mode=docker it follows
+// the native-only rule of docs/agents/specs/docker/dispatch.md: with its
+// real migration-status.json status (`native`, not docker-ready yet) it
+// runs native on the host with the row-3 warning, never reaching docker.
 describe('arcanum-check-config native-only routing (via the real check_config.sh shim)', () => {
   let repoPath;
   let homeDir;
@@ -87,16 +90,34 @@ describe('arcanum-check-config native-only routing (via the real check_config.sh
     });
   });
 
-  it('fails without a fallback when engine.mode is docker', async () => {
-    await seedEngineMode({ repoPath }, 'docker');
+  describe('with engine.mode docker', () => {
+    let fakeDocker;
 
-    const result = await runShim(repoPath, 'git.authors');
+    beforeEach(async () => {
+      fakeDocker = await createFakeDockerBin();
+    });
 
-    expect(result.code).toEqual(1);
-    expect(result.stdout).toEqual('');
-    expect(result.stderr).toContain(
-      'engine.mode=docker is not implemented yet for native-only command \'arcanum-check-config\''
-    );
+    afterEach(async () => {
+      await fakeDocker.cleanup();
+    });
+
+    it('runs native on the host with the not-docker-ready warning, matching the native run', async () => {
+      await seedEngineMode({ repoPath }, 'native');
+      const native = await runShim(repoPath, 'git.authors');
+
+      await seedEngineMode({ repoPath }, 'docker');
+      env = { ...env, PATH: `${fakeDocker.binDir}${path.delimiter}${env.PATH}` };
+      const docker = await runShim(repoPath, 'git.authors');
+
+      expect(native.code).toEqual(0);
+      expect(docker).toEqual({
+        stdout: native.stdout,
+        stderr: 'Warning: \'arcanum-check-config\' is not docker-ready yet ' +
+          '(arcanum/_lib/migration-status.json) — falling back to the native implementation on the host.\n',
+        code: native.code
+      });
+      expect(await fakeDocker.readCalls()).toEqual([]);
+    });
   });
 
   it('prints usage on stderr when the key argument is missing', async () => {
