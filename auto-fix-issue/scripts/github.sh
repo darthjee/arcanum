@@ -9,6 +9,13 @@
 # the right migration-status.json/COMMANDS key from $1 before calling
 # engine_dispatch, once per invocation — never for the whole script.
 #
+# Under engine.mode=docker, `info` runs core/bin/arcanum inside the
+# container, now that its migration-status.json status is `"docker"`
+# (#745), with only the repo mount (no `--needs`). If docker is
+# unavailable, engine_dispatch falls back to native on the host with a
+# warning — see docs/agents/specs/docker/dispatch.md. pr-create/pr-view/
+# pr-ready are not in that batch and keep their current status.
+#
 # HOME is forwarded to the native path's explicit env-var allowlist for
 # pr-create/pr-view/pr-ready only (all three resolve a GitHub token via
 # `gh`, which needs HOME to find its own auth config once native's
