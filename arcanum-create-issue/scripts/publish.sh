@@ -6,7 +6,8 @@
 # applies (and, if missing, creates) its labels, then deletes the draft.
 #
 # Native-only: this command has NO shell implementation (no *_shell.sh
-# twin) and is not tracked in arcanum/_lib/migration-status.json. It is
+# twin). It is listed in arcanum/_lib/migration-status.json with a
+# non-`shell` status, but never falls back to a shell twin. It is
 # dispatched with `engine_dispatch --native-only`, which always runs
 # core/bin/arcanum (except engine.mode=docker, which errors out).
 #

@@ -168,18 +168,107 @@ expected_err="Error: engine.mode=docker is not implemented yet for native-only c
 [[ "$(cat "${TMP_DIR}/case8.stderr")" == "$expected_err" ]] || fail "case 8 (--native-only, docker): expected stderr '${expected_err}', got '$(cat "${TMP_DIR}/case8.stderr")'"
 echo "OK: --native-only with engine.mode=docker fails with the documented error"
 
-# Case 9: point the lib at a temporary map that marks the command
-# unavailable, then one that omits it entirely — --native-only must still
-# run native, with no fallback warning.
+# Case 9: point the lib at temporary maps that mark the command `shell`
+# (no native implementation), a legacy `false`, then omit it entirely.
+# This path does not consult the map yet (docker branch, #729), so
+# --native-only must still run native, with no fallback warning.
 set_engine_mode "native"
 REAL_MIGRATION_STATUS_FILE="$_ENGINE_DISPATCH_MIGRATION_STATUS_FILE"
 _ENGINE_DISPATCH_MIGRATION_STATUS_FILE="${TMP_DIR}/migration-status.json"
+echo '{"auto-fix-all-config-get": "shell"}' > "$_ENGINE_DISPATCH_MIGRATION_STATUS_FILE"
+run_native_only "case9-map-shell"
 echo '{"auto-fix-all-config-get": false}' > "$_ENGINE_DISPATCH_MIGRATION_STATUS_FILE"
 run_native_only "case9-map-false"
 echo '{}' > "$_ENGINE_DISPATCH_MIGRATION_STATUS_FILE"
 run_native_only "case9-map-absent"
-_ENGINE_DISPATCH_MIGRATION_STATUS_FILE="$REAL_MIGRATION_STATUS_FILE"
 echo "OK: --native-only ignores migration-status.json"
+
+# --- Case 10: engine.mode=native, dual entrypoint, driven by temporary
+#     maps. Status `shell` -> shell fallback with the warning; status
+#     `host-only` -> native (only `shell` falls back); legacy booleans
+#     are tolerated (`false` -> shell fallback with the warning, `true`
+#     -> native). ---
+
+expected_warn="Warning: no native implementation of 'auto-fix-all-config-get' yet (arcanum/_lib/migration-status.json) — falling back to the shell implementation."
+
+run_dual() {
+  local label="$1" expect="$2"
+  out=$(engine_dispatch "$REPO_DIR" "auto-fix-all-config-get" "$FIXTURE_SCRIPT" -- "$REPO_DIR" "$FIXTURE_KEY" 2>"${TMP_DIR}/${label}.stderr")
+  code=$?
+  [[ $code -eq 0 ]] || fail "${label}: expected exit 0, got $code (stderr: $(cat "${TMP_DIR}/${label}.stderr"))"
+  [[ "$out" == "$EXPECTED_OUTPUT" ]] || fail "${label}: expected stdout '${EXPECTED_OUTPUT}', got '${out}'"
+  if [[ "$expect" == "fallback" ]]; then
+    [[ "$(cat "${TMP_DIR}/${label}.stderr")" == "$expected_warn" ]] || fail "${label}: expected stderr '${expected_warn}', got '$(cat "${TMP_DIR}/${label}.stderr")'"
+  else
+    [[ -s "${TMP_DIR}/${label}.stderr" ]] && fail "${label}: expected no stderr (native path), got: $(cat "${TMP_DIR}/${label}.stderr")"
+  fi
+  return 0
+}
+
+echo '{"auto-fix-all-config-get": "shell"}' > "$_ENGINE_DISPATCH_MIGRATION_STATUS_FILE"
+run_dual "case10-enum-shell" "fallback"
+echo '{"auto-fix-all-config-get": "host-only"}' > "$_ENGINE_DISPATCH_MIGRATION_STATUS_FILE"
+run_dual "case10-enum-host-only" "native"
+echo '{"auto-fix-all-config-get": false}' > "$_ENGINE_DISPATCH_MIGRATION_STATUS_FILE"
+run_dual "case10-legacy-false" "fallback"
+echo '{"auto-fix-all-config-get": true}' > "$_ENGINE_DISPATCH_MIGRATION_STATUS_FILE"
+run_dual "case10-legacy-true" "native"
+echo "OK: engine.mode=native follows the status enum (only \`shell\` falls back) and tolerates legacy booleans"
+
+# --- Case 11: _engine_dispatch_status reading rule, called directly for
+#     every map state and both <native_only> values. ---
+
+assert_status() {
+  local key="$1" native_only="$2" expected="$3" label="$4"
+  local actual
+  actual=$(_engine_dispatch_status "$key" "$native_only") || fail "case 11 (${label}, native_only=${native_only}): expected exit 0"
+  [[ "$actual" == "$expected" ]] || fail "case 11 (${label}, native_only=${native_only}): expected '${expected}', got '${actual}'"
+  return 0
+}
+
+cat > "$_ENGINE_DISPATCH_MIGRATION_STATUS_FILE" <<'JSON'
+{
+  "k-shell": "shell",
+  "k-native": "native",
+  "k-docker": "docker",
+  "k-host-only": "host-only",
+  "k-true": true,
+  "k-false": false,
+  "k-unknown": "weird",
+  "k-number": 3,
+  "k-null": null,
+  "k-object": {}
+}
+JSON
+
+#            key          dual         native-only
+for row in \
+  "k-shell     shell      native" \
+  "k-native    native     native" \
+  "k-docker    docker     docker" \
+  "k-host-only host-only  host-only" \
+  "k-true      native     native" \
+  "k-false     shell      native" \
+  "k-unknown   shell      native" \
+  "k-number    shell      native" \
+  "k-null      shell      native" \
+  "k-object    shell      native" \
+  "k-missing   shell      native"; do
+  read -r key dual native_only_expected <<< "$row"
+  assert_status "$key" false "$dual" "$key"
+  assert_status "$key" true "$native_only_expected" "$key"
+done
+
+echo '{bad json' > "$_ENGINE_DISPATCH_MIGRATION_STATUS_FILE"
+assert_status "k-native" false shell "malformed file"
+assert_status "k-native" true native "malformed file"
+
+_ENGINE_DISPATCH_MIGRATION_STATUS_FILE="${TMP_DIR}/does-not-exist.json"
+assert_status "k-native" false shell "missing file"
+assert_status "k-native" true native "missing file"
+
+_ENGINE_DISPATCH_MIGRATION_STATUS_FILE="$REAL_MIGRATION_STATUS_FILE"
+echo "OK: _engine_dispatch_status follows the reading rule for every map state"
 
 echo "PASS: arcanum/_lib/engine_dispatch.sh — shell/native/docker dispatch guard behaves per docs/agents/architecture/script-engine.md"
 exit 0
