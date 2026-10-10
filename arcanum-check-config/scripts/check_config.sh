@@ -6,9 +6,10 @@
 # config tier (local -> repo -> global) holds for a dotted key, plus the
 # final resolved value and the tier it came from.
 #
-# Native-only: this command has NO shell implementation (no
-# *_shell.sh twin) and is not tracked in arcanum/_lib/migration-status.json.
-# It is dispatched with `engine_dispatch --native-only`, which always runs
+# Native-only: this command has NO shell implementation (no *_shell.sh
+# twin). It is listed in arcanum/_lib/migration-status.json with a
+# non-`shell` status, but never falls back to a shell twin. It is
+# dispatched with `engine_dispatch --native-only`, which always runs
 # core/bin/arcanum (except engine.mode=docker, which errors out).
 #
 # `HOME` and `CLAUDE_CONFIG_DIR` are forwarded to the native path's

@@ -27,7 +27,7 @@ The skill has its own steps, modeled on `enhance-issue`. `enhance-issue` itself 
 
 ## Native commands
 
-Both commands are native-only (see [Native-only entrypoints](script-engine.md#native-only-entrypoints)). Each is registered in `core/lib/core/commands.js` with `context: 'repo'`, and each has a thin shim in `arcanum-create-issue/scripts/` that calls `engine_dispatch --native-only`. Neither has a `*_shell.sh` twin, and neither is in `migration-status.json`. The code is in `core/lib/commands/arcanum-create-issue/`.
+Both commands are native-only (see [Native-only entrypoints](script-engine.md#native-only-entrypoints)). Each is registered in `core/lib/core/commands.js` with `context: 'repo'`, and each has a thin shim in `arcanum-create-issue/scripts/` that calls `engine_dispatch --native-only`. Neither has a `*_shell.sh` twin. Both are listed in `migration-status.json` as `"native"`. The code is in `core/lib/commands/arcanum-create-issue/`.
 
 Output is `KEY=value` lines on stdout. Exit codes for both commands:
 

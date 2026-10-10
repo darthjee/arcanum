@@ -100,7 +100,7 @@ Output and exit codes:
 
 ### Engine
 
-`finish_report.sh` follows the shim pattern from [Script Engine](script-engine.md): `finish_report.sh` → `engine_dispatch.sh` → `finish_report_shell.sh`, or the native `core/bin/arcanum finish-report` command (`core/lib/commands/shared/FinishReport.js`). Both implementations ship together with a shell-vs-native parity spec, and `finish-report` is `true` in `arcanum/_lib/migration-status.json`, so it adds nothing to the backlog that blocks [Shell Engine Removal](../specs/shell-engine-removal.md). The script is pure formatting plus local git-origin parsing, with no `gh`/GitHub API dependency, so the shim forwards no env vars to the native path.
+`finish_report.sh` follows the shim pattern from [Script Engine](script-engine.md): `finish_report.sh` → `engine_dispatch.sh` → `finish_report_shell.sh`, or the native `core/bin/arcanum finish-report` command (`core/lib/commands/shared/FinishReport.js`). Both implementations ship together with a shell-vs-native parity spec, and `finish-report` is `"native"` in `arcanum/_lib/migration-status.json`, so it adds nothing to the backlog that blocks [Shell Engine Removal](../specs/shell-engine-removal.md). The script is pure formatting plus local git-origin parsing, with no `gh`/GitHub API dependency, so the shim forwards no env vars to the native path.
 
 ## Next-step offer (interactive skills)
 
