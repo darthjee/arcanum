@@ -144,8 +144,13 @@ RUN test -n "$ARCANUM_VERSION" \
 # small caches here; nothing persists between calls.
 ENV HOME=/tmp/arcanum-home
 
+# The entrypoint sources the runtime user setup (nss_wrapper passwd/group
+# entry) from a separate file, so `make core-smoke-runtime` can check the
+# same setup without exec'ing the CLI.
+COPY core/docker-runtime-env.sh /usr/local/lib/arcanum-runtime-env.sh
 COPY core/docker-runtime-entrypoint.sh /usr/local/bin/arcanum-entrypoint
-RUN chmod 0755 /usr/local/bin/arcanum-entrypoint
+RUN chmod 0644 /usr/local/lib/arcanum-runtime-env.sh \
+    && chmod 0755 /usr/local/bin/arcanum-entrypoint
 
 # Non-root default; dispatch always overrides it with
 # --user "$(id -u):$(id -g)". No root phase, no chown, no su.
