@@ -62,7 +62,7 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 
 | command | script | kind | status | credentials | mounts | env | issue | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `arcanum-check-config` | `arcanum-check-config/scripts/check_config.sh` | native-only | ☐ | none | global-config:ro | — | | |
+| `arcanum-check-config` | `arcanum-check-config/scripts/check_config.sh` | native-only | ✅ | none | global-config:ro | — | #741 | |
 
 ## arcanum-create-issue
 

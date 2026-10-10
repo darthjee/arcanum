@@ -1,6 +1,6 @@
 # Docker Engine: Dispatch
 
-Part of the [Docker Engine spec](../docker.md) (epic #724). Written in #727, implemented in #729.
+Part of the [Docker Engine spec](../docker.md) (epic #724). Written in #727, implemented in #729 (sub-issues #739, #740 and #741).
 
 This part defines the docker branch of `arcanum/_lib/engine_dispatch.sh`: when a call goes to a container, how the `docker run` command is assembled from [image.md](image.md), [mounts.md](mounts.md) and [environment.md](environment.md), and what happens when Docker is missing or fails. How it is tested is in [testing.md](testing.md).
 
@@ -154,12 +154,12 @@ The root filesystem is read-only: everything the command may write is a mount or
 
 Per-call `docker run` is the default. A long-lived container with `docker exec` would save startup time, but its mounts and env are fixed when it is created, while every call here needs its own `--path-arg` mounts, credentials and allowlist. It would also share `/tmp` and `HOME` between calls and need a lifecycle owner. So it is only worth that cost if startup is clearly too slow.
 
-Issue #729 measures it with the pilot entrypoint and records the numbers in its PR:
+Issue #741 delivered the measuring tool: `scripts/docker_benchmark.sh`, run with `make docker-benchmark` (`--cold` for the single cold run). Its numbers are recorded in #741's PR:
 
-- **Commands:** `issue-state get` (local file, no credentials), `resolve-plan-paths` (filesystem only), `auto-fix-all-config-get` (config chain) and `github-issue-info` (gh plus network, measured with a fake API or against a sandbox repo, so only the overhead is compared). The last three need not be docker-ready to be benchmarked: #729 runs them through a local build of the `runtime` image directly.
+- **Commands:** `issue-state get` (local file, no credentials), `resolve-plan-paths` (filesystem only), `auto-fix-all-config-get` (config chain) and `github-issue-info` (gh plus network, measured with a fake API or against a sandbox repo, so only the overhead is compared). The last three need not be docker-ready to be benchmarked: the benchmark runs them through a local build of the `runtime` image directly.
 - **Platforms:** Linux (native Docker Engine) and macOS (Docker Desktop, virtiofs).
 - **Runs:** 20 per command and platform, warm (daemon up, image local) and once cold (first call after a daemon restart). Report median and p95 wall time for native on the host and for `docker run`, and the overhead between them.
-- **Threshold:** per-call `docker run` stays if the warm median overhead is at most 1s on Linux (the index's target) and at most 2s on macOS. Above either, #729 still ships per-call, and a new sub-issue of #724 designs the `docker exec` alternative. The pilot is not blocked on it.
+- **Threshold:** per-call `docker run` stays if the warm median overhead is at most 1s on Linux (the index's target) and at most 2s on macOS. Above either, #741 still ships per-call, and a new sub-issue of #724 designs the `docker exec` alternative. The pilot is not blocked on it.
 
 ## Docker availability check
 

@@ -78,7 +78,7 @@
   "monitor-issues-rewrite-queue-pop": "native",
   "monitor-issues-rewrite-queue-push": "native",
   "finish-report": "native",
-  "arcanum-check-config": "native",
+  "arcanum-check-config": "docker",
   "arcanum-create-issue-start": "native",
   "arcanum-create-issue-publish": "native",
   "init-claude-set-next-step-auto": "native"

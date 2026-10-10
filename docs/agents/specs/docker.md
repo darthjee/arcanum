@@ -2,7 +2,9 @@
 
 ## Status
 
-In progress, tracked by epic [#724](https://github.com/darthjee/arcanum/issues/724). Phase 1 (spec) is done except #733: this index, the [migration checklist](docker/checklist.md), and the [image](docker/image.md), [mounts](docker/mounts.md), [environment](docker/environment.md), [dispatch](docker/dispatch.md) and [testing](docker/testing.md) parts are written (#725, #726, #727). No docker execution path is implemented yet. Today `arcanum/_lib/engine_dispatch.sh` only warns and falls back to shell for dual entrypoints, and errors out for native-only commands. Update this section as each phase completes.
+In progress, tracked by epic [#724](https://github.com/darthjee/arcanum/issues/724). Phase 1 (spec) is done except #733: this index, the [migration checklist](docker/checklist.md), and the [image](docker/image.md), [mounts](docker/mounts.md), [environment](docker/environment.md), [dispatch](docker/dispatch.md) and [testing](docker/testing.md) parts are written (#725, #726, #727). The runtime image is built locally (#728). The docker branch of `arcanum/_lib/engine_dispatch.sh` is implemented (#740), on top of the `migration-status.json` status enum (#739). `arcanum-check-config` is the first docker-ready command (#741): its checklist row is ticked and its `migration-status.json` value is `"docker"`. Every other command still falls back to native on the host under `engine.mode=docker`, until #730 migrates it.
+
+Parity between a real container and native on the host runs locally with `make docker-parity` (specs under `core/spec/docker/`, see [testing.md](docker/testing.md#parity-specs-local-only)). Per-call `docker run` cost is measured with `make docker-benchmark` (`scripts/docker_benchmark.sh`). The macOS/Linux numbers are recorded in #741's PR. A `docker exec` follow-up is only opened if they exceed the threshold in [dispatch.md](docker/dispatch.md#per-call-docker-run-and-when-to-revisit-it). Update this section as each phase completes.
 
 ## Goal
 
@@ -52,9 +54,9 @@ In dependency order: #725 → #726, #727 → #728 → #729 → #730 → #731 →
 | #726 | Spec: docker image, mounts and environment | architect (`infra` consulted) | #725 | Done |
 | #727 | Spec: docker dispatch and testing | architect | #725 | Done |
 | #733 | Decide docker handling for scripts not routed through `engine_dispatch` | architect (`scripter` consulted) | #725 | Open |
-| #728 | Build the runtime Docker image | infra | #726 | Open |
+| #728 | Build the runtime Docker image | infra | #726 | Done |
 | #737 | Publish the multi-arch runtime Docker image from release CI | infra | #728 | Open |
-| #729 | Docker branch of `engine_dispatch.sh` with a pilot entrypoint | scripter (+ node if needed) | #727, #728 | Open |
+| #729 | Docker branch of `engine_dispatch.sh` with a pilot entrypoint | scripter (+ node if needed) | #727, #728 | Done (#739, #740, #741) |
 | #730 | Migrate remaining entrypoints to docker (placeholder for batches) | scripter / node | #729 | Open |
 | #731 | Promote docker engine design into architecture docs | architect | all of the above | Open |
 | #732 | Remove docker spec docs | architect | #731 | Open |
@@ -64,7 +66,7 @@ In dependency order: #725 → #726, #727 → #728 → #729 → #730 → #731 →
 Each is resolved by the part/issue named:
 
 - **TTY handling:** resolved. No TTY in the container, never `-t`. `/dev/tty`-owning dispatched commands always take their exit-4 `FALLBACK=chat` path under docker. See [dispatch.md](docker/dispatch.md#tty) (#727), and #733 for non-dispatched TTY scripts such as `next_step_prompt.sh`.
-- **Performance:** `docker run` adds startup overhead (roughly 0.3–1s per call, more on macOS Docker Desktop), and one skill run makes many script calls, more so in `auto-fix-all` loops. Default chosen: per-call `docker run`. #729 benchmarks a few hot scripts on Linux and macOS, and a long-lived container with `docker exec` is only designed if the warm median overhead exceeds 1s on Linux or 2s on macOS. See [dispatch.md](docker/dispatch.md#per-call-docker-run-and-when-to-revisit-it) (#727), measured in #729.
+- **Performance:** `docker run` adds startup overhead (roughly 0.3–1s per call, more on macOS Docker Desktop), and one skill run makes many script calls, more so in `auto-fix-all` loops. Default chosen: per-call `docker run`. `make docker-benchmark` (#741) times a few hot scripts on Linux and macOS, and a long-lived container with `docker exec` is only designed if the warm median overhead exceeds 1s on Linux or 2s on macOS. See [dispatch.md](docker/dispatch.md#per-call-docker-run-and-when-to-revisit-it) (#727), with the numbers recorded in #741's PR.
 - **Docker-readiness source of truth:** resolved. `migration-status.json` with a string enum. See [dispatch.md](docker/dispatch.md#docker-readiness-source-of-truth) (#727).
 - **Worktrees and path identity:** resolved. Every mount uses the same absolute path, and the git common dir is mounted for worktrees. See [mounts.md](docker/mounts.md#path-identity) (#726).
 - **File ownership:** resolved. The container runs as `--user $(id -u):$(id -g)`, and the `runtime` target has no root phase, so `core/docker-entrypoint.sh` stays test-only. See [mounts.md](docker/mounts.md#file-ownership) and [image.md](docker/image.md#runtime-user-and-entrypoint) (#726).

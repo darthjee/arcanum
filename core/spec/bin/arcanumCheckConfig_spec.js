@@ -1,7 +1,10 @@
-import { writeFile } from 'node:fs/promises';
+import { realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import {
+  dockerUnavailableWarning, fixedRunFlags, runCalls, splitRunArgv
+} from '../support/factories/engineDispatchDockerSetup.js';
 import { seedEngineMode } from '../support/utils/engineMode.js';
-import { createFakeDockerBin } from '../support/utils/fakeDockerBin.js';
+import { DOCKER_PRESETS, createFakeDockerBin } from '../support/utils/fakeDockerBin.js';
 import { REPO_ROOT, runCommand } from '../support/utils/runCommand.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
@@ -15,8 +18,12 @@ const SHIM_SCRIPT = path.join(REPO_ROOT, 'arcanum-check-config', 'scripts', 'che
 // non-docker engine.mode (and that CLAUDE_CONFIG_DIR survives the
 // native path's `env -i`), and that under engine.mode=docker it follows
 // the native-only rule of docs/agents/specs/docker/dispatch.md: with its
-// real migration-status.json status (`native`, not docker-ready yet) it
-// runs native on the host with the row-3 warning, never reaching docker.
+// real migration-status.json status (`docker`, the pilot of #741) it
+// reaches `docker run` (a passthrough fake `docker`) with the global
+// config mounted read-only and CLAUDE_CONFIG_DIR forwarded, through its
+// own `--needs=global-config`; with Docker unavailable it falls back to
+// native on the host with the "Docker is unavailable" warning. The real
+// container is compared with native in core/spec/docker/ (local only).
 describe('arcanum-check-config native-only routing (via the real check_config.sh shim)', () => {
   let repoPath;
   let homeDir;
@@ -24,9 +31,10 @@ describe('arcanum-check-config native-only routing (via the real check_config.sh
   let env;
 
   beforeEach(async () => {
-    repoPath = await createTempDir('arcanum-core-check-config-repo-');
-    homeDir = await createTempDir('arcanum-core-check-config-home-');
-    configDir = await createTempDir('arcanum-core-check-config-global-');
+    // realpath'd: docker mounts are compared against these exact paths.
+    repoPath = await realpath(await createTempDir('arcanum-core-check-config-repo-'));
+    homeDir = await realpath(await createTempDir('arcanum-core-check-config-home-'));
+    configDir = await realpath(await createTempDir('arcanum-core-check-config-global-'));
 
     await writeFile(
       path.join(configDir, 'arcanum-config.json'),
@@ -92,31 +100,56 @@ describe('arcanum-check-config native-only routing (via the real check_config.sh
 
   describe('with engine.mode docker', () => {
     let fakeDocker;
+    let native;
 
-    beforeEach(async () => {
-      fakeDocker = await createFakeDockerBin();
-    });
+    /**
+     * Builds the fake `docker`, puts it first on `PATH`, and records the
+     * native run to compare against.
+     * @param {object} [options] - `createFakeDockerBin` options.
+     * @returns {Promise<void>} resolves once ready.
+     */
+    async function useFakeDocker(options) {
+      await seedEngineMode({ repoPath }, 'native');
+      native = await runShim(repoPath, 'git.authors');
+
+      fakeDocker = await createFakeDockerBin(options);
+      env = { ...env, PATH: `${fakeDocker.binDir}${path.delimiter}${env.PATH}` };
+      await seedEngineMode({ repoPath }, 'docker');
+    }
 
     afterEach(async () => {
       await fakeDocker.cleanup();
     });
 
-    it('runs native on the host with the not-docker-ready warning, matching the native run', async () => {
-      await seedEngineMode({ repoPath }, 'native');
-      const native = await runShim(repoPath, 'git.authors');
-
-      await seedEngineMode({ repoPath }, 'docker');
-      env = { ...env, PATH: `${fakeDocker.binDir}${path.delimiter}${env.PATH}` };
+    it('runs in docker with the global config mounted read-only and CLAUDE_CONFIG_DIR forwarded', async () => {
+      await useFakeDocker({ mode: 'passthrough' });
       const docker = await runShim(repoPath, 'git.authors');
+      const runs = runCalls(await fakeDocker.readCalls());
 
       expect(native.code).toEqual(0);
+      expect(docker).toEqual({ stdout: native.stdout, stderr: '', code: native.code });
+      expect(runs.length).toEqual(1);
+
+      const run = splitRunArgv(runs[0].argv);
+      const configFile = path.join(configDir, 'arcanum-config.json');
+
+      expect(run.flags.slice(0, fixedRunFlags(repoPath).length)).toEqual(fixedRunFlags(repoPath));
+      expect(run.mounts).toEqual([`${repoPath}:${repoPath}`, `${configFile}:${configFile}:ro`]);
+      expect(run.envNames).toContain('CLAUDE_CONFIG_DIR');
+      expect(runs[0].env.CLAUDE_CONFIG_DIR).toEqual(configDir);
+      expect(run.after).toEqual(['arcanum-check-config', repoPath, 'git.authors']);
+    });
+
+    it('falls back to native on the host with the Docker-unavailable warning when the daemon is down', async () => {
+      await useFakeDocker({ inspect: DOCKER_PRESETS.daemonDown });
+      const docker = await runShim(repoPath, 'git.authors');
+
       expect(docker).toEqual({
         stdout: native.stdout,
-        stderr: 'Warning: \'arcanum-check-config\' is not docker-ready yet ' +
-          '(arcanum/_lib/migration-status.json) — falling back to the native implementation on the host.\n',
+        stderr: dockerUnavailableWarning('daemon not reachable', 'arcanum-check-config'),
         code: native.code
       });
-      expect(await fakeDocker.readCalls()).toEqual([]);
+      expect(runCalls(await fakeDocker.readCalls())).toEqual([]);
     });
   });
 
