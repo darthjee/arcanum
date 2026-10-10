@@ -2,7 +2,7 @@
 
 ## Status
 
-In progress, tracked by epic [#724](https://github.com/darthjee/arcanum/issues/724). Phase 1 (spec) is under way: this index, the [migration checklist](docker/checklist.md), and the [image](docker/image.md), [mounts](docker/mounts.md) and [environment](docker/environment.md) parts are written (#725, #726). [dispatch.md](docker/dispatch.md) and [testing.md](docker/testing.md) are stubs until #727 lands. No docker execution path is implemented yet. Today `arcanum/_lib/engine_dispatch.sh` only warns and falls back to shell for dual entrypoints, and errors out for native-only commands. Update this section as each phase completes.
+In progress, tracked by epic [#724](https://github.com/darthjee/arcanum/issues/724). Phase 1 (spec) is done except #733: this index, the [migration checklist](docker/checklist.md), and the [image](docker/image.md), [mounts](docker/mounts.md), [environment](docker/environment.md), [dispatch](docker/dispatch.md) and [testing](docker/testing.md) parts are written (#725, #726, #727). No docker execution path is implemented yet. Today `arcanum/_lib/engine_dispatch.sh` only warns and falls back to shell for dual entrypoints, and errors out for native-only commands. Update this section as each phase completes.
 
 ## Goal
 
@@ -18,7 +18,7 @@ Summarized from epic #724:
 - **Fallback rules:** both fallbacks happen inside `engine_dispatch.sh`, with a warning on stderr. Skills never see or handle them, and stdout/exit code are unchanged.
   - An entrypoint that is not docker-ready yet falls back to **native** on the host. If it has no native implementation, it falls back to shell, following the existing native → shell rule.
   - If Docker is unavailable at call time (daemon not running, binary missing, image not available), it falls back to **native** on the host. The warning tells the user to fix Docker or change `engine.mode`.
-- **The checklist is hand-maintained:** [`docker/checklist.md`](docker/checklist.md) has one row per dispatch command. Each implementation PR ticks its own rows. The source of truth that dispatch reads to decide "docker-ready or not" is a separate decision (#727).
+- **The checklist is hand-maintained:** [`docker/checklist.md`](docker/checklist.md) has one row per dispatch command. Each implementation PR ticks its own rows. Dispatch decides "docker-ready or not" from `arcanum/_lib/migration-status.json`, whose values become `"shell"`, `"native"`, `"docker"` or `"host-only"`, with native-only commands listed too. Ticking a row ✅ flips its value to `"docker"` in the same PR. See [dispatch.md](docker/dispatch.md#docker-readiness-source-of-truth) (#727).
 
 ## Security principles
 
@@ -36,8 +36,8 @@ These bind every other part of this spec:
 | [image.md](docker/image.md) | The runtime image: reuse/extend `core/Dockerfile` or add a new one, base and pins, user, entrypoint, distribution and versioning. | #726 |
 | [mounts.md](docker/mounts.md) | What is mounted and how: repo (same path), git common dir for worktrees, `CLAUDE_CONFIG_DIR`, arcanum install, tmp/scratchpad; `ro` vs. `rw`; file ownership. | #726 |
 | [environment.md](docker/environment.md) | Env-var allowlist to `-e` flags, credentials (`gh` token, SSH agent), the nested-call marker. | #726 |
-| [dispatch.md](docker/dispatch.md) | The docker branch of `engine_dispatch.sh`: `docker run` shape, availability check and fallback, exit-code/stream passthrough, native-only commands, TTY, concurrency, docker-readiness source of truth. | #727 |
-| [testing.md](docker/testing.md) | How docker mode is tested: bin-level routing specs, parity under docker, CI. | #727 |
+| [dispatch.md](docker/dispatch.md) | The docker branch of `engine_dispatch.sh`: resolution order, docker-readiness source of truth, per-command declarations (`--needs`, `--path-arg`), `docker run` shape and benchmark, availability check and fallback, native-only commands, exit-code/stream passthrough, nested-call guard, TTY, concurrency. | #727 |
+| [testing.md](docker/testing.md) | How docker mode is tested: routing specs with a fake `docker` in CI, local-only parity specs behind `make docker-parity`, and the evidence a checklist row needs. | #727 |
 | [checklist.md](docker/checklist.md) | One row per dispatch command, tracking which ones are docker-ready, plus the scripts not routed through dispatch. | #725 |
 
 Scripts not routed through `engine_dispatch.sh` (sourced libraries, thin wrappers, non-dispatched entrypoints, install/update bootstraps) are listed in the checklist, but how they behave under docker is decided in #733.
@@ -50,7 +50,7 @@ In dependency order: #725 → #726, #727 → #728 → #729 → #730 → #731 →
 | --- | --- | --- | --- | --- |
 | #725 | Spec: docker index and migration checklist | architect | — | Done |
 | #726 | Spec: docker image, mounts and environment | architect (`infra` consulted) | #725 | Done |
-| #727 | Spec: docker dispatch and testing | architect | #725 | Open |
+| #727 | Spec: docker dispatch and testing | architect | #725 | Done |
 | #733 | Decide docker handling for scripts not routed through `engine_dispatch` | architect (`scripter` consulted) | #725 | Open |
 | #728 | Build the runtime Docker image (plus the release-CI multi-arch publishing job, unless split into a new sub-issue) | infra | #726 | Open |
 | #729 | Docker branch of `engine_dispatch.sh` with a pilot entrypoint | scripter (+ node if needed) | #727, #728 | Open |
@@ -62,20 +62,21 @@ In dependency order: #725 → #726, #727 → #728 → #729 → #730 → #731 →
 
 Each is resolved by the part/issue named:
 
-- **TTY handling:** whether `/dev/tty`-owning scripts run with `docker run -it` or always take the exit-4 `FALLBACK=chat` path. See [dispatch.md](docker/dispatch.md) (#727), and #733 for non-dispatched TTY scripts such as `next_step_prompt.sh`.
-- **Performance:** `docker run` adds startup overhead (roughly 0.3–1s per call, more on macOS Docker Desktop), and one skill run makes many script calls, more so in `auto-fix-all` loops. Choose between per-call `docker run` and a long-lived container with `docker exec`, against a rough target of under 1s overhead per call on Linux, by benchmarking a few hot scripts. See [dispatch.md](docker/dispatch.md) (#727).
-- **Docker-readiness source of truth:** what dispatch reads to decide whether a command is docker-ready. See [dispatch.md](docker/dispatch.md) (#727).
+- **TTY handling:** resolved. No TTY in the container, never `-t`. `/dev/tty`-owning dispatched commands always take their exit-4 `FALLBACK=chat` path under docker. See [dispatch.md](docker/dispatch.md#tty) (#727), and #733 for non-dispatched TTY scripts such as `next_step_prompt.sh`.
+- **Performance:** `docker run` adds startup overhead (roughly 0.3–1s per call, more on macOS Docker Desktop), and one skill run makes many script calls, more so in `auto-fix-all` loops. Default chosen: per-call `docker run`. #729 benchmarks a few hot scripts on Linux and macOS, and a long-lived container with `docker exec` is only designed if the warm median overhead exceeds 1s on Linux or 2s on macOS. See [dispatch.md](docker/dispatch.md#per-call-docker-run-and-when-to-revisit-it) (#727), measured in #729.
+- **Docker-readiness source of truth:** resolved. `migration-status.json` with a string enum. See [dispatch.md](docker/dispatch.md#docker-readiness-source-of-truth) (#727).
 - **Worktrees and path identity:** resolved. Every mount uses the same absolute path, and the git common dir is mounted for worktrees. See [mounts.md](docker/mounts.md#path-identity) (#726).
 - **File ownership:** resolved. The container runs as `--user $(id -u):$(id -g)`, and the `runtime` target has no root phase, so `core/docker-entrypoint.sh` stays test-only. See [mounts.md](docker/mounts.md#file-ownership) and [image.md](docker/image.md#runtime-user-and-entrypoint) (#726).
 - **Credentials:** resolved. A host-resolved `GH_TOKEN` passed by env (`~/.config/gh` never mounted), SSH agent forwarding plus `known_hosts:ro` for ssh remotes, and the gh credential helper for https remotes. See [environment.md](docker/environment.md#gh-credentials) (#726).
 - **Platforms:** resolved. A multi-arch (amd64 + arm64) image, with the macOS Docker Desktop differences documented. See [image.md](docker/image.md#platforms) (#726). The macOS per-call cost stays part of **Performance**.
-- **Nested calls:** environment half resolved. `ARCANUM_IN_DOCKER=1` is always set in the container, and nested `env -i` calls keep it along with the container infrastructure env. See [environment.md](docker/environment.md#nested-call-marker) (#726). The dispatch-side check is still open in [dispatch.md](docker/dispatch.md) (#727).
-- **Exit codes and streams:** pass through the exact exit code (including 3/4), keep stdout and stderr separate, and never confuse Docker's own failures (125–127) with script exit codes. See [dispatch.md](docker/dispatch.md) (#727).
-- **Concurrency:** no fixed container names. That the lock system works across host and container processes is settled in [mounts.md](docker/mounts.md#shared-state-and-locks) (#726). The rest is in [dispatch.md](docker/dispatch.md) (#727).
+- **Nested calls:** resolved. Environment half: `ARCANUM_IN_DOCKER=1` is always set in the container, and nested `env -i` calls keep it along with the container infrastructure env. See [environment.md](docker/environment.md#nested-call-marker) (#726). Dispatch half resolved too: the `ARCANUM_IN_DOCKER` check is the first thing in `engine_dispatch`, and every nested command runs native (or shell, without one) in the container. See [dispatch.md](docker/dispatch.md#nested-call-guard) (#727).
+- **Exit codes and streams:** resolved. The exact exit code passes through (including 3/4), stdout and stderr stay separate, and 125–127 from `docker run` mean Docker failed, falling back to native on the host, since the native CLI never uses them. See [dispatch.md](docker/dispatch.md#exit-codes-and-streams) (#727).
+- **Concurrency:** resolved. No fixed container names, `--rm` and `--init` with signal proxying so an interrupt leaves no container behind, and a label for the rare hard-kill orphan. See [dispatch.md](docker/dispatch.md#concurrency) (#727). That the lock system works across host and container processes is settled in [mounts.md](docker/mounts.md#shared-state-and-locks) (#726).
 - **Non-dispatched scripts:** sourced libraries, thin wrappers, non-dispatched entrypoints, install/update bootstraps. Decided in #733.
-- **Host-only commands:** #726 marks `arcanum-update-run-update-*` as host-only and proposes the same for `auto-fix-issue-run-checks` (see the [checklist](docker/checklist.md)). How dispatch knows a command is host-only is part of the docker-readiness source of truth in [dispatch.md](docker/dispatch.md) (#727).
+- **Host-only commands:** #726 marks `arcanum-update-run-update-*` as host-only and proposes the same for `auto-fix-issue-run-checks` (see the [checklist](docker/checklist.md)). Resolved: all three are `host-only`, and dispatch knows it from their `"host-only"` value in `migration-status.json`. See [dispatch.md](docker/dispatch.md#migration-of-existing-values) (#727).
 - **Image publishing:** the release-CI job that pushes `darthjee/arcanum:<version>` has no sub-issue yet. It is follow-up work under #728, or a new sub-issue of #724. See [image.md](docker/image.md#distribution-and-versioning).
 - **Known limitations:** commit signing, git hooks that need host tools, and included git config files (see [mounts.md](docker/mounts.md#known-limitations)). #729 decides whether each one makes a command fall back to native.
+- **Argument paths:** resolved. A shim declares path arguments with `--path-arg=<index>:<ro|rw>`. See [dispatch.md](docker/dispatch.md#argument-path-declaration) (#727).
 
 ## Maintenance rule (drift)
 

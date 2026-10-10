@@ -65,7 +65,7 @@ Some commands take a file path argument that may point outside the repo: a body 
 - `args:ro`: an input file. The file itself is mounted.
 - `args:rw`: a file the command writes or creates. Its parent directory is mounted, because the file may not exist yet.
 
-Paths inside the repo need nothing extra. Which arguments of a command are paths is the shim's knowledge. How the shim tells dispatch is part of [dispatch.md](dispatch.md) (#727).
+Paths inside the repo need nothing extra. Which arguments of a command are paths is the shim's knowledge. The shim declares them with `--path-arg=<index>:<ro|rw>` (see [dispatch.md](dispatch.md#argument-path-declaration)).
 
 ## File ownership
 
