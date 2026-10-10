@@ -1,9 +1,10 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { cp, lstat, mkdir, readdir, readFile, readlink, rm, writeFile } from 'node:fs/promises';
+import { cp, lstat, readdir, readFile, readlink, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { runEngineDispatch, writeStatusMap } from './engineDispatchLib.js';
+import { mergeEngineMode } from './engineMode.js';
 import { createTempDir, removeTempDir } from './tempDir.js';
 
 // Helpers for the local-only docker parity suite under core/spec/docker/
@@ -89,30 +90,6 @@ export async function snapshotTree(root, ignore = DEFAULT_IGNORE) {
 }
 
 /**
- * Sets `engine.mode` in `repoPath`'s local tier
- * (`.claude/state/arcanum-config.json`), keeping every other key a case
- * may have seeded there (unlike `seedEngineMode`, which overwrites the
- * file).
- * @param {string} repoPath - the fixture repo.
- * @param {string} mode - the engine mode.
- * @returns {Promise<void>} resolves once written.
- */
-export async function mergeEngineMode(repoPath, mode) {
-  const dir = path.join(repoPath, '.claude', 'state');
-  const file = path.join(dir, 'arcanum-config.json');
-  let config;
-
-  try {
-    config = JSON.parse(await readFile(file, 'utf8'));
-  } catch {
-    config = {};
-  }
-
-  await mkdir(dir, { recursive: true });
-  await writeFile(file, JSON.stringify({ ...config, engine: { ...config.engine, mode } }));
-}
-
-/**
  * Diffs two `snapshotTree` results.
  * @param {Map<string, string>} before - the snapshot before a run.
  * @param {Map<string, string>} after - the snapshot after it.
@@ -185,7 +162,7 @@ function diffAll(before, after) {
 async function runOnce(mode, { repoPath, dispatchArgs, argDirs, env, ignore }, statusFile) {
   const dirs = [repoPath, ...argDirs];
 
-  await mergeEngineMode(repoPath, mode);
+  await mergeEngineMode({ repoPath }, mode);
 
   const before = await snapshotAll(dirs, ignore);
   const overrides = mode === 'docker' ? { image: PARITY_IMAGE } : {};
