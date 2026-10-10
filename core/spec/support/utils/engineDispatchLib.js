@@ -9,15 +9,17 @@ export const ENGINE_DISPATCH_LIB = path.join(REPO_ROOT, 'arcanum', '_lib', 'engi
  * The `bash -c` body: sources the lib, points the sourced
  * `_ENGINE_DISPATCH_MIGRATION_STATUS_FILE` at a fixture map (never an
  * env hook), overrides the sourced `_ENGINE_DISPATCH_INSTALL_ROOT` /
- * `_ENGINE_DISPATCH_DOCKER_IMAGE` when non-empty (empty keeps the lib
- * default), then calls the requested function with the rest of argv.
+ * `_ENGINE_DISPATCH_DOCKER_IMAGE` / `_ENGINE_DISPATCH_NATIVE_BIN` when
+ * non-empty (empty keeps the lib default), then calls the requested
+ * function with the rest of argv.
  */
 const WRAPPER = [
   'source "$1"',
   '_ENGINE_DISPATCH_MIGRATION_STATUS_FILE="$2"',
   'if [[ -n "$3" ]]; then _ENGINE_DISPATCH_INSTALL_ROOT="$3"; fi',
   'if [[ -n "$4" ]]; then _ENGINE_DISPATCH_DOCKER_IMAGE="$4"; fi',
-  'shift 4',
+  'if [[ -n "$5" ]]; then _ENGINE_DISPATCH_NATIVE_BIN="$5"; fi',
+  'shift 5',
   '"$@"'
 ].join('; ');
 
@@ -48,14 +50,17 @@ export async function writeStatusMap(dir, map) {
  *   (empty/omitted keeps the lib default).
  * @param {string} [overrides.image] - `_ENGINE_DISPATCH_DOCKER_IMAGE`
  *   (empty/omitted keeps the lib default: resolve from the install root).
+ * @param {string} [overrides.nativeBin] - `_ENGINE_DISPATCH_NATIVE_BIN`
+ *   (empty/omitted keeps the real `core/bin/arcanum`); lets a spec swap
+ *   in a fixture that reports the env a native call received.
  * @param {string} [overrides.input] - when given, written to stdin.
  * @returns {Promise<{stdout: string, stderr: string, code: number}>} the result.
  */
 export function runEngineDispatchFn(
-  statusFile, fnAndArgs, cwd, env = process.env, { installRoot = '', image = '', input } = {}
+  statusFile, fnAndArgs, cwd, env = process.env, { installRoot = '', image = '', nativeBin = '', input } = {}
 ) {
   return runCommand(
-    ['bash', '-c', WRAPPER, '_', ENGINE_DISPATCH_LIB, statusFile, installRoot, image, ...fnAndArgs],
+    ['bash', '-c', WRAPPER, '_', ENGINE_DISPATCH_LIB, statusFile, installRoot, image, nativeBin, ...fnAndArgs],
     cwd,
     env,
     input
