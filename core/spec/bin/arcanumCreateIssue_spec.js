@@ -1,7 +1,9 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { notDockerReadyWarning } from '../support/factories/engineDispatchDockerSetup.js';
 import { seedGithubLikeRepo } from '../support/factories/githubParitySetup.js';
 import { seedEngineMode } from '../support/utils/engineMode.js';
+import { createFakeDockerBin } from '../support/utils/fakeDockerBin.js';
 import { createFakeGhBin } from '../support/utils/fakeGhBin.js';
 import { createGitFixtureRepo } from '../support/utils/gitFixtureRepo.js';
 import { REPO_ROOT, runCommand } from '../support/utils/runCommand.js';
@@ -18,8 +20,11 @@ const DRAFTS_DIR = path.join('.claude', 'state', 'create-issue');
 // and engine_dispatch's --native-only mode. There is no shell twin, so
 // there is no parity spec: this spec proves both shims reach
 // core/bin/arcanum in every non-docker engine.mode (with only PATH and
-// HOME surviving the native path's `env -i`), and that
-// engine.mode=docker fails without a fallback.
+// HOME surviving the native path's `env -i`), and that under
+// engine.mode=docker both follow the native-only rule of
+// docs/agents/specs/docker/dispatch.md: with their real
+// migration-status.json status (`native`, not docker-ready yet) they run
+// native on the host with the row-3 warning, never reaching docker.
 //
 // GitHub access is stubbed by a fake `gh` on PATH; no case reaches a
 // REST call (start's preflight only needs `gh auth token`, and publish's
@@ -149,23 +154,31 @@ describe('arcanum-create-issue native-only routing (via the real start.sh / publ
     });
   });
 
-  it('fails without a fallback when engine.mode is docker', async () => {
-    await seedEngineMode(repo, 'docker');
+  it('runs both shims native on the host with the not-docker-ready warning when engine.mode is docker', async () => {
+    const fakeDocker = await createFakeDockerBin();
 
-    const env = await buildEnv();
-    const start = await runShim(START_SCRIPT, env, repo.repoPath, '--new');
-    const publish = await runShim(PUBLISH_SCRIPT, env, repo.repoPath, 'x.md', 'Title', '--confirmed');
+    try {
+      await seedEngineMode(repo, 'docker');
+      const draft = await seedDraft('# Only a title\n');
+      const ghEnv = await buildEnv();
+      const env = { ...ghEnv, PATH: `${fakeDocker.binDir}${path.delimiter}${ghEnv.PATH}` };
+      const start = await runShim(START_SCRIPT, env, repo.repoPath, '--resume', 'nope.md');
+      const publish = await runShim(PUBLISH_SCRIPT, env, repo.repoPath, draft, 'Title', '--confirmed', 'bug');
 
-    expect(start.code).toEqual(1);
-    expect(start.stdout).toEqual('');
-    expect(start.stderr).toContain(
-      'engine.mode=docker is not implemented yet for native-only command \'arcanum-create-issue-start\''
-    );
-    expect(publish.code).toEqual(1);
-    expect(publish.stdout).toEqual('');
-    expect(publish.stderr).toContain(
-      'engine.mode=docker is not implemented yet for native-only command \'arcanum-create-issue-publish\''
-    );
+      expect(start).toEqual({
+        stdout: 'ERROR=unknown draft: nope.md\n',
+        stderr: notDockerReadyWarning('arcanum-create-issue-start'),
+        code: 2
+      });
+      expect(publish).toEqual({
+        stdout: 'ERROR=the draft body is empty\n',
+        stderr: notDockerReadyWarning('arcanum-create-issue-publish'),
+        code: 2
+      });
+      expect(await fakeDocker.readCalls()).toEqual([]);
+    } finally {
+      await fakeDocker.cleanup();
+    }
   });
 
   it('rejects missing shim arguments with exit 2 and usage on stderr', async () => {

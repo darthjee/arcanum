@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { notDockerReadyWarning } from '../support/factories/engineDispatchDockerSetup.js';
 import { seedEngineMode } from '../support/utils/engineMode.js';
+import { createFakeDockerBin } from '../support/utils/fakeDockerBin.js';
 import { REPO_ROOT, runCommand } from '../support/utils/runCommand.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
@@ -11,8 +13,11 @@ const SHIM_SCRIPT = path.join(REPO_ROOT, 'init-claude', 'scripts', 'set_next_ste
 // init-claude/scripts/set_next_step_auto.sh shim and engine_dispatch's
 // --native-only mode. There is no shell twin, so there is no
 // shell-vs-native parity spec: this spec instead proves the shim reaches
-// core/bin/arcanum in every non-docker engine.mode, and that
-// engine.mode=docker fails without a fallback.
+// core/bin/arcanum in every non-docker engine.mode, and that under
+// engine.mode=docker it follows the native-only rule of
+// docs/agents/specs/docker/dispatch.md: with its real
+// migration-status.json status (`native`, not docker-ready yet) it runs
+// native on the host with the row-3 warning, never reaching docker.
 describe('init-claude-set-next-step-auto native-only routing (via the real set_next_step_auto.sh shim)', () => {
   let repoPath;
   let configFile;
@@ -80,16 +85,25 @@ describe('init-claude-set-next-step-auto native-only routing (via the real set_n
     });
   });
 
-  it('fails without a fallback when engine.mode is docker', async () => {
-    await seedEngineMode({ repoPath }, 'docker');
+  it('runs native on the host with the not-docker-ready warning when engine.mode is docker', async () => {
+    const fakeDocker = await createFakeDockerBin();
 
-    const result = await runShim(repoPath, 'enhance-issue', 'true');
+    try {
+      await seedEngineMode({ repoPath }, 'docker');
+      env = { ...env, PATH: `${fakeDocker.binDir}${path.delimiter}${env.PATH}` };
 
-    expect(result.code).toEqual(1);
-    expect(result.stdout).toEqual('');
-    expect(result.stderr).toContain(
-      'engine.mode=docker is not implemented yet for native-only command \'init-claude-set-next-step-auto\''
-    );
+      const result = await runShim(repoPath, 'enhance-issue', 'true');
+
+      expect(result).toEqual({
+        stdout: 'NEXT_STEP_AUTO=enhance-issue=true\n',
+        stderr: notDockerReadyWarning('init-claude-set-next-step-auto'),
+        code: 0
+      });
+      expect(await writtenConfig()).toEqual({ next_step: { auto: { 'enhance-issue': true } } });
+      expect(await fakeDocker.readCalls()).toEqual([]);
+    } finally {
+      await fakeDocker.cleanup();
+    }
   });
 
   [[], ['REPO'], ['REPO', 'enhance-issue']].forEach((args) => {
