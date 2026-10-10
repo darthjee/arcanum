@@ -2,9 +2,12 @@
 # Generates docs/agents/architecture/entrypoint-migration-status.md — a
 # scannable table of every entry point tracked in
 # arcanum/_lib/migration-status.json (see
-# docs/agents/architecture/script-engine.md), whether it has been
-# migrated to the native Node.js engine yet, and — where knowable — the
-# issue that migrated it. Dev tooling, alongside scripts/bump-version.sh
+# docs/agents/architecture/script-engine.md and
+# docs/agents/specs/docker/dispatch.md), its raw docker-readiness status
+# (`shell`, `native`, `docker` or `host-only`, printed as-is so a stray
+# legacy boolean shows up rather than being hidden) and — where knowable —
+# the issue whose commit introduced the key. Native-only commands are
+# listed too. Dev tooling, alongside scripts/bump-version.sh
 # and scripts/generate_tags_table.sh — NOT a skill script under
 # <skill>/scripts/.
 #
@@ -68,18 +71,15 @@ issue_for_key() {
   echo
   echo "<!-- AUTO-GENERATED, DO NOT EDIT BY HAND. Run scripts/generate_entrypoint_migration_status.sh to refresh. -->"
   echo
-  echo "One row per entry point tracked in [\`arcanum/_lib/migration-status.json\`](../../../arcanum/_lib/migration-status.json) — see [Script Engine](script-engine.md) for the shell → Node.js migration this tracks. \`Migrated\` reflects the map's current boolean value; \`Issue\` is the issue that migrated it, resolved from the file's own git history where knowable, blank otherwise (never a guess)."
+  echo "One row per entry point tracked in [\`arcanum/_lib/migration-status.json\`](../../../arcanum/_lib/migration-status.json) — see [Script Engine](script-engine.md) for the shell → Node.js migration this tracks. \`Status\` is the command's docker-readiness value (\`shell\`, \`native\`, \`docker\` or \`host-only\`; see [Docker-readiness source of truth](../specs/docker/dispatch.md#docker-readiness-source-of-truth)); \`Issue\` is the issue whose commit introduced the key, resolved from the file's own git history where knowable, blank otherwise (never a guess)."
   echo
-  echo "Native-only commands (dispatched with \`engine_dispatch --native-only\`, e.g. \`arcanum-check-config\`) have no shell implementation, are not tracked in \`migration-status.json\`, and so never appear in this table."
+  echo "Native-only commands (dispatched with \`engine_dispatch --native-only\`, e.g. \`arcanum-check-config\`) have no shell implementation but are listed here too, with a non-\`shell\` status."
   echo
-  echo "| Command | Migrated | Issue |"
+  echo "| Command | Status | Issue |"
   echo "| --- | --- | --- |"
 
   jq -r 'keys[]' "$STATUS_FILE" | while IFS= read -r key; do
-    migrated="No"
-    if jq -e --arg k "$key" '.[$k] == true' "$STATUS_FILE" > /dev/null 2>&1; then
-      migrated="Yes"
-    fi
+    status="$(jq -r --arg k "$key" '.[$k] | tostring' "$STATUS_FILE")"
 
     issue="$(issue_for_key "$key")"
     issue_display="-"
@@ -87,7 +87,7 @@ issue_for_key() {
 
     # Literal printf format string, not a shell expansion
     # shellcheck disable=SC2016
-    printf '| `%s` | %s | %s |\n' "$key" "$migrated" "$issue_display"
+    printf '| `%s` | `%s` | %s |\n' "$key" "$status" "$issue_display"
   done
 } > "$OUTPUT_FILE"
 
