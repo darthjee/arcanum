@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { seedGithubLikeRepo } from '../../support/factories/autoFixIssueGithubParitySetup.js';
+import { expectRepoMountOnlyRun } from '../../support/factories/engineDispatchDockerSetup.js';
 import { itRoutesEngineDispatch } from '../../support/sharedExamples/engineDispatchRouting.js';
 import { seedEngineMode } from '../../support/utils/engineMode.js';
 import { createFakeGhBin } from '../../support/utils/fakeGhBin.js';
@@ -41,26 +42,44 @@ const REPO_REF = 'darthjee/arcanum-github-fixture';
 // That success-vs-failure split proves which implementation actually
 // ran.
 describe('auto-fix-issue-github engine_dispatch routing (via the real github.sh shim)', () => {
-  itRoutesEngineDispatch(
-    'info',
-    SHIM_SCRIPT,
-    async (repo, mode) => {
-      await seedGithubLikeRepo(repo);
-      await seedEngineMode(repo, mode);
+  describe('info', () => {
+    let infoRepoPath;
 
-      return { args: ['info', repo.repoPath] };
-    },
-    {
-      shell: (result) => {
-        expect(result.code).toEqual(0);
-        expect(result.stdout).toEqual(`DOMAIN=github.com\nREPO=${REPO_REF}\n`);
+    itRoutesEngineDispatch(
+      'info',
+      SHIM_SCRIPT,
+      async (repo, mode) => {
+        // An empty CLAUDE_CONFIG_DIR keeps this machine's global config
+        // (e.g. an engine.log.location, a docker log mount) out of it.
+        const emptyConfigDir = await createTempDir('arcanum-core-afigh-dispatch-config-');
+
+        infoRepoPath = repo.repoPath;
+        await seedGithubLikeRepo(repo);
+        await seedEngineMode(repo, mode);
+
+        return {
+          args: ['info', repo.repoPath],
+          env: { ...process.env, CLAUDE_CONFIG_DIR: emptyConfigDir },
+          cleanup: () => removeTempDir(emptyConfigDir)
+        };
       },
-      native: (result) => {
-        expect(result.code).toEqual(0);
-        expect(result.stdout).toEqual(`DOMAIN=github.com\nREPO=${REPO_REF}\n`);
+      {
+        shell: (result) => {
+          expect(result.code).toEqual(0);
+          expect(result.stdout).toEqual(`DOMAIN=github.com\nREPO=${REPO_REF}\n`);
+        },
+        native: (result) => {
+          expect(result.code).toEqual(0);
+          expect(result.stdout).toEqual(`DOMAIN=github.com\nREPO=${REPO_REF}\n`);
+        },
+        // Docker-ready since #745: only the repo mount, no extra env.
+        docker: (result, calls) => {
+          expect(result).toEqual({ stdout: `DOMAIN=github.com\nREPO=${REPO_REF}\n`, stderr: '', code: 0 });
+          expectRepoMountOnlyRun(calls, infoRepoPath, ['auto-fix-issue-github-info', infoRepoPath]);
+        }
       }
-    }
-  );
+    );
+  });
 
   describe('info (engine.mode unset)', () => {
     it('defaults to the shell implementation when engine.mode is unset', async () => {
