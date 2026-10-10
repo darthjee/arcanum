@@ -18,8 +18,16 @@ RUNTIME_ENV_SCRIPT := /usr/local/lib/arcanum-runtime-env.sh
 RUNTIME_RUN := docker run --rm --user "$$(id -u):$$(id -g)" --read-only --tmpfs /tmp
 RUNTIME_SMOKE_COMMAND := arcanum-smoke-check
 
+# Docker-engine parity specs and benchmark (#741), run on the host. See
+# docs/agents/specs/docker/testing.md.
+CORE_DIR := core
+PARITY_IMAGE_VAR := ARCANUM_DOCKER_PARITY_IMAGE
+BENCH_IMAGE_VAR := ARCANUM_BENCH_IMAGE
+BENCH_SCRIPT := scripts/docker_benchmark.sh
+BENCH_ARGS ?=
+
 .PHONY: core-test core-lint core-check core-shell core-report core-audit \
-	core-build-runtime core-smoke-runtime
+	core-build-runtime core-smoke-runtime docker-parity docker-benchmark
 
 core-test:
 	$(CORE_COMPOSE) run --rm core sh -c "yarn install --frozen-lockfile && yarn test"
@@ -60,3 +68,20 @@ core-smoke-runtime: core-build-runtime
 		&& test "$$version" = "$(RUNTIME_VERSION)" \
 		|| { echo "arcanum.json version '$$version' != '$(RUNTIME_VERSION)'" >&2; exit 1; }
 	@echo "smoke: ok"
+
+# Parity specs (core/spec/docker/, yarn test:docker): each case runs a
+# command natively and inside the runtime image and compares the two.
+# Local-only, not in CI (docs/agents/specs/docker/testing.md, "Not in CI,
+# and why"): it needs a real Docker daemon and the host's Docker CLI, so
+# it runs node on the host rather than inside the `core` compose service.
+# ARCANUM_DOCKER_PARITY_GH=1 / ARCANUM_DOCKER_PARITY_SSH=1 pass through
+# from the caller's env to enable the opt-in credential cases.
+docker-parity: core-build-runtime
+	cd $(CORE_DIR) && yarn install --frozen-lockfile && $(PARITY_IMAGE_VAR)=$(RUNTIME_IMAGE) yarn test:docker
+
+# Per-call docker-vs-native overhead through the real dispatch path.
+# Local-only, like docker-parity. Pass script flags through BENCH_ARGS,
+# e.g. `make docker-benchmark BENCH_ARGS=--cold` (restart Docker first)
+# or `BENCH_ARGS="--runs 50"`.
+docker-benchmark: core-build-runtime
+	$(BENCH_IMAGE_VAR)=$(RUNTIME_IMAGE) $(BENCH_SCRIPT) $(BENCH_ARGS)
