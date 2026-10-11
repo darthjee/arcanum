@@ -3,7 +3,8 @@ import {
   seedLocalState,
   SHIM_SCRIPT
 } from '../../support/factories/autoFixAllWaitCiAndMergeParitySetup.js';
-import { itRoutesEngineDispatch } from '../../support/sharedExamples/engineDispatchRouting.js';
+import { expectGhNeedsRun } from '../../support/factories/engineDispatchDockerSetup.js';
+import { itRoutesGhEngineDispatch } from '../../support/sharedExamples/ghEngineDispatchRouting.js';
 import { createFakeGhBin } from '../../support/utils/fakeGhBin.js';
 
 const MODEL_EMAIL = 'model@example.com';
@@ -22,12 +23,15 @@ const MODEL_EMAIL = 'model@example.com';
 // engine.mode=native, proving the shim really does select the intended
 // implementation.
 describe('auto-fix-all-wait-ci-and-merge parity (shell vs. native) — engine_dispatch routing', () => {
-  itRoutesEngineDispatch(
+  let repoPath;
+
+  itRoutesGhEngineDispatch(
     'engine_dispatch routing (via the real wait_ci_and_merge.sh shim)',
     SHIM_SCRIPT,
     async (repo, mode) => {
-      const fakeGh = await createFakeGhBin(mode === 'native' ? { authTokenAlwaysFails: true } : undefined);
+      const fakeGh = await createFakeGhBin(mode === 'shell' ? undefined : { authTokenAlwaysFails: true });
 
+      repoPath = repo.repoPath;
       await seedGithubLikeRepo(repo);
       await seedLocalState(repo, { engine: { mode } });
 
@@ -45,6 +49,17 @@ describe('auto-fix-all-wait-ci-and-merge parity (shell vs. native) — engine_di
         expect(result.code).toEqual(1);
         expect(result.stdout).toEqual('');
         expect(result.stderr).toContain('could not obtain GitHub token via gh auth token');
+      },
+      // Docker batch 3 (issue #747): the passthrough fake `docker` runs
+      // core/bin/arcanum on the host with the same fake `gh`, so it
+      // fails like native; the run carries the gh needs.
+      docker: (result, calls, world) => {
+        expect(result).toEqual({
+          stdout: '',
+          stderr: 'arcanum: Error: could not obtain GitHub token via gh auth token\n',
+          code: 1
+        });
+        expectGhNeedsRun(calls, repoPath, ['auto-fix-all-wait-ci-and-merge', ...[repoPath, MODEL_EMAIL]], world);
       }
     }
   );

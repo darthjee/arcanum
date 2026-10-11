@@ -1,7 +1,11 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { seedQueue } from '../support/factories/queueParitySetup.js';
+import { expectGhNeedsRun } from '../support/factories/engineDispatchDockerSetup.js';
+import { seedGithubLikeRepo, seedQueue } from '../support/factories/queueParitySetup.js';
+import { itRoutesGhEngineDispatch } from '../support/sharedExamples/ghEngineDispatchRouting.js';
 import { itRoutesWithInvocationLog } from '../support/sharedExamples/invocationLogRouting.js';
+import { seedEngineMode } from '../support/utils/engineMode.js';
+import { createFakeGhBin } from '../support/utils/fakeGhBin.js';
 import { REPO_ROOT } from '../support/utils/runCommand.js';
 
 const SCRIPTS_DIR = path.join(REPO_ROOT, 'auto-fix-all', 'scripts');
@@ -53,6 +57,15 @@ async function readQueueIds(repoPath) {
 // also checks the `docker run` carries only the repo mount and no
 // extra env. The real container is compared with native in
 // core/spec/docker/ (local only).
+//
+// queue.sh save/push (docker batch 3, issue #747) tag the saved issues
+// on GitHub, so their docker run carries the
+// `--needs=global-config,gitconfig,gh` mounts and env. A fake `gh` whose
+// `auth token` always fails splits the modes: the shell side's `gh
+// issue view/edit` never asks for a token and tags the issue, while
+// native (and the passthrough fake `docker`, which runs core/bin/arcanum
+// on the host with the same `PATH`) writes the queue, then fails at
+// token resolution and exits 1.
 describe('auto-fix-all engine_dispatch routing (via the real shims)', () => {
   describe('config.sh', () => {
     itRoutesWithInvocationLog('get', CONFIG_SHIM, {
@@ -134,6 +147,66 @@ describe('auto-fix-all engine_dispatch routing (via the real shims)', () => {
         },
         dockerArgs: ({ repoPath }) => [repoPath]
       });
+    });
+  });
+
+  describe('queue.sh (gh)', () => {
+    const REPO_REF = 'darthjee/arcanum-queue-fixture';
+    const GH_QUEUE_CASES = [
+      { sub: 'save', line: 'Queue saved: 7\n', ids: ['7'] },
+      { sub: 'push', line: 'Pushed: 7\n', ids: ['5', '7'] }
+    ];
+
+    GH_QUEUE_CASES.forEach(({ sub, line, ids }) => {
+      let repoPath;
+
+      /**
+       * @returns {Promise<void>} resolves once the queue file is checked.
+       */
+      const expectQueue = async () => {
+        expect(await readQueueIds(repoPath)).toEqual(ids);
+      };
+      const nativeResult = { stdout: line, stderr: '', code: 1 };
+
+      itRoutesGhEngineDispatch(
+        sub,
+        QUEUE_SHIM,
+        async (repo, mode) => {
+          const fakeGh = await createFakeGhBin({ authTokenAlwaysFails: true });
+
+          repoPath = repo.repoPath;
+          await seedGithubLikeRepo(repo);
+          await seedEngineMode(repo, mode);
+          await seedQueue(repo.repoPath, ['5']);
+
+          return {
+            args: [sub, repo.repoPath, '7'],
+            env: { ...process.env, PATH: `${fakeGh.binDir}${path.delimiter}${process.env.PATH}` },
+            cleanup: fakeGh.cleanup
+          };
+        },
+        {
+          shell: async (result) => {
+            expect(result).toEqual({
+              stdout: `${line}Added tag 'enqueued' to issue #7 on ${REPO_REF}\n` +
+                'Tag \'ready_for_work\' not present on issue #7 — nothing to do.\n' +
+                'Tag \'created\' not present on issue #7 — nothing to do.\n',
+              stderr: '',
+              code: 0
+            });
+            await expectQueue();
+          },
+          native: async (result) => {
+            expect(result).toEqual(nativeResult);
+            await expectQueue();
+          },
+          docker: async (result, calls, world) => {
+            expect(result).toEqual(nativeResult);
+            await expectQueue();
+            expectGhNeedsRun(calls, repoPath, [`auto-fix-all-queue-${sub}`, repoPath, '7'], world);
+          }
+        }
+      );
     });
   });
 });

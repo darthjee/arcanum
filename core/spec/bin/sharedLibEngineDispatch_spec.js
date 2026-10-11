@@ -1,7 +1,11 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { expectGhNeedsRun } from '../support/factories/engineDispatchDockerSetup.js';
+import { itRoutesGhEngineDispatch } from '../support/sharedExamples/ghEngineDispatchRouting.js';
 import { itRoutesWithInvocationLog } from '../support/sharedExamples/invocationLogRouting.js';
-import { REPO_ROOT } from '../support/utils/runCommand.js';
+import { seedEngineMode } from '../support/utils/engineMode.js';
+import { REPO_ROOT, runCommand } from '../support/utils/runCommand.js';
+import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
 const LIB_DIR = path.join(REPO_ROOT, 'arcanum', '_lib');
 
@@ -15,6 +19,14 @@ const LIB_DIR = path.join(REPO_ROOT, 'arcanum', '_lib');
 async function seedFile(repoPath, file, content) {
   await mkdir(path.dirname(path.join(repoPath, file)), { recursive: true });
   await writeFile(path.join(repoPath, file), content);
+}
+
+/**
+ * @param {{repoPath: string}} repo - the fixture repo.
+ * @returns {Promise<void>} resolves once its `origin` remote is removed.
+ */
+async function removeOrigin(repo) {
+  await runCommand(['git', '-C', repo.repoPath, 'remote', 'remove', 'origin'], repo.repoPath);
 }
 
 // Routing spec for the real arcanum/_lib engine_dispatch shims of
@@ -99,5 +111,93 @@ describe('arcanum/_lib engine_dispatch routing (via the real shims)', () => {
       });
     },
     dockerArgs: ({ repoPath }) => [repoPath, 'docs/issues', 'docs/plans', '12']
+  });
+
+  // Docker batch 3 (issue #747): resolve_and_fetch.sh and spawn_issue.sh
+  // need GitHub, so their cases run in a repo with no `origin` and fail
+  // before any GitHub call — core/bin/arcanum (native, and the
+  // passthrough fake `docker`) with its own `arcanum: ` prefix. Their
+  // docker run carries the `--needs=global-config,gitconfig,gh` mounts
+  // and env; spawn_issue.sh's <body_file> (`--path-arg=4:ro`) adds a
+  // read-only file mount only when it sits outside the repo.
+  describe('gh commands (no origin)', () => {
+    let repoPath;
+    let bodyFile;
+
+    itRoutesGhEngineDispatch(
+      'resolve_and_fetch.sh',
+      path.join(LIB_DIR, 'resolve_and_fetch.sh'),
+      async (repo, mode) => {
+        repoPath = repo.repoPath;
+        await removeOrigin(repo);
+        await seedEngineMode(repo, mode);
+
+        return { args: [repo.repoPath, 'docs/agents/issues', '#42'] };
+      },
+      {
+        shell: (result) => {
+          expect(result).toEqual({
+            stdout: '',
+            stderr: 'error: pathspec \'origin/main\' did not match any file(s) known to git\n',
+            code: 1
+          });
+        },
+        native: (result) => {
+          expect(result.code).toEqual(1);
+          expect(result.stdout).toEqual('');
+          expect(result.stderr).toContain('arcanum: Command failed: git checkout origin/main\n');
+        },
+        docker: (result, calls, world) => {
+          expect(result.code).toEqual(1);
+          expect(result.stdout).toEqual('');
+          expect(result.stderr).toContain('arcanum: Command failed: git checkout origin/main\n');
+          expectGhNeedsRun(
+            calls, repoPath, ['resolve-and-fetch', repoPath, 'docs/agents/issues', '#42'], world
+          );
+        }
+      }
+    );
+
+    [
+      { label: 'inside the repo', outside: false, mounts: () => [] },
+      { label: 'outside the repo', outside: true, mounts: () => [`${bodyFile}:${bodyFile}:ro`] }
+    ].forEach(({ label, outside, mounts }) => {
+      const noOrigin = () => `Error: '${repoPath}' is not a git repository or has no 'origin' remote\n`;
+
+      itRoutesGhEngineDispatch(
+        `spawn_issue.sh with a body file ${label}`,
+        path.join(LIB_DIR, 'spawn_issue.sh'),
+        async (repo, mode) => {
+          const bodyDir = outside ? await realpath(await createTempDir('arcanum-core-spawn-issue-body-')) : repo.repoPath;
+
+          repoPath = repo.repoPath;
+          bodyFile = path.join(bodyDir, 'body.md');
+          await removeOrigin(repo);
+          await seedEngineMode(repo, mode);
+          await writeFile(bodyFile, 'body\n');
+
+          return {
+            args: [repo.repoPath, '7', 'Child title', bodyFile],
+            cleanup: async () => {
+              if (outside) await removeTempDir(bodyDir);
+            }
+          };
+        },
+        {
+          shell: (result) => {
+            expect(result).toEqual({ stdout: '', stderr: noOrigin(), code: 1 });
+          },
+          native: (result) => {
+            expect(result).toEqual({ stdout: '', stderr: `arcanum: ${noOrigin()}`, code: 1 });
+          },
+          docker: (result, calls, world) => {
+            expect(result).toEqual({ stdout: '', stderr: `arcanum: ${noOrigin()}`, code: 1 });
+            expectGhNeedsRun(
+              calls, repoPath, ['spawn-issue', repoPath, '7', 'Child title', bodyFile], world, mounts()
+            );
+          }
+        }
+      );
+    });
   });
 });

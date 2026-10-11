@@ -1,8 +1,13 @@
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { expectGhNeedsRun } from '../support/factories/engineDispatchDockerSetup.js';
+import { seedGithubLikeRepo } from '../support/factories/githubParitySetup.js';
 import { itRoutesEngineDispatch } from '../support/sharedExamples/engineDispatchRouting.js';
+import { itRoutesGhEngineDispatch } from '../support/sharedExamples/ghEngineDispatchRouting.js';
 import { itRoutesWithInvocationLog } from '../support/sharedExamples/invocationLogRouting.js';
+import { seedEngineMode } from '../support/utils/engineMode.js';
+import { createFakeGhBin } from '../support/utils/fakeGhBin.js';
 import { createGitFixtureRepo } from '../support/utils/gitFixtureRepo.js';
 import { REPO_ROOT, runCommand } from '../support/utils/runCommand.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
@@ -21,6 +26,16 @@ import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 // a relative path inside the repo needs no mount, an absolute one
 // outside it gets its directory mounted read-write. sync_labels.sh is
 // answered "n", so neither side reaches GitHub.
+//
+// sync_labels.sh under engine.mode=docker (issue #747, docker batch 3)
+// is answered "y" instead, with a fake `gh` whose `auth token` always
+// fails: the shell side syncs against the fake `gh`, while native and
+// the passthrough fake `docker` (core/bin/arcanum on the host, same
+// `PATH`) print the table and prompt, read the "y" from stdin — proving
+// stdin reaches the container — and fail at token resolution. The
+// docker run carries the `--needs=global-config,gitconfig,gh` mounts and
+// env, plus a read-only mount of <config_path> (`--path-arg=2:ro`) only
+// when it sits outside the repo.
 
 const SCRIPTS_DIR = path.join(REPO_ROOT, 'init-claude', 'scripts');
 const WRITE_SHIM = path.join(SCRIPTS_DIR, 'write_label_config.sh');
@@ -160,6 +175,59 @@ describe('init-claude label commands engine_dispatch routing (via the real shims
       },
       { shell: assertFor('shell'), native: assertFor('native') }
     );
+  });
+
+  describe('sync_labels.sh (answered "y", gh needs)', () => {
+    const TABLE = '| Label | Color |\n| --- | --- |\n| Bug | #b60205 |\nSync these labels to GitHub? [y/n]: ';
+    const NATIVE_RESULT = {
+      stdout: TABLE,
+      stderr: 'arcanum: Error: could not obtain GitHub token via gh auth token\n',
+      code: 1
+    };
+    let repoPath;
+    let configFile;
+
+    [
+      { label: 'inside the repo', outside: false, mounts: () => [] },
+      { label: 'outside the repo', outside: true, mounts: () => [`${configFile}:${configFile}:ro`] }
+    ].forEach(({ label, outside, mounts }) => {
+      itRoutesGhEngineDispatch(
+        `sync_labels.sh with an absolute config ${label}`,
+        SYNC_SHIM,
+        async (repo, mode) => {
+          const fakeGh = await createFakeGhBin({ authTokenAlwaysFails: true });
+          const configDir = outside ? await realpath(await createTempDir('arcanum-core-labels-sync-')) : repo.repoPath;
+
+          repoPath = repo.repoPath;
+          configFile = path.join(configDir, 'labels.json');
+          await seedGithubLikeRepo(repo);
+          await seedEngineMode(repo, mode);
+          await writeFile(configFile, '{"labels":[{"name":"Bug","color":"b60205"}]}');
+
+          return {
+            args: [repo.repoPath, configFile],
+            input: 'y\n',
+            env: { ...process.env, PATH: `${fakeGh.binDir}${path.delimiter}${process.env.PATH}` },
+            cleanup: async () => {
+              await fakeGh.cleanup();
+              if (outside) await removeTempDir(configDir);
+            }
+          };
+        },
+        {
+          shell: (result) => {
+            expect(result).toEqual({ stdout: `${TABLE}STATUS=synced\nCREATED=Bug\n`, stderr: '', code: 0 });
+          },
+          native: (result) => {
+            expect(result).toEqual(NATIVE_RESULT);
+          },
+          docker: (result, calls, world) => {
+            expect(result).toEqual(NATIVE_RESULT);
+            expectGhNeedsRun(calls, repoPath, ['init-claude-sync-labels', repoPath, configFile], world, mounts());
+          }
+        }
+      );
+    });
   });
 
   describe('shim-level usage errors (never dispatched)', () => {

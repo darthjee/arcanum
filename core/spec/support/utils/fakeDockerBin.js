@@ -26,7 +26,9 @@ import { createTempDir, removeTempDir } from './tempDir.js';
 //     after the image reference, in the `-w` directory, with an env built
 //     only from the `-e` names (plus the host `PATH` and a throwaway
 //     `HOME`, standing in for the image's own `PATH` and synthetic
-//     `HOME`), and exits with its code (128+n for a signal). Shape
+//     `HOME`), forwarding SIGINT/SIGTERM/SIGHUP to it (like the real
+//     CLI's default `--sig-proxy`), and exits with its code (128+n for
+//     a signal). Shape
 //     violations print `fake docker: invalid run argv: <reason>` on
 //     stderr and exit 99 (outside 125-127, so dispatch never falls back
 //     on them).
@@ -52,7 +54,7 @@ export const DOCKER_PRESETS = {
 function buildDockerScript(config) {
   return `#!${process.execPath}
 const { appendFileSync } = require('node:fs');
-const { spawnSync } = require('node:child_process');
+const { spawn } = require('node:child_process');
 const { constants } = require('node:os');
 
 const config = ${JSON.stringify(config)};
@@ -117,16 +119,18 @@ function passthroughRun() {
   run.names.forEach((name) => {
     if (process.env[name] !== undefined) childEnv[name] = process.env[name];
   });
-  const result = spawnSync(process.execPath, [config.nativeBin, ...run.opts.slice(run.imageIndex + 1)], {
+  const child = spawn(process.execPath, [config.nativeBin, ...run.opts.slice(run.imageIndex + 1)], {
     cwd: run.workdir,
     env: childEnv,
     stdio: 'inherit'
   });
-  if (result.signal) {
-    process.exitCode = 128 + constants.signals[result.signal];
-  } else {
-    process.exitCode = result.status ?? 1;
-  }
+  // Like the real CLI's --sig-proxy (on by default without a TTY):
+  // signals sent to \`docker run\` reach the "container".
+  ['SIGINT', 'SIGTERM', 'SIGHUP'].forEach((signal) => process.on(signal, () => child.kill(signal)));
+  child.on('error', () => { process.exitCode = 1; });
+  child.on('exit', (code, signal) => {
+    process.exitCode = signal ? 128 + constants.signals[signal] : (code ?? 1);
+  });
 }
 
 const name = subcommand();

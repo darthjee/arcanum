@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { seedGithubLikeRepo } from '../../support/factories/autoFixAllWaitCiParitySetup.js';
-import { itRoutesEngineDispatch } from '../../support/sharedExamples/engineDispatchRouting.js';
+import { expectGhNeedsRun } from '../../support/factories/engineDispatchDockerSetup.js';
+import { itRoutesGhEngineDispatch } from '../../support/sharedExamples/ghEngineDispatchRouting.js';
 import { seedEngineMode } from '../../support/utils/engineMode.js';
 import { createFakeGhBin } from '../../support/utils/fakeGhBin.js';
 import { REPO_ROOT } from '../../support/utils/runCommand.js';
@@ -42,12 +43,15 @@ describe('auto-fix-all-wait-ci parity (shell vs. native) — engine_dispatch', (
   // distinct, native-only failure message that only reaches native's
   // own code path, proving real native execution (not a silent shell
   // fallback) occurred.
-  itRoutesEngineDispatch(
+  let repoPath;
+
+  itRoutesGhEngineDispatch(
     'engine_dispatch routing (via the real wait_ci.sh shim)',
     SHIM_SCRIPT,
     async (repo, mode) => {
-      const fakeGh = await createFakeGhBin(mode === 'native' ? { authTokenAlwaysFails: true } : undefined);
+      const fakeGh = await createFakeGhBin(mode === 'shell' ? undefined : { authTokenAlwaysFails: true });
 
+      repoPath = repo.repoPath;
       await seedGithubLikeRepo(repo);
       await seedEngineMode(repo, mode);
 
@@ -65,6 +69,17 @@ describe('auto-fix-all-wait-ci parity (shell vs. native) — engine_dispatch', (
         expect(result.code).toEqual(1);
         expect(result.stdout).toEqual('');
         expect(result.stderr).toContain('could not obtain GitHub token via gh auth token');
+      },
+      // Docker batch 3 (issue #747): the passthrough fake `docker` runs
+      // core/bin/arcanum on the host with the same fake `gh`, so it
+      // fails like native; the run carries the gh needs.
+      docker: (result, calls, world) => {
+        expect(result).toEqual({
+          stdout: '',
+          stderr: 'arcanum: Error: could not obtain GitHub token via gh auth token\n',
+          code: 1
+        });
+        expectGhNeedsRun(calls, repoPath, ['auto-fix-all-wait-ci', ...[repoPath]], world);
       }
     }
   );

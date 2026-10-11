@@ -1,6 +1,7 @@
 import path from 'node:path';
+import { expectGhNeedsRun } from '../../support/factories/engineDispatchDockerSetup.js';
 import { seedGithubLikeRepo } from '../../support/factories/githubParitySetup.js';
-import { itRoutesEngineDispatch } from '../../support/sharedExamples/engineDispatchRouting.js';
+import { itRoutesGhEngineDispatch } from '../../support/sharedExamples/ghEngineDispatchRouting.js';
 import { seedEngineMode } from '../../support/utils/engineMode.js';
 import { createFakeGhBin } from '../../support/utils/fakeGhBin.js';
 import { createGitFixtureRepo } from '../../support/utils/gitFixtureRepo.js';
@@ -9,6 +10,7 @@ import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
 
 const SHIM_SCRIPT = path.join(REPO_ROOT, 'auto-fix-all', 'scripts', 'github.sh');
 const NATIVE_TOKEN_FAILURE = 'could not obtain GitHub token via gh auth token';
+const REPO_REF = 'darthjee/arcanum-github-fixture';
 
 // Routing test for the real auto-fix-all/scripts/github.sh
 // engine_dispatch router (issue #656) — unlike the sibling
@@ -36,6 +38,13 @@ const NATIVE_TOKEN_FAILURE = 'could not obtain GitHub token via gh auth token';
 // success-vs-failure split proves which implementation actually ran.
 //
 // This file tests routing, not output parity.
+//
+// Docker batch 3 (issue #747): every subcommand but cleanup-branch also
+// runs under engine.mode=docker (a passthrough fake `docker`, which runs
+// core/bin/arcanum on the host with the same fake `gh` first on
+// `PATH`), failing exactly like native, with the `docker run` carrying
+// the `--needs=global-config,gitconfig,gh` mounts and env (GH_TOKEN by
+// name only).
 describe('auto-fix-all-github engine_dispatch routing (via the real github.sh shim)', () => {
   /**
    * Builds a github.com-shaped fixture repo's pr-state invocation, with a
@@ -61,27 +70,117 @@ describe('auto-fix-all-github engine_dispatch routing (via the real github.sh sh
     return { args: ['pr-state', repo.repoPath], env, cleanup: fakeGh.cleanup };
   }
 
-  itRoutesEngineDispatch(
+  let repoPath;
+
+  /**
+   * The shell-vs-native split shared by every subcommand below: the
+   * shell side succeeds against the fake `gh`, native and docker fail
+   * at token resolution.
+   * @param {string} command - the dispatched command.
+   * @param {string[]} extraArgs - the args after `<repo_path>`.
+   * @param {{stdout: string, code: number}} shellResult - the shell side's outcome.
+   * @param {{stdout: string, stderr: string, code: number}} nativeResult - native's (and docker's).
+   * @returns {object} the `shell`/`native`/`docker` callbacks.
+   */
+  function splitsOnToken(command, extraArgs, shellResult, nativeResult) {
+    return {
+      shell: (result) => {
+        expect(result.code).toEqual(shellResult.code);
+        expect(result.stdout).toEqual(shellResult.stdout);
+      },
+      native: (result) => {
+        expect(result).toEqual(nativeResult);
+      },
+      docker: (result, calls, world) => {
+        expect(result).toEqual(nativeResult);
+        expectGhNeedsRun(calls, repoPath, [command, repoPath, ...extraArgs], world);
+      }
+    };
+  }
+
+  itRoutesGhEngineDispatch(
     'pr-state',
     SHIM_SCRIPT,
     async (repo, mode) => {
+      repoPath = repo.repoPath;
       await seedEngineMode(repo, mode);
 
       return preparePrState(repo);
     },
-    {
-      shell: (result) => {
-        expect(result.code).toEqual(0);
-        expect(result.stdout).toEqual('STATE=MERGED\n');
-      },
-      native: (result) => {
-        expect(result.code).toEqual(1);
-        expect(result.stdout).toEqual('');
-        expect(result.stderr).toContain(NATIVE_TOKEN_FAILURE);
-        expect(result.stderr).not.toContain('no native implementation');
-      }
-    }
+    splitsOnToken(
+      'auto-fix-all-github-pr-state', [],
+      { stdout: 'STATE=MERGED\n', code: 0 },
+      { stdout: '', stderr: `arcanum: Error: ${NATIVE_TOKEN_FAILURE}\n`, code: 1 }
+    )
   );
+
+  const GH_CASES = [
+    {
+      sub: 'pr-number',
+      command: 'auto-fix-all-github-pr-number',
+      args: [],
+      env: { FAKE_GH_PR_NUMBER: '42' },
+      shell: { stdout: '42\n', code: 0 },
+      native: { stdout: '', stderr: `arcanum: Error: ${NATIVE_TOKEN_FAILURE}\n`, code: 1 }
+    },
+    {
+      sub: 'pr-merge',
+      command: 'auto-fix-all-github-pr-merge',
+      args: [],
+      env: { FAKE_GH_PR_NUMBER: '42' },
+      shell: { stdout: 'https://github.com/example/repo/pull/42\n', code: 0 },
+      native: { stdout: '', stderr: `arcanum: Error: ${NATIVE_TOKEN_FAILURE}\n`, code: 1 }
+    },
+    {
+      sub: 'has-label',
+      command: 'auto-fix-all-github-has-label',
+      args: ['5', 'Epic'],
+      env: { FAKE_GH_ISSUE_LABELS: 'Epic' },
+      shell: { stdout: '', code: 0 },
+      native: { stdout: '', stderr: '', code: 2 }
+    },
+    {
+      sub: 'has-shipit-label',
+      command: 'auto-fix-all-github-has-label',
+      args: ['5'],
+      dockerArgs: ['5', 'shipit'],
+      env: { FAKE_GH_ISSUE_LABELS: 'shipit' },
+      shell: { stdout: '', code: 0 },
+      native: { stdout: '', stderr: '', code: 2 }
+    },
+    {
+      sub: 'add-tag',
+      command: 'auto-fix-all-github-add-tag',
+      args: ['5', 'enqueued'],
+      env: {},
+      shell: { stdout: `Added tag 'enqueued' to issue #5 on ${REPO_REF}\n`, code: 0 },
+      native: { stdout: '', stderr: `arcanum: Error: could not fetch issue #5 from ${REPO_REF}\n`, code: 1 }
+    },
+    {
+      sub: 'remove-tag',
+      command: 'auto-fix-all-github-remove-tag',
+      args: ['5', 'created'],
+      env: {},
+      shell: { stdout: 'Tag \'created\' not present on issue #5 — nothing to do.\n', code: 0 },
+      native: { stdout: '', stderr: `arcanum: Error: could not fetch issue #5 from ${REPO_REF}\n`, code: 1 }
+    }
+  ];
+
+  GH_CASES.forEach(({ sub, command, args, dockerArgs = args, env, shell, native }) => {
+    itRoutesGhEngineDispatch(
+      sub,
+      SHIM_SCRIPT,
+      async (repo, mode) => {
+        repoPath = repo.repoPath;
+        await seedEngineMode(repo, mode);
+
+        const prepared = await preparePrState(repo, env);
+
+        return { ...prepared, args: [sub, repo.repoPath, ...args] };
+      },
+      splitsOnToken(command, dockerArgs, shell, native)
+    );
+  });
 
   describe('pr-state (engine.mode unset)', () => {
     it('defaults to the shell implementation when engine.mode is unset', async () => {
