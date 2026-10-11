@@ -37,7 +37,7 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 
 | command | script | kind | status | credentials | mounts | env | issue | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `checkout-safe-branch` | `arcanum/_lib/checkout_safe_branch.sh` | dispatched | ☐ | git-push (ssh) | gitconfig:ro, remote | GIT_CONFIG_GLOBAL, remote | | |
+| `checkout-safe-branch` | `arcanum/_lib/checkout_safe_branch.sh` | dispatched | ✅ | git-push (ssh) | gitconfig:ro, remote | GIT_CONFIG_GLOBAL, remote | #748 | The parity case fetches from a local `file://` bare origin. Real ssh transport is covered only by the opt-in ssh parity case (`ARCANUM_DOCKER_PARITY_SSH=1` plus `ARCANUM_DOCKER_PARITY_SSH_REMOTE`), not yet run; https transport is covered by the #747 `resolve-and-fetch` gh case. Known divergence, unconfirmed against a real remote: under `engine.mode=native` the shim runs under `env -i` without `SSH_AUTH_SOCK` allowlisted, so native git over ssh can't use the SSH agent, while docker can through the `remote` need. This applies to every `remote` row. |
 | `finish-report` | `arcanum/_lib/finish_report.sh` | dispatched | ✅ | none | — | — | #745 | |
 | `github-issue-create` | `arcanum/_lib/github_issue.sh` `create` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro, args:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | No parity case: it creates a GitHub issue. The routing spec covers the docker wiring. `--path-arg=3:ro`: `<file>` is mounted read-only at its own path when it sits outside the repo. |
 | `github-issue-fetch` | `arcanum/_lib/github_issue.sh` `fetch` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | |
@@ -77,7 +77,7 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `arcanum-split-issue-create-sub-issue` | `arcanum-split-issue/scripts/create_sub_issue.sh` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | No parity case: it creates a GitHub issue. The routing spec covers the docker wiring. Arg 3 `<sub_issue_file>` has no `--path-arg`: a repo-relative path works (the container cwd is the repo), an absolute path outside the repo is not visible in the container. |
 | `arcanum-split-issue-create-sub-issue-file` | `arcanum-split-issue/scripts/create_sub_issue_file.sh` | dispatched | ✅ | none | args:ro | — | #746 | `--path-arg=4:ro`: `<body_file>` is mounted read-only at its own path when it sits outside the repo. |
-| `arcanum-split-issue-finish` | `arcanum-split-issue/scripts/finish.sh` | dispatched | ☐ | gh, git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN, remote | | |
+| `arcanum-split-issue-finish` | `arcanum-split-issue/scripts/finish.sh` | dispatched | ✅ | gh, git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN, remote | #748 | No local parity case: `mark-split` relabels the issue on GitHub first and stops on failure, so a local origin can't reach its fetch. It has only an opt-in gh sandbox case (in `arcanumSplitIssue_spec.js`), not yet run. The routing spec covers the docker wiring. |
 | `arcanum-split-issue-push-sub-issues` | `arcanum-split-issue/scripts/push_sub_issues.sh` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | No parity case: it creates GitHub issues. The routing spec covers the docker wiring. |
 
 ## arcanum-update
@@ -91,14 +91,14 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 
 | command | script | kind | status | credentials | mounts | env | issue | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `auto-fix-all-checkout-from-main` | `auto-fix-all/scripts/checkout_from_main.sh` | dispatched | ☐ | git-push (ssh) | gitconfig:ro, remote | GIT_CONFIG_GLOBAL, remote | | |
-| `auto-fix-all-cleanup-artifacts` | `auto-fix-all/scripts/cleanup_artifacts.sh` | dispatched | ☐ | git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, remote | | |
+| `auto-fix-all-checkout-from-main` | `auto-fix-all/scripts/checkout_from_main.sh` | dispatched | ✅ | git-push (ssh) | gitconfig:ro, remote | GIT_CONFIG_GLOBAL, remote | #748 | |
+| `auto-fix-all-cleanup-artifacts` | `auto-fix-all/scripts/cleanup_artifacts.sh` | dispatched | ✅ | git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, remote | #748 | |
 | `auto-fix-all-config-get` | `auto-fix-all/scripts/config.sh` `get` | dispatched | ✅ | none | — | — | #745 | |
 | `auto-fix-all-config-is-enabled` | `auto-fix-all/scripts/config.sh` `is-enabled` | dispatched | ✅ | none | — | — | #745 | |
 | `auto-fix-all-config-set` | `auto-fix-all/scripts/config.sh` `set` | dispatched | ✅ | none | — | — | #745 | |
 | `auto-fix-all-config-toggle` | `auto-fix-all/scripts/config.sh` `toggle` | dispatched | ✅ | none | — | — | #745 | |
 | `auto-fix-all-github-add-tag` | `auto-fix-all/scripts/github.sh` `add-tag` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | |
-| `auto-fix-all-github-cleanup-branch` | `auto-fix-all/scripts/github.sh` `cleanup-branch` | dispatched | ☐ | git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, remote | | |
+| `auto-fix-all-github-cleanup-branch` | `auto-fix-all/scripts/github.sh` `cleanup-branch` | dispatched | ✅ | git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, remote | #748 | |
 | `auto-fix-all-github-has-label` | `auto-fix-all/scripts/github.sh` `has-label`, `has-shipit-label` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | |
 | `auto-fix-all-github-pr-merge` | `auto-fix-all/scripts/github.sh` `pr-merge` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | No parity case: it merges a PR. The routing spec covers the docker wiring. |
 | `auto-fix-all-github-pr-number` | `auto-fix-all/scripts/github.sh` `pr-number` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | |
@@ -111,7 +111,7 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 | `auto-fix-all-queue-push` | `auto-fix-all/scripts/queue.sh` `push` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | |
 | `auto-fix-all-queue-save` | `auto-fix-all/scripts/queue.sh` `save` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | |
 | `auto-fix-all-queue-wait-next` | `auto-fix-all/scripts/queue.sh` `wait-next` | dispatched | ✅ | none | — | — | #745 | Credentials corrected from `gh` in #726: it never touches GitHub (only `save`/`push` tag issues). Blocks until the queue has an entry. The parity case seeds the queue first, so the blocking call returns at once. |
-| `auto-fix-all-reply-comment` | `auto-fix-all/scripts/reply_comment.sh` | dispatched | ☐ | gh, git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN, remote | | |
+| `auto-fix-all-reply-comment` | `auto-fix-all/scripts/reply_comment.sh` | dispatched | ✅ | gh, git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN, remote | #748 | No parity case: its success path posts a PR comment on GitHub. The routing spec covers the docker wiring. |
 | `auto-fix-all-wait-ci` | `auto-fix-all/scripts/wait_ci.sh` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | Blocks until CI completes. No parity case: it blocks on CI. The routing spec covers the docker wiring. |
 | `auto-fix-all-wait-ci-and-merge` | `auto-fix-all/scripts/wait_ci_and_merge.sh` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | Blocks until CI completes. No parity case: it blocks on CI and merges a PR. The routing spec covers the docker wiring. |
 
@@ -119,7 +119,7 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 
 | command | script | kind | status | credentials | mounts | env | issue | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `auto-fix-issue-commit-change` | `auto-fix-issue/scripts/commit_change.sh` | dispatched | ☐ | git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, remote | | |
+| `auto-fix-issue-commit-change` | `auto-fix-issue/scripts/commit_change.sh` | dispatched | ✅ | git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, remote | #748 | |
 | `auto-fix-issue-github-info` | `auto-fix-issue/scripts/github.sh` `info` | dispatched | ✅ | none | — | — | #745 | |
 | `auto-fix-issue-github-pr-create` | `auto-fix-issue/scripts/github.sh` `pr-create` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro, args:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | No parity case: it creates a PR. The routing spec covers the docker wiring. `--path-arg=3:ro`: `<file>` is mounted read-only at its own path when it sits outside the repo. |
 | `auto-fix-issue-github-pr-ready` | `auto-fix-issue/scripts/github.sh` `pr-ready` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | No parity case: it changes a PR's state. The routing spec covers the docker wiring. |
@@ -138,19 +138,19 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 
 | command | script | kind | status | credentials | mounts | env | issue | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `auto-monitor-pr-monitor-pr` | `auto-monitor-pr/scripts/monitor_pr.sh` | dispatched | ☐ | gh, git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN, remote | | Pushes only to restart monitoring after fixes. |
+| `auto-monitor-pr-monitor-pr` | `auto-monitor-pr/scripts/monitor_pr.sh` | dispatched | ✅ | gh, git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN, remote | #748 | Pushes only to restart monitoring after fixes. The local parity case covers only the best-effort push and the `pending` result; GitHub polling and reactions are not covered by parity. |
 
 ## auto-new-issue
 
 | command | script | kind | status | credentials | mounts | env | issue | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `auto-new-issue-commit-issue` | `auto-new-issue/scripts/commit_issue.sh` | dispatched | ☐ | git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, remote | | |
+| `auto-new-issue-commit-issue` | `auto-new-issue/scripts/commit_issue.sh` | dispatched | ✅ | git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, remote | #748 | |
 
 ## auto-plan-issue
 
 | command | script | kind | status | credentials | mounts | env | issue | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `auto-plan-issue-commit-plan` | `auto-plan-issue/scripts/commit_plan.sh` | dispatched | ☐ | git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, remote | | |
+| `auto-plan-issue-commit-plan` | `auto-plan-issue/scripts/commit_plan.sh` | dispatched | ✅ | git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, remote | #748 | |
 
 ## discuss-issue
 
