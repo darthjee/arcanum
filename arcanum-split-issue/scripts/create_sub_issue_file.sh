@@ -9,7 +9,7 @@
 # per engine.mode / arcanum/_lib/migration-status.json.
 #
 # Under engine.mode=docker it runs core/bin/arcanum inside the container,
-# once its migration-status.json status is `"docker"` (#746), with the
+# now that its migration-status.json status is `"docker"` (#746), with the
 # repo mount plus `--path-arg=4:ro`: <body_file> is mounted read-only at
 # its own host path when it sits outside the repo. If docker is
 # unavailable, engine_dispatch falls back to native on the host with a

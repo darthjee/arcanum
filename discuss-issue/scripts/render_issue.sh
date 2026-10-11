@@ -13,7 +13,7 @@
 # repoPath/positional args, not env vars).
 #
 # Under engine.mode=docker it runs core/bin/arcanum inside the container,
-# once its migration-status.json status is `"docker"` (#746), with the
+# now that its migration-status.json status is `"docker"` (#746), with the
 # repo mount plus `--path-arg=1:rw`: the directory of <output_file> is
 # mounted read-write at its own host path when it sits outside the repo.
 # If docker is unavailable, engine_dispatch falls back to native on the

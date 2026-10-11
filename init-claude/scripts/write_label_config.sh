@@ -26,7 +26,7 @@
 # entrypoint only reads/writes the label-config file.
 #
 # Under engine.mode=docker all three subcommands run core/bin/arcanum
-# inside the container, once their migration-status.json status is
+# inside the container, now that their migration-status.json status is
 # `"docker"` (#746), with the repo mount plus `--path-arg=1:rw`: the
 # directory of the absolute <config_path> is mounted read-write at its
 # own host path when it sits outside the repo. If docker is unavailable,

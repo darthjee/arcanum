@@ -29,7 +29,7 @@
 # auto-new-issue/scripts/commit_issue.sh).
 #
 # Under engine.mode=docker it runs core/bin/arcanum inside the container,
-# once its migration-status.json status is `"docker"` (#746), with the
+# now that its migration-status.json status is `"docker"` (#746), with the
 # repo mount plus `--needs=global-config`: the global arcanum config
 # ($CLAUDE_CONFIG_DIR/arcanum-config.json) is mounted read-only when it
 # exists. HOME stays in the allowlist for the native path; under docker
