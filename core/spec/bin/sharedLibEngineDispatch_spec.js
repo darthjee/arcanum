@@ -1,12 +1,13 @@
 import { mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
-  GH_NEEDS_ENV_NAMES, SPEC_GH_TOKEN, expectGhNeedsRun, expectRunWith, runCalls
+  GH_NEEDS_ENV_NAMES, HTTPS_NOT_ALLOWED, SPEC_GH_TOKEN, expectGhNeedsRun, expectRunWith, nativeCommandFailed, runCalls
 } from '../support/factories/engineDispatchDockerSetup.js';
 import { itRoutesGhEngineDispatch } from '../support/sharedExamples/ghEngineDispatchRouting.js';
 import { itRoutesWithInvocationLog } from '../support/sharedExamples/invocationLogRouting.js';
+import { itRoutesRemoteEngineDispatch } from '../support/sharedExamples/remoteEngineDispatchRouting.js';
 import { seedEngineMode } from '../support/utils/engineMode.js';
-import { FAKE_SSH_ERROR, createFakeSshBin } from '../support/utils/fakeSshBin.js';
+import { FAKE_SSH_ERROR, SSH_REMOTE_FAILURE, createFakeSshBin } from '../support/utils/fakeSshBin.js';
 import { REPO_ROOT, runCommand, seedOriginUrl } from '../support/utils/runCommand.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
@@ -222,9 +223,6 @@ describe('arcanum/_lib engine_dispatch routing (via the real shims)', () => {
     let homeDir;
     let fakeSsh;
 
-    const fetchFailure = () => `${FAKE_SSH_ERROR}fatal: Could not read from remote repository.\n\n` +
-      'Please make sure you have the correct access rights\nand the repository exists.\n';
-
     itRoutesGhEngineDispatch(
       'resolve_and_fetch.sh',
       path.join(LIB_DIR, 'resolve_and_fetch.sh'),
@@ -257,7 +255,7 @@ describe('arcanum/_lib engine_dispatch routing (via the real shims)', () => {
       },
       {
         shell: (result) => {
-          expect(result).toEqual({ stdout: '', stderr: fetchFailure(), code: 128 });
+          expect(result).toEqual({ stdout: '', stderr: SSH_REMOTE_FAILURE, code: 128 });
         },
         native: (result) => {
           expect(result.code).toEqual(1);
@@ -294,5 +292,29 @@ describe('arcanum/_lib engine_dispatch routing (via the real shims)', () => {
         }
       }
     );
+  });
+
+  // Docker batch 4 (issue #748): checkout_safe_branch.sh declares
+  // `--needs=gitconfig,remote` (no HOME in its allowlist). Its
+  // `git fetch -p` goes through the world's fake `ssh` (ssh origin) or
+  // is refused by `protocol.https.allow=never` (https origin), so every
+  // mode fails offline.
+  itRoutesRemoteEngineDispatch('checkout_safe_branch.sh', path.join(LIB_DIR, 'checkout_safe_branch.sh'), {
+    command: 'checkout-safe-branch',
+    needs: ['gitconfig', 'remote'],
+    reachesRemote: true,
+    prepare: async (repo) => ({ args: [repo.repoPath] }),
+    shell: (result) => {
+      expect(result).toEqual({ stdout: '', stderr: SSH_REMOTE_FAILURE, code: 128 });
+    },
+    native: (result) => {
+      expect(result).toEqual({ stdout: '', stderr: nativeCommandFailed('git fetch -p', SSH_REMOTE_FAILURE), code: 1 });
+    },
+    docker: (result) => {
+      expect(result).toEqual({ stdout: '', stderr: nativeCommandFailed('git fetch -p', SSH_REMOTE_FAILURE), code: 1 });
+    },
+    https: (result) => {
+      expect(result).toEqual({ stdout: '', stderr: nativeCommandFailed('git fetch -p', HTTPS_NOT_ALLOWED), code: 1 });
+    }
   });
 });

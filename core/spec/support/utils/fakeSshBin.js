@@ -48,3 +48,10 @@ process.exitCode = 255;
     cleanup: () => removeTempDir(binDir)
   };
 }
+
+/**
+ * What `git` prints on stderr when a fetch/push over an ssh `origin`
+ * goes through the fake `ssh`: the fake's own line, then git's.
+ */
+export const SSH_REMOTE_FAILURE = `${FAKE_SSH_ERROR}fatal: Could not read from remote repository.\n\n` +
+  'Please make sure you have the correct access rights\nand the repository exists.\n';

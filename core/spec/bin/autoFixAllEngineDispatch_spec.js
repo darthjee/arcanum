@@ -1,12 +1,18 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { expectGhNeedsRun } from '../support/factories/engineDispatchDockerSetup.js';
+import {
+  HTTPS_NOT_ALLOWED, expectGhNeedsRun, nativeCommandFailed
+} from '../support/factories/engineDispatchDockerSetup.js';
 import { seedGithubLikeRepo, seedQueue } from '../support/factories/queueParitySetup.js';
 import { itRoutesGhEngineDispatch } from '../support/sharedExamples/ghEngineDispatchRouting.js';
 import { itRoutesWithInvocationLog } from '../support/sharedExamples/invocationLogRouting.js';
+import {
+  commitThenPushAssertions, itRoutesRemoteEngineDispatch
+} from '../support/sharedExamples/remoteEngineDispatchRouting.js';
 import { seedEngineMode } from '../support/utils/engineMode.js';
 import { createFakeGhBin } from '../support/utils/fakeGhBin.js';
-import { REPO_ROOT } from '../support/utils/runCommand.js';
+import { SSH_REMOTE_FAILURE } from '../support/utils/fakeSshBin.js';
+import { REPO_ROOT, runCommand } from '../support/utils/runCommand.js';
 
 const SCRIPTS_DIR = path.join(REPO_ROOT, 'auto-fix-all', 'scripts');
 const CONFIG_SHIM = path.join(SCRIPTS_DIR, 'config.sh');
@@ -47,6 +53,25 @@ async function readQueueIds(repoPath) {
   const file = path.join(repoPath, '.claude', 'state', 'auto-fix-all-queue.json');
 
   return JSON.parse(await readFile(file, 'utf8')).map(({ id }) => id);
+}
+
+/**
+ * Asserts reply_comment's native outcome when the nested
+ * resolve_pr_number.sh cannot get a GitHub token.
+ * @param {object} result - the shim's result.
+ * @param {{repoPath: string}} ctx - the case context.
+ * @returns {void}
+ */
+function expectReplyTokenFailure(result, { repoPath }) {
+  const resolvePrNumber = path.join(REPO_ROOT, 'auto-monitor-issue-pr', 'scripts', 'resolve_pr_number.sh');
+
+  expect(result).toEqual({
+    stdout: '',
+    stderr: nativeCommandFailed(
+      `${resolvePrNumber} ${repoPath} 7`, 'arcanum: Error: could not obtain GitHub token via gh auth token\n'
+    ),
+    code: 1
+  });
 }
 
 // Routing spec for the real auto-fix-all config.sh and queue.sh
@@ -207,6 +232,81 @@ describe('auto-fix-all engine_dispatch routing (via the real shims)', () => {
           }
         }
       );
+    });
+  });
+
+  // Docker batch 4 (issue #748): the git remote commands. Every case
+  // runs in a `createRemoteNeedsWorld` with an ssh origin (all modes)
+  // and an https origin (docker only), so no fetch/push ever leaves the
+  // machine; the docker cases assert each shim's `--needs` wiring.
+  describe('git remote commands', () => {
+    /**
+     * @param {string} gitError - the failed fetch's stderr.
+     * @returns {string} checkout_from_main's error for a failed `main` fetch.
+     */
+    const fetchMainFailed = (gitError) => `Error: git fetch origin main failed: ${gitError}`;
+
+    itRoutesRemoteEngineDispatch('checkout_from_main.sh', path.join(SCRIPTS_DIR, 'checkout_from_main.sh'), {
+      command: 'auto-fix-all-checkout-from-main',
+      needs: ['gitconfig', 'remote'],
+      reachesRemote: true,
+      prepare: async ({ repoPath }) => ({ args: [repoPath, '7'] }),
+      shell: (result) => {
+        expect(result).toEqual({ stdout: '', stderr: fetchMainFailed(SSH_REMOTE_FAILURE), code: 1 });
+      },
+      native: (result) => {
+        expect(result).toEqual({ stdout: '', stderr: `arcanum: ${fetchMainFailed(SSH_REMOTE_FAILURE)}`, code: 1 });
+      },
+      docker: (result) => {
+        expect(result).toEqual({ stdout: '', stderr: `arcanum: ${fetchMainFailed(SSH_REMOTE_FAILURE)}`, code: 1 });
+      },
+      https: (result) => {
+        expect(result).toEqual({ stdout: '', stderr: `arcanum: ${fetchMainFailed(HTTPS_NOT_ALLOWED)}`, code: 1 });
+      }
+    });
+
+    const ISSUE_FILE = 'docs/agents/issues/7-add-change.md';
+    const PLAN_DIR = 'docs/agents/plans/7-add-change';
+
+    itRoutesRemoteEngineDispatch('cleanup_artifacts.sh', path.join(SCRIPTS_DIR, 'cleanup_artifacts.sh'), {
+      command: 'auto-fix-all-cleanup-artifacts',
+      needs: ['global-config', 'gitconfig', 'remote'],
+      reachesRemote: true,
+      prepare: async ({ repoPath }, mode, world) => {
+        await mkdir(path.join(repoPath, PLAN_DIR), { recursive: true });
+        await mkdir(path.dirname(path.join(repoPath, ISSUE_FILE)), { recursive: true });
+        await writeFile(path.join(repoPath, PLAN_DIR, 'plan.md'), '# Plan\n');
+        await writeFile(path.join(repoPath, ISSUE_FILE), '# Issue 7: Add change\n');
+        await runCommand(['git', '-C', repoPath, 'add', 'docs'], repoPath);
+        await runCommand(['git', '-C', repoPath, 'commit', '-q', '-m', 'seed artifacts'], repoPath, world.env);
+
+        return { args: [repoPath, ISSUE_FILE, PLAN_DIR, '7', 'Spec Model', 'model@example.com'] };
+      },
+      ...commitThenPushAssertions('chore(docs): remove planning artifacts (issue #7)')
+    });
+
+    // The shell side resolves PR #42 and comments through the fake `gh`,
+    // then fails its push; native (and the "container") fails at the
+    // nested resolve_pr_number.sh's token resolution, before any remote
+    // call, so only the docker wiring is asserted for the remote.
+    itRoutesRemoteEngineDispatch('reply_comment.sh', path.join(SCRIPTS_DIR, 'reply_comment.sh'), {
+      command: 'auto-fix-all-reply-comment',
+      needs: ['global-config', 'gitconfig', 'gh', 'remote'],
+      prepare: async ({ repoPath }, mode, world) => {
+        const fakeGh = await createFakeGhBin({ authTokenAlwaysFails: true });
+
+        return {
+          args: [repoPath, '7', 'node', 'Spec Model', 'model@example.com', 'Done.'],
+          env: { PATH: `${fakeGh.binDir}${path.delimiter}${world.env.PATH}`, FAKE_GH_PR_NUMBER: '42' },
+          cleanup: fakeGh.cleanup
+        };
+      },
+      shell: (result) => {
+        expect(result).toEqual({ stdout: '', stderr: SSH_REMOTE_FAILURE, code: 128 });
+      },
+      native: expectReplyTokenFailure,
+      docker: expectReplyTokenFailure,
+      https: expectReplyTokenFailure
     });
   });
 });

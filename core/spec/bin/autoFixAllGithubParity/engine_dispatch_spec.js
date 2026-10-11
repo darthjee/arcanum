@@ -2,6 +2,7 @@ import path from 'node:path';
 import { expectGhNeedsRun } from '../../support/factories/engineDispatchDockerSetup.js';
 import { seedGithubLikeRepo } from '../../support/factories/githubParitySetup.js';
 import { itRoutesGhEngineDispatch } from '../../support/sharedExamples/ghEngineDispatchRouting.js';
+import { itRoutesRemoteEngineDispatch } from '../../support/sharedExamples/remoteEngineDispatchRouting.js';
 import { seedEngineMode } from '../../support/utils/engineMode.js';
 import { createFakeGhBin } from '../../support/utils/fakeGhBin.js';
 import { createGitFixtureRepo } from '../../support/utils/gitFixtureRepo.js';
@@ -45,6 +46,11 @@ const REPO_REF = 'darthjee/arcanum-github-fixture';
 // `PATH`), failing exactly like native, with the `docker run` carrying
 // the `--needs=global-config,gitconfig,gh` mounts and env (GH_TOKEN by
 // name only).
+//
+// Docker batch 4 (issue #748): cleanup-branch declares
+// `--needs=global-config,gitconfig,remote`; its case runs in a
+// `createRemoteNeedsWorld`, where the (tolerated) remote branch delete
+// fails offline and the local cleanup still succeeds in every mode.
 describe('auto-fix-all-github engine_dispatch routing (via the real github.sh shim)', () => {
   /**
    * Builds a github.com-shaped fixture repo's pr-state invocation, with a
@@ -180,6 +186,41 @@ describe('auto-fix-all-github engine_dispatch routing (via the real github.sh sh
       },
       splitsOnToken(command, dockerArgs, shell, native)
     );
+  });
+
+  /**
+   * Asserts cleanup-branch's outcome: back on `main` at `origin/main`,
+   * with the local `issue-7` branch deleted.
+   * @param {string} stderr - the expected stderr.
+   * @returns {(result: object, ctx: {repoPath: string}) => Promise<void>} the assertion.
+   */
+  const expectBranchCleaned = (stderr) => async (result, { repoPath: cleanedRepo }) => {
+    const head = (await runCommand(['git', '-C', cleanedRepo, 'rev-parse', '--short', 'HEAD'], cleanedRepo)).stdout.trim();
+    const branches = (await runCommand(['git', '-C', cleanedRepo, 'branch', '--list', 'issue-7'], cleanedRepo)).stdout;
+
+    expect(result).toEqual({
+      stdout: `Your branch is up to date with 'origin/main'.\nHEAD is now at ${head} seed\n` +
+        `Deleted branch issue-7 (was ${head}).\n`,
+      stderr,
+      code: 0
+    });
+    expect(branches).toEqual('');
+  };
+
+  itRoutesRemoteEngineDispatch('cleanup-branch', SHIM_SCRIPT, {
+    command: 'auto-fix-all-github-cleanup-branch',
+    needs: ['global-config', 'gitconfig', 'remote'],
+    reachesRemote: true,
+    dockerArgs: (args) => args.slice(1),
+    prepare: async (repo) => {
+      await runCommand(['git', '-C', repo.repoPath, 'branch', 'issue-7'], repo.repoPath);
+
+      return { args: ['cleanup-branch', repo.repoPath, '7'] };
+    },
+    shell: expectBranchCleaned('Already on \'main\'\n'),
+    native: expectBranchCleaned(''),
+    docker: expectBranchCleaned(''),
+    https: expectBranchCleaned('')
   });
 
   describe('pr-state (engine.mode unset)', () => {
