@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { expectRepoMountOnlyRun } from '../factories/engineDispatchDockerSetup.js';
+import { expectRunWith } from '../factories/engineDispatchDockerSetup.js';
 import { createTempDir, removeTempDir } from '../utils/tempDir.js';
 import { itRoutesEngineDispatch } from './engineDispatchRouting.js';
 
@@ -27,22 +27,33 @@ async function logContent(logFile) {
  * empty directory (so no global config leaks in). Each mode then checks the same
  * `check` expectations — so docker's stdout/exit code equal native's —
  * plus: shell leaves the log empty; native and docker log the command;
- * docker reaches exactly one `docker run` with only the repo mount, no
- * extra env, and `<command> <dockerArgs...>` after the image.
+ * docker reaches exactly one `docker run` with the repo mount followed
+ * by `dockerMounts(ctx)` (none by default), the fixed env plus
+ * `dockerEnvNames` (none by default), and `<command> <dockerArgs...>`
+ * after the image. `ctx.configDir` is that empty `CLAUDE_CONFIG_DIR`: a
+ * `--needs=global-config` case seeds `arcanum-config.json` there (in
+ * `prepare`) to see its `:ro` mount.
  * @param {string} description - the `describe` block's label.
  * @param {string} shimScript - the real `engine_dispatch` shim's path.
  * @param {object} spec - the case.
  * @param {string} spec.command - the dispatched command name.
- * @param {(ctx: {repoPath: string, mode: string}) => Promise<{args: string[], cwd?: string, input?: string, env?: object, cleanup?: () => Promise<void>}>} spec.prepare
+ * @param {(ctx: {repoPath: string, mode: string, configDir: string}) => Promise<{args: string[], cwd?: string, input?: string, env?: object, cleanup?: () => Promise<void>}>} spec.prepare
  *   - seeds per-case fixtures under `ctx.repoPath`; returns the shim's
  *   arguments (and optional `cwd`, defaulting to `ctx.repoPath`).
  * @param {(result: object, ctx: {repoPath: string, mode: string}) => Promise<void>|void} spec.check
  *   - the expectations every mode must meet.
  * @param {(ctx: {repoPath: string}) => string[]} spec.dockerArgs - the
  *   argv the docker run passes after `<command>`.
+ * @param {(ctx: {repoPath: string, configDir: string}) => string[]} [spec.dockerMounts] -
+ *   the `-v` values the docker run carries after the repo mount
+ *   (default none).
+ * @param {string[]} [spec.dockerEnvNames] - the `-e` names the docker run
+ *   carries on top of the fixed env (default none).
  * @returns {void}
  */
-export function itRoutesWithInvocationLog(description, shimScript, { command, prepare, check, dockerArgs }) {
+export function itRoutesWithInvocationLog(description, shimScript, {
+  command, prepare, check, dockerArgs, dockerMounts = () => [], dockerEnvNames = []
+}) {
   let ctx;
 
   /**
@@ -61,7 +72,9 @@ export function itRoutesWithInvocationLog(description, shimScript, { command, pr
     }
 
     if (mode === 'docker') {
-      expectRepoMountOnlyRun(calls, ctx.repoPath, [command, ...dockerArgs(ctx)]);
+      expectRunWith(calls, ctx.repoPath, [command, ...dockerArgs(ctx)], {
+        mounts: dockerMounts(ctx), envNames: dockerEnvNames
+      });
     }
   };
 
@@ -78,10 +91,10 @@ export function itRoutesWithInvocationLog(description, shimScript, { command, pr
         JSON.stringify({ engine: { mode, log: { location: logDir } } })
       );
 
-      ctx = { repoPath, mode, logFile: path.join(logDir, `arcanum-${path.basename(repoPath)}-log.txt`) };
-
       // An empty CLAUDE_CONFIG_DIR keeps this machine's global config out.
-      const configDir = await createTempDir('arcanum-core-routing-global-');
+      const configDir = await realpath(await createTempDir('arcanum-core-routing-global-'));
+
+      ctx = { repoPath, mode, configDir, logFile: path.join(logDir, `arcanum-${path.basename(repoPath)}-log.txt`) };
       const prepared = await prepare(ctx);
 
       return {

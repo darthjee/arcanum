@@ -126,17 +126,22 @@ export function runCalls(calls) {
 }
 
 /**
- * Asserts the fake docker saw exactly one `docker run`, shaped like
- * every batch-1 command's (no `--needs`, no `--path-arg`, no extra env):
- * the fixed flags, only the repo mount, only the fixed `-e` names, and
- * `after` following the image.
+ * Asserts the fake docker saw exactly one `docker run`: the fixed flags,
+ * the repo mount followed by exactly `mounts` (in order), the fixed `-e`
+ * names plus exactly `envNames` (order-insensitive), and `after`
+ * following the image.
  * @param {object[]} calls - the fake docker's logged calls.
  * @param {string} repoPath - the repo path the shim dispatched with.
  * @param {string[]} after - the expected argv after the image
  *   (`<command> <args...>`).
+ * @param {object} [extras] - what the run carries beyond batch 1's shape.
+ * @param {string[]} [extras.mounts] - the `-v` values expected after the
+ *   repo mount (e.g. `--needs` / `--path-arg` mounts).
+ * @param {string[]} [extras.envNames] - the `-e` names expected on top of
+ *   `FIXED_ENV_NAMES`.
  * @returns {void}
  */
-export function expectRepoMountOnlyRun(calls, repoPath, after) {
+export function expectRunWith(calls, repoPath, after, { mounts = [], envNames = [] } = {}) {
   const runs = runCalls(calls);
 
   expect(runs.length).withContext('docker run calls').toEqual(1);
@@ -146,9 +151,23 @@ export function expectRepoMountOnlyRun(calls, repoPath, after) {
   const fixed = fixedRunFlags(repoPath);
 
   expect(run.flags.slice(0, fixed.length)).toEqual(fixed);
-  expect(run.mounts).toEqual([`${repoPath}:${repoPath}`]);
-  expect([...run.envNames].sort()).toEqual(FIXED_ENV_NAMES);
+  expect(run.mounts).toEqual([`${repoPath}:${repoPath}`, ...mounts]);
+  expect([...run.envNames].sort()).toEqual([...FIXED_ENV_NAMES, ...envNames].sort());
   expect(run.after).toEqual(after);
+}
+
+/**
+ * Asserts the fake docker saw exactly one `docker run`, shaped like
+ * every batch-1 command's (no `--needs`, no `--path-arg`, no extra env):
+ * `expectRunWith` with no extra mounts or env.
+ * @param {object[]} calls - the fake docker's logged calls.
+ * @param {string} repoPath - the repo path the shim dispatched with.
+ * @param {string[]} after - the expected argv after the image
+ *   (`<command> <args...>`).
+ * @returns {void}
+ */
+export function expectRepoMountOnlyRun(calls, repoPath, after) {
+  expectRunWith(calls, repoPath, after);
 }
 
 /**
