@@ -15,23 +15,7 @@ Docker dispatch resolves `darthjee/arcanum:<version>` and tries to pull it befor
 Blocker: every published `darthjee/node` tag, including `0.2.1` (the current `core/Dockerfile` base), is `linux/amd64` only (single-arch manifest). A buildx `linux/arm64` build of the `runtime` target can't resolve its `FROM` until darthjee/docker#148 publishes a multi-arch `darthjee/node` tag.
 
 ## Expected Behavior
-- On a release tag build (`^\d+\.\d+\.\d+# Issue: Publish the multi-arch runtime Docker image from release CI
-
-## Description
-Part of epic #724 (implement `engine.mode=docker`). Split out of #728 (closed), which builds the `runtime` target of `core/Dockerfile` but does not publish it.
-
-Add the release-CI job described in `docs/agents/specs/docker/image.md` ("Distribution and versioning"): build the `runtime` target with buildx for `linux/amd64` and `linux/arm64` and push `darthjee/arcanum:<version>` as one multi-arch manifest, after the release zip is published.
-
-Owner: `infra` (CI job, Dockerfile base bump), with the `architect` updating the spec text.
-
-Depends on darthjee/docker#148 (multi-arch `darthjee/node` base).
-
-## Problem
-Docker dispatch resolves `darthjee/arcanum:<version>` and tries to pull it before falling back to a local build. Nothing publishes that tag today, so every user pays the local-build cost on first use of each version.
-
-Blocker: every published `darthjee/node` tag, including `0.2.1` (the current `core/Dockerfile` base), is `linux/amd64` only (single-arch manifest). A buildx `linux/arm64` build of the `runtime` target can't resolve its `FROM` until darthjee/docker#148 publishes a multi-arch `darthjee/node` tag.
-
-), after the release zip is uploaded, CI publishes `darthjee/arcanum:<tag>` as one multi-arch manifest covering `linux/amd64` and `linux/arm64`.
+- On a release tag build (`^\d+\.\d+\.\d+$`), after the release zip is uploaded, CI publishes `darthjee/arcanum:<tag>` as one multi-arch manifest covering `linux/amd64` and `linux/arm64`.
 - Only the version tag is pushed: no `latest` or other moving tag.
 - If `darthjee/arcanum:<tag>` already exists, the job **fails** and does not build or push. This holds on workflow re-runs too, per the spec's immutable-tags rule.
 - Branch builds never publish.
