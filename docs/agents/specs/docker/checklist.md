@@ -39,23 +39,23 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `checkout-safe-branch` | `arcanum/_lib/checkout_safe_branch.sh` | dispatched | ☐ | git-push (ssh) | gitconfig:ro, remote | GIT_CONFIG_GLOBAL, remote | | |
 | `finish-report` | `arcanum/_lib/finish_report.sh` | dispatched | ✅ | none | — | — | #745 | |
-| `github-issue-create` | `arcanum/_lib/github_issue.sh` `create` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro, args:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
-| `github-issue-fetch` | `arcanum/_lib/github_issue.sh` `fetch` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
-| `github-issue-info` | `arcanum/_lib/github_issue.sh` `info` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
-| `github-issue-mark-created` | `arcanum/_lib/github_issue.sh` `mark-created` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
-| `github-issue-mark-enhancing` | `arcanum/_lib/github_issue.sh` `mark-enhancing` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
-| `github-issue-mark-planning` | `arcanum/_lib/github_issue.sh` `mark-planning` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
-| `github-issue-mark-ready` | `arcanum/_lib/github_issue.sh` `mark-ready` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
-| `github-issue-mark-refined` | `arcanum/_lib/github_issue.sh` `mark-refined` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
-| `github-issue-mark-split` | `arcanum/_lib/github_issue.sh` `mark-split` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
-| `github-issue-update` | `arcanum/_lib/github_issue.sh` `update` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro, args:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
+| `github-issue-create` | `arcanum/_lib/github_issue.sh` `create` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro, args:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | No parity case: it creates a GitHub issue. The routing spec covers the docker wiring. `--path-arg=3:ro`: `<file>` is mounted read-only at its own path when it sits outside the repo. |
+| `github-issue-fetch` | `arcanum/_lib/github_issue.sh` `fetch` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | |
+| `github-issue-info` | `arcanum/_lib/github_issue.sh` `info` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | When the global gitconfig sets `user.ghuser`, `gh auth switch` fails in the container because `GH_TOKEN` is set, so a `Warning: gh auth switch --user <x> failed; …` line goes to stderr. Stdout and the exit code are unaffected. This applies to every `gh` row. |
+| `github-issue-mark-created` | `arcanum/_lib/github_issue.sh` `mark-created` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | |
+| `github-issue-mark-enhancing` | `arcanum/_lib/github_issue.sh` `mark-enhancing` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | |
+| `github-issue-mark-planning` | `arcanum/_lib/github_issue.sh` `mark-planning` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | |
+| `github-issue-mark-ready` | `arcanum/_lib/github_issue.sh` `mark-ready` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | |
+| `github-issue-mark-refined` | `arcanum/_lib/github_issue.sh` `mark-refined` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | |
+| `github-issue-mark-split` | `arcanum/_lib/github_issue.sh` `mark-split` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | |
+| `github-issue-update` | `arcanum/_lib/github_issue.sh` `update` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro, args:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | No parity case: it overwrites an issue body. The routing spec covers the docker wiring. `--path-arg=4:ro`: `<file>` is mounted read-only at its own path when it sits outside the repo. |
 | `issue-state` | `arcanum/_lib/issue_state.sh` | dispatched | ✅ | none | — | — | #745 | |
 | `list-agents` | `arcanum/_lib/list_agents.sh` | dispatched | ✅ | none | — | — | #745 | |
 | `permission-grant-add` | `arcanum/_lib/permission_grant.sh` `add` | dispatched | ☐ | none | args:rw | — | | Moved out of batch 2 (#746) to #753. |
-| `resolve-and-fetch` | `arcanum/_lib/resolve_and_fetch.sh` | dispatched | ☐ | gh, git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN, remote | | |
+| `resolve-and-fetch` | `arcanum/_lib/resolve_and_fetch.sh` | dispatched | ✅ | gh, git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN, remote | #747 | `remote` because it runs checkout-safe-branch, whose `git fetch` needs git remote access. |
 | `resolve-id-and-file` | `arcanum/_lib/resolve_id_and_file.sh` | dispatched | ✅ | none | — | — | #745 | |
 | `resolve-plan-paths` | `arcanum/_lib/resolve_plan_paths.sh` | dispatched | ✅ | none | — | — | #745 | |
-| `spawn-issue` | `arcanum/_lib/spawn_issue.sh` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro, args:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
+| `spawn-issue` | `arcanum/_lib/spawn_issue.sh` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro, args:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | No parity case: it creates a GitHub issue. The routing spec covers the docker wiring. `--path-arg=4:ro`: `<body_file>` is mounted read-only at its own path when it sits outside the repo. |
 | `dispatch-fixture-crash` | — | dispatched | ✅ | none | — | — | #745 | Test fixture (`core/lib/commands/shared/DispatchFixture.js`), no shim. No shim-level routing spec: covered by the dispatch-level specs and a parity case under `core/spec/docker/`. |
 
 ## arcanum-check-config
@@ -75,10 +75,10 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 
 | command | script | kind | status | credentials | mounts | env | issue | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `arcanum-split-issue-create-sub-issue` | `arcanum-split-issue/scripts/create_sub_issue.sh` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
+| `arcanum-split-issue-create-sub-issue` | `arcanum-split-issue/scripts/create_sub_issue.sh` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | No parity case: it creates a GitHub issue. The routing spec covers the docker wiring. Arg 3 `<sub_issue_file>` has no `--path-arg`: a repo-relative path works (the container cwd is the repo), an absolute path outside the repo is not visible in the container. |
 | `arcanum-split-issue-create-sub-issue-file` | `arcanum-split-issue/scripts/create_sub_issue_file.sh` | dispatched | ✅ | none | args:ro | — | #746 | `--path-arg=4:ro`: `<body_file>` is mounted read-only at its own path when it sits outside the repo. |
 | `arcanum-split-issue-finish` | `arcanum-split-issue/scripts/finish.sh` | dispatched | ☐ | gh, git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN, remote | | |
-| `arcanum-split-issue-push-sub-issues` | `arcanum-split-issue/scripts/push_sub_issues.sh` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
+| `arcanum-split-issue-push-sub-issues` | `arcanum-split-issue/scripts/push_sub_issues.sh` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | No parity case: it creates GitHub issues. The routing spec covers the docker wiring. |
 
 ## arcanum-update
 
@@ -97,23 +97,23 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 | `auto-fix-all-config-is-enabled` | `auto-fix-all/scripts/config.sh` `is-enabled` | dispatched | ✅ | none | — | — | #745 | |
 | `auto-fix-all-config-set` | `auto-fix-all/scripts/config.sh` `set` | dispatched | ✅ | none | — | — | #745 | |
 | `auto-fix-all-config-toggle` | `auto-fix-all/scripts/config.sh` `toggle` | dispatched | ✅ | none | — | — | #745 | |
-| `auto-fix-all-github-add-tag` | `auto-fix-all/scripts/github.sh` `add-tag` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
+| `auto-fix-all-github-add-tag` | `auto-fix-all/scripts/github.sh` `add-tag` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | |
 | `auto-fix-all-github-cleanup-branch` | `auto-fix-all/scripts/github.sh` `cleanup-branch` | dispatched | ☐ | git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, remote | | |
-| `auto-fix-all-github-has-label` | `auto-fix-all/scripts/github.sh` `has-label`, `has-shipit-label` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
-| `auto-fix-all-github-pr-merge` | `auto-fix-all/scripts/github.sh` `pr-merge` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
-| `auto-fix-all-github-pr-number` | `auto-fix-all/scripts/github.sh` `pr-number` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
-| `auto-fix-all-github-pr-state` | `auto-fix-all/scripts/github.sh` `pr-state` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
-| `auto-fix-all-github-remove-tag` | `auto-fix-all/scripts/github.sh` `remove-tag` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
+| `auto-fix-all-github-has-label` | `auto-fix-all/scripts/github.sh` `has-label`, `has-shipit-label` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | |
+| `auto-fix-all-github-pr-merge` | `auto-fix-all/scripts/github.sh` `pr-merge` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | No parity case: it merges a PR. The routing spec covers the docker wiring. |
+| `auto-fix-all-github-pr-number` | `auto-fix-all/scripts/github.sh` `pr-number` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | |
+| `auto-fix-all-github-pr-state` | `auto-fix-all/scripts/github.sh` `pr-state` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | |
+| `auto-fix-all-github-remove-tag` | `auto-fix-all/scripts/github.sh` `remove-tag` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | |
 | `auto-fix-all-queue-empty` | `auto-fix-all/scripts/queue.sh` `empty` | dispatched | ✅ | none | — | — | #745 | Credentials corrected from `gh` in #726: it never touches GitHub (only `save`/`push` tag issues). |
 | `auto-fix-all-queue-list` | `auto-fix-all/scripts/queue.sh` `list` | dispatched | ✅ | none | — | — | #745 | Credentials corrected from `gh` in #726: it never touches GitHub (only `save`/`push` tag issues). |
 | `auto-fix-all-queue-next` | `auto-fix-all/scripts/queue.sh` `next` | dispatched | ✅ | none | — | — | #745 | Credentials corrected from `gh` in #726: it never touches GitHub (only `save`/`push` tag issues). |
 | `auto-fix-all-queue-pop` | `auto-fix-all/scripts/queue.sh` `pop` | dispatched | ✅ | none | — | — | #745 | Credentials corrected from `gh` in #726: it never touches GitHub (only `save`/`push` tag issues). |
-| `auto-fix-all-queue-push` | `auto-fix-all/scripts/queue.sh` `push` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
-| `auto-fix-all-queue-save` | `auto-fix-all/scripts/queue.sh` `save` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
+| `auto-fix-all-queue-push` | `auto-fix-all/scripts/queue.sh` `push` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | |
+| `auto-fix-all-queue-save` | `auto-fix-all/scripts/queue.sh` `save` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | |
 | `auto-fix-all-queue-wait-next` | `auto-fix-all/scripts/queue.sh` `wait-next` | dispatched | ✅ | none | — | — | #745 | Credentials corrected from `gh` in #726: it never touches GitHub (only `save`/`push` tag issues). Blocks until the queue has an entry. The parity case seeds the queue first, so the blocking call returns at once. |
 | `auto-fix-all-reply-comment` | `auto-fix-all/scripts/reply_comment.sh` | dispatched | ☐ | gh, git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN, remote | | |
-| `auto-fix-all-wait-ci` | `auto-fix-all/scripts/wait_ci.sh` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | Blocks until CI completes. |
-| `auto-fix-all-wait-ci-and-merge` | `auto-fix-all/scripts/wait_ci_and_merge.sh` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | Blocks until CI completes. |
+| `auto-fix-all-wait-ci` | `auto-fix-all/scripts/wait_ci.sh` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | Blocks until CI completes. No parity case: it blocks on CI. The routing spec covers the docker wiring. |
+| `auto-fix-all-wait-ci-and-merge` | `auto-fix-all/scripts/wait_ci_and_merge.sh` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | Blocks until CI completes. No parity case: it blocks on CI and merges a PR. The routing spec covers the docker wiring. |
 
 ## auto-fix-issue
 
@@ -121,9 +121,9 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `auto-fix-issue-commit-change` | `auto-fix-issue/scripts/commit_change.sh` | dispatched | ☐ | git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, remote | | |
 | `auto-fix-issue-github-info` | `auto-fix-issue/scripts/github.sh` `info` | dispatched | ✅ | none | — | — | #745 | |
-| `auto-fix-issue-github-pr-create` | `auto-fix-issue/scripts/github.sh` `pr-create` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro, args:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
-| `auto-fix-issue-github-pr-ready` | `auto-fix-issue/scripts/github.sh` `pr-ready` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
-| `auto-fix-issue-github-pr-view` | `auto-fix-issue/scripts/github.sh` `pr-view` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
+| `auto-fix-issue-github-pr-create` | `auto-fix-issue/scripts/github.sh` `pr-create` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro, args:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | No parity case: it creates a PR. The routing spec covers the docker wiring. `--path-arg=3:ro`: `<file>` is mounted read-only at its own path when it sits outside the repo. |
+| `auto-fix-issue-github-pr-ready` | `auto-fix-issue/scripts/github.sh` `pr-ready` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | No parity case: it changes a PR's state. The routing spec covers the docker wiring. |
+| `auto-fix-issue-github-pr-view` | `auto-fix-issue/scripts/github.sh` `pr-view` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | |
 | `auto-fix-issue-list-plan-agents` | `auto-fix-issue/scripts/list_plan_agents.sh` | dispatched | ✅ | none | — | — | #745 | |
 | `auto-fix-issue-list-plan-steps` | `auto-fix-issue/scripts/list_plan_steps.sh` | dispatched | ✅ | none | — | — | #745 | |
 | `auto-fix-issue-run-checks` | `auto-fix-issue/scripts/run_checks.sh` | dispatched | n/a | inherits target | host-only | — | | Host-only (decided in #727): runs the target project's own `.claude/scripts/check_<agent>.sh`, whose toolchain the image doesn't have. Its credentials and mounts are the target project's. |
@@ -132,7 +132,7 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 
 | command | script | kind | status | credentials | mounts | env | issue | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `auto-monitor-issue-pr-resolve-pr-number` | `auto-monitor-issue-pr/scripts/resolve_pr_number.sh` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
+| `auto-monitor-issue-pr-resolve-pr-number` | `auto-monitor-issue-pr/scripts/resolve_pr_number.sh` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | |
 
 ## auto-monitor-pr
 
@@ -168,7 +168,7 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 | `init-claude-setup-docs-structure` | `init-claude/scripts/setup_docs_structure.sh` | dispatched | ✅ | none | — | — | #745 | |
 | `init-claude-setup-templates` | `init-claude/scripts/setup_templates.sh` | dispatched | ✅ | none | — | — | #745 | |
 | `init-claude-stamp-arcanum-version` | `init-claude/scripts/stamp_arcanum_version.sh` | dispatched | ✅ | none | global-config:ro | CLAUDE_CONFIG_DIR | #746 | `--needs=global-config`. `global-config:ro` follows the `HOME` allowlist rule: `HOME` stays in the allowlist so that, natively, `git describe` resolves a git-clone install's tag. Under docker the version comes from the image's own `arcanum.json` instead. On a dev install between tags (e.g. `2.0.0-15-ge7a86db`), native resolves no version and stamps nothing. Against the image dispatch picks for that install (`darthjee/arcanum:local-<sha>`) docker also stamps nothing, so parity holds. Against an image whose `arcanum.json` carries a release version (e.g. one built with `ARCANUM_VERSION=2.0.0`), docker stamps that version into `.claude/configuration/arcanum-repo-config.json` and `.claude/state/arcanum-config.json` (`migrations.version`) while native does not. The parity spec pins this with a divergence case. |
-| `init-claude-sync-labels` | `init-claude/scripts/sync_labels.sh` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro, args:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
+| `init-claude-sync-labels` | `init-claude/scripts/sync_labels.sh` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro, args:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | No parity case: it edits the repo's labels. The routing spec covers the docker wiring. `--path-arg=2:ro`: `<abs_config_path>` is mounted read-only at its own path when it sits outside the repo. |
 | `init-claude-write-label-config-add` | `init-claude/scripts/write_label_config.sh` `add` | dispatched | ✅ | none | args:rw | — | #746 | `--path-arg=1:rw`: the directory of the absolute `<config_path>` is mounted read-write when it sits outside the repo. |
 | `init-claude-write-label-config-remove` | `init-claude/scripts/write_label_config.sh` `remove` | dispatched | ✅ | none | args:rw | — | #746 | `--path-arg=1:rw`: the directory of the absolute `<config_path>` is mounted read-write when it sits outside the repo. |
 | `init-claude-write-label-config-replace` | `init-claude/scripts/write_label_config.sh` `replace` | dispatched | ✅ | none | args:rw | — | #746 | `--path-arg=1:rw`: the directory of the absolute `<config_path>` is mounted read-write when it sits outside the repo. |
@@ -181,8 +181,8 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 | `monitor-issues-config-is-enabled` | `monitor-issues/scripts/config.sh` `is-enabled` | dispatched | ✅ | none | — | — | #745 | |
 | `monitor-issues-config-set` | `monitor-issues/scripts/config.sh` `set` | dispatched | ✅ | none | — | — | #745 | |
 | `monitor-issues-config-toggle` | `monitor-issues/scripts/config.sh` `toggle` | dispatched | ✅ | none | — | — | #745 | |
-| `monitor-issues-github-remove-tag` | `monitor-issues/scripts/github.sh` `remove-tag` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
-| `monitor-issues-monitor-issues` | `monitor-issues/scripts/monitor_issues.sh` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | Long-running polling loop. |
+| `monitor-issues-github-remove-tag` | `monitor-issues/scripts/github.sh` `remove-tag` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | |
+| `monitor-issues-monitor-issues` | `monitor-issues/scripts/monitor_issues.sh` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | Long-running polling loop. No parity case: it never returns on its own. The routing spec covers the docker wiring. The shim backgrounds the dispatch call and stops it with `pkill -P`, which reaches the `docker` CLI, not the container: the container stops only through `docker run`'s default `--sig-proxy`. The fake docker models this and a spec covers it; not verified against a real long-running container. |
 | `monitor-issues-rewrite-queue-pop` | `monitor-issues/scripts/rewrite_queue.sh` `pop` | dispatched | ✅ | none | — | — | #745 | |
 | `monitor-issues-rewrite-queue-push` | `monitor-issues/scripts/rewrite_queue.sh` `push` | dispatched | ✅ | none | — | — | #745 | |
 
