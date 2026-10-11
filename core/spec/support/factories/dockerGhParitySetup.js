@@ -108,9 +108,10 @@ export async function restoreIssueLabels(sandboxRepo, issue, labels) {
  * created files host-owned on Linux.
  *
  * With `mutatesLabels`, the sandbox issue's labels are snapshotted
- * first, restored before each run (so native and docker start from the
- * same labels, as `runDockerParity` restores the tree) and restored
- * again in a `finally`, whatever the outcome.
+ * first, set to the snapshot plus `startLabels` before each run (so
+ * native and docker start from the same labels, as `runDockerParity`
+ * restores the tree) and restored to the snapshot in a `finally`,
+ * whatever the outcome; the labels each run left behind must match too.
  * @param {string} label - the `it` label.
  * @param {() => {repoPath: string, env: object}} getWorld - the parity world.
  * @param {object} spec - the case.
@@ -124,10 +125,14 @@ export async function restoreIssueLabels(sandboxRepo, issue, labels) {
  *   further expectations (run before the labels are restored).
  * @param {boolean} [spec.mutatesLabels] - whether the command edits the
  *   sandbox issue's labels.
+ * @param {string[]} [spec.startLabels] - with `mutatesLabels`, labels
+ *   added to the fixture issue before each run (on top of the ones it
+ *   had), so a removal has something to remove; they must exist in the
+ *   sandbox repo. The final restore drops them again.
  * @returns {void}
  */
 export function itMatchesNativeInDockerWithGh(label, getWorld, {
-  command, needs, dispatchArgs, seed, check, mutatesLabels = false
+  command, needs, dispatchArgs, seed, check, mutatesLabels = false, startLabels = []
 }) {
   const allNeeds = [...new Set(['repo', ...(mutatesLabels ? ['issue'] : []), ...needs])];
 
@@ -136,6 +141,8 @@ export function itMatchesNativeInDockerWithGh(label, getWorld, {
     const { repoPath } = world;
     const snapshot = mutatesLabels ? await issueLabels(sandbox.repo, sandbox.issue) : null;
     const restore = mutatesLabels ? () => restoreIssueLabels(sandbox.repo, sandbox.issue, snapshot) : undefined;
+    const start = mutatesLabels ? [...new Set([...snapshot, ...startLabels])].sort() : null;
+    let nativeLabels = null;
 
     try {
       await seedSandboxOrigin(repoPath, sandbox.repo, sandbox.prBranch);
@@ -146,13 +153,21 @@ export function itMatchesNativeInDockerWithGh(label, getWorld, {
         repoPath,
         dispatchArgs: dispatchArgs(repoPath, sandbox),
         env: ghParityEnv(world),
-        reset: restore
+        reset: restore && (async (mode) => {
+          if (mode === 'docker') nativeLabels = await issueLabels(sandbox.repo, sandbox.issue);
+          await restoreIssueLabels(sandbox.repo, sandbox.issue, start);
+        })
       });
 
       expect(withoutPlatformNotice(parity.docker.stderr).replace(GH_SWITCH_WARNING, ''))
         .toEqual(parity.native.stderr);
       expectDockerParity(parity);
       expectHostOwned(parity);
+      if (mutatesLabels) {
+        expect(await issueLabels(sandbox.repo, sandbox.issue))
+          .withContext('the fixture issue labels after the docker run vs. after the native run')
+          .toEqual(nativeLabels);
+      }
       if (check) await check(parity, repoPath, sandbox);
     } finally {
       if (restore) await restore();

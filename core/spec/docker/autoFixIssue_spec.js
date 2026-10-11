@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { itMatchesNativeInDockerWithGh } from '../support/factories/dockerGhParitySetup.js';
 import {
   describeParityRepos, itMatchesNativeInDocker, seedRepoFile
 } from '../support/factories/dockerParitySetup.js';
@@ -69,4 +70,22 @@ describe('auto-fix-issue docker parity', () => {
       seed: seedPlan
     });
   });
+
+  // Opt-in gh case (docker batch 3, #747): pending unless
+  // ARCANUM_DOCKER_PARITY_GH=1 and the sandbox vars are set. pr-create
+  // and pr-ready have no case (they create or change a PR).
+  describeParityRepos('github pr-view (gh)', (getWorld) => {
+    itMatchesNativeInDockerWithGh('pr-view prints the fixture PR URL and draft flag', getWorld, {
+      command: 'auto-fix-issue-github-pr-view',
+      needs: ['pr', 'prBranch'],
+      dispatchArgs: (repoPath) => [
+        repoPath, 'auto-fix-issue-github-pr-view', path.join(SCRIPTS_DIR, 'github_shell_pr_view.sh'),
+        '--needs=global-config,gitconfig,gh', 'HOME', '--', repoPath
+      ],
+      check: ({ native }, repoPath, { repo, pr }) => {
+        expect(native.code).toEqual(0);
+        expect(native.stdout).toMatch(new RegExp(`^URL=https://github.com/${repo}/pull/${pr}\nIS_DRAFT=(true|false)\n$`));
+      }
+    });
+  }, { worktree: true });
 });
