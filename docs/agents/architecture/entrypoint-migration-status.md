@@ -12,7 +12,7 @@ Native-only commands (dispatched with `engine_dispatch --native-only`, e.g. `arc
 | `arcanum-create-issue-publish` | `native` | #739 |
 | `arcanum-create-issue-start` | `native` | #739 |
 | `arcanum-split-issue-create-sub-issue` | `native` | #230 |
-| `arcanum-split-issue-create-sub-issue-file` | `native` | #230 |
+| `arcanum-split-issue-create-sub-issue-file` | `docker` | #230 |
 | `arcanum-split-issue-finish` | `native` | #230 |
 | `arcanum-split-issue-push-sub-issues` | `native` | #230 |
 | `arcanum-update-run-update-apply` | `host-only` | #263 |
@@ -54,7 +54,7 @@ Native-only commands (dispatched with `engine_dispatch --native-only`, e.g. `arc
 | `auto-plan-issue-commit-plan` | `native` | #230 |
 | `checkout-safe-branch` | `native` | #230 |
 | `discuss-issue-confirm` | `docker` | #230 |
-| `discuss-issue-render-issue` | `native` | #230 |
+| `discuss-issue-render-issue` | `docker` | #230 |
 | `dispatch-fixture-crash` | `docker` | #192 |
 | `finish-report` | `docker` | #660 |
 | `github-issue-create` | `native` | #237 |
@@ -71,11 +71,11 @@ Native-only commands (dispatched with `engine_dispatch --native-only`, e.g. `arc
 | `init-claude-set-next-step-auto` | `docker` | #739 |
 | `init-claude-setup-docs-structure` | `docker` | #230 |
 | `init-claude-setup-templates` | `docker` | #230 |
-| `init-claude-stamp-arcanum-version` | `native` | #230 |
+| `init-claude-stamp-arcanum-version` | `docker` | #230 |
 | `init-claude-sync-labels` | `native` | #230 |
-| `init-claude-write-label-config-add` | `native` | #594 |
-| `init-claude-write-label-config-remove` | `native` | #594 |
-| `init-claude-write-label-config-replace` | `native` | #594 |
+| `init-claude-write-label-config-add` | `docker` | #594 |
+| `init-claude-write-label-config-remove` | `docker` | #594 |
+| `init-claude-write-label-config-replace` | `docker` | #594 |
 | `issue-state` | `docker` | #230 |
 | `list-agents` | `docker` | #230 |
 | `monitor-issues-config-get` | `docker` | #586 |
