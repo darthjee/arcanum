@@ -178,13 +178,15 @@ describe('arcanum/_lib commands docker parity', () => {
   });
 
   describeParityRepos('github-issue mark-* (gh, label mutations)', (getWorld) => {
-    Object.keys(MARK_TRANSITIONS).forEach((name) => {
+    const labelOf = new Map(Object.entries(TAG_TO_LABEL));
+
+    Object.entries(MARK_TRANSITIONS).forEach(([name, { removes }]) => {
       itMatchesNativeInDockerWithGh(`github-issue-mark-${name} relabels the fixture issue`, getWorld, {
         command: `github-issue-mark-${name}`,
         needs: ['issue'],
         mutatesLabels: true,
         // Start from the labels the transition removes, so it has some.
-        startLabels: MARK_TRANSITIONS[name].removes.map((tag) => TAG_TO_LABEL[tag]),
+        startLabels: removes.map((tag) => labelOf.get(tag)),
         dispatchArgs: ghLibDispatch(
           `github-issue-mark-${name}`, `github_issue_mark_${name}_shell.sh`, ({ issue }) => [issue]
         ),

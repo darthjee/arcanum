@@ -84,7 +84,9 @@ describe('auto-fix-issue docker parity', () => {
       ],
       check: ({ native }, repoPath, { repo, pr }) => {
         expect(native.code).toEqual(0);
-        expect(native.stdout).toMatch(new RegExp(`^URL=https://github.com/${repo}/pull/${pr}\nIS_DRAFT=(true|false)\n$`));
+        const prefix = `URL=https://github.com/${repo}/pull/${pr}\nIS_DRAFT=`;
+
+        expect([`${prefix}true\n`, `${prefix}false\n`]).toContain(native.stdout);
       }
     });
   }, { worktree: true });
