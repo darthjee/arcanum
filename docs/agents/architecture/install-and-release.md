@@ -7,6 +7,8 @@ Besides `git clone`, arcanum can be installed via a `curl | bash` one-liner, in 
 
 The release zip is assembled by `scripts/build_release_zip.sh` (a development tool, not included in the zip itself) and published by the CircleCI pipeline (`.circleci/config.yml`) as a GitHub Release asset, triggered on a semver tag push (the same `X.Y.Z` pattern already used by the repository's existing tags). The zip includes a `MANIFEST` file (a list of every packaged path, one per line, generated from the same `FILES` array used to assemble the zip) at the root of the tree, used by both the installer and the updater to reconcile installations without depending on `git`.
 
+After the zip is uploaded, the same `release` workflow also publishes the multi-arch runtime Docker image `darthjee/arcanum:<version>` (job `publish-image`), used by `engine.mode=docker`. See [image.md](../specs/docker/image.md#distribution-and-versioning).
+
 ## Update
 
 Complementing `install`, `arcanum/update/{bootstrap.sh,updater.sh}` brings an already-existing installation up to a newer release, reconciling the target directory: adds new files, overwrites changed ones, and removes ones that dropped out of the release — without touching anything else in the directory. Same two-stage architecture as `install`:
