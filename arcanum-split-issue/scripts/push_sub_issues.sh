@@ -15,7 +15,7 @@
 # create_sub_issue.sh's own shim.
 #
 # Under engine.mode=docker it runs core/bin/arcanum inside the
-# container, once its migration-status.json status is `"docker"` (#747),
+# container, now that its migration-status.json status is `"docker"` (#747),
 # with the repo mount plus `--needs=global-config,gitconfig,gh`: the
 # global arcanum config ($CLAUDE_CONFIG_DIR/arcanum-config.json) and the
 # global git config are mounted read-only, and a GitHub token resolved

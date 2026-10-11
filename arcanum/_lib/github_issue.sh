@@ -13,7 +13,7 @@
 # error below (exit 1).
 #
 # Under engine.mode=docker all ten subcommands run core/bin/arcanum
-# inside the container, once their migration-status.json status is
+# inside the container, now that their migration-status.json status is
 # `"docker"` (#747), with the repo mount plus
 # `--needs=global-config,gitconfig,gh`: the global arcanum config
 # ($CLAUDE_CONFIG_DIR/arcanum-config.json) and the global git config are
