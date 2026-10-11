@@ -51,7 +51,7 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 | `github-issue-update` | `arcanum/_lib/github_issue.sh` `update` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro, args:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
 | `issue-state` | `arcanum/_lib/issue_state.sh` | dispatched | ✅ | none | — | — | #745 | |
 | `list-agents` | `arcanum/_lib/list_agents.sh` | dispatched | ✅ | none | — | — | #745 | |
-| `permission-grant-add` | `arcanum/_lib/permission_grant.sh` `add` | dispatched | ☐ | none | args:rw | — | | |
+| `permission-grant-add` | `arcanum/_lib/permission_grant.sh` `add` | dispatched | ☐ | none | args:rw | — | | Moved out of batch 2 (#746) to #753. |
 | `resolve-and-fetch` | `arcanum/_lib/resolve_and_fetch.sh` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
 | `resolve-id-and-file` | `arcanum/_lib/resolve_id_and_file.sh` | dispatched | ✅ | none | — | — | #745 | |
 | `resolve-plan-paths` | `arcanum/_lib/resolve_plan_paths.sh` | dispatched | ✅ | none | — | — | #745 | |
@@ -76,7 +76,7 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 | command | script | kind | status | credentials | mounts | env | issue | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `arcanum-split-issue-create-sub-issue` | `arcanum-split-issue/scripts/create_sub_issue.sh` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
-| `arcanum-split-issue-create-sub-issue-file` | `arcanum-split-issue/scripts/create_sub_issue_file.sh` | dispatched | ☐ | none | args:ro | — | | |
+| `arcanum-split-issue-create-sub-issue-file` | `arcanum-split-issue/scripts/create_sub_issue_file.sh` | dispatched | ✅ | none | args:ro | — | #746 | `--path-arg=4:ro`: `<body_file>` is mounted read-only at its own path when it sits outside the repo. |
 | `arcanum-split-issue-finish` | `arcanum-split-issue/scripts/finish.sh` | dispatched | ☐ | gh, git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN, remote | | |
 | `arcanum-split-issue-push-sub-issues` | `arcanum-split-issue/scripts/push_sub_issues.sh` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
 
@@ -157,7 +157,7 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 | command | script | kind | status | credentials | mounts | env | issue | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `discuss-issue-confirm` | `discuss-issue/scripts/confirm.sh` | dispatched | ✅ | none | — | — | #745 | |
-| `discuss-issue-render-issue` | `discuss-issue/scripts/render_issue.sh` | dispatched | ☐ | none | args:rw | — | | |
+| `discuss-issue-render-issue` | `discuss-issue/scripts/render_issue.sh` | dispatched | ✅ | none | args:rw | — | #746 | `--path-arg=1:rw`: the directory of `<output_file>` is mounted read-write when it sits outside the repo. |
 
 ## init-claude
 
@@ -167,11 +167,11 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 | `init-claude-set-next-step-auto` | `init-claude/scripts/set_next_step_auto.sh` | native-only | ✅ | none | — | — | #745 | |
 | `init-claude-setup-docs-structure` | `init-claude/scripts/setup_docs_structure.sh` | dispatched | ✅ | none | — | — | #745 | |
 | `init-claude-setup-templates` | `init-claude/scripts/setup_templates.sh` | dispatched | ✅ | none | — | — | #745 | |
-| `init-claude-stamp-arcanum-version` | `init-claude/scripts/stamp_arcanum_version.sh` | dispatched | ☐ | none | global-config:ro | CLAUDE_CONFIG_DIR | | |
+| `init-claude-stamp-arcanum-version` | `init-claude/scripts/stamp_arcanum_version.sh` | dispatched | ✅ | none | global-config:ro | CLAUDE_CONFIG_DIR | #746 | `--needs=global-config`. `global-config:ro` follows the `HOME` allowlist rule: `HOME` stays in the allowlist so that, natively, `git describe` resolves a git-clone install's tag. Under docker the version comes from the image's own `arcanum.json` instead. On a dev install between tags (e.g. `2.0.0-15-ge7a86db`), native resolves no version and stamps nothing. Against the image dispatch picks for that install (`darthjee/arcanum:local-<sha>`) docker also stamps nothing, so parity holds. Against an image whose `arcanum.json` carries a release version (e.g. one built with `ARCANUM_VERSION=2.0.0`), docker stamps that version into `.claude/configuration/arcanum-repo-config.json` and `.claude/state/arcanum-config.json` (`migrations.version`) while native does not. The parity spec pins this with a divergence case. |
 | `init-claude-sync-labels` | `init-claude/scripts/sync_labels.sh` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro, args:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
-| `init-claude-write-label-config-add` | `init-claude/scripts/write_label_config.sh` `add` | dispatched | ☐ | none | args:rw | — | | |
-| `init-claude-write-label-config-remove` | `init-claude/scripts/write_label_config.sh` `remove` | dispatched | ☐ | none | args:rw | — | | |
-| `init-claude-write-label-config-replace` | `init-claude/scripts/write_label_config.sh` `replace` | dispatched | ☐ | none | args:rw | — | | |
+| `init-claude-write-label-config-add` | `init-claude/scripts/write_label_config.sh` `add` | dispatched | ✅ | none | args:rw | — | #746 | `--path-arg=1:rw`: the directory of the absolute `<config_path>` is mounted read-write when it sits outside the repo. |
+| `init-claude-write-label-config-remove` | `init-claude/scripts/write_label_config.sh` `remove` | dispatched | ✅ | none | args:rw | — | #746 | `--path-arg=1:rw`: the directory of the absolute `<config_path>` is mounted read-write when it sits outside the repo. |
+| `init-claude-write-label-config-replace` | `init-claude/scripts/write_label_config.sh` `replace` | dispatched | ✅ | none | args:rw | — | #746 | `--path-arg=1:rw`: the directory of the absolute `<config_path>` is mounted read-write when it sits outside the repo. |
 
 ## monitor-issues
 

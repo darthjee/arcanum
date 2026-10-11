@@ -8,6 +8,13 @@
 # (create_sub_issue_file_shell.sh) or the native one (core/bin/arcanum),
 # per engine.mode / arcanum/_lib/migration-status.json.
 #
+# Under engine.mode=docker it runs core/bin/arcanum inside the container,
+# now that its migration-status.json status is `"docker"` (#746), with the
+# repo mount plus `--path-arg=4:ro`: <body_file> is mounted read-only at
+# its own host path when it sits outside the repo. If docker is
+# unavailable, engine_dispatch falls back to native on the host with a
+# warning — see docs/agents/specs/docker/dispatch.md.
+#
 # Usage: create_sub_issue_file.sh <repo_path> <issue_id> <title> <body_file>
 #
 # Output and exit code: unchanged from before this migration — see
@@ -30,4 +37,4 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../../arcanum/_lib/engine_dispatch.sh
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/../../arcanum/_lib/engine_dispatch.sh"
-engine_dispatch "$REPO_PATH" arcanum-split-issue-create-sub-issue-file "${SCRIPT_DIR}/create_sub_issue_file_shell.sh" -- "$@"
+engine_dispatch "$REPO_PATH" arcanum-split-issue-create-sub-issue-file "${SCRIPT_DIR}/create_sub_issue_file_shell.sh" --path-arg=4:ro -- "$@"

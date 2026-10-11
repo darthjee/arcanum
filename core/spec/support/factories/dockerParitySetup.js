@@ -30,16 +30,20 @@ async function sharedTempDir(prefix) {
 /**
  * Builds a parity world: a git fixture repo (a clone, or a worktree of
  * it), plus a clean env whose `HOME` and `CLAUDE_CONFIG_DIR` are empty
- * temp dirs, so this machine's global config never leaks in.
+ * temp dirs, so this machine's global config never leaks in, and an
+ * empty `outsideDir` outside the repo for argument paths
+ * (`--path-arg`) that must sit outside it.
  * @param {object} [opts] - options.
  * @param {boolean} [opts.worktree] - run from a git worktree of the
  *   fixture repo (exercising the git common dir mount).
- * @returns {Promise<{repoPath: string, env: object, cleanup: () => Promise<void>}>} the world.
+ * @returns {Promise<{repoPath: string, outsideDir: string, configDir: string, env: object, cleanup: () => Promise<void>}>}
+ *   the world.
  */
 export async function createParityWorld({ worktree = false } = {}) {
   const fixture = await createGitFixtureRepo();
   const homeDir = await sharedTempDir('arcanum-docker-parity-home-');
   const configDir = await sharedTempDir('arcanum-docker-parity-global-');
+  const outsideDir = await sharedTempDir('arcanum-docker-parity-outside-');
   const fixturePath = await realpath(fixture.repoPath);
   let worktreeRoot = null;
   let repoPath = fixturePath;
@@ -52,9 +56,12 @@ export async function createParityWorld({ worktree = false } = {}) {
 
   return {
     repoPath,
+    outsideDir,
+    configDir,
     env: { PATH: process.env.PATH, HOME: homeDir, CLAUDE_CONFIG_DIR: configDir },
     cleanup: async () => {
       if (worktreeRoot) await removeTempDir(worktreeRoot);
+      await removeTempDir(outsideDir);
       await removeTempDir(homeDir);
       await removeTempDir(configDir);
       await fixture.cleanup();
@@ -101,31 +108,41 @@ export function describeParityRepos(description, defineCases, { worktree = false
  * Registers one parity case: seeds the repo, runs the real shim's
  * `engine_dispatch` arguments natively and in `PARITY_IMAGE`, and
  * asserts identical stdout, exit code, stderr (minus Docker's platform
- * notice) and file diff — with, on Linux, every created/changed file
+ * notice) and file diff — of the repo and, with `watchOutside`, of the
+ * world's `outsideDir` too — with, on Linux, every created/changed file
  * owned by the host uid.
  * @param {string} label - the `it` label.
- * @param {() => {repoPath: string, env: object}} getWorld - the world.
+ * @param {() => {repoPath: string, outsideDir: string, env: object}} getWorld - the world.
  * @param {object} spec - the case.
  * @param {string} spec.command - the dispatched command.
- * @param {(repoPath: string) => string[]} spec.dispatchArgs - the shim's
+ * @param {(repoPath: string, world: object) => string[]} spec.dispatchArgs - the shim's
  *   real `engine_dispatch` arguments.
- * @param {(repoPath: string) => Promise<void>} [spec.seed] - fixture setup.
- * @param {(parity: object, repoPath: string) => Promise<void>|void} [spec.check] -
+ * @param {(repoPath: string, world: object) => Promise<void>} [spec.seed] - fixture setup.
+ * @param {(parity: object, repoPath: string, world: object) => Promise<void>|void} [spec.check] -
  *   further expectations (e.g. on the native result itself).
+ * @param {boolean} [spec.watchOutside] - also diff the world's
+ *   `outsideDir` (for argument paths outside the repo).
  * @returns {void}
  */
-export function itMatchesNativeInDocker(label, getWorld, { command, dispatchArgs, seed, check }) {
+export function itMatchesNativeInDocker(label, getWorld, { command, dispatchArgs, seed, check, watchOutside = false }) {
   it(label, async () => {
-    const { repoPath, env } = getWorld();
+    const world = getWorld();
+    const { repoPath, env } = world;
 
-    if (seed) await seed(repoPath);
+    if (seed) await seed(repoPath, world);
 
-    const parity = await runDockerParity({ command, repoPath, dispatchArgs: dispatchArgs(repoPath), env });
+    const parity = await runDockerParity({
+      command,
+      repoPath,
+      dispatchArgs: dispatchArgs(repoPath, world),
+      argDirs: watchOutside ? [world.outsideDir] : [],
+      env
+    });
 
     expect(withoutPlatformNotice(parity.docker.stderr)).toEqual(parity.native.stderr);
     expectDockerParity(parity);
     expectHostOwned(parity);
-    if (check) await check(parity, repoPath);
+    if (check) await check(parity, repoPath, world);
   }, TIMEOUT);
 }
 
@@ -158,4 +175,14 @@ function changedFiles(diff) {
 export function nativeWrites(parity, repoPath) {
   return changedFiles(parity.nativeFiles[repoPath])
     .filter((file) => file !== path.join('.claude', 'state', 'arcanum-config.json'));
+}
+
+/**
+ * @param {object} parity - a `runDockerParity` result (run with the
+ *   world's `outsideDir` watched).
+ * @param {string} outsideDir - the watched directory outside the repo.
+ * @returns {string[]} the files the native run created/changed there.
+ */
+export function nativeOutsideWrites(parity, outsideDir) {
+  return changedFiles(parity.nativeFiles[outsideDir]);
 }
