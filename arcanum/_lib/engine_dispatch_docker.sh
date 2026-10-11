@@ -250,7 +250,12 @@ _engine_dispatch_docker_gh_token() {
 #   working directory would resolve differently made absolute).
 #
 #   Runs in a subshell: the values behind every `-e NAME` are exported
-#   there only (never in argv), so nothing leaks into the caller.
+#   there only (never in argv), so nothing leaks into the caller. The
+#   subshell then `exec`s docker, so `docker run` replaces it and stays
+#   a direct child of the dispatching process: some bash versions (5.1)
+#   keep the subshell alive otherwise, leaving docker a grandchild that
+#   a `pkill -P <dispatch pid>` (monitor_issues.sh) never reaches. The
+#   exit code is unchanged: docker's own, or 126/127 if exec fails.
 # shellcheck disable=SC2154  # engine_dispatch's locals, via dynamic scoping
 _engine_dispatch_docker_run() (
   local ref="$1"
@@ -448,5 +453,5 @@ _engine_dispatch_docker_run() (
   [[ "$prepend_repo_path" == "true" ]] && run_args+=("$repo_path")
   [[ ${#container_args[@]} -gt 0 ]] && run_args+=("${container_args[@]}")
 
-  docker "${run_args[@]}"
+  exec docker "${run_args[@]}"
 )

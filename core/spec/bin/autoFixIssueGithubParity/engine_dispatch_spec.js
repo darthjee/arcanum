@@ -1,8 +1,9 @@
-import { writeFile } from 'node:fs/promises';
+import { realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { seedGithubLikeRepo } from '../../support/factories/autoFixIssueGithubParitySetup.js';
-import { expectRepoMountOnlyRun } from '../../support/factories/engineDispatchDockerSetup.js';
+import { expectGhNeedsRun, expectRepoMountOnlyRun } from '../../support/factories/engineDispatchDockerSetup.js';
 import { itRoutesEngineDispatch } from '../../support/sharedExamples/engineDispatchRouting.js';
+import { itRoutesGhEngineDispatch } from '../../support/sharedExamples/ghEngineDispatchRouting.js';
 import { seedEngineMode } from '../../support/utils/engineMode.js';
 import { createFakeGhBin } from '../../support/utils/fakeGhBin.js';
 import { createGitFixtureRepo } from '../../support/utils/gitFixtureRepo.js';
@@ -41,6 +42,14 @@ const REPO_REF = 'darthjee/arcanum-github-fixture';
 // unconditionally), so the SAME scenario succeeds on the shell side.
 // That success-vs-failure split proves which implementation actually
 // ran.
+//
+// Docker batch 3 (issue #747): pr-create/pr-view/pr-ready also run under
+// engine.mode=docker (a passthrough fake `docker`, which runs
+// core/bin/arcanum on the host with the same failing fake `gh`), failing
+// exactly like native, with the `docker run` carrying the
+// `--needs=global-config,gitconfig,gh` mounts and env (GH_TOKEN by name
+// only); pr-create's <file> (`--path-arg=3:ro`) adds a read-only file
+// mount only when it sits outside the repo.
 describe('auto-fix-issue-github engine_dispatch routing (via the real github.sh shim)', () => {
   describe('info', () => {
     let infoRepoPath;
@@ -107,44 +116,70 @@ describe('auto-fix-issue-github engine_dispatch routing (via the real github.sh 
     });
   });
 
-  itRoutesEngineDispatch(
-    'pr-create',
-    SHIM_SCRIPT,
-    async (repo, mode) => {
-      const fakeGh = await createFakeGhBin(mode === 'native' ? { authTokenAlwaysFails: true } : undefined);
-      const file = path.join(repo.repoPath, 'body.md');
+  let repoPath;
+  let bodyFile;
 
-      await seedGithubLikeRepo(repo);
-      await seedEngineMode(repo, mode);
-      await writeFile(file, 'body text\n');
+  [
+    { label: 'inside the repo', outside: false, mounts: () => [] },
+    { label: 'outside the repo', outside: true, mounts: () => [`${bodyFile}:${bodyFile}:ro`] }
+  ].forEach(({ label, outside, mounts }) => {
+    itRoutesGhEngineDispatch(
+      `pr-create (body file ${label})`,
+      SHIM_SCRIPT,
+      async (repo, mode) => {
+        const fakeGh = await createFakeGhBin(mode === 'shell' ? undefined : { authTokenAlwaysFails: true });
+        const bodyDir = outside ? await realpath(await createTempDir('arcanum-core-afigh-body-')) : repo.repoPath;
 
-      const env = {
-        ...process.env,
-        PATH: `${fakeGh.binDir}:${process.env.PATH}`,
-        FAKE_GH_PR_CREATE_URL: 'https://github.com/example/repo/pull/77'
-      };
+        repoPath = repo.repoPath;
+        bodyFile = path.join(bodyDir, 'body.md');
+        await seedGithubLikeRepo(repo);
+        await seedEngineMode(repo, mode);
+        await writeFile(bodyFile, 'body text\n');
 
-      return { args: ['pr-create', repo.repoPath, 'My PR', file], env, cleanup: fakeGh.cleanup };
-    },
-    {
-      shell: (result) => {
-        expect(result.code).toEqual(0);
-        expect(result.stdout).toEqual('https://github.com/example/repo/pull/77\n');
+        const env = {
+          ...process.env,
+          PATH: `${fakeGh.binDir}:${process.env.PATH}`,
+          FAKE_GH_PR_CREATE_URL: 'https://github.com/example/repo/pull/77'
+        };
+
+        return {
+          args: ['pr-create', repo.repoPath, 'My PR', bodyFile],
+          env,
+          cleanup: async () => {
+            await fakeGh.cleanup();
+            if (outside) await removeTempDir(bodyDir);
+          }
+        };
       },
-      native: (result) => {
-        expect(result.code).not.toEqual(0);
-        expect(result.stdout).toEqual('');
-        expect(result.stderr).toContain(`Error: could not create PR on ${REPO_REF}`);
+      {
+        shell: (result) => {
+          expect(result.code).toEqual(0);
+          expect(result.stdout).toEqual('https://github.com/example/repo/pull/77\n');
+        },
+        native: (result) => {
+          expect(result.code).not.toEqual(0);
+          expect(result.stdout).toEqual('');
+          expect(result.stderr).toContain(`Error: could not create PR on ${REPO_REF}`);
+        },
+        docker: (result, calls, world) => {
+          expect(result.code).not.toEqual(0);
+          expect(result.stdout).toEqual('');
+          expect(result.stderr).toContain(`Error: could not create PR on ${REPO_REF}`);
+          expectGhNeedsRun(
+            calls, repoPath, ['auto-fix-issue-github-pr-create', repoPath, 'My PR', bodyFile], world, mounts()
+          );
+        }
       }
-    }
-  );
+    );
+  });
 
-  itRoutesEngineDispatch(
+  itRoutesGhEngineDispatch(
     'pr-view',
     SHIM_SCRIPT,
     async (repo, mode) => {
-      const fakeGh = await createFakeGhBin(mode === 'native' ? { authTokenAlwaysFails: true } : undefined);
+      const fakeGh = await createFakeGhBin(mode === 'shell' ? undefined : { authTokenAlwaysFails: true });
 
+      repoPath = repo.repoPath;
       await seedGithubLikeRepo(repo);
       await seedEngineMode(repo, mode);
 
@@ -166,16 +201,23 @@ describe('auto-fix-issue-github engine_dispatch routing (via the real github.sh 
         expect(result.code).not.toEqual(0);
         expect(result.stdout).toEqual('');
         expect(result.stderr).toEqual('');
+      },
+      docker: (result, calls, world) => {
+        expect(result.code).not.toEqual(0);
+        expect(result.stdout).toEqual('');
+        expect(result.stderr).toEqual('');
+        expectGhNeedsRun(calls, repoPath, ['auto-fix-issue-github-pr-view', repoPath], world);
       }
     }
   );
 
-  itRoutesEngineDispatch(
+  itRoutesGhEngineDispatch(
     'pr-ready',
     SHIM_SCRIPT,
     async (repo, mode) => {
-      const fakeGh = await createFakeGhBin(mode === 'native' ? { authTokenAlwaysFails: true } : undefined);
+      const fakeGh = await createFakeGhBin(mode === 'shell' ? undefined : { authTokenAlwaysFails: true });
 
+      repoPath = repo.repoPath;
       await seedGithubLikeRepo(repo);
       await seedEngineMode(repo, mode);
 
@@ -192,6 +234,12 @@ describe('auto-fix-issue-github engine_dispatch routing (via the real github.sh 
         expect(result.code).not.toEqual(0);
         expect(result.stdout).toEqual('');
         expect(result.stderr).toContain(`Error: could not mark PR ready on ${REPO_REF}`);
+      },
+      docker: (result, calls, world) => {
+        expect(result.code).not.toEqual(0);
+        expect(result.stdout).toEqual('');
+        expect(result.stderr).toContain(`Error: could not mark PR ready on ${REPO_REF}`);
+        expectGhNeedsRun(calls, repoPath, ['auto-fix-issue-github-pr-ready', repoPath], world);
       }
     }
   );

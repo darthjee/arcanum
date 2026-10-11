@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { itMatchesNativeInDockerWithGh } from '../support/factories/dockerGhParitySetup.js';
 import {
   describeParityRepos, itMatchesNativeInDocker, nativeWrites, seedRepoFile
 } from '../support/factories/dockerParitySetup.js';
@@ -102,6 +103,25 @@ describe('monitor-issues commands docker parity', () => {
       dispatchArgs: monitorDispatch('monitor-issues-config-toggle', 'config_toggle_shell.sh', 'enabled'),
       seed: seedEnabled,
       check: ({ native }) => expect(native.stdout).toEqual('false\n')
+    });
+  });
+
+  // Opt-in gh case (docker batch 3, #747): github.sh remove-tag on the
+  // sandbox fixture issue (starting from `Created` added), whose labels
+  // are restored between and after the runs. Pending unless
+  // ARCANUM_DOCKER_PARITY_GH=1 and the sandbox vars are set.
+  // monitor-issues-monitor-issues has no case (a polling loop).
+  describeParityRepos('github remove-tag (gh)', (getWorld) => {
+    itMatchesNativeInDockerWithGh('remove-tag untags the fixture issue', getWorld, {
+      command: 'monitor-issues-github-remove-tag',
+      needs: ['issue'],
+      mutatesLabels: true,
+      startLabels: ['Created'],
+      dispatchArgs: (repoPath, { issue }) => [
+        repoPath, 'monitor-issues-github-remove-tag', path.join(SCRIPTS_DIR, 'github_remove_tag_shell.sh'),
+        '--needs=global-config,gitconfig,gh', 'HOME', '--', repoPath, issue, 'created'
+      ],
+      check: ({ native }) => expect(native.code).toEqual(0)
     });
   });
 });

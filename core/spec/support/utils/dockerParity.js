@@ -155,13 +155,15 @@ function diffAll(before, after) {
  * @param {string[]} options.argDirs - further watched directories.
  * @param {object} options.env - the run's environment.
  * @param {string[]} options.ignore - see `snapshotTree`.
+ * @param {(mode: string) => Promise<void>} [options.reset] - run first, see `runDockerParity`.
  * @param {string} statusFile - the temp status map's path.
  * @returns {Promise<{result: object, files: object}>} the run's result
  *   and its file diff.
  */
-async function runOnce(mode, { repoPath, dispatchArgs, argDirs, env, ignore }, statusFile) {
+async function runOnce(mode, { repoPath, dispatchArgs, argDirs, env, ignore, reset }, statusFile) {
   const dirs = [repoPath, ...argDirs];
 
+  if (reset) await reset(mode);
   await mergeEngineMode({ repoPath }, mode);
 
   const before = await snapshotAll(dirs, ignore);
@@ -191,13 +193,17 @@ async function runOnce(mode, { repoPath, dispatchArgs, argDirs, env, ignore }, s
  * @param {object} [options.env] - the environment for both runs.
  * @param {string[]} [options.ignore] - top-level names skipped by the
  *   file diff (defaults to `['.git']`).
+ * @param {(mode: string) => Promise<void>} [options.reset] - run before
+ *   each run (before its snapshot), to put state outside the watched
+ *   directories (e.g. a sandbox issue's GitHub labels) back where the
+ *   first run found it.
  * @returns {Promise<{native: object, docker: object, nativeFiles: object, dockerFiles: object}>}
  *   both runs' results and file diffs.
  */
 export async function runDockerParity({
-  command, repoPath, dispatchArgs, argDirs = [], env = process.env, ignore = DEFAULT_IGNORE
+  command, repoPath, dispatchArgs, argDirs = [], env = process.env, ignore = DEFAULT_IGNORE, reset
 }) {
-  const options = { repoPath, dispatchArgs, argDirs, env, ignore };
+  const options = { repoPath, dispatchArgs, argDirs, env, ignore, reset };
   const dirs = [repoPath, ...argDirs];
   const work = await createTempDir('arcanum-docker-parity-');
 
@@ -283,8 +289,89 @@ function gatedIt(envVar, reason) {
 /** `it` that runs only when `ARCANUM_DOCKER_PARITY_GH=1` (a host gh token and a sandbox repo). */
 export const itWithGh = gatedIt('ARCANUM_DOCKER_PARITY_GH', 'needs a gh token resolvable on the host and a sandbox repo');
 
+/**
+ * The gh sandbox the opt-in gh cases run against, one env var per
+ * fixture (see docs/agents/specs/docker/testing.md -> "Credentials"),
+ * each with the format it must match and what it must point to.
+ */
+export const GH_SANDBOX_VARS = {
+  repo: {
+    name: 'ARCANUM_DOCKER_PARITY_GH_REPO',
+    pattern: /^[\w.-]+\/[\w.-]+$/,
+    what: 'the sandbox repo on github.com, as <owner>/<repo>'
+  },
+  issue: {
+    name: 'ARCANUM_DOCKER_PARITY_GH_ISSUE',
+    pattern: /^[1-9][0-9]*$/,
+    what: 'an open fixture issue number in the sandbox repo whose labels the cases may toggle'
+  },
+  pr: {
+    name: 'ARCANUM_DOCKER_PARITY_GH_PR',
+    pattern: /^[1-9][0-9]*$/,
+    what: 'an open fixture pull request number in the sandbox repo'
+  },
+  prBranch: {
+    name: 'ARCANUM_DOCKER_PARITY_GH_PR_BRANCH',
+    pattern: /^[^\s]+$/,
+    what: 'the head branch of ARCANUM_DOCKER_PARITY_GH_PR'
+  }
+};
+
+/**
+ * Reads the gh sandbox fixtures a case needs from the environment.
+ * @param {string[]} needs - `GH_SANDBOX_VARS` keys (e.g. `['repo', 'issue']`).
+ * @param {object} [env] - the environment to read (default `process.env`).
+ * @returns {{sandbox: object|null, problems: string[]}} the values by key,
+ *   or `null` plus one message per missing or malformed var.
+ */
+export function readGhSandbox(needs, env = process.env) {
+  const sandbox = {};
+  const problems = [];
+
+  needs.forEach((key) => {
+    const { name, pattern, what } = GH_SANDBOX_VARS[key];
+    const value = env[name];
+
+    if (!value) {
+      problems.push(`set ${name} (${what})`);
+    } else if (!pattern.test(value)) {
+      problems.push(`${name}='${value}' is not ${what}`);
+    } else {
+      sandbox[key] = value;
+    }
+  });
+
+  return { sandbox: problems.length === 0 ? sandbox : null, problems };
+}
+
+/**
+ * `itWithGh`, plus the gh sandbox fixtures: when a var in `needs` is
+ * missing or malformed the case is pending, with a message naming it —
+ * never failed. `fn` gets the sandbox values (`readGhSandbox`).
+ * @param {string} description - the `it` label.
+ * @param {string[]} needs - the `GH_SANDBOX_VARS` keys the case needs.
+ * @param {(sandbox: object) => Promise<void>} fn - the case body.
+ * @param {number} [timeout] - the case timeout.
+ * @returns {void}
+ */
+export function itWithGhSandbox(description, needs, fn, timeout) {
+  itWithGh(description, async function() {
+    const { sandbox, problems } = readGhSandbox(needs);
+
+    if (!sandbox) {
+      pending(`gh sandbox not configured: ${problems.join('; ')}`);
+
+      return;
+    }
+
+    await fn.call(this, sandbox);
+  }, timeout);
+}
+
 /** `it` that runs only when `ARCANUM_DOCKER_PARITY_SSH=1` (an ssh agent and an ssh remote). */
 export const itWithSsh = gatedIt('ARCANUM_DOCKER_PARITY_SSH', 'needs an ssh agent and an ssh remote');
+
+
 
 /**
  * On Linux, asserts every file the docker run created or changed is

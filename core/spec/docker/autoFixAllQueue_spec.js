@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { seedQueue } from '../support/factories/queueParitySetup.js';
+import { itMatchesNativeInDockerWithGh } from '../support/factories/dockerGhParitySetup.js';
 import {
   describeParityRepos, itMatchesNativeInDocker, nativeWrites
 } from '../support/factories/dockerParitySetup.js';
@@ -19,6 +20,21 @@ function queueDispatch(sub) {
   return (repoPath) => [
     repoPath, `auto-fix-all-queue-${sub}`, path.join(SCRIPTS_DIR, `queue_${sub.replace('-', '_')}_shell.sh`),
     '--', repoPath
+  ];
+}
+
+/**
+ * The real queue.sh `engine_dispatch` call for save/push (docker batch
+ * 3): `--needs=global-config,gitconfig,gh`, `HOME` allowlisted, then
+ * `<repo_path> <id>` — the sandbox fixture issue, which the command tags
+ * `Enqueued` (removing `Ready for Work` / `Created`).
+ * @param {string} sub - `save` or `push`.
+ * @returns {(repoPath: string, sandbox: object) => string[]} `engine_dispatch`'s arguments.
+ */
+function ghQueueDispatch(sub) {
+  return (repoPath, { issue }) => [
+    repoPath, `auto-fix-all-queue-${sub}`, path.join(SCRIPTS_DIR, `queue_${sub}_shell.sh`),
+    '--needs=global-config,gitconfig,gh', 'HOME', '--', repoPath, issue
   ];
 }
 
@@ -89,4 +105,36 @@ describe('auto-fix-all-queue docker parity', () => {
       check: ({ native }) => expect(native.code).toEqual(0)
     });
   });
+
+  // Opt-in gh cases (docker batch 3, #747): save/push write the queue and
+  // tag the sandbox fixture issue (starting from `Ready for Work` and
+  // `Created` added, so both removals run), whose labels are restored
+  // between and after the runs. Pending unless ARCANUM_DOCKER_PARITY_GH=1 and the
+  // sandbox vars are set.
+  describeParityRepos('save and push (gh)', (getWorld) => {
+    itMatchesNativeInDockerWithGh('save writes the queue and tags the fixture issue', getWorld, {
+      command: 'auto-fix-all-queue-save',
+      needs: ['issue'],
+      mutatesLabels: true,
+      startLabels: ['Ready for Work', 'Created'],
+      dispatchArgs: ghQueueDispatch('save'),
+      check: (parity, repoPath, { issue }) => {
+        expect(parity.native.stdout).toContain(`Queue saved: ${issue}\n`);
+        expect(nativeWrites(parity, repoPath)).toContain(QUEUE_FILE);
+      }
+    });
+
+    itMatchesNativeInDockerWithGh('push appends to the queue and tags the fixture issue', getWorld, {
+      command: 'auto-fix-all-queue-push',
+      needs: ['issue'],
+      mutatesLabels: true,
+      startLabels: ['Ready for Work', 'Created'],
+      dispatchArgs: ghQueueDispatch('push'),
+      seed: seedTwo,
+      check: (parity, repoPath, { issue }) => {
+        expect(parity.native.stdout).toContain(`Pushed: ${issue}\n`);
+        expect(nativeWrites(parity, repoPath)).toContain(QUEUE_FILE);
+      }
+    });
+  }, { worktree: true });
 });

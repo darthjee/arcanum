@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { MARK_TRANSITIONS } from '../../../lib/commands/shared/GithubIssueMark.js';
-import { itRoutesEngineDispatch } from '../../support/sharedExamples/engineDispatchRouting.js';
+import { expectGhNeedsRun } from '../../support/factories/engineDispatchDockerSetup.js';
+import { itRoutesGhEngineDispatch } from '../../support/sharedExamples/ghEngineDispatchRouting.js';
 import { seedEngineMode } from '../../support/utils/engineMode.js';
 import { createGitFixtureRepo } from '../../support/utils/gitFixtureRepo.js';
 import { REPO_ROOT, runCommand } from '../../support/utils/runCommand.js';
@@ -20,6 +21,12 @@ const SHIM_SCRIPT = path.join(REPO_ROOT, 'arcanum', '_lib', 'github_issue.sh');
 // `_load_origin`'s/`Origin#resolve`'s message and exit 1, but only
 // `core/bin/arcanum` prefixes it with `arcanum: `, which proves which
 // implementation actually ran.
+//
+// Docker batch 3 (issue #747): under engine.mode=docker (a passthrough
+// fake `docker`), the container's core/bin/arcanum fails the same way
+// as native, and the `docker run` carries the
+// `--needs=global-config,gitconfig,gh` mounts and env (GH_TOKEN by name
+// only).
 
 /**
  * @param {{repoPath: string}} repo - the fixture repo.
@@ -33,7 +40,7 @@ describe('github-issue mark-* engine_dispatch routing (via the real github_issue
   Object.keys(MARK_TRANSITIONS).forEach((name) => {
     let repoPath;
 
-    itRoutesEngineDispatch(
+    itRoutesGhEngineDispatch(
       `mark-${name}`,
       SHIM_SCRIPT,
       async (repo, mode) => {
@@ -57,6 +64,14 @@ describe('github-issue mark-* engine_dispatch routing (via the real github_issue
           expect(result.stderr).toEqual(
             `arcanum: Error: '${repoPath}' is not a git repository or has no 'origin' remote\n`
           );
+        },
+        docker: (result, calls, world) => {
+          expect(result).toEqual({
+            stdout: '',
+            stderr: `arcanum: Error: '${repoPath}' is not a git repository or has no 'origin' remote\n`,
+            code: 1
+          });
+          expectGhNeedsRun(calls, repoPath, [`github-issue-mark-${name}`, repoPath, '42'], world);
         }
       }
     );

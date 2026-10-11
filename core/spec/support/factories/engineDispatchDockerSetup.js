@@ -171,6 +171,76 @@ export function expectRepoMountOnlyRun(calls, repoPath, after) {
 }
 
 /**
+ * The GitHub token every `--needs=gh` routing case seeds as `GH_TOKEN`
+ * on the host, so host-side token resolution never calls a real `gh
+ * auth token`. It must reach the run's env, never its argv.
+ */
+export const SPEC_GH_TOKEN = 'spec-gh-token-never-in-argv';
+
+/** The `-e` names `--needs=global-config,gitconfig,gh` adds on github.com. */
+export const GH_NEEDS_ENV_NAMES = ['CLAUDE_CONFIG_DIR', 'GIT_CONFIG_GLOBAL', 'GH_TOKEN'];
+
+/**
+ * Builds the host-side world a `--needs=global-config,gitconfig,gh`
+ * routing case runs in: a realpath'd temp dir holding a global config
+ * dir with an `arcanum-config.json` and a global gitconfig, so both
+ * `:ro` mounts appear, plus the env pointing at them and seeding
+ * `GH_TOKEN` with `SPEC_GH_TOKEN`.
+ * @returns {Promise<{configDir: string, configFile: string, gitconfig: string, mounts: string[], env: object, cleanup: () => Promise<void>}>}
+ *   the world: its files, the `-v` values they produce (in run order),
+ *   the env overrides, and a teardown.
+ */
+export async function createGhNeedsWorld() {
+  const dir = await realpath(await createTempDir('arcanum-core-gh-needs-'));
+  const configDir = path.join(dir, 'claude');
+  const configFile = path.join(configDir, 'arcanum-config.json');
+  const gitconfig = path.join(dir, 'gitconfig');
+
+  await mkdir(configDir);
+  await writeFile(configFile, '{}\n');
+  await writeFile(gitconfig, '[user]\n\tname = Spec\n');
+
+  return {
+    configDir,
+    configFile,
+    gitconfig,
+    mounts: [`${configFile}:${configFile}:ro`, `${gitconfig}:${gitconfig}:ro`],
+    env: { CLAUDE_CONFIG_DIR: configDir, GIT_CONFIG_GLOBAL: gitconfig, GH_TOKEN: SPEC_GH_TOKEN },
+    cleanup: () => removeTempDir(dir)
+  };
+}
+
+/**
+ * Asserts the fake docker saw exactly one `docker run` shaped by
+ * `--needs=global-config,gitconfig,gh` on a github.com (or origin-less)
+ * repo: `expectRunWith` with the world's global-config and gitconfig
+ * `:ro` mounts (then `pathMounts`) and the `CLAUDE_CONFIG_DIR`,
+ * `GIT_CONFIG_GLOBAL` and `GH_TOKEN` names; the token reaches the run's
+ * env by name only and never appears in any logged argv.
+ * @param {object[]} calls - the fake docker's logged calls.
+ * @param {string} repoPath - the repo path the shim dispatched with.
+ * @param {string[]} after - the expected argv after the image.
+ * @param {{configDir: string, gitconfig: string, mounts: string[]}} world -
+ *   the `createGhNeedsWorld` the case ran in.
+ * @param {string[]} [pathMounts] - the `--path-arg` `-v` values expected
+ *   after the `--needs` mounts.
+ * @returns {void}
+ */
+export function expectGhNeedsRun(calls, repoPath, after, world, pathMounts = []) {
+  expectRunWith(calls, repoPath, after, { mounts: [...world.mounts, ...pathMounts], envNames: GH_NEEDS_ENV_NAMES });
+
+  const [run] = runCalls(calls);
+
+  if (!run) return;
+  expect(run.env.GH_TOKEN).toEqual(SPEC_GH_TOKEN);
+  expect(run.env.CLAUDE_CONFIG_DIR).toEqual(world.configDir);
+  expect(run.env.GIT_CONFIG_GLOBAL).toEqual(world.gitconfig);
+  calls.forEach(({ argv }) => {
+    expect(argv.some((arg) => arg.includes(SPEC_GH_TOKEN))).withContext('token in docker argv').toBeFalse();
+  });
+}
+
+/**
  * @param {object} env - a logged `run` call's `env` (name -> value).
  * @returns {Array<[string, string]>} its `GIT_CONFIG_KEY_<n>` /
  *   `GIT_CONFIG_VALUE_<n>` pairs, for n < `GIT_CONFIG_COUNT`.

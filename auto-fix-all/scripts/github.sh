@@ -14,6 +14,19 @@
 # operations that rely on the user's git config/credentials, once
 # native's `env -i PATH="$PATH"` strips the ambient environment down.
 #
+# Under engine.mode=docker every subcommand except `cleanup-branch` (not
+# in batch 3) runs core/bin/arcanum inside the container, now that their
+# migration-status.json status is `"docker"` (#747), with the repo mount
+# plus `--needs=global-config,gitconfig,gh`: the global arcanum config
+# ($CLAUDE_CONFIG_DIR/arcanum-config.json) and the global git config are
+# mounted read-only, and a GitHub token resolved on the host is
+# forwarded by name only as `-e GH_TOKEN` (`-e GH_HOST`/`-e
+# GH_ENTERPRISE_TOKEN` on a GitHub Enterprise host), never as a value in
+# argv. HOME stays in the allowlist for the native path. If docker is
+# unavailable, engine_dispatch falls back to native on the host with a
+# warning — see docs/agents/specs/docker/dispatch.md and
+# docs/agents/specs/docker/environment.md.
+#
 # engine_dispatch passes its OWN trailing <args...> unchanged to BOTH the
 # shell fallback and the native command — but those two need different
 # argv shapes here: native needs `<repo_path> [rest]` (no subcommand;
@@ -64,28 +77,28 @@ REPO_PATH="${2:-}"
 
 case "$SUBCOMMAND" in
   pr-number)
-    engine_dispatch "$REPO_PATH" auto-fix-all-github-pr-number "${SCRIPT_DIR}/github_shell_pr_number.sh" HOME -- "${@:2}"
+    engine_dispatch "$REPO_PATH" auto-fix-all-github-pr-number "${SCRIPT_DIR}/github_shell_pr_number.sh" --needs=global-config,gitconfig,gh HOME -- "${@:2}"
     ;;
   pr-state)
-    engine_dispatch "$REPO_PATH" auto-fix-all-github-pr-state "${SCRIPT_DIR}/github_shell_pr_state.sh" HOME -- "${@:2}"
+    engine_dispatch "$REPO_PATH" auto-fix-all-github-pr-state "${SCRIPT_DIR}/github_shell_pr_state.sh" --needs=global-config,gitconfig,gh HOME -- "${@:2}"
     ;;
   pr-merge)
-    engine_dispatch "$REPO_PATH" auto-fix-all-github-pr-merge "${SCRIPT_DIR}/github_shell_pr_merge.sh" HOME -- "${@:2}"
+    engine_dispatch "$REPO_PATH" auto-fix-all-github-pr-merge "${SCRIPT_DIR}/github_shell_pr_merge.sh" --needs=global-config,gitconfig,gh HOME -- "${@:2}"
     ;;
   cleanup-branch)
     engine_dispatch "$REPO_PATH" auto-fix-all-github-cleanup-branch "${SCRIPT_DIR}/github_shell_cleanup_branch.sh" HOME -- "${@:2}"
     ;;
   has-label)
-    engine_dispatch "$REPO_PATH" auto-fix-all-github-has-label "${SCRIPT_DIR}/github_shell_has_label.sh" HOME -- "${@:2}"
+    engine_dispatch "$REPO_PATH" auto-fix-all-github-has-label "${SCRIPT_DIR}/github_shell_has_label.sh" --needs=global-config,gitconfig,gh HOME -- "${@:2}"
     ;;
   has-shipit-label)
-    engine_dispatch "$REPO_PATH" auto-fix-all-github-has-label "${SCRIPT_DIR}/github_shell_has_label.sh" HOME -- "${2:-}" "${3:-}" shipit
+    engine_dispatch "$REPO_PATH" auto-fix-all-github-has-label "${SCRIPT_DIR}/github_shell_has_label.sh" --needs=global-config,gitconfig,gh HOME -- "${2:-}" "${3:-}" shipit
     ;;
   add-tag)
-    engine_dispatch "$REPO_PATH" auto-fix-all-github-add-tag "${SCRIPT_DIR}/github_shell_add_tag.sh" HOME -- "${@:2}"
+    engine_dispatch "$REPO_PATH" auto-fix-all-github-add-tag "${SCRIPT_DIR}/github_shell_add_tag.sh" --needs=global-config,gitconfig,gh HOME -- "${@:2}"
     ;;
   remove-tag)
-    engine_dispatch "$REPO_PATH" auto-fix-all-github-remove-tag "${SCRIPT_DIR}/github_shell_remove_tag.sh" HOME -- "${@:2}"
+    engine_dispatch "$REPO_PATH" auto-fix-all-github-remove-tag "${SCRIPT_DIR}/github_shell_remove_tag.sh" --needs=global-config,gitconfig,gh HOME -- "${@:2}"
     ;;
   *)
     echo "Usage: $0 <command> <repo_path> [args]" >&2

@@ -1,11 +1,16 @@
+import { spawn } from 'node:child_process';
 import { mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { expectRepoMountOnlyRun } from '../support/factories/engineDispatchDockerSetup.js';
+import {
+  createGhNeedsWorld, expectGhNeedsRun, expectRepoMountOnlyRun
+} from '../support/factories/engineDispatchDockerSetup.js';
 import { seedGithubLikeRepo } from '../support/factories/githubParitySetup.js';
 import { runUntil, SCRIPTS_DIR } from '../support/factories/monitorIssuesParitySetup.js';
 import { itRoutesEngineDispatch } from '../support/sharedExamples/engineDispatchRouting.js';
+import { itRoutesGhEngineDispatch } from '../support/sharedExamples/ghEngineDispatchRouting.js';
 import { itRoutesWithInvocationLog } from '../support/sharedExamples/invocationLogRouting.js';
 import { seedEngineMode } from '../support/utils/engineMode.js';
+import { createFakeDockerBin } from '../support/utils/fakeDockerBin.js';
 import { createFakeGhBin } from '../support/utils/fakeGhBin.js';
 import { createGitFixtureRepo } from '../support/utils/gitFixtureRepo.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
@@ -41,6 +46,13 @@ function rewriteQueueFile(repoPath) {
 // fake `docker`), and every config.sh/rewrite_queue.sh subcommand gets a
 // success case proven through core/bin/arcanum's invocation log, whose
 // docker run carries only the repo mount and no extra env.
+//
+// Docker batch 3 (issue #747): github.sh remove-tag and monitor_issues.sh
+// also run under engine.mode=docker (a passthrough fake `docker`, which
+// runs core/bin/arcanum on the host with the same failing fake `gh`),
+// failing like native, with the `docker run` carrying the
+// `--needs=global-config,gitconfig,gh` mounts and env (GH_TOKEN by name
+// only).
 describe('monitor-issues engine_dispatch routing (via the real shims)', () => {
   describe('usage errors', () => {
     let realRepoPath;
@@ -161,12 +173,15 @@ describe('monitor-issues engine_dispatch routing (via the real shims)', () => {
     });
   });
 
-  itRoutesEngineDispatch(
+  let removeTagRepoPath;
+
+  itRoutesGhEngineDispatch(
     'github.sh remove-tag',
     path.join(SCRIPTS_DIR, 'github.sh'),
     async (repo, mode) => {
-      const fakeGh = await createFakeGhBin(mode === 'native' ? { authTokenAlwaysFails: true } : undefined);
+      const fakeGh = await createFakeGhBin(mode === 'shell' ? undefined : { authTokenAlwaysFails: true });
 
+      removeTagRepoPath = repo.repoPath;
       await seedGithubLikeRepo(repo);
       await seedEngineMode(repo, mode);
 
@@ -183,6 +198,14 @@ describe('monitor-issues engine_dispatch routing (via the real shims)', () => {
         expect(result.code).not.toEqual(0);
         expect(result.stdout).toEqual('');
         expect(result.stderr).toContain('Error: could not fetch issue #5');
+      },
+      docker: (result, calls, world) => {
+        expect(result.code).not.toEqual(0);
+        expect(result.stdout).toEqual('');
+        expect(result.stderr).toContain('Error: could not fetch issue #5');
+        expectGhNeedsRun(
+          calls, removeTagRepoPath, ['monitor-issues-github-remove-tag', removeTagRepoPath, '5', 'created'], world
+        );
       }
     }
   );
@@ -190,40 +213,117 @@ describe('monitor-issues engine_dispatch routing (via the real shims)', () => {
   describe('monitor_issues.sh', () => {
     const SHIM = path.join(SCRIPTS_DIR, 'monitor_issues.sh');
 
+    /**
+     * Runs the real monitor_issues.sh shim in `mode` until its first
+     * failed poll cycle, then SIGTERMs its process group. In docker mode
+     * a passthrough fake `docker` goes first on `PATH`, in a gh-needs
+     * world.
+     * @param {string} mode - the engine mode.
+     * @returns {Promise<{result: object, calls: object[], world: object, repoPath: string}>}
+     *   the capture, the fake docker's calls (docker mode only) and the
+     *   gh-needs world.
+     */
     async function runMonitor(mode) {
       const repo = await createGitFixtureRepo();
-      const fakeGh = await createFakeGhBin(mode === 'native' ? { authTokenAlwaysFails: true } : undefined);
+      const fakeGh = await createFakeGhBin(mode === 'shell' ? undefined : { authTokenAlwaysFails: true });
+      const fakeDocker = mode === 'docker' ? await createFakeDockerBin({ mode: 'passthrough' }) : null;
+      const world = mode === 'docker' ? await createGhNeedsWorld() : null;
 
       try {
         await seedGithubLikeRepo(repo);
         await seedEngineMode(repo, mode);
 
-        const env = { ...process.env, PATH: `${fakeGh.binDir}:${process.env.PATH}`, FAKE_GH_ISSUE_LIST_FAIL: '1' };
-
-        return await runUntil(['bash', SHIM, repo.repoPath], {
+        const binDirs = [fakeDocker?.binDir, fakeGh.binDir].filter(Boolean);
+        const env = {
+          ...process.env,
+          ...world?.env,
+          PATH: [...binDirs, process.env.PATH].join(path.delimiter),
+          FAKE_GH_ISSUE_LIST_FAIL: '1'
+        };
+        const result = await runUntil(['bash', SHIM, repo.repoPath], {
           cwd: repo.repoPath,
           env,
           isDone: (stdout) => stdout.includes('ERROR in poll cycle')
         });
+
+        return { result, calls: fakeDocker ? await fakeDocker.readCalls() : [], world, repoPath: repo.repoPath };
       } finally {
-        await Promise.all([repo.cleanup(), fakeGh.cleanup()]);
+        await Promise.all([repo.cleanup(), fakeGh.cleanup(), fakeDocker?.cleanup(), world?.cleanup()]);
       }
     }
 
     it('routes to the shell implementation when engine.mode=shell', async () => {
-      const result = await runMonitor('shell');
+      const { result } = await runMonitor('shell');
 
       expect(result.timedOut).toBeFalse();
       expect(result.stdout).toContain('ERROR: gh issue list failed: fake gh: issue list failed');
     }, 60000);
 
     it('routes to the native implementation when engine.mode=native', async () => {
-      const result = await runMonitor('native');
+      const { result } = await runMonitor('native');
 
       expect(result.timedOut).toBeFalse();
       expect(result.stdout).toContain(
         'ERROR: gh issue list failed: Error: could not obtain GitHub token via gh auth token'
       );
+    }, 60000);
+
+    it('routes to docker run when engine.mode=docker', async () => {
+      const { result, calls, world, repoPath } = await runMonitor('docker');
+
+      expect(result.timedOut).toBeFalse();
+      expect(result.stdout).toContain(
+        'ERROR: gh issue list failed: Error: could not obtain GitHub token via gh auth token'
+      );
+      expectGhNeedsRun(calls, repoPath, ['monitor-issues-monitor-issues', repoPath], world);
+    }, 60000);
+
+    // The shim backgrounds engine_dispatch and forwards SIGTERM to its
+    // direct children only: under docker that is the `docker run` CLI,
+    // which (with its default --sig-proxy, mirrored by the passthrough
+    // fake) passes it on to the container. The shim's stdout closes only
+    // once every process holding it — the container included — is gone.
+    it('stops the container when only the shim is sent SIGTERM (engine.mode=docker)', async () => {
+      const repo = await createGitFixtureRepo();
+      const fakeGh = await createFakeGhBin({ authTokenAlwaysFails: true });
+      const fakeDocker = await createFakeDockerBin({ mode: 'passthrough' });
+      const world = await createGhNeedsWorld();
+      let child;
+
+      try {
+        await seedGithubLikeRepo(repo);
+        await seedEngineMode(repo, 'docker');
+
+        const env = {
+          ...process.env,
+          ...world.env,
+          PATH: [fakeDocker.binDir, fakeGh.binDir, process.env.PATH].join(path.delimiter),
+          FAKE_GH_ISSUE_LIST_FAIL: '1'
+        };
+
+        child = spawn('bash', [SHIM, repo.repoPath], { cwd: repo.repoPath, env, detached: true });
+        const closed = new Promise((resolve) => child.stdout.on('close', () => resolve(true)));
+        let stdout = '';
+
+        await new Promise((resolve) => {
+          child.stdout.on('data', (chunk) => {
+            stdout += chunk;
+            if (stdout.includes('ERROR in poll cycle')) resolve();
+          });
+        });
+        process.kill(child.pid, 'SIGTERM');
+
+        const timeout = new Promise((resolve) => setTimeout(() => resolve(false), 15000));
+
+        expect(await Promise.race([closed, timeout])).withContext('every process left the shim stdout').toBeTrue();
+      } finally {
+        try {
+          process.kill(-child.pid, 'SIGKILL');
+        } catch {
+          // already gone
+        }
+        await Promise.all([repo.cleanup(), fakeGh.cleanup(), fakeDocker.cleanup(), world.cleanup()]);
+      }
     }, 60000);
   });
 });
