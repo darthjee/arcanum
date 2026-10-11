@@ -1,7 +1,10 @@
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { MARK_TRANSITIONS } from '../../lib/commands/shared/GithubIssueMark.js';
+import { TAG_TO_LABEL } from '../../lib/utils/issue/Tags.js';
+import { itMatchesNativeInDockerWithGh } from '../support/factories/dockerGhParitySetup.js';
 import {
-  describeParityRepos, itMatchesNativeInDocker, nativeWrites
+  describeParityRepos, itMatchesNativeInDocker, nativeWrites, seedRepoFile
 } from '../support/factories/dockerParitySetup.js';
 import { requireParityImage } from '../support/utils/dockerParity.js';
 import { REPO_ROOT } from '../support/utils/runCommand.js';
@@ -23,7 +26,7 @@ function dispatch(repoPath, ...args) {
 // Local-only parity cases for arcanum-split-issue-create-sub-issue-file
 // (docker batch 2, #746): a <body_file> outside the repo reaches the
 // container through its own `:ro` mount.
-describe('arcanum-split-issue-create-sub-issue-file docker parity', () => {
+describe('arcanum-split-issue docker parity', () => {
   requireParityImage();
 
   describeParityRepos('create-sub-issue-file', (getWorld) => {
@@ -58,4 +61,30 @@ describe('arcanum-split-issue-create-sub-issue-file docker parity', () => {
       }
     });
   }, { worktree: true });
+
+  // arcanum-split-issue-finish (docker batch 4, #748): opt-in only, since
+  // it relabels the parent issue on GitHub (mark-split) before it
+  // deletes the working files and fetches `origin` (the sandbox's https
+  // URL, through the `remote` need's gh credential helper). The fixture
+  // issue starts with the labels mark-split removes, and its labels are
+  // restored before each run and at the end.
+  describeParityRepos('arcanum-split-issue-finish (gh, label mutations)', (getWorld) => {
+    const labelOf = new Map(Object.entries(TAG_TO_LABEL));
+
+    itMatchesNativeInDockerWithGh('finish relabels the issue, deletes its files and fetches origin', getWorld, {
+      command: 'arcanum-split-issue-finish',
+      needs: ['issue'],
+      mutatesLabels: true,
+      startLabels: MARK_TRANSITIONS.split.removes.map((tag) => labelOf.get(tag)),
+      seed: (repoPath, { issue }) => seedRepoFile(repoPath, `docs/agents/issues/${issue}-parent.md`, '# Parent\n'),
+      dispatchArgs: (repoPath, { issue }) => [
+        repoPath, 'arcanum-split-issue-finish', path.join(REPO_ROOT, 'arcanum-split-issue', 'scripts', 'finish_shell.sh'),
+        '--needs=global-config,gitconfig,gh,remote', 'HOME', '--', repoPath, issue
+      ],
+      check: ({ native }, repoPath, { issue }) => {
+        expect(native.code).toEqual(0);
+        expect(native.stdout).toContain(`Deleted:\n  docs/agents/issues/${issue}-parent.md\n`);
+      }
+    });
+  });
 });

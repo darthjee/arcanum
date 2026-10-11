@@ -156,11 +156,12 @@ function diffAll(before, after) {
  * @param {object} options.env - the run's environment.
  * @param {string[]} options.ignore - see `snapshotTree`.
  * @param {(mode: string) => Promise<void>} [options.reset] - run first, see `runDockerParity`.
+ * @param {(mode: string) => Promise<unknown>} [options.inspect] - run last, see `runDockerParity`.
  * @param {string} statusFile - the temp status map's path.
- * @returns {Promise<{result: object, files: object}>} the run's result
- *   and its file diff.
+ * @returns {Promise<{result: object, files: object, inspected: unknown}>} the
+ *   run's result, its file diff and what `inspect` returned.
  */
-async function runOnce(mode, { repoPath, dispatchArgs, argDirs, env, ignore, reset }, statusFile) {
+async function runOnce(mode, { repoPath, dispatchArgs, argDirs, env, ignore, reset, inspect }, statusFile) {
   const dirs = [repoPath, ...argDirs];
 
   if (reset) await reset(mode);
@@ -170,8 +171,9 @@ async function runOnce(mode, { repoPath, dispatchArgs, argDirs, env, ignore, res
   const overrides = mode === 'docker' ? { image: PARITY_IMAGE } : {};
   const result = await runEngineDispatch(statusFile, dispatchArgs, repoPath, env, overrides);
   const after = await snapshotAll(dirs, ignore);
+  const inspected = inspect ? await inspect(mode) : undefined;
 
-  return { result, files: diffAll(before, after) };
+  return { result, files: diffAll(before, after), inspected };
 }
 
 /**
@@ -197,13 +199,17 @@ async function runOnce(mode, { repoPath, dispatchArgs, argDirs, env, ignore, res
  *   each run (before its snapshot), to put state outside the watched
  *   directories (e.g. a sandbox issue's GitHub labels) back where the
  *   first run found it.
- * @returns {Promise<{native: object, docker: object, nativeFiles: object, dockerFiles: object}>}
- *   both runs' results and file diffs.
+ * @param {(mode: string) => Promise<unknown>} [options.inspect] - run after
+ *   each run (after its snapshot, before the tree is restored), to
+ *   capture state the file diff doesn't see (e.g. a fixture remote's
+ *   refs under `.git`, which the diff ignores).
+ * @returns {Promise<{native: object, docker: object, nativeFiles: object, dockerFiles: object, nativeInspected: unknown, dockerInspected: unknown}>}
+ *   both runs' results, file diffs and `inspect` results.
  */
 export async function runDockerParity({
-  command, repoPath, dispatchArgs, argDirs = [], env = process.env, ignore = DEFAULT_IGNORE, reset
+  command, repoPath, dispatchArgs, argDirs = [], env = process.env, ignore = DEFAULT_IGNORE, reset, inspect
 }) {
-  const options = { repoPath, dispatchArgs, argDirs, env, ignore, reset };
+  const options = { repoPath, dispatchArgs, argDirs, env, ignore, reset, inspect };
   const dirs = [repoPath, ...argDirs];
   const work = await createTempDir('arcanum-docker-parity-');
 
@@ -231,7 +237,14 @@ export async function runDockerParity({
       );
     }
 
-    return { native: native.result, docker: docker.result, nativeFiles: native.files, dockerFiles: docker.files };
+    return {
+      native: native.result,
+      docker: docker.result,
+      nativeFiles: native.files,
+      dockerFiles: docker.files,
+      nativeInspected: native.inspected,
+      dockerInspected: docker.inspected
+    };
   } finally {
     await removeTempDir(work);
   }
