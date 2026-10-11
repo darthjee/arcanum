@@ -155,6 +155,7 @@ function diffAll(before, after) {
  * @param {string[]} options.argDirs - further watched directories.
  * @param {object} options.env - the run's environment.
  * @param {string[]} options.ignore - see `snapshotTree`.
+ * @param {(mode: string) => Promise<void>} [options.reset] - run first, see `runDockerParity`.
  * @param {string} statusFile - the temp status map's path.
  * @returns {Promise<{result: object, files: object}>} the run's result
  *   and its file diff.
