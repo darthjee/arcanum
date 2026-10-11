@@ -12,8 +12,8 @@
 # includes) are needed for the native path.
 #
 # Under engine.mode=docker it runs core/bin/arcanum inside the
-# container, once its migration-status.json status is `"docker"` (#748),
-# with the repo mount plus `--needs=gitconfig,remote`: the global git
+# container, now that its migration-status.json status is `"docker"`
+# (#748), with the repo mount plus `--needs=gitconfig,remote`: the global git
 # config is mounted read-only (its git operations need the user's git
 # identity and config). `remote` is needed for its `git fetch`: for an
 # ssh origin the host's SSH agent socket and known_hosts are mounted

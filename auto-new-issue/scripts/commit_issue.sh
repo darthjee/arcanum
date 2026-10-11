@@ -13,8 +13,8 @@
 # environment down.
 #
 # Under engine.mode=docker it runs core/bin/arcanum inside the
-# container, once its migration-status.json status is `"docker"` (#748),
-# with the repo mount plus `--needs=global-config,gitconfig,remote`: the
+# container, now that its migration-status.json status is `"docker"`
+# (#748), with the repo mount plus `--needs=global-config,gitconfig,remote`: the
 # global arcanum config ($CLAUDE_CONFIG_DIR/arcanum-config.json) and the
 # global git config are mounted read-only. `remote` is needed for its
 # git remote access (fetch/push): for an ssh origin the host's SSH agent

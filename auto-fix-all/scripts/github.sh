@@ -27,7 +27,7 @@
 # warning — see docs/agents/specs/docker/dispatch.md and
 # docs/agents/specs/docker/environment.md.
 #
-# `cleanup-branch` runs core/bin/arcanum inside the container once its
+# `cleanup-branch` runs core/bin/arcanum inside the container now that its
 # migration-status.json status is `"docker"` (#748), with the repo mount
 # plus `--needs=global-config,gitconfig,remote`: the global arcanum
 # config and the global git config are mounted read-only. `remote` is

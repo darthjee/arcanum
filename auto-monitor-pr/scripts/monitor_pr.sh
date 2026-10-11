@@ -13,8 +13,8 @@
 # and run_checks.sh.
 #
 # Under engine.mode=docker it runs core/bin/arcanum inside the
-# container, once its migration-status.json status is `"docker"` (#748),
-# with the repo mount plus `--needs=global-config,gitconfig,gh,remote`:
+# container, now that its migration-status.json status is `"docker"`
+# (#748), with the repo mount plus `--needs=global-config,gitconfig,gh,remote`:
 # the global arcanum config ($CLAUDE_CONFIG_DIR/arcanum-config.json) and
 # the global git config are mounted read-only, and a GitHub token
 # resolved on the host is forwarded by name only as `-e GH_TOKEN` (`-e
