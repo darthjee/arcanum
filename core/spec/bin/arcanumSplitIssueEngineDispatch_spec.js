@@ -1,9 +1,14 @@
 import { mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { expectGhNeedsRun } from '../support/factories/engineDispatchDockerSetup.js';
+import {
+  HTTPS_NOT_ALLOWED, expectGhNeedsRun, nativeCommandFailed
+} from '../support/factories/engineDispatchDockerSetup.js';
 import { itRoutesGhEngineDispatch } from '../support/sharedExamples/ghEngineDispatchRouting.js';
 import { itRoutesWithInvocationLog } from '../support/sharedExamples/invocationLogRouting.js';
+import { itRoutesRemoteEngineDispatch } from '../support/sharedExamples/remoteEngineDispatchRouting.js';
 import { seedEngineMode } from '../support/utils/engineMode.js';
+import { createFakeGhBin } from '../support/utils/fakeGhBin.js';
+import { SSH_REMOTE_FAILURE } from '../support/utils/fakeSshBin.js';
 import { REPO_ROOT, runCommand } from '../support/utils/runCommand.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
@@ -139,5 +144,44 @@ describe('arcanum-split-issue engine_dispatch routing (via the real shims)', () 
         }
       }
     );
+  });
+
+  // Docker batch 4 (issue #748): finish.sh declares
+  // `--needs=global-config,gitconfig,gh,remote`. A fake `gh` (whose
+  // `auth token` always fails) answers the shell side's mark-split
+  // label calls; every mode then reaches safe_branch's `git fetch -p`,
+  // which fails offline in the `createRemoteNeedsWorld`.
+  itRoutesRemoteEngineDispatch('finish.sh', path.join(SCRIPTS_DIR, 'finish.sh'), {
+    command: 'arcanum-split-issue-finish',
+    needs: ['global-config', 'gitconfig', 'gh', 'remote'],
+    reachesRemote: true,
+    prepare: async ({ repoPath }, mode, world) => {
+      const fakeGh = await createFakeGhBin({ authTokenAlwaysFails: true });
+
+      return {
+        args: [repoPath, '7'],
+        env: { PATH: `${fakeGh.binDir}${path.delimiter}${world.env.PATH}` },
+        cleanup: fakeGh.cleanup
+      };
+    },
+    shell: (result) => {
+      expect(result).toEqual({
+        stdout: 'Added tag \'split\' to issue #7 on darthjee/arcanum\n' +
+          'Added tag \'epic\' to issue #7 on darthjee/arcanum\n' +
+          'Tag \'planning\' not present on issue #7 — nothing to do.\n' +
+          'Deleted: (nothing to clean up)\n',
+        stderr: SSH_REMOTE_FAILURE,
+        code: 128
+      });
+    },
+    native: (result) => {
+      expect(result).toEqual({ stdout: '', stderr: nativeCommandFailed('git fetch -p', SSH_REMOTE_FAILURE), code: 1 });
+    },
+    docker: (result) => {
+      expect(result).toEqual({ stdout: '', stderr: nativeCommandFailed('git fetch -p', SSH_REMOTE_FAILURE), code: 1 });
+    },
+    https: (result) => {
+      expect(result).toEqual({ stdout: '', stderr: nativeCommandFailed('git fetch -p', HTTPS_NOT_ALLOWED), code: 1 });
+    }
   });
 });
