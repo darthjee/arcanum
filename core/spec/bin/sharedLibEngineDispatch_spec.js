@@ -1,10 +1,13 @@
 import { mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { expectGhNeedsRun } from '../support/factories/engineDispatchDockerSetup.js';
+import {
+  GH_NEEDS_ENV_NAMES, SPEC_GH_TOKEN, expectGhNeedsRun, expectRunWith, runCalls
+} from '../support/factories/engineDispatchDockerSetup.js';
 import { itRoutesGhEngineDispatch } from '../support/sharedExamples/ghEngineDispatchRouting.js';
 import { itRoutesWithInvocationLog } from '../support/sharedExamples/invocationLogRouting.js';
 import { seedEngineMode } from '../support/utils/engineMode.js';
-import { REPO_ROOT, runCommand } from '../support/utils/runCommand.js';
+import { FAKE_SSH_ERROR, createFakeSshBin } from '../support/utils/fakeSshBin.js';
+import { REPO_ROOT, runCommand, seedOriginUrl } from '../support/utils/runCommand.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
 const LIB_DIR = path.join(REPO_ROOT, 'arcanum', '_lib');
@@ -118,8 +121,10 @@ describe('arcanum/_lib engine_dispatch routing (via the real shims)', () => {
   // before any GitHub call — core/bin/arcanum (native, and the
   // passthrough fake `docker`) with its own `arcanum: ` prefix. Their
   // docker run carries the `--needs=global-config,gitconfig,gh` mounts
-  // and env; spawn_issue.sh's <body_file> (`--path-arg=4:ro`) adds a
-  // read-only file mount only when it sits outside the repo.
+  // and env (resolve_and_fetch.sh's `remote` need adds nothing without
+  // an `origin`; see the ssh-origin case below); spawn_issue.sh's
+  // <body_file> (`--path-arg=4:ro`) adds a read-only file mount only
+  // when it sits outside the repo.
   describe('gh commands (no origin)', () => {
     let repoPath;
     let bodyFile;
@@ -199,5 +204,95 @@ describe('arcanum/_lib engine_dispatch routing (via the real shims)', () => {
         }
       );
     });
+  });
+  // resolve_and_fetch.sh's `remote` need (issue #747), with an ssh
+  // `origin`: checkout-safe-branch's `git fetch -p` goes through a fake
+  // `ssh` (first on PATH; it logs its argv and exits 255), so the fetch
+  // fails offline in every mode. HOME is a temp dir holding
+  // `.ssh/known_hosts` and SSH_AUTH_SOCK is seeded, so the docker run's
+  // remote additions are deterministic on both platforms: the agent
+  // socket mount (Darwin: Docker Desktop's fixed
+  // /run/host-services/ssh-auth.sock; Linux: the host socket onto
+  // /run/arcanum/ssh-agent.sock), the known_hosts `:ro` mount, and
+  // `-e SSH_AUTH_SOCK` / `-e GIT_SSH_COMMAND` — the latter proven to be
+  // what the in-"container" git actually ran.
+  describe('gh commands (ssh origin)', () => {
+    const SSH_ORIGIN = 'git@github.com:darthjee/arcanum.git';
+    let repoPath;
+    let homeDir;
+    let fakeSsh;
+
+    const fetchFailure = () => `${FAKE_SSH_ERROR}fatal: Could not read from remote repository.\n\n` +
+      'Please make sure you have the correct access rights\nand the repository exists.\n';
+
+    itRoutesGhEngineDispatch(
+      'resolve_and_fetch.sh',
+      path.join(LIB_DIR, 'resolve_and_fetch.sh'),
+      async (repo, mode) => {
+        repoPath = repo.repoPath;
+        homeDir = await realpath(await createTempDir('arcanum-core-ssh-home-'));
+        fakeSsh = await createFakeSshBin();
+        await mkdir(path.join(homeDir, '.ssh'));
+        await writeFile(path.join(homeDir, '.ssh', 'known_hosts'), '');
+        await seedOriginUrl(repo.repoPath, SSH_ORIGIN);
+        await seedEngineMode(repo, mode);
+
+        const env = { ...process.env };
+
+        ['GIT_SSH', 'GIT_SSH_COMMAND', 'GIT_CONFIG_GLOBAL', 'XDG_CONFIG_HOME'].forEach((name) => delete env[name]);
+
+        return {
+          args: [repo.repoPath, 'docs/agents/issues', '#42'],
+          env: {
+            ...env,
+            HOME: homeDir,
+            SSH_AUTH_SOCK: path.join(homeDir, 'agent.sock'),
+            PATH: `${fakeSsh.binDir}${path.delimiter}${process.env.PATH}`
+          },
+          cleanup: async () => {
+            await fakeSsh.cleanup();
+            await removeTempDir(homeDir);
+          }
+        };
+      },
+      {
+        shell: (result) => {
+          expect(result).toEqual({ stdout: '', stderr: fetchFailure(), code: 128 });
+        },
+        native: (result) => {
+          expect(result.code).toEqual(1);
+          expect(result.stdout).toEqual('');
+          expect(result.stderr).toContain('arcanum: Command failed: git fetch -p\n');
+          expect(result.stderr).toContain(FAKE_SSH_ERROR);
+        },
+        docker: async (result, calls, world) => {
+          const knownHosts = path.join(homeDir, '.ssh', 'known_hosts');
+          const containerSock = process.platform === 'darwin'
+            ? '/run/host-services/ssh-auth.sock'
+            : '/run/arcanum/ssh-agent.sock';
+          const hostSock = process.platform === 'darwin' ? containerSock : path.join(homeDir, 'agent.sock');
+          const sshCommand = `ssh -o UserKnownHostsFile=${knownHosts} -o StrictHostKeyChecking=yes`;
+          const sshCalls = await fakeSsh.readCalls();
+
+          expect(result.code).toEqual(1);
+          expect(result.stdout).toEqual('');
+          expect(result.stderr).toContain('arcanum: Command failed: git fetch -p\n');
+          expectRunWith(calls, repoPath, ['resolve-and-fetch', repoPath, 'docs/agents/issues', '#42'], {
+            mounts: [...world.mounts, `${hostSock}:${containerSock}`, `${knownHosts}:${knownHosts}:ro`],
+            envNames: [...GH_NEEDS_ENV_NAMES, 'SSH_AUTH_SOCK', 'GIT_SSH_COMMAND']
+          });
+
+          const [run] = runCalls(calls);
+
+          expect(run.env.SSH_AUTH_SOCK).toEqual(containerSock);
+          expect(run.env.GIT_SSH_COMMAND).toEqual(sshCommand);
+          expect(run.env.GH_TOKEN).toEqual(SPEC_GH_TOKEN);
+          expect(sshCalls.length).toEqual(1);
+          expect(sshCalls[0].argv.slice(0, 4))
+            .toEqual(['-o', `UserKnownHostsFile=${knownHosts}`, '-o', 'StrictHostKeyChecking=yes']);
+          expect(sshCalls[0].sshAuthSock).toEqual(containerSock);
+        }
+      }
+    );
   });
 });
