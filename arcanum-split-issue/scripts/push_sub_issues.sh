@@ -14,6 +14,18 @@
 # `env -i PATH="$PATH"` strips the ambient environment; mirrors
 # create_sub_issue.sh's own shim.
 #
+# Under engine.mode=docker it runs core/bin/arcanum inside the
+# container, once its migration-status.json status is `"docker"` (#747),
+# with the repo mount plus `--needs=global-config,gitconfig,gh`: the
+# global arcanum config ($CLAUDE_CONFIG_DIR/arcanum-config.json) and the
+# global git config are mounted read-only, and a GitHub token resolved
+# on the host is forwarded by name only as `-e GH_TOKEN` (`-e
+# GH_HOST`/`-e GH_ENTERPRISE_TOKEN` on a GitHub Enterprise host), never
+# as a value in argv. HOME stays in the allowlist for the native path.
+# If docker is unavailable, engine_dispatch falls back to native on the
+# host with a warning — see docs/agents/specs/docker/dispatch.md and
+# docs/agents/specs/docker/environment.md.
+#
 # Usage: push_sub_issues.sh <repo_path> <issue_id>
 #
 # Output and exit code: unchanged from before this migration — see
@@ -35,4 +47,4 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../../arcanum/_lib/engine_dispatch.sh
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/../../arcanum/_lib/engine_dispatch.sh"
-engine_dispatch "$REPO_PATH" arcanum-split-issue-push-sub-issues "${SCRIPT_DIR}/push_sub_issues_shell.sh" HOME -- "$@"
+engine_dispatch "$REPO_PATH" arcanum-split-issue-push-sub-issues "${SCRIPT_DIR}/push_sub_issues_shell.sh" --needs=global-config,gitconfig,gh HOME -- "$@"

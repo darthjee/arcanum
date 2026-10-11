@@ -12,7 +12,22 @@
 # `gh auth token` (called deeper in the shell implementation via
 # github_issue.sh) needs it to find its own config once native's
 # `env -i PATH="$PATH"` strips the ambient environment down; without it,
-# native-mode auth would fail in a way shell-mode never does.
+# native-mode auth would fail in a way shell-mode never does. Under
+# docker, HOME's gh config is not mounted: the token is resolved on the
+# host and forwarded as GH_TOKEN, which `gh auth token` inside the
+# container returns (see below).
+#
+# Under engine.mode=docker it runs core/bin/arcanum inside the
+# container, once its migration-status.json status is `"docker"` (#747),
+# with the repo mount plus `--needs=global-config,gitconfig,gh`: the
+# global arcanum config ($CLAUDE_CONFIG_DIR/arcanum-config.json) and the
+# global git config are mounted read-only, and a GitHub token resolved
+# on the host is forwarded by name only as `-e GH_TOKEN` (`-e
+# GH_HOST`/`-e GH_ENTERPRISE_TOKEN` on a GitHub Enterprise host), never
+# as a value in argv. HOME stays in the allowlist for the native path.
+# If docker is unavailable, engine_dispatch falls back to native on the
+# host with a warning — see docs/agents/specs/docker/dispatch.md and
+# docs/agents/specs/docker/environment.md.
 #
 # Usage: resolve_and_fetch.sh <repo_path> <issues_folder> <arg_string>
 #
@@ -30,4 +45,4 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=engine_dispatch.sh
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/engine_dispatch.sh"
-engine_dispatch "$REPO_PATH" resolve-and-fetch "${SCRIPT_DIR}/resolve_and_fetch_shell.sh" HOME -- "$@"
+engine_dispatch "$REPO_PATH" resolve-and-fetch "${SCRIPT_DIR}/resolve_and_fetch_shell.sh" --needs=global-config,gitconfig,gh HOME -- "$@"

@@ -14,6 +14,18 @@
 # docs/agents/specs/docker/dispatch.md. save/push are not in that batch
 # and keep their current status.
 #
+# Under engine.mode=docker save/push run core/bin/arcanum inside the
+# container, once their migration-status.json status is `"docker"`
+# (#747), with the repo mount plus `--needs=global-config,gitconfig,gh`:
+# the global arcanum config ($CLAUDE_CONFIG_DIR/arcanum-config.json) and
+# the global git config are mounted read-only, and a GitHub token
+# resolved on the host is forwarded by name only as `-e GH_TOKEN` (`-e
+# GH_HOST`/`-e GH_ENTERPRISE_TOKEN` on a GitHub Enterprise host), never
+# as a value in argv. HOME stays in the allowlist for the native path.
+# If docker is unavailable, engine_dispatch falls back to native on the
+# host with a warning — see docs/agents/specs/docker/dispatch.md and
+# docs/agents/specs/docker/environment.md.
+#
 # State is stored in .claude/state/auto-fix-all-queue.json — a JSON array of
 # entry objects (currently just {"id": "<id>"} each), so future fields (e.g.
 # issue metadata or auto-fix-all options) can be added to an entry without
@@ -54,7 +66,7 @@ shift
 
 case "$SUBCOMMAND" in
   save)
-    engine_dispatch "$REPO_PATH" auto-fix-all-queue-save "${SCRIPT_DIR}/queue_save_shell.sh" HOME -- "$REPO_PATH" "$@"
+    engine_dispatch "$REPO_PATH" auto-fix-all-queue-save "${SCRIPT_DIR}/queue_save_shell.sh" --needs=global-config,gitconfig,gh HOME -- "$REPO_PATH" "$@"
     ;;
   next)
     engine_dispatch "$REPO_PATH" auto-fix-all-queue-next "${SCRIPT_DIR}/queue_next_shell.sh" -- "$REPO_PATH"
@@ -63,7 +75,7 @@ case "$SUBCOMMAND" in
     engine_dispatch "$REPO_PATH" auto-fix-all-queue-wait-next "${SCRIPT_DIR}/queue_wait_next_shell.sh" -- "$REPO_PATH"
     ;;
   push)
-    engine_dispatch "$REPO_PATH" auto-fix-all-queue-push "${SCRIPT_DIR}/queue_push_shell.sh" HOME -- "$REPO_PATH" "$@"
+    engine_dispatch "$REPO_PATH" auto-fix-all-queue-push "${SCRIPT_DIR}/queue_push_shell.sh" --needs=global-config,gitconfig,gh HOME -- "$REPO_PATH" "$@"
     ;;
   pop)
     engine_dispatch "$REPO_PATH" auto-fix-all-queue-pop "${SCRIPT_DIR}/queue_pop_shell.sh" -- "$REPO_PATH"
