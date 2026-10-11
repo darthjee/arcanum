@@ -73,6 +73,17 @@ How it runs:
 - **Fixtures:** the existing ones. `createGitFixtureRepo` (with a worktree variant), the per-command parity setups under `core/spec/support/factories/`, and `tempDir.js` for argument paths outside the repo.
 - **Credentials:** cases that need `gh` or a git remote are opt-in. They run only when `ARCANUM_DOCKER_PARITY_GH=1` (with a token resolvable on the host and a sandbox repo) or `ARCANUM_DOCKER_PARITY_SSH=1` (with an agent and an ssh remote) is set, and are marked pending otherwise. A fake GitHub API can't reach into the container, so these are the only way to check the gh/ssh wiring for real. Fake `gh` binaries don't help either: the image has its own `gh`.
 
+  The gh cases (#747) run against a sandbox repo on github.com named by env, never hardcoded. Each case needs some of these; when `ARCANUM_DOCKER_PARITY_GH=1` is set but one it needs is missing or malformed, the case is pending with a message naming the var, never failed:
+
+  - `ARCANUM_DOCKER_PARITY_GH_REPO=<owner>/<repo>`: the sandbox repo. Every gh case needs it. The fixture repo's `origin` is pointed at `https://github.com/<owner>/<repo>.git`, so `origin.sh`, `Origin` and `gh` resolve it in both runs.
+  - `ARCANUM_DOCKER_PARITY_GH_ISSUE=<n>`: an open fixture issue in the sandbox repo. The label-mutation cases add and remove labels on it, snapshotting its labels first, restoring them before each run (so native and docker start from the same labels) and again at the end, whatever the outcome.
+  - `ARCANUM_DOCKER_PARITY_GH_PR=<n>`: an open fixture pull request in the sandbox repo, for the PR lookups.
+  - `ARCANUM_DOCKER_PARITY_GH_PR_BRANCH=<branch>`: that PR's head branch. The PR lookups that resolve the PR from the current branch check out a local branch of that name.
+
+  The token comes from the host: `GH_TOKEN`, `GITHUB_TOKEN` or `gh auth token`, never from a fixture file. So the gh cases keep this machine's real `HOME` (the other cases use an empty one), with `CLAUDE_CONFIG_DIR` still isolated. When the global gitconfig sets `user.ghuser`, the container's `gh auth switch` fails while `GH_TOKEN` is set, and native's `Warning: gh auth switch --user <x> failed; …` line shows up on the docker run's stderr only. The gh cases drop that line before comparing stderr; stdout and the exit code are unaffected.
+
+  Example: `ARCANUM_DOCKER_PARITY_GH=1 ARCANUM_DOCKER_PARITY_GH_REPO=<owner>/<repo> ARCANUM_DOCKER_PARITY_GH_ISSUE=<n> ARCANUM_DOCKER_PARITY_GH_PR=<n> ARCANUM_DOCKER_PARITY_GH_PR_BRANCH=<branch> make docker-parity`.
+
 ## Not in CI, and why
 
 - CircleCI's `setup_remote_docker` runs the daemon on a separate remote host. Bind mounts there refer to the remote host's filesystem, not the job's checkout, so the [path-identity](mounts.md#path-identity) mounts parity depends on can't work.
