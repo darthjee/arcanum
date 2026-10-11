@@ -52,7 +52,7 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 | `issue-state` | `arcanum/_lib/issue_state.sh` | dispatched | ✅ | none | — | — | #745 | |
 | `list-agents` | `arcanum/_lib/list_agents.sh` | dispatched | ✅ | none | — | — | #745 | |
 | `permission-grant-add` | `arcanum/_lib/permission_grant.sh` `add` | dispatched | ☐ | none | args:rw | — | | Moved out of batch 2 (#746) to #753. |
-| `resolve-and-fetch` | `arcanum/_lib/resolve_and_fetch.sh` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
+| `resolve-and-fetch` | `arcanum/_lib/resolve_and_fetch.sh` | dispatched | ☐ | gh, git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN, remote | | |
 | `resolve-id-and-file` | `arcanum/_lib/resolve_id_and_file.sh` | dispatched | ✅ | none | — | — | #745 | |
 | `resolve-plan-paths` | `arcanum/_lib/resolve_plan_paths.sh` | dispatched | ✅ | none | — | — | #745 | |
 | `spawn-issue` | `arcanum/_lib/spawn_issue.sh` | dispatched | ☐ | gh | global-config:ro, gitconfig:ro, args:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | |
