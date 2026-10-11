@@ -75,7 +75,7 @@ How it runs:
 
   The gh cases (#747) run against a sandbox repo on github.com named by env, never hardcoded. Each case needs some of these; when `ARCANUM_DOCKER_PARITY_GH=1` is set but one it needs is missing or malformed, the case is pending with a message naming the var, never failed:
 
-  - `ARCANUM_DOCKER_PARITY_GH_REPO=<owner>/<repo>`: the sandbox repo. Every gh case needs it. The fixture repo's `origin` is pointed at `https://github.com/<owner>/<repo>.git`, so `origin.sh`, `Origin` and `gh` resolve it in both runs.
+  - `ARCANUM_DOCKER_PARITY_GH_REPO=<owner>/<repo>`: the sandbox repo. Every gh case needs it. The fixture repo's `origin` is pointed at `https://github.com/<owner>/<repo>.git`, so `origin.sh`, `Origin` and `gh` resolve it in both runs. It can be private: the resolve-and-fetch case's `git fetch` runs with the shim's `remote` need, which forwards the gh credential helper (`credential.helper=!gh auth git-credential`, backed by the forwarded `GH_TOKEN`) for an https `origin`. The token needs read access to it (plus issue write access for the label-mutation cases).
   - `ARCANUM_DOCKER_PARITY_GH_ISSUE=<n>`: an open fixture issue in the sandbox repo. The label-mutation cases add and remove labels on it, snapshotting its labels first, restoring them before each run (so native and docker start from the same labels) and again at the end, whatever the outcome.
   - `ARCANUM_DOCKER_PARITY_GH_PR=<n>`: an open fixture pull request in the sandbox repo, for the PR lookups.
   - `ARCANUM_DOCKER_PARITY_GH_PR_BRANCH=<branch>`: that PR's head branch. The PR lookups that resolve the PR from the current branch check out a local branch of that name.

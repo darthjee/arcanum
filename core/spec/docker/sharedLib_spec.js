@@ -28,17 +28,26 @@ function libDispatch(command, shellScript, ...args) {
 const GH_NEEDS = '--needs=global-config,gitconfig,gh';
 
 /**
+ * resolve_and_fetch.sh's `--needs`: the gh ones plus `remote`, since its
+ * checkout-safe-branch step runs `git fetch` (with the sandbox's https
+ * `origin`, the gh credential helper is forwarded).
+ */
+const GH_REMOTE_NEEDS = `${GH_NEEDS},remote`;
+
+/**
  * The real github_issue.sh / resolve_and_fetch.sh `engine_dispatch` call
- * for a batch-3 command: `--needs=global-config,gitconfig,gh`, `HOME`
- * allowlisted, `"$@"` (starting with `<repo_path>`) passed on.
+ * for a batch-3 command: its `--needs` (`--needs=global-config,gitconfig,gh`
+ * by default), `HOME` allowlisted, `"$@"` (starting with `<repo_path>`)
+ * passed on.
  * @param {string} command - the dispatched command.
  * @param {string} shellScript - the shell twin's file name under arcanum/_lib.
  * @param {(sandbox: object) => string[]} args - the args after `<repo_path>`.
+ * @param {string} [needs] - the shim's `--needs=...` flag.
  * @returns {(repoPath: string, sandbox: object) => string[]} `engine_dispatch`'s arguments.
  */
-function ghLibDispatch(command, shellScript, args) {
+function ghLibDispatch(command, shellScript, args, needs = GH_NEEDS) {
   return (repoPath, sandbox) => [
-    repoPath, command, path.join(LIB_DIR, shellScript), GH_NEEDS, 'HOME', '--', repoPath, ...args(sandbox)
+    repoPath, command, path.join(LIB_DIR, shellScript), needs, 'HOME', '--', repoPath, ...args(sandbox)
   ];
 }
 
@@ -158,7 +167,8 @@ describe('arcanum/_lib commands docker parity', () => {
       command: 'resolve-and-fetch',
       needs: ['issue'],
       dispatchArgs: ghLibDispatch(
-        'resolve-and-fetch', 'resolve_and_fetch_shell.sh', ({ issue }) => ['docs/agents/issues', `#${issue}`]
+        'resolve-and-fetch', 'resolve_and_fetch_shell.sh', ({ issue }) => ['docs/agents/issues', `#${issue}`],
+        GH_REMOTE_NEEDS
       ),
       check: ({ native }, repoPath, { issue }) => {
         expect(native.code).toEqual(0);
