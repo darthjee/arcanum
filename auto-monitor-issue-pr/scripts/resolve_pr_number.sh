@@ -21,8 +21,8 @@
 # GH_HOST`/`-e GH_ENTERPRISE_TOKEN` on a GitHub Enterprise host), never
 # as a value in argv. HOME stays in the allowlist for the native path.
 # If docker is unavailable, engine_dispatch falls back to native on the
-# host with a warning — see docs/agents/specs/docker/dispatch.md and
-# docs/agents/specs/docker/environment.md.
+# host with a warning — see docs/agents/architecture/docker-engine.md#fallback-rules and
+# docs/agents/architecture/docker-engine.md#environment.
 #
 # Usage: resolve_pr_number.sh <repo_path> <id>
 #

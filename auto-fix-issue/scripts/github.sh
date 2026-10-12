@@ -13,7 +13,7 @@
 # container, now that its migration-status.json status is `"docker"`
 # (#745), with only the repo mount (no `--needs`). If docker is
 # unavailable, engine_dispatch falls back to native on the host with a
-# warning — see docs/agents/specs/docker/dispatch.md. pr-create/pr-view/
+# warning — see docs/agents/architecture/docker-engine.md#fallback-rules. pr-create/pr-view/
 # pr-ready are not in that batch and keep their current status.
 #
 # Under engine.mode=docker pr-create/pr-view/pr-ready run
@@ -28,8 +28,8 @@
 # its own host path when it sits outside the repo. HOME stays in the
 # allowlist for the native path. If docker is unavailable,
 # engine_dispatch falls back to native on the host with a warning — see
-# docs/agents/specs/docker/dispatch.md and
-# docs/agents/specs/docker/environment.md.
+# docs/agents/architecture/docker-engine.md#fallback-rules and
+# docs/agents/architecture/docker-engine.md#environment.
 #
 # HOME is forwarded to the native path's explicit env-var allowlist for
 # pr-create/pr-view/pr-ready only (all three resolve a GitHub token via

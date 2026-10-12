@@ -113,7 +113,7 @@ _engine_dispatch_run_native() {
 # engine_dispatch <repo_path> <command> <shell_script> [--prepend-repo-path] [--native-only] [--needs=<tag>[,<tag>...]]... [--path-arg=<index>:<ro|rw|rw-mkdir>]... [<env_var_name> ...] -- <args...>
 #   The shared dispatch guard for one migrated-entrypoint call. See
 #   docs/agents/architecture/script-engine.md and
-#   docs/agents/specs/docker/dispatch.md for the full design.
+#   docs/agents/architecture/docker-engine.md#dispatch for the full design.
 #
 #   - <repo_path>: the target repo whose engine.mode config is
 #     consulted (arcanum/_lib/config_chain.sh) — required, never falls

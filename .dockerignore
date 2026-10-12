@@ -1,5 +1,5 @@
 # Build-context filter for `docker build -f core/Dockerfile <install root>`
-# (see core/Dockerfile and docs/agents/specs/docker/image.md).
+# (see core/Dockerfile and docs/agents/architecture/docker-engine.md#image).
 #
 # The context is the install root, from either a dev checkout or a zip
 # install, and must yield the release-zip file set. Keep the first block

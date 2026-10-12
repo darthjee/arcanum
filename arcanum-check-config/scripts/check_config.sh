@@ -18,7 +18,7 @@
 # `--needs=global-config` mounts the global config read-only and forwards
 # `CLAUDE_CONFIG_DIR` into the container. If docker is unavailable,
 # engine_dispatch falls back to native on the host with a warning — see
-# docs/agents/specs/docker/dispatch.md.
+# docs/agents/architecture/docker-engine.md#fallback-rules.
 #
 # `HOME` and `CLAUDE_CONFIG_DIR` are forwarded to the native path's
 # explicit env-var allowlist — the global tier's file is resolved from

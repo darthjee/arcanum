@@ -24,7 +24,7 @@ const DRAFTS_DIR = path.join('.claude', 'state', 'create-issue');
 // core/bin/arcanum in every non-docker engine.mode (with only PATH and
 // HOME surviving the native path's `env -i`), and that under
 // engine.mode=docker both follow the native-only rule of
-// docs/agents/specs/docker/dispatch.md: with their real
+// docs/agents/architecture/docker-engine.md#native-only-commands: with their real
 // migration-status.json status (`docker`, issue #749) they reach
 // `docker run` (a passthrough fake `docker`) through their
 // `--needs=global-config,gitconfig,gh`: the global config and global

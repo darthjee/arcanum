@@ -3,7 +3,7 @@
 # multi-arch manifest (linux/amd64 + linux/arm64), tagged with the release
 # version. Run by the `publish-image` job of the CircleCI `release`
 # workflow, after the release zip is uploaded. See
-# docs/agents/specs/docker/image.md#distribution-and-versioning.
+# docs/agents/architecture/docker-engine.md#distribution-and-versioning.
 #
 # Usage: publish_runtime_image.sh <tag>
 #

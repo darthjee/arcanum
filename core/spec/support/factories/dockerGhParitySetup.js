@@ -10,7 +10,7 @@ import { TIMEOUT } from './dockerParitySetup.js';
 // (docker batch 3, issue #747): real GitHub calls against the sandbox
 // repo named by the ARCANUM_DOCKER_PARITY_GH_* env vars (see
 // `GH_SANDBOX_VARS` in dockerParity.js and
-// docs/agents/specs/docker/testing.md -> "Credentials"). Local only, and
+// docs/agents/architecture/docker-engine.md#credentials). Local only, and
 // only with `ARCANUM_DOCKER_PARITY_GH=1`; pending otherwise. The token
 // always comes from the host (`GH_TOKEN`, `GITHUB_TOKEN` or `gh auth
 // token`), never from a fixture file, and is never printed.

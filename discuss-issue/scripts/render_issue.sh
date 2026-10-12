@@ -17,7 +17,7 @@
 # repo mount plus `--path-arg=1:rw`: the directory of <output_file> is
 # mounted read-write at its own host path when it sits outside the repo.
 # If docker is unavailable, engine_dispatch falls back to native on the
-# host with a warning — see docs/agents/specs/docker/dispatch.md.
+# host with a warning — see docs/agents/architecture/docker-engine.md#fallback-rules.
 #
 # Usage: render_issue.sh <output_file> <title> [description] [problem] [expected_behavior] [solution] [benefits]
 #

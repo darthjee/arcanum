@@ -13,7 +13,7 @@
 # now that its migration-status.json status is `"docker"` (#745), with
 # only the repo mount (no `--needs`). If docker is unavailable,
 # engine_dispatch falls back to native on the host with a warning — see
-# docs/agents/specs/docker/dispatch.md.
+# docs/agents/architecture/docker-engine.md#fallback-rules.
 #
 # Usage: setup_templates.sh
 #   Run from the target project root.

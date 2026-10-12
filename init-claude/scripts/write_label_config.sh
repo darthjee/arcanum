@@ -32,7 +32,7 @@
 # its own host path when it sits outside the repo, and created on the
 # host first if missing (LabelConfig `mkdir -p`s natively). If docker is unavailable,
 # engine_dispatch falls back to native on the host with a warning — see
-# docs/agents/specs/docker/dispatch.md.
+# docs/agents/architecture/docker-engine.md#fallback-rules.
 #
 # All usage/arity validation below lives here, before engine_dispatch,
 # so usage errors (usage block on stderr, exit 2) are identical in both

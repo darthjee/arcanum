@@ -2,7 +2,7 @@
 # Runtime user setup for the core/ runtime image, sourced (not executed)
 # by core/docker-runtime-entrypoint.sh — and by `make core-smoke-runtime`,
 # which checks the same setup without exec'ing the arcanum CLI. See
-# docs/agents/specs/docker/image.md#runtime-user-and-entrypoint.
+# docs/agents/architecture/docker-engine.md#runtime-user-and-entrypoint.
 #
 # The container runs as the host user (`--user "$(id -u):$(id -g)"`),
 # read-only, with /tmp a tmpfs. That uid has no /etc/passwd entry in the
@@ -14,8 +14,9 @@
 # Idempotent: a second start in the same tmpfs rewrites the same files.
 # LD_PRELOAD / NSS_WRAPPER_* are exported so they reach child processes;
 # dispatch forwards them across nested `env -i` calls (see
-# docs/agents/specs/docker/environment.md). The git credential helper and
-# safe.directory come from dispatch env, not from here.
+# docs/agents/architecture/docker-engine.md#container-infrastructure-env).
+# The git credential helper and safe.directory come from dispatch env,
+# not from here.
 
 ARCANUM_NSS_WRAPPER_LIB=/usr/local/lib/libnss_wrapper.so
 

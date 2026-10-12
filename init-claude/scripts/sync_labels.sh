@@ -36,8 +36,8 @@
 # <config_path> read-only at its own host path when it sits outside the
 # repo. HOME stays in the allowlist for the native path. If docker is
 # unavailable, engine_dispatch falls back to native on the host with a
-# warning — see docs/agents/specs/docker/dispatch.md and
-# docs/agents/specs/docker/environment.md.
+# warning — see docs/agents/architecture/docker-engine.md#fallback-rules and
+# docs/agents/architecture/docker-engine.md#environment.
 #
 # stdin is passed through untouched to both implementations: the y/n
 # confirmation prompt is answered on stdin in either mode.

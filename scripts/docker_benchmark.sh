@@ -3,8 +3,8 @@
 # engine.mode=native, through the real dispatch path
 # (arcanum/_lib/engine_dispatch.sh), so the Docker availability check and
 # the `docker run` argv construction count as overhead. See
-# docs/agents/specs/docker/dispatch.md ("Per-call `docker run`, and when
-# to revisit it") and docs/agents/specs/docker/testing.md. Local-only:
+# docs/agents/architecture/docker-engine.md#per-call-docker-run-and-when-to-revisit-it
+# and docs/agents/architecture/docker-engine.md#testing. Local-only:
 # it needs a Docker daemon and the runtime image (`make docker-benchmark`
 # builds it first).
 #

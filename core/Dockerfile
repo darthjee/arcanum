@@ -1,6 +1,6 @@
 # Images for the core/ Node.js package — one file, one set of pins.
 #
-# See docs/agents/specs/docker/image.md and
+# See docs/agents/architecture/docker-engine.md#image and
 # docs/agents/architecture/script-engine.md. Stages:
 #
 # - base:    darthjee/node plus the pinned tools both targets need (jq,
