@@ -117,17 +117,24 @@ export function describeParityRepos(description, defineCases, { worktree = false
  * @param {string} spec.command - the dispatched command.
  * @param {(repoPath: string, world: object) => string[]} spec.dispatchArgs - the shim's
  *   real `engine_dispatch` arguments.
- * @param {(repoPath: string, world: object) => Promise<void>} [spec.seed] - fixture setup.
+ * @param {(repoPath: string, world: object) => Promise<void>} [spec.seed] - fixture setup;
+ *   it may replace `world.env`, which both runs use (read after it).
  * @param {(parity: object, repoPath: string, world: object) => Promise<void>|void} [spec.check] -
  *   further expectations (e.g. on the native result itself).
  * @param {boolean} [spec.watchOutside] - also diff the world's
  *   `outsideDir` (for argument paths outside the repo).
+ * @param {(mode: string, repoPath: string, world: object) => Promise<void>} [spec.reset] -
+ *   run before each run (see `runDockerParity`'s `reset`).
+ * @param {boolean} [spec.detachNative] - run the native side with no
+ *   controlling terminal (see `runDockerParity`'s `detachNative`).
  * @returns {void}
  */
-export function itMatchesNativeInDocker(label, getWorld, { command, dispatchArgs, seed, check, watchOutside = false }) {
+export function itMatchesNativeInDocker(label, getWorld, {
+  command, dispatchArgs, seed, check, watchOutside = false, reset, detachNative = false
+}) {
   it(label, async () => {
     const world = getWorld();
-    const { repoPath, env } = world;
+    const { repoPath } = world;
 
     if (seed) await seed(repoPath, world);
 
@@ -136,7 +143,9 @@ export function itMatchesNativeInDocker(label, getWorld, { command, dispatchArgs
       repoPath,
       dispatchArgs: dispatchArgs(repoPath, world),
       argDirs: watchOutside ? [world.outsideDir] : [],
-      env
+      env: world.env,
+      reset: reset ? (mode) => reset(mode, repoPath, world) : undefined,
+      detachNative
     });
 
     expect(withoutPlatformNotice(parity.docker.stderr)).toEqual(parity.native.stderr);

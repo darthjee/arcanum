@@ -157,18 +157,19 @@ function diffAll(before, after) {
  * @param {string[]} options.ignore - see `snapshotTree`.
  * @param {(mode: string) => Promise<void>} [options.reset] - run first, see `runDockerParity`.
  * @param {(mode: string) => Promise<unknown>} [options.inspect] - run last, see `runDockerParity`.
+ * @param {boolean} [options.detachNative] - see `runDockerParity`.
  * @param {string} statusFile - the temp status map's path.
  * @returns {Promise<{result: object, files: object, inspected: unknown}>} the
  *   run's result, its file diff and what `inspect` returned.
  */
-async function runOnce(mode, { repoPath, dispatchArgs, argDirs, env, ignore, reset, inspect }, statusFile) {
+async function runOnce(mode, { repoPath, dispatchArgs, argDirs, env, ignore, reset, inspect, detachNative }, statusFile) {
   const dirs = [repoPath, ...argDirs];
 
   if (reset) await reset(mode);
   await mergeEngineMode({ repoPath }, mode);
 
   const before = await snapshotAll(dirs, ignore);
-  const overrides = mode === 'docker' ? { image: PARITY_IMAGE } : {};
+  const overrides = mode === 'docker' ? { image: PARITY_IMAGE } : { detached: Boolean(detachNative) };
   const result = await runEngineDispatch(statusFile, dispatchArgs, repoPath, env, overrides);
   const after = await snapshotAll(dirs, ignore);
   const inspected = inspect ? await inspect(mode) : undefined;
@@ -203,13 +204,20 @@ async function runOnce(mode, { repoPath, dispatchArgs, argDirs, env, ignore, res
  *   each run (after its snapshot, before the tree is restored), to
  *   capture state the file diff doesn't see (e.g. a fixture remote's
  *   refs under `.git`, which the diff ignores).
+ * @param {boolean} [options.detachNative] - run the native side in a new
+ *   session with no controlling terminal (stdin closed), so a command
+ *   that would prompt on `/dev/tty` takes its no-TTY path (exit 4,
+ *   `FALLBACK=chat`) exactly as it does in the container, where
+ *   dispatch never passes `-t`. Without it, a native run started from
+ *   an interactive terminal could open `/dev/tty` and block on a prompt.
  * @returns {Promise<{native: object, docker: object, nativeFiles: object, dockerFiles: object, nativeInspected: unknown, dockerInspected: unknown}>}
  *   both runs' results, file diffs and `inspect` results.
  */
 export async function runDockerParity({
-  command, repoPath, dispatchArgs, argDirs = [], env = process.env, ignore = DEFAULT_IGNORE, reset, inspect
+  command, repoPath, dispatchArgs, argDirs = [], env = process.env, ignore = DEFAULT_IGNORE, reset, inspect,
+  detachNative = false
 }) {
-  const options = { repoPath, dispatchArgs, argDirs, env, ignore, reset, inspect };
+  const options = { repoPath, dispatchArgs, argDirs, env, ignore, reset, inspect, detachNative };
   const dirs = [repoPath, ...argDirs];
   const work = await createTempDir('arcanum-docker-parity-');
 
