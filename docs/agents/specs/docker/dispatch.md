@@ -194,7 +194,7 @@ This only works because the native CLI never exits with `125`–`127` itself. To
 
 Decided: no TTY in the container, ever. Dispatch never passes `-t`, and the container has no `/dev/tty`.
 
-Today two dispatched commands open `/dev/tty` through `core/lib/utils/io/TtyPrompt.js`: `arcanum-create-issue-start` and `arcanum-create-issue-publish` (both native-only). Under docker they can't open it, so they always take their exit-4 `FALLBACK=chat` path, and `arcanum-create-issue` already handles that with `AskUserQuestion`. The user-visible change: no terminal prompt under docker, the chat fallback every time. Nothing else changes. The exit code and the `FALLBACK=chat`/`DRAFT=` lines pass through as in [Exit codes and streams](#exit-codes-and-streams).
+Today two dispatched commands open `/dev/tty` through `core/lib/utils/io/TtyPrompt.js`: `arcanum-create-issue-start` and `arcanum-create-issue-publish` (both native-only). Under docker they can't open it, so any call that would prompt takes their exit-4 `FALLBACK=chat` path, and `arcanum-create-issue` already handles that with `AskUserQuestion`. This applies only to prompting calls: `start` with drafts present and neither `--new` nor `--resume`, and `publish` without `--confirmed` / `--shipit-confirmed`. Calls that pass those flags never open `/dev/tty` and behave as they do natively. The user-visible change: no terminal prompt under docker, the chat fallback every time one would have appeared. Nothing else changes. The exit code and the `FALLBACK=chat`/`DRAFT=` lines pass through as in [Exit codes and streams](#exit-codes-and-streams).
 
 Non-dispatched TTY scripts, such as `next_step_prompt.sh`, never reach dispatch and stay with #733.
 
