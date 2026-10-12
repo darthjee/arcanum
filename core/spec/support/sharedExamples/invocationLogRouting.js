@@ -49,10 +49,14 @@ async function logContent(logFile) {
  *   (default none).
  * @param {string[]} [spec.dockerEnvNames] - the `-e` names the docker run
  *   carries on top of the fixed env (default none).
+ * @param {boolean} [spec.hostOnly] - the command's migration-status.json
+ *   status is `"host-only"`: under `engine.mode=docker` it must run
+ *   native on the host (logged, like native) with no `docker` call at
+ *   all, so `dockerArgs`/`dockerMounts`/`dockerEnvNames` are unused.
  * @returns {void}
  */
 export function itRoutesWithInvocationLog(description, shimScript, {
-  command, prepare, check, dockerArgs, dockerMounts = () => [], dockerEnvNames = []
+  command, prepare, check, dockerArgs, dockerMounts = () => [], dockerEnvNames = [], hostOnly = false
 }) {
   let ctx;
 
@@ -71,7 +75,9 @@ export function itRoutesWithInvocationLog(description, shimScript, {
       expect(log).toContain(`command ${command} invoked at `);
     }
 
-    if (mode === 'docker') {
+    if (mode === 'docker' && hostOnly) {
+      expect(calls).toEqual([]);
+    } else if (mode === 'docker') {
       expectRunWith(calls, ctx.repoPath, [command, ...dockerArgs(ctx)], {
         mounts: dockerMounts(ctx), envNames: dockerEnvNames
       });
