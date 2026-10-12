@@ -196,7 +196,20 @@ Decided: no TTY in the container, ever. Dispatch never passes `-t`, and the cont
 
 Today two dispatched commands open `/dev/tty` through `core/lib/utils/io/TtyPrompt.js`: `arcanum-create-issue-start` and `arcanum-create-issue-publish` (both native-only). Under docker they can't open it, so any call that would prompt takes their exit-4 `FALLBACK=chat` path, and `arcanum-create-issue` already handles that with `AskUserQuestion`. This applies only to prompting calls: `start` with drafts present and neither `--new` nor `--resume`, and `publish` without `--confirmed` / `--shipit-confirmed`. Calls that pass those flags never open `/dev/tty` and behave as they do natively. The user-visible change: no terminal prompt under docker, the chat fallback every time one would have appeared. Nothing else changes. The exit code and the `FALLBACK=chat`/`DRAFT=` lines pass through as in [Exit codes and streams](#exit-codes-and-streams).
 
-Non-dispatched TTY scripts, such as `next_step_prompt.sh`, never reach dispatch and stay with #733.
+Non-dispatched TTY scripts, today only `next_step_prompt.sh`, never reach dispatch. Under `engine.mode=docker` it keeps prompting on the host's real `/dev/tty`. It must not move into the container: that would turn every next-step offer into the `AskUserQuestion` fallback. #760 migrates it, together with `auto_next.sh`, to a dispatched native command whose `migration-status.json` value is `"host-only"`, so it runs native on the host and never in the container (row 2 of the [resolution order](#resolution-order)). See [Scripts not routed through dispatch](#scripts-not-routed-through-dispatch).
+
+## Scripts not routed through dispatch
+
+Some scripts under `<skill>/scripts/` and `arcanum/_lib/` never call `engine_dispatch.sh`, so the docker path does not cover them. The [checklist](checklist.md#not-routed-through-dispatch) gives each one a kind. The rule per kind (decided in #733):
+
+| kind | Under `engine.mode=docker` |
+| --- | --- |
+| `sourced` | A library that is only ever `source`d. It runs wherever its caller runs. Inside the container the native implementation runs, so these shell libraries are never used there. |
+| `wrapper` | A per-skill script that `exec`s a dispatched `arcanum/_lib` shim. It is covered by that shim's rows, named in its `notes`. |
+| `entrypoint` | Called directly by skills and never dispatched, so it runs as bash on the host. Only `next_step_prompt.sh` and `auto_next.sh`. #760 turns both into dispatched `host-only` commands, and their rows then move into their skill-folder tables. |
+| `bootstrap` | The install/update bootstraps. They run before or outside an installed arcanum, so they can never be dispatched. |
+
+None of these kinds can ever be ✅: their rows are permanently `n/a`. Only `dispatched` and `native-only` rows can be docker-ready.
 
 ## Concurrency
 
