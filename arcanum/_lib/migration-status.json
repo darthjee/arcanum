@@ -81,5 +81,7 @@
   "arcanum-check-config": "docker",
   "arcanum-create-issue-start": "docker",
   "arcanum-create-issue-publish": "docker",
-  "init-claude-set-next-step-auto": "docker"
+  "init-claude-set-next-step-auto": "docker",
+  "next-step-prompt": "host-only",
+  "auto-plan-issue-auto-next": "host-only"
 }
