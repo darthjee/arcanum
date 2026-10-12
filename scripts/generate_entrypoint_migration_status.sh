@@ -3,7 +3,8 @@
 # scannable table of every entry point tracked in
 # arcanum/_lib/migration-status.json (see
 # docs/agents/architecture/script-engine.md and
-# docs/agents/specs/docker/dispatch.md), its raw docker-readiness status
+# docs/agents/architecture/docker-engine.md#docker-readiness-source-of-truth),
+# its raw docker-readiness status
 # (`shell`, `native`, `docker` or `host-only`, printed as-is so a stray
 # legacy boolean shows up rather than being hidden) and — where knowable —
 # the issue whose commit introduced the key. Native-only commands are
@@ -71,7 +72,7 @@ issue_for_key() {
   echo
   echo "<!-- AUTO-GENERATED, DO NOT EDIT BY HAND. Run scripts/generate_entrypoint_migration_status.sh to refresh. -->"
   echo
-  echo "One row per entry point tracked in [\`arcanum/_lib/migration-status.json\`](../../../arcanum/_lib/migration-status.json) — see [Script Engine](script-engine.md) for the shell → Node.js migration this tracks. \`Status\` is the command's docker-readiness value (\`shell\`, \`native\`, \`docker\` or \`host-only\`; see [Docker-readiness source of truth](../specs/docker/dispatch.md#docker-readiness-source-of-truth)); \`Issue\` is the issue whose commit introduced the key, resolved from the file's own git history where knowable, blank otherwise (never a guess)."
+  echo "One row per entry point tracked in [\`arcanum/_lib/migration-status.json\`](../../../arcanum/_lib/migration-status.json) — see [Script Engine](script-engine.md) for the shell → Node.js migration this tracks. \`Status\` is the command's docker-readiness value (\`shell\`, \`native\`, \`docker\` or \`host-only\`; see [Docker-readiness source of truth](docker-engine.md#docker-readiness-source-of-truth)); \`Issue\` is the issue whose commit introduced the key, resolved from the file's own git history where knowable, blank otherwise (never a guess)."
   echo
   echo "Native-only commands (dispatched with \`engine_dispatch --native-only\`, e.g. \`arcanum-check-config\`) have no shell implementation but are listed here too, with a non-\`shell\` status."
   echo
