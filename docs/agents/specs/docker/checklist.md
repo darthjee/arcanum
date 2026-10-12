@@ -5,7 +5,7 @@ Part of the [Docker Engine spec](../docker.md) (epic #724). This checklist track
 ## How to use it
 
 - There is one row per **dispatch command**: every key of `arcanum/_lib/migration-status.json`, plus every native-only command (shims calling `engine_dispatch ... --native-only`). This is the name `engine_dispatch` receives, and therefore its key in `migration-status.json`, which dispatch reads to decide whether the command is docker-ready (see [dispatch.md](dispatch.md#docker-readiness-source-of-truth)). A per-subcommand router produces several rows that share one `script`.
-- There is one table per skill folder, so a batch PR touches a single section. The last section lists the scripts that are not routed through `engine_dispatch.sh`, one row per file, pending #733.
+- There is one table per skill folder, so a batch PR touches a single section. The last section lists the scripts that are not routed through `engine_dispatch.sh`, one row per file, each with a non-dispatched kind and status `n/a`.
 - **This checklist is hand-maintained.** Each implementation PR ticks its own rows (`status` ✅, plus `issue`) in the same PR, and flips each ticked command's `migration-status.json` value to `"docker"` in that same PR. The evidence a row needs before it is ticked is in [testing.md](testing.md#ticking-a-checklist-row). `host-only` rows have status `n/a` and map to `"host-only"`. While epic #724 is open, any PR that adds or removes a script under `<skill>/scripts/` or `arcanum/_lib/` also adds or removes its row here.
 - The repo mount (plus the git common dir for worktrees and the log location) and the fixed env from [environment.md](environment.md#fixed-env) are implicit for every row and not repeated in `mounts`/`env`.
 
@@ -15,7 +15,7 @@ Part of the [Docker Engine spec](../docker.md) (epic #724). This checklist track
 | --- | --- |
 | `command` | Dispatch command name. In the "not routed through dispatch" section, the file name. |
 | `script` | Shim path, plus the subcommand(s) where the shim is a router. |
-| `kind` | `dispatched` (dual entrypoint, in `migration-status.json`) / `native-only` / `TBD (#733)`. |
+| `kind` | `dispatched` (dual entrypoint, in `migration-status.json`) / `native-only`. In the "not routed through dispatch" section: `sourced` (a library only ever `source`d by other scripts; it runs wherever its caller runs and is unused inside the container, where native code runs) / `wrapper` (a per-skill script that `exec`s a dispatched `arcanum/_lib` shim, covered by that shim's rows) / `entrypoint` (called directly by skills, never dispatched, so always bash on the host) / `bootstrap` (install/update bootstrap, runs before or outside an installed arcanum, so it can never be dispatched). Only `dispatched` and `native-only` rows can ever be ✅. Every non-dispatched kind is permanently `n/a`. |
 | `status` | ☐ not docker-ready / ✅ docker-ready / `blocked (no native)` / `n/a`. |
 | `credentials` | `none` / `gh` / `git-push (ssh)` / `inherits target` / `?`. `git-push (ssh)` covers any git remote access (fetch or push), whatever the transport. `inherits target` means the command runs the target project's own script, so its needs are that project's. `?` means not determinable yet. |
 | `mounts` | Extra mounts beyond the implicit ones (repo, git common dir for worktrees, log location): `global-config:ro`, `gitconfig:ro`, `remote`, `args:ro`/`args:rw`, `host-only`, or `—` for none. Derived by the rule in [mounts.md](mounts.md#deriving-the-checklist-mounts-column). `?` means not determinable yet. |
@@ -186,48 +186,48 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 | `monitor-issues-rewrite-queue-pop` | `monitor-issues/scripts/rewrite_queue.sh` `pop` | dispatched | ✅ | none | — | — | #745 | |
 | `monitor-issues-rewrite-queue-push` | `monitor-issues/scripts/rewrite_queue.sh` `push` | dispatched | ✅ | none | — | — | #745 | |
 
-## Not routed through dispatch (pending #733)
+## Not routed through dispatch
 
-Scripts under `<skill>/scripts/` and `arcanum/_lib/` that are not routed through `engine_dispatch.sh` (excluding shell twins and `test_*` files), plus the install/update bootstraps: sourced libraries, thin per-skill wrappers, non-dispatched entrypoints. How each kind behaves under docker is decided in #733.
+Scripts under `<skill>/scripts/` and `arcanum/_lib/` that are not routed through `engine_dispatch.sh` (excluding shell twins and `test_*` files), plus the install/update bootstraps. Each row has a non-dispatched kind and is permanently `n/a`: `sourced` libraries run wherever their caller runs, each `wrapper` is covered by the dispatched row named in its `notes`, the two `entrypoint`s stay bash on the host until #760 makes them dispatched `host-only` commands, and a `bootstrap` can never be dispatched. The full rule is in [dispatch.md](dispatch.md#scripts-not-routed-through-dispatch) (#733).
 
 | command | script | kind | status | credentials | mounts | env | issue | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `github.sh` | `arcanum-split-issue/scripts/github.sh` | TBD (#733) | n/a | | | | | |
-| `run_update_common.sh` | `arcanum-update/scripts/run_update_common.sh` | TBD (#733) | n/a | | | | | |
-| `agent_email.sh` | `arcanum/_lib/agent_email.sh` | TBD (#733) | n/a | | | | | |
-| `commit_template.sh` | `arcanum/_lib/commit_template.sh` | TBD (#733) | n/a | | | | | |
-| `config_chain.sh` | `arcanum/_lib/config_chain.sh` | TBD (#733) | n/a | | | | | |
-| `git_branch.sh` | `arcanum/_lib/git_branch.sh` | TBD (#733) | n/a | | | | | |
-| `global_config.sh` | `arcanum/_lib/global_config.sh` | TBD (#733) | n/a | | | | | |
-| `lock.sh` | `arcanum/_lib/lock.sh` | TBD (#733) | n/a | | | | | |
-| `merge_body.sh` | `arcanum/_lib/merge_body.sh` | TBD (#733) | n/a | | | | | |
-| `next_step_prompt.sh` | `arcanum/_lib/next_step_prompt.sh` | TBD (#733) | n/a | | | | | |
-| `origin.sh` | `arcanum/_lib/origin.sh` | TBD (#733) | n/a | | | | | |
-| `push.sh` | `arcanum/_lib/push.sh` | TBD (#733) | n/a | | | | | |
-| `repo_config.sh` | `arcanum/_lib/repo_config.sh` | TBD (#733) | n/a | | | | | |
-| `repo_path.sh` | `arcanum/_lib/repo_path.sh` | TBD (#733) | n/a | | | | | |
-| `safe_branch.sh` | `arcanum/_lib/safe_branch.sh` | TBD (#733) | n/a | | | | | |
-| `tag_actions.sh` | `arcanum/_lib/tag_actions.sh` | TBD (#733) | n/a | | | | | |
-| `tag_mutate.sh` | `arcanum/_lib/tag_mutate.sh` | TBD (#733) | n/a | | | | | |
-| `tags.sh` | `arcanum/_lib/tags.sh` | TBD (#733) | n/a | | | | | |
-| `config_common.sh` | `auto-fix-all/scripts/config_common.sh` | TBD (#733) | n/a | | | | | |
-| `queue_common.sh` | `auto-fix-all/scripts/queue_common.sh` | TBD (#733) | n/a | | | | | |
-| `issue_state.sh` | `auto-fix-issue/scripts/issue_state.sh` | TBD (#733) | n/a | | | | | |
-| `resolve_plan_paths.sh` | `auto-fix-issue/scripts/resolve_plan_paths.sh` | TBD (#733) | n/a | | | | | |
-| `github.sh` | `auto-new-issue/scripts/github.sh` | TBD (#733) | n/a | | | | | |
-| `resolve_id_and_file.sh` | `auto-new-issue/scripts/resolve_id_and_file.sh` | TBD (#733) | n/a | | | | | |
-| `auto_next.sh` | `auto-plan-issue/scripts/auto_next.sh` | TBD (#733) | n/a | | | | | |
-| `list_agents.sh` | `auto-plan-issue/scripts/list_agents.sh` | TBD (#733) | n/a | | | | | |
-| `resolve_plan_paths.sh` | `auto-plan-issue/scripts/resolve_plan_paths.sh` | TBD (#733) | n/a | | | | | |
-| `github.sh` | `discuss-issue/scripts/github.sh` | TBD (#733) | n/a | | | | | |
-| `list_agents.sh` | `discuss-issue/scripts/list_agents.sh` | TBD (#733) | n/a | | | | | |
-| `resolve_and_fetch.sh` | `discuss-issue/scripts/resolve_and_fetch.sh` | TBD (#733) | n/a | | | | | |
-| `resolve_id_and_file.sh` | `discuss-issue/scripts/resolve_id_and_file.sh` | TBD (#733) | n/a | | | | | |
-| `github.sh` | `enhance-issue/scripts/github.sh` | TBD (#733) | n/a | | | | | |
-| `config_common.sh` | `monitor-issues/scripts/config_common.sh` | TBD (#733) | n/a | | | | | |
-| `rewrite_queue_common.sh` | `monitor-issues/scripts/rewrite_queue_common.sh` | TBD (#733) | n/a | | | | | |
-| `list_agents.sh` | `plan-issue/scripts/list_agents.sh` | TBD (#733) | n/a | | | | | |
-| `bootstrap.sh` | `arcanum/install/bootstrap.sh` | TBD (#733) | n/a | | | | | |
-| `installer.sh` | `arcanum/install/installer.sh` | TBD (#733) | n/a | | | | | |
-| `bootstrap.sh` | `arcanum/update/bootstrap.sh` | TBD (#733) | n/a | | | | | |
-| `updater.sh` | `arcanum/update/updater.sh` | TBD (#733) | n/a | | | | | |
+| `github.sh` | `arcanum-split-issue/scripts/github.sh` | wrapper | n/a | | | | #733 | Covered by the `github-issue-*` rows. |
+| `run_update_common.sh` | `arcanum-update/scripts/run_update_common.sh` | sourced | n/a | | | | #733 | |
+| `agent_email.sh` | `arcanum/_lib/agent_email.sh` | sourced | n/a | | | | #733 | |
+| `commit_template.sh` | `arcanum/_lib/commit_template.sh` | sourced | n/a | | | | #733 | |
+| `config_chain.sh` | `arcanum/_lib/config_chain.sh` | sourced | n/a | | | | #733 | |
+| `git_branch.sh` | `arcanum/_lib/git_branch.sh` | sourced | n/a | | | | #733 | |
+| `global_config.sh` | `arcanum/_lib/global_config.sh` | sourced | n/a | | | | #733 | |
+| `lock.sh` | `arcanum/_lib/lock.sh` | sourced | n/a | | | | #733 | |
+| `merge_body.sh` | `arcanum/_lib/merge_body.sh` | sourced | n/a | | | | #733 | Sourced, not an entrypoint. |
+| `next_step_prompt.sh` | `arcanum/_lib/next_step_prompt.sh` | entrypoint | n/a | | | | #733 | Bash on the host. Owns `/dev/tty`. Becomes a dispatched `host-only` command in #760. |
+| `origin.sh` | `arcanum/_lib/origin.sh` | sourced | n/a | | | | #733 | |
+| `push.sh` | `arcanum/_lib/push.sh` | sourced | n/a | | | | #733 | Sourced, not an entrypoint. |
+| `repo_config.sh` | `arcanum/_lib/repo_config.sh` | sourced | n/a | | | | #733 | |
+| `repo_path.sh` | `arcanum/_lib/repo_path.sh` | sourced | n/a | | | | #733 | |
+| `safe_branch.sh` | `arcanum/_lib/safe_branch.sh` | sourced | n/a | | | | #733 | |
+| `tag_actions.sh` | `arcanum/_lib/tag_actions.sh` | sourced | n/a | | | | #733 | |
+| `tag_mutate.sh` | `arcanum/_lib/tag_mutate.sh` | sourced | n/a | | | | #733 | |
+| `tags.sh` | `arcanum/_lib/tags.sh` | sourced | n/a | | | | #733 | |
+| `config_common.sh` | `auto-fix-all/scripts/config_common.sh` | sourced | n/a | | | | #733 | |
+| `queue_common.sh` | `auto-fix-all/scripts/queue_common.sh` | sourced | n/a | | | | #733 | |
+| `issue_state.sh` | `auto-fix-issue/scripts/issue_state.sh` | wrapper | n/a | | | | #733 | Covered by the `issue-state` row. |
+| `resolve_plan_paths.sh` | `auto-fix-issue/scripts/resolve_plan_paths.sh` | wrapper | n/a | | | | #733 | Covered by the `resolve-plan-paths` row. |
+| `github.sh` | `auto-new-issue/scripts/github.sh` | wrapper | n/a | | | | #733 | Covered by the `github-issue-*` rows. |
+| `resolve_id_and_file.sh` | `auto-new-issue/scripts/resolve_id_and_file.sh` | wrapper | n/a | | | | #733 | Covered by the `resolve-id-and-file` row. |
+| `auto_next.sh` | `auto-plan-issue/scripts/auto_next.sh` | entrypoint | n/a | | | | #733 | Bash on the host. Runs `next_step_prompt.sh --no-prompt` and `git push`. Becomes a dispatched `host-only` command in #760. |
+| `list_agents.sh` | `auto-plan-issue/scripts/list_agents.sh` | wrapper | n/a | | | | #733 | Covered by the `list-agents` row. |
+| `resolve_plan_paths.sh` | `auto-plan-issue/scripts/resolve_plan_paths.sh` | wrapper | n/a | | | | #733 | Covered by the `resolve-plan-paths` row. |
+| `github.sh` | `discuss-issue/scripts/github.sh` | wrapper | n/a | | | | #733 | Covered by the `github-issue-*` rows. |
+| `list_agents.sh` | `discuss-issue/scripts/list_agents.sh` | wrapper | n/a | | | | #733 | Covered by the `list-agents` row. |
+| `resolve_and_fetch.sh` | `discuss-issue/scripts/resolve_and_fetch.sh` | wrapper | n/a | | | | #733 | Covered by the `resolve-and-fetch` row. |
+| `resolve_id_and_file.sh` | `discuss-issue/scripts/resolve_id_and_file.sh` | wrapper | n/a | | | | #733 | Covered by the `resolve-id-and-file` row. |
+| `github.sh` | `enhance-issue/scripts/github.sh` | wrapper | n/a | | | | #733 | Covered by the `github-issue-*` rows. |
+| `config_common.sh` | `monitor-issues/scripts/config_common.sh` | sourced | n/a | | | | #733 | |
+| `rewrite_queue_common.sh` | `monitor-issues/scripts/rewrite_queue_common.sh` | sourced | n/a | | | | #733 | |
+| `list_agents.sh` | `plan-issue/scripts/list_agents.sh` | wrapper | n/a | | | | #733 | Covered by the `list-agents` row. |
+| `bootstrap.sh` | `arcanum/install/bootstrap.sh` | bootstrap | n/a | | | | #733 | Runs before or outside an installed arcanum. |
+| `installer.sh` | `arcanum/install/installer.sh` | bootstrap | n/a | | | | #733 | Runs before or outside an installed arcanum. |
+| `bootstrap.sh` | `arcanum/update/bootstrap.sh` | bootstrap | n/a | | | | #733 | Runs before or outside an installed arcanum. |
+| `updater.sh` | `arcanum/update/updater.sh` | bootstrap | n/a | | | | #733 | Runs before or outside an installed arcanum. |
