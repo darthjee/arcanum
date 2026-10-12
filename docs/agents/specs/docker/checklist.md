@@ -21,7 +21,7 @@ Part of the [Docker Engine spec](../docker.md) (epic #724). This checklist track
 | `mounts` | Extra mounts beyond the implicit ones (repo, git common dir for worktrees, log location): `global-config:ro`, `gitconfig:ro`, `remote`, `args:ro`/`args:rw`, `host-only`, or `—` for none. Derived by the rule in [mounts.md](mounts.md#deriving-the-checklist-mounts-column). `?` means not determinable yet. |
 | `env` | Extra env vars beyond the command's existing `engine_dispatch` allowlist and the fixed env every row gets: `CLAUDE_CONFIG_DIR`, `GIT_CONFIG_GLOBAL`, `GH_TOKEN`, `remote`, or `—` for none. Derived by the rule in [environment.md](environment.md#deriving-the-checklist-env-column). |
 | `issue` | The issue that made the command docker-ready. |
-| `notes` | Free text, e.g. TTY-owning, long-running. A TTY-owning command always takes its exit-4 `FALLBACK=chat` path under docker (see [dispatch.md](dispatch.md#tty)). |
+| `notes` | Free text, e.g. TTY-owning, long-running. A TTY-owning command takes its exit-4 `FALLBACK=chat` path under docker whenever the call would prompt (see [dispatch.md](dispatch.md#tty)). |
 
 The initial `credentials` values come from each `engine_dispatch` call's env allowlist (`HOME` forwarded usually means `gh` or git remote access), reviewed by hand against the shell implementation.
 
@@ -68,8 +68,8 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 
 | command | script | kind | status | credentials | mounts | env | issue | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `arcanum-create-issue-publish` | `arcanum-create-issue/scripts/publish.sh` | native-only | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | TTY-owning: always exit 4 `FALLBACK=chat` under docker. |
-| `arcanum-create-issue-start` | `arcanum-create-issue/scripts/start.sh` | native-only | ☐ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | | TTY-owning: always exit 4 `FALLBACK=chat` under docker. |
+| `arcanum-create-issue-publish` | `arcanum-create-issue/scripts/publish.sh` | native-only | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #749 | TTY-owning: under docker, a call without `--confirmed` / `--shipit-confirmed` takes the exit-4 `FALLBACK=chat` path; confirmed calls behave as native. Parity covers invalid input, a missing draft and the no-TTY fallback. The GitHub-writing success path has no parity case, because it would create a real issue. |
+| `arcanum-create-issue-start` | `arcanum-create-issue/scripts/start.sh` | native-only | ✅ | gh | global-config:ro, gitconfig:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #749 | TTY-owning: under docker, a call with drafts present and neither `--new` nor `--resume` takes the exit-4 `FALLBACK=chat` path (with `DRAFT=` lines); calls with either flag behave as native. Parity covers invalid input, an unknown and an existing `--resume` draft, `--new`, and the drafts-present fallback, with the native side detached from any terminal (`detachNative`, see [testing.md](testing.md)). |
 
 ## arcanum-split-issue
 

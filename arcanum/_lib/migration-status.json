@@ -79,7 +79,7 @@
   "monitor-issues-rewrite-queue-push": "docker",
   "finish-report": "docker",
   "arcanum-check-config": "docker",
-  "arcanum-create-issue-start": "native",
-  "arcanum-create-issue-publish": "native",
+  "arcanum-create-issue-start": "docker",
+  "arcanum-create-issue-publish": "docker",
   "init-claude-set-next-step-auto": "docker"
 }

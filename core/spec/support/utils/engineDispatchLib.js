@@ -54,16 +54,19 @@ export async function writeStatusMap(dir, map) {
  *   (empty/omitted keeps the real `core/bin/arcanum`); lets a spec swap
  *   in a fixture that reports the env a native call received.
  * @param {string} [overrides.input] - when given, written to stdin.
+ * @param {boolean} [overrides.detached] - run with no controlling
+ *   terminal (see `runCommand`'s `detached`).
  * @returns {Promise<{stdout: string, stderr: string, code: number}>} the result.
  */
 export function runEngineDispatchFn(
-  statusFile, fnAndArgs, cwd, env = process.env, { installRoot = '', image = '', nativeBin = '', input } = {}
+  statusFile, fnAndArgs, cwd, env = process.env, { installRoot = '', image = '', nativeBin = '', input, detached } = {}
 ) {
   return runCommand(
     ['bash', '-c', WRAPPER, '_', ENGINE_DISPATCH_LIB, statusFile, installRoot, image, nativeBin, ...fnAndArgs],
     cwd,
     env,
-    input
+    input,
+    { detached }
   );
 }
 
