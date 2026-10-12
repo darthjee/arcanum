@@ -26,7 +26,10 @@
  *     update / mark-created / mark-enhancing / mark-planning / mark-ready /
  *     mark-refined / mark-split), on `auto-monitor-issue-pr-resolve-pr-number`, on
  *     `auto-monitor-pr-monitor-pr`, on `auto-new-issue-commit-issue`, on
- *     `auto-plan-issue-commit-plan`, on `discuss-issue-render-issue`, on
+ *     `auto-plan-issue-commit-plan`, on `auto-plan-issue-auto-next`
+ *     (host-only; `validateRepoPath: false` — its shell original only
+ *     requires a directory, and a non-git one answers `REASON=branch`),
+ *     on `discuss-issue-render-issue`, on
  *     `finish-report` (`validateRepoPath: false` — its shell original
  *     only reads `origin`, and only when an issue/PR URL is printed), on
  *     the `init-claude-*` family (set-ci-ignored-patterns /
@@ -272,6 +275,12 @@ export const COMMANDS = {
     module: 'commands/auto-new-issue/AutoNewIssueCommitIssue.js',
     method: 'run',
     context: 'repo'
+  },
+  'auto-plan-issue-auto-next': {
+    module: 'commands/auto-plan-issue/AutoPlanIssueAutoNext.js',
+    method: 'run',
+    context: 'repo',
+    validateRepoPath: false
   },
   'auto-plan-issue-commit-plan': {
     module: 'commands/auto-plan-issue/AutoPlanIssueCommitPlan.js',
