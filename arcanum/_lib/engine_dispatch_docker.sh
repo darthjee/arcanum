@@ -47,9 +47,12 @@ _engine_dispatch_docker_valid_needs() {
 
 # _engine_dispatch_docker_valid_path_arg <value>
 #   Exits 0 when <value> (the part after `--path-arg=`) is
-#   `<index>:<ro|rw>` with a 1-based positive index, 1 otherwise.
+#   `<index>:<ro|rw|rw-mkdir>` with a 1-based positive index, 1
+#   otherwise. `rw-mkdir` behaves as `rw`, except that a missing
+#   out-of-repo parent directory is created on the host (`mkdir -p`)
+#   before mounting, instead of skipping the mount.
 _engine_dispatch_docker_valid_path_arg() {
-  [[ "$1" =~ ^[1-9][0-9]*:(ro|rw)$ ]]
+  [[ "$1" =~ ^[1-9][0-9]*:(ro|rw|rw-mkdir)$ ]]
 }
 
 # _engine_dispatch_docker_infra_env_names
@@ -388,7 +391,14 @@ _engine_dispatch_docker_run() (
         src="$abs"
       else
         src="$(dirname "$abs")"
+        if [[ ! -d "$src" && "$mode" == "rw-mkdir" ]]; then
+          # Parity with natives that `mkdir -p` the parent themselves;
+          # a failed mkdir skips the mount, like `rw`.
+          mkdir -p "$src" 2>/dev/null
+        fi
         [[ -d "$src" ]] || continue
+        # From here on rw-mkdir is plain rw (collapse and -v emission).
+        mode="rw"
       fi
 
       merged="false"

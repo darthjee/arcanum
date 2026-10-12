@@ -110,7 +110,7 @@ _engine_dispatch_run_native() {
   return $?
 }
 
-# engine_dispatch <repo_path> <command> <shell_script> [--prepend-repo-path] [--native-only] [--needs=<tag>[,<tag>...]]... [--path-arg=<index>:<ro|rw>]... [<env_var_name> ...] -- <args...>
+# engine_dispatch <repo_path> <command> <shell_script> [--prepend-repo-path] [--native-only] [--needs=<tag>[,<tag>...]]... [--path-arg=<index>:<ro|rw|rw-mkdir>]... [<env_var_name> ...] -- <args...>
 #   The shared dispatch guard for one migrated-entrypoint call. See
 #   docs/agents/architecture/script-engine.md and
 #   docs/agents/specs/docker/dispatch.md for the full design.
@@ -145,10 +145,11 @@ _engine_dispatch_run_native() {
 #   - [--needs=<tag>[,<tag>...]]: repeatable; tags `global-config`,
 #     `gitconfig`, `gh`, `remote` — the extra mounts and env a container
 #     call needs. Ignored outside the container path.
-#   - [--path-arg=<index>:<ro|rw>]: repeatable; marks <args...>[index]
+#   - [--path-arg=<index>:<ro|rw|rw-mkdir>]: repeatable; marks <args...>[index]
 #     (1-based, never counting the --prepend-repo-path repo path) as a
 #     file path to mount into the container. Ignored outside the
-#     container path.
+#     container path. `rw-mkdir` is `rw` plus a host-side `mkdir -p`
+#     of a missing out-of-repo parent directory before mounting.
 #     An unknown --needs tag or a malformed --path-arg value prints
 #     `Error: engine_dispatch: invalid <flag> '<value>'.` (where <value>
 #     is everything after `=`) on stderr and returns 1.
