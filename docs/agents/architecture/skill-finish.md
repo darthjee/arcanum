@@ -110,7 +110,7 @@ After relaying a `success` report, an interactive skill runs:
 arcanum/_lib/next_step_prompt.sh --repo <repo_path> --command "<command>" [--command "<command>"]... [--auto-key <skill>] [--no-prompt]
 ```
 
-It follows the "TTY-first with `AskUserQuestion` fallback" convention in [Per-Repo Migrations](per-repo-migrations.md#script-driven-interaction): it owns the prompt on `/dev/tty` whenever a terminal is available. When `/dev/tty` cannot be opened (as in some agent-driven sessions, where the Bash tool has no controlling terminal), it does not fail: it exits `4` with `FALLBACK=chat`, and the skill asks the same question through `AskUserQuestion`. Free-text chat yes/no stays forbidden. It is a plain bash script, not engine-dispatched, like `arcanum/migrations/run.sh`.
+It follows the "TTY-first with `AskUserQuestion` fallback" convention in [Per-Repo Migrations](per-repo-migrations.md#script-driven-interaction): it owns the prompt on `/dev/tty` whenever a terminal is available. When `/dev/tty` cannot be opened (as in some agent-driven sessions, where the Bash tool has no controlling terminal), it does not fail: it exits `4` with `FALLBACK=chat`, and the skill asks the same question through `AskUserQuestion`. Free-text chat yes/no stays forbidden. It is a thin `engine_dispatch` shim for the `next-step-prompt` command (shell twin `next_step_prompt_shell.sh`). Its `migration-status.json` status is `"host-only"`, so under `engine.mode=docker` it runs native on the host and keeps the real `/dev/tty` (#760).
 
 ### Auto-next
 

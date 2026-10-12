@@ -51,7 +51,7 @@ The entrypoint is `/usr/local/bin/arcanum-entrypoint` (source: `core/docker-runt
 
 Every input is pinned, following the existing `jq` convention in `core/Dockerfile`: an exact version string next to a comment explaining how to find the current candidate when refreshing it.
 
-- **Base image:** an exact `darthjee/node:<x.y.z>` tag (`0.2.1` today, Debian bookworm), shared by both targets. Pinned by tag only, with no digest.
+- **Base image:** an exact `darthjee/node:<x.y.z>` tag (`0.2.2` today, Debian bookworm, published for `linux/amd64` and `linux/arm64`), shared by both targets. Pinned by tag only, with no digest.
 - **apt packages:** `jq`, `git`, `openssh-client` and `libnss-wrapper` as `pkg=<version>`, with `--no-install-recommends`, from the base image's Debian release.
 - **`gh`:** Debian's own `gh` package lags far behind, so `gh` comes from GitHub's release tarball, pinned by version (`GH_VERSION`) with one SHA-256 per architecture (`GH_SHA256_AMD64`, `GH_SHA256_ARM64`, from the release's checksums file), verified before extraction. There is no third-party apt repository. The architecture is read from `dpkg --print-architecture`, not `TARGETARCH`, so the `gh` binary always matches the base image's actual platform (see the note in [Platforms](#platforms)). The refresh procedure is written next to the pin.
 
@@ -72,11 +72,16 @@ Rules:
 
 - Published tags are immutable. A release never overwrites an existing tag. A fix ships as a new arcanum version, and therefore as a new image tag.
 - `/arcanum-update` needs no docker-specific step. Updating the install changes the resolved version, and the next docker call pulls (or builds) the matching tag. Old tags stay local until the user prunes them.
-- **Publishing:** release CI (`.circleci/config.yml`) builds the `runtime` target with buildx for `linux/amd64` and `linux/arm64` and pushes `darthjee/arcanum:<version>` as one multi-arch manifest, at the same point the release zip is published. This job is #737 (see [docker.md](../docker.md#sub-issue-map)).
+- **Publishing:** the `publish-image` job in the `release` workflow of `.circleci/config.yml` builds the `runtime` target with buildx for `linux/amd64` and `linux/arm64` and pushes `darthjee/arcanum:<version>` as one multi-arch manifest. It runs on the same semver tag filter as `build-and-release`, and only after it, so the image is published after the release zip is uploaded. Branch builds never publish.
+  - It logs in to Docker Hub with the `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` CircleCI project env vars.
+  - It pushes only the version tag: no `latest` or other moving tag.
+  - If `darthjee/arcanum:<version>` already exists, the job fails before building, including on workflow re-runs (see the immutability rule above).
+  - A failed image push leaves a release whose zip exists but whose image doesn't. Dispatch still works, because it falls back to a local build.
+  - One-time prerequisites, outside the repo: the `darthjee/arcanum` Docker Hub repository and the two env vars must exist before the first release that runs the job.
 
 ## Platforms
 
-- **Architectures:** the published manifest covers `linux/amd64` and `linux/arm64`, so Apple Silicon Macs and arm64 Linux hosts run natively with no emulation. A local build always targets the host's own architecture. `darthjee/node:0.2.1` is published for `linux/amd64` only, so today an arm64 build runs the amd64 base under emulation; publishing a native arm64 image (#737) needs an arm64 `darthjee/node` base first.
+- **Architectures:** the published manifest covers `linux/amd64` and `linux/arm64`, so Apple Silicon Macs and arm64 Linux hosts run natively with no emulation. A local build always targets the host's own architecture. The `darthjee/node:0.2.2` base is itself multi-arch, so both platforms build on a native base.
 - **Linux:** containers run on the host kernel. Bind mounts are native, and uids pass through unchanged. Overhead is mostly `docker run` startup.
 - **macOS Docker Desktop:** containers run in a Linux VM. Bind mounts go through the file-sharing layer (virtiofs by default, gRPC FUSE on older setups), which is slower for many small file operations and maps ownership (see [mounts.md](mounts.md#file-ownership)). Mounted paths must be inside Docker Desktop's shared directories, which by default include `/Users`, `/Volumes`, `/private`, `/tmp` and `/var/folders`. The per-call cost on macOS is part of the benchmark in [dispatch.md](dispatch.md#per-call-docker-run-and-when-to-revisit-it).
 - **Windows:** out of scope. Arcanum's scripts target macOS and Linux.

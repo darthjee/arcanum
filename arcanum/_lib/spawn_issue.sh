@@ -13,6 +13,20 @@
 # environment down; without it, native-mode auth would fail in a way
 # shell-mode never does.
 #
+# Under engine.mode=docker it runs core/bin/arcanum inside the
+# container, now that its migration-status.json status is `"docker"` (#747),
+# with the repo mount plus `--needs=global-config,gitconfig,gh`: the
+# global arcanum config ($CLAUDE_CONFIG_DIR/arcanum-config.json) and the
+# global git config are mounted read-only, and a GitHub token resolved
+# on the host is forwarded by name only as `-e GH_TOKEN` (`-e
+# GH_HOST`/`-e GH_ENTERPRISE_TOKEN` on a GitHub Enterprise host), never
+# as a value in argv. `--path-arg=4:ro` additionally mounts <body_file>
+# read-only at its own host path when it sits outside the repo. HOME
+# stays in the allowlist for the native path. If docker is unavailable,
+# engine_dispatch falls back to native on the host with a warning — see
+# docs/agents/specs/docker/dispatch.md and
+# docs/agents/specs/docker/environment.md.
+#
 # Usage: spawn_issue.sh <repo_path> <parent_id> <title> <body_file> [--as-subissue]
 #
 # Output and exit code: unchanged from before this migration — see
@@ -36,4 +50,4 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=engine_dispatch.sh
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/engine_dispatch.sh"
-engine_dispatch "$REPO_PATH" spawn-issue "${SCRIPT_DIR}/spawn_issue_shell.sh" HOME -- "$@"
+engine_dispatch "$REPO_PATH" spawn-issue "${SCRIPT_DIR}/spawn_issue_shell.sh" --needs=global-config,gitconfig,gh --path-arg=4:ro HOME -- "$@"

@@ -24,16 +24,16 @@
 
 # Pinned by exact tag only (no digest). To refresh: pick the new
 # darthjee/node release tag, then re-check every apt pin below against it.
-FROM darthjee/node:0.2.1 AS base
+FROM darthjee/node:0.2.2 AS base
 
 # Hadolint DL4006: fail the build if any command in a pipe fails.
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # Every apt package is pinned for reproducible builds, from the base
-# image's Debian release (bookworm for darthjee/node:0.2.1). To find the
+# image's Debian release (bookworm for darthjee/node:0.2.2). To find the
 # current candidate version for this base image (e.g. when refreshing a
 # pin), run:
-#   docker run --rm darthjee/node:0.2.1 sh -c \
+#   docker run --rm darthjee/node:0.2.2 sh -c \
 #     "apt-get update -qq && apt-cache policy jq git openssh-client libnss-wrapper"
 # Debian ships the same version for amd64 and arm64.
 #

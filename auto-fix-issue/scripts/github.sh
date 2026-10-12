@@ -9,6 +9,28 @@
 # the right migration-status.json/COMMANDS key from $1 before calling
 # engine_dispatch, once per invocation — never for the whole script.
 #
+# Under engine.mode=docker, `info` runs core/bin/arcanum inside the
+# container, now that its migration-status.json status is `"docker"`
+# (#745), with only the repo mount (no `--needs`). If docker is
+# unavailable, engine_dispatch falls back to native on the host with a
+# warning — see docs/agents/specs/docker/dispatch.md. pr-create/pr-view/
+# pr-ready are not in that batch and keep their current status.
+#
+# Under engine.mode=docker pr-create/pr-view/pr-ready run
+# core/bin/arcanum inside the container, now that their
+# migration-status.json status is `"docker"` (#747), with the repo mount
+# plus `--needs=global-config,gitconfig,gh`: the global arcanum config
+# ($CLAUDE_CONFIG_DIR/arcanum-config.json) and the global git config are
+# mounted read-only, and a GitHub token resolved on the host is
+# forwarded by name only as `-e GH_TOKEN` (`-e GH_HOST`/`-e
+# GH_ENTERPRISE_TOKEN` on a GitHub Enterprise host), never as a value in
+# argv. `pr-create` adds `--path-arg=3:ro`, mounting <file> read-only at
+# its own host path when it sits outside the repo. HOME stays in the
+# allowlist for the native path. If docker is unavailable,
+# engine_dispatch falls back to native on the host with a warning — see
+# docs/agents/specs/docker/dispatch.md and
+# docs/agents/specs/docker/environment.md.
+#
 # HOME is forwarded to the native path's explicit env-var allowlist for
 # pr-create/pr-view/pr-ready only (all three resolve a GitHub token via
 # `gh`, which needs HOME to find its own auth config once native's
@@ -56,13 +78,13 @@ case "$SUBCOMMAND" in
     engine_dispatch "$REPO_PATH" auto-fix-issue-github-info "${SCRIPT_DIR}/github_shell_info.sh" -- "${@:2}"
     ;;
   pr-create)
-    engine_dispatch "$REPO_PATH" auto-fix-issue-github-pr-create "${SCRIPT_DIR}/github_shell_pr_create.sh" HOME -- "${@:2}"
+    engine_dispatch "$REPO_PATH" auto-fix-issue-github-pr-create "${SCRIPT_DIR}/github_shell_pr_create.sh" --needs=global-config,gitconfig,gh --path-arg=3:ro HOME -- "${@:2}"
     ;;
   pr-view)
-    engine_dispatch "$REPO_PATH" auto-fix-issue-github-pr-view "${SCRIPT_DIR}/github_shell_pr_view.sh" HOME -- "${@:2}"
+    engine_dispatch "$REPO_PATH" auto-fix-issue-github-pr-view "${SCRIPT_DIR}/github_shell_pr_view.sh" --needs=global-config,gitconfig,gh HOME -- "${@:2}"
     ;;
   pr-ready)
-    engine_dispatch "$REPO_PATH" auto-fix-issue-github-pr-ready "${SCRIPT_DIR}/github_shell_pr_ready.sh" HOME -- "${@:2}"
+    engine_dispatch "$REPO_PATH" auto-fix-issue-github-pr-ready "${SCRIPT_DIR}/github_shell_pr_ready.sh" --needs=global-config,gitconfig,gh HOME -- "${@:2}"
     ;;
   *)
     echo "Usage: $0 <command> <repo_path> [args]" >&2

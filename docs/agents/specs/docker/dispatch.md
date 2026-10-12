@@ -84,7 +84,7 @@ The shim already passes `engine_dispatch` a per-command env allowlist and flags 
 | Flag | Repeatable | Values | Drives |
 | --- | --- | --- | --- |
 | `--needs=<tag>[,<tag>...]` | yes | `global-config`, `gitconfig`, `gh`, `remote` | the checklist `mounts` and `env` columns |
-| `--path-arg=<index>:<ro\|rw>` | yes | 1-based index into `<args...>` | `args:ro` / `args:rw` mounts |
+| `--path-arg=<index>:<ro\|rw\|rw-mkdir>` | yes | 1-based index into `<args...>` | `args:ro` / `args:rw` mounts |
 
 `--needs` maps to the checklist shorthands:
 
@@ -99,7 +99,7 @@ Both flags are ignored outside the container path, so adding them to a shim chan
 
 ### Argument path declaration
 
-`--path-arg=<index>:<mode>` marks `<args...>[index]` (1-based, counting only the args after `--`, never the repo path `--prepend-repo-path` adds) as a file path. For each declared index present on this call, dispatch resolves the mount on the host:
+`--path-arg=<index>:<mode>` (`<mode>` is `ro`, `rw` or `rw-mkdir`) marks `<args...>[index]` (1-based, counting only the args after `--`, never the repo path `--prepend-repo-path` adds) as a file path. For each declared index present on this call, dispatch resolves the mount on the host:
 
 | Case | Rule |
 | --- | --- |
@@ -108,9 +108,10 @@ Both flags are ignored outside the container path, so adding them to a shim chan
 | relative path | resolved against the shim's `$PWD`. If it lands outside the repo, the container gets the absolute path in its argv instead of the relative one, since the container's working directory is the repo |
 | inside `$REPO_PATH` | nothing extra, the repo is already mounted |
 | outside the repo, `ro` | the file itself, at the same path, `:ro`. Missing file: not mounted, and the command fails in the container the way it would natively |
-| outside the repo, `rw` | the parent directory, at the same path, `rw`, since the file may not exist yet. Missing parent: not mounted, same failure as natively |
+| outside the repo, `rw` | the parent directory, at the same path, `rw`, since the file may not exist yet. Missing parent: not mounted, same failure as natively. For writers that don't create the parent themselves (`discuss-issue-render-issue`) |
+| outside the repo, `rw-mkdir` | like `rw`, but a missing parent is created on the host (`mkdir -p`) before it is mounted, so the write lands where native would put it. For writers that `mkdir -p` the parent natively (`permission-grant-add`, `init-claude-write-label-config-*`). If the `mkdir -p` fails, nothing is mounted and the command fails in the container the way it would natively |
 
-Mount sources that are the same path or nested in one another are collapsed into one `-v` (an `rw` parent wins over an `ro` file under it). Only positional path arguments exist today (`github-issue-create <repo_path> <title> <file>`, `permission-grant-add <anchor> add <file> <pattern>`, …). A future option-style path (`--body-file <path>`) gets a sibling flag when it appears, not before.
+Mount sources that are the same path or nested in one another are collapsed into one `-v` (an `rw` parent wins over an `ro` file under it; `rw-mkdir` counts as `rw`). Only positional path arguments exist today (`github-issue-create <repo_path> <title> <file>`, `permission-grant-add <anchor> add <file> <pattern>`, …). A future option-style path (`--body-file <path>`) gets a sibling flag when it appears, not before.
 
 ## `docker run` invocation shape
 
@@ -194,9 +195,22 @@ This only works because the native CLI never exits with `125`–`127` itself. To
 
 Decided: no TTY in the container, ever. Dispatch never passes `-t`, and the container has no `/dev/tty`.
 
-Today two dispatched commands open `/dev/tty` through `core/lib/utils/io/TtyPrompt.js`: `arcanum-create-issue-start` and `arcanum-create-issue-publish` (both native-only). Under docker they can't open it, so they always take their exit-4 `FALLBACK=chat` path, and `arcanum-create-issue` already handles that with `AskUserQuestion`. The user-visible change: no terminal prompt under docker, the chat fallback every time. Nothing else changes. The exit code and the `FALLBACK=chat`/`DRAFT=` lines pass through as in [Exit codes and streams](#exit-codes-and-streams).
+Today two dispatched commands open `/dev/tty` through `core/lib/utils/io/TtyPrompt.js`: `arcanum-create-issue-start` and `arcanum-create-issue-publish` (both native-only). Under docker they can't open it, so any call that would prompt takes their exit-4 `FALLBACK=chat` path, and `arcanum-create-issue` already handles that with `AskUserQuestion`. This applies only to prompting calls: `start` with drafts present and neither `--new` nor `--resume`, and `publish` without `--confirmed` / `--shipit-confirmed`. Calls that pass those flags never open `/dev/tty` and behave as they do natively. The user-visible change: no terminal prompt under docker, the chat fallback every time one would have appeared. Nothing else changes. The exit code and the `FALLBACK=chat`/`DRAFT=` lines pass through as in [Exit codes and streams](#exit-codes-and-streams).
 
-Non-dispatched TTY scripts, such as `next_step_prompt.sh`, never reach dispatch and stay with #733.
+`next_step_prompt.sh` also owns `/dev/tty`, but it must keep prompting on the host's real `/dev/tty` under `engine.mode=docker`: moving it into the container would turn every next-step offer into the `AskUserQuestion` fallback. It used to be a non-dispatched bash script. Since #760 it is the dispatched `next-step-prompt` command, and `auto_next.sh`, which calls it, is the dispatched `auto-plan-issue-auto-next` command. Both are `"host-only"` in `migration-status.json`, so under docker they run native on the host and never in the container (row 2 of the [resolution order](#resolution-order)).
+
+## Scripts not routed through dispatch
+
+Some scripts under `<skill>/scripts/` and `arcanum/_lib/` never call `engine_dispatch.sh`, so the docker path does not cover them. The [checklist](checklist.md#not-routed-through-dispatch) gives each one a kind. The rule per kind (decided in #733):
+
+| kind | Under `engine.mode=docker` |
+| --- | --- |
+| `sourced` | A library that is only ever `source`d. It runs wherever its caller runs. Inside the container the native implementation runs, so these shell libraries are never used there. |
+| `wrapper` | A per-skill script that `exec`s a dispatched `arcanum/_lib` shim. It is covered by that shim's rows, named in its `notes`. |
+| `entrypoint` | Historical, no longer used. It covered scripts called directly by skills and never dispatched: `next_step_prompt.sh` and `auto_next.sh`. #760 turned both into dispatched `host-only` commands, and their rows moved into their skill-folder tables. |
+| `bootstrap` | The install/update bootstraps. They run before or outside an installed arcanum, so they can never be dispatched. |
+
+None of these kinds can ever be ✅: their rows are permanently `n/a`. Only `dispatched` and `native-only` rows can be docker-ready.
 
 ## Concurrency
 

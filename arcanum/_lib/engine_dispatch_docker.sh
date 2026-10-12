@@ -47,9 +47,12 @@ _engine_dispatch_docker_valid_needs() {
 
 # _engine_dispatch_docker_valid_path_arg <value>
 #   Exits 0 when <value> (the part after `--path-arg=`) is
-#   `<index>:<ro|rw>` with a 1-based positive index, 1 otherwise.
+#   `<index>:<ro|rw|rw-mkdir>` with a 1-based positive index, 1
+#   otherwise. `rw-mkdir` behaves as `rw`, except that a missing
+#   out-of-repo parent directory is created on the host (`mkdir -p`)
+#   before mounting, instead of skipping the mount.
 _engine_dispatch_docker_valid_path_arg() {
-  [[ "$1" =~ ^[1-9][0-9]*:(ro|rw)$ ]]
+  [[ "$1" =~ ^[1-9][0-9]*:(ro|rw|rw-mkdir)$ ]]
 }
 
 # _engine_dispatch_docker_infra_env_names
@@ -250,7 +253,12 @@ _engine_dispatch_docker_gh_token() {
 #   working directory would resolve differently made absolute).
 #
 #   Runs in a subshell: the values behind every `-e NAME` are exported
-#   there only (never in argv), so nothing leaks into the caller.
+#   there only (never in argv), so nothing leaks into the caller. The
+#   subshell then `exec`s docker, so `docker run` replaces it and stays
+#   a direct child of the dispatching process: some bash versions (5.1)
+#   keep the subshell alive otherwise, leaving docker a grandchild that
+#   a `pkill -P <dispatch pid>` (monitor_issues.sh) never reaches. The
+#   exit code is unchanged: docker's own, or 126/127 if exec fails.
 # shellcheck disable=SC2154  # engine_dispatch's locals, via dynamic scoping
 _engine_dispatch_docker_run() (
   local ref="$1"
@@ -383,7 +391,14 @@ _engine_dispatch_docker_run() (
         src="$abs"
       else
         src="$(dirname "$abs")"
+        if [[ ! -d "$src" && "$mode" == "rw-mkdir" ]]; then
+          # Parity with natives that `mkdir -p` the parent themselves;
+          # a failed mkdir skips the mount, like `rw`.
+          mkdir -p "$src" 2>/dev/null || true
+        fi
         [[ -d "$src" ]] || continue
+        # From here on rw-mkdir is plain rw (collapse and -v emission).
+        mode="rw"
       fi
 
       merged="false"
@@ -448,5 +463,5 @@ _engine_dispatch_docker_run() (
   [[ "$prepend_repo_path" == "true" ]] && run_args+=("$repo_path")
   [[ ${#container_args[@]} -gt 0 ]] && run_args+=("${container_args[@]}")
 
-  docker "${run_args[@]}"
+  exec docker "${run_args[@]}"
 )

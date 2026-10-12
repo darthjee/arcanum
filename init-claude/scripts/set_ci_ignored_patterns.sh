@@ -7,6 +7,12 @@
 # (set_ci_ignored_patterns_shell.sh) or the native one (core/bin/arcanum),
 # per engine.mode / arcanum/_lib/migration-status.json.
 #
+# Under engine.mode=docker it runs core/bin/arcanum inside the container,
+# now that its migration-status.json status is `"docker"` (#745), with
+# only the repo mount (no `--needs`). If docker is unavailable,
+# engine_dispatch falls back to native on the host with a warning — see
+# docs/agents/specs/docker/dispatch.md.
+#
 # Usage: set_ci_ignored_patterns.sh <pattern-1> [<pattern-2> ...]
 #        set_ci_ignored_patterns.sh --clear
 #   Run from the target project root.

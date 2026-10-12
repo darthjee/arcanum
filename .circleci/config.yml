@@ -13,6 +13,15 @@
 # explicit `gh auth login --with-token` step both redundant and, once
 # GH_TOKEN was actually set, a hard failure. Mechanism documented in
 # release-zip.md.
+#
+# The `publish-image` job (also release-only, run after build-and-release)
+# pushes the multi-arch (linux/amd64 + linux/arm64) runtime image
+# darthjee/arcanum:<tag> to Docker Hub via scripts/publish_runtime_image.sh.
+# It requires CircleCI project (or context) env vars DOCKERHUB_USERNAME and
+# DOCKERHUB_TOKEN, a Docker Hub access token with push rights on the
+# darthjee/arcanum repository. Only the version tag is pushed (no
+# `latest`), and published tags are immutable: the job fails if
+# darthjee/arcanum:<tag> already exists, including on workflow re-runs.
 
 version: 2.1
 
@@ -38,6 +47,27 @@ jobs:
       - run:
           name: Create or update GitHub release and upload asset
           command: scripts/upload_release_asset.sh "$CIRCLE_TAG" "$ZIP_PATH"
+
+  publish-image:
+    machine:
+      image: ubuntu-2204:current
+    steps:
+      - checkout
+      - run:
+          name: Set up QEMU and a multi-platform buildx builder
+          command: |
+            docker run --privileged --rm tonistiigi/binfmt --install arm64
+            docker buildx create --name arcanum --use
+            docker buildx inspect --bootstrap
+      - run:
+          name: Log in to Docker Hub
+          command: |
+            : "${DOCKERHUB_USERNAME:?DOCKERHUB_USERNAME env var is required}"
+            : "${DOCKERHUB_TOKEN:?DOCKERHUB_TOKEN env var is required}"
+            echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+      - run:
+          name: Build and push the multi-arch runtime image
+          command: scripts/publish_runtime_image.sh "$CIRCLE_TAG"
 
   test:
     docker:
@@ -83,6 +113,13 @@ workflows:
   release:
     jobs:
       - build-and-release:
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^\d+\.\d+\.\d+$/
+      - publish-image:
+          requires: [build-and-release]
           filters:
             branches:
               ignore: /.*/
