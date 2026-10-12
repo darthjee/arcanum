@@ -27,9 +27,10 @@
 #
 # Under engine.mode=docker all three subcommands run core/bin/arcanum
 # inside the container, now that their migration-status.json status is
-# `"docker"` (#746), with the repo mount plus `--path-arg=1:rw`: the
-# directory of the absolute <config_path> is mounted read-write at its
-# own host path when it sits outside the repo. If docker is unavailable,
+# `"docker"` (#746), with the repo mount plus `--path-arg=1:rw-mkdir`:
+# the directory of the absolute <config_path> is mounted read-write at
+# its own host path when it sits outside the repo, and created on the
+# host first if missing (LabelConfig `mkdir -p`s natively). If docker is unavailable,
 # engine_dispatch falls back to native on the host with a warning — see
 # docs/agents/specs/docker/dispatch.md.
 #
@@ -110,4 +111,4 @@ fi
 
 REPO_PATH="$PWD"
 
-engine_dispatch "$REPO_PATH" "init-claude-write-label-config-${SUBCOMMAND}" "${SCRIPT_DIR}/write_label_config_${SUBCOMMAND}_shell.sh" --prepend-repo-path --path-arg=1:rw -- "$ABS_CONFIG_PATH" "$@"
+engine_dispatch "$REPO_PATH" "init-claude-write-label-config-${SUBCOMMAND}" "${SCRIPT_DIR}/write_label_config_${SUBCOMMAND}_shell.sh" --prepend-repo-path --path-arg=1:rw-mkdir -- "$ABS_CONFIG_PATH" "$@"

@@ -29,6 +29,13 @@
 #              this file's `case` dispatcher and is NOT forwarded.
 #              <file> may be repo-relative.
 #
+# Under engine.mode=docker, <file> is declared `--path-arg=2:rw-mkdir`
+# (index 2 of the forwarded `<anchor> <file> <pattern>`): when it sits
+# outside the repo, its parent directory is created on the host if
+# missing and mounted read-write at its own path. A relative <file> is
+# resolved by engine_dispatch against $PWD, so it assumes the caller's
+# cwd is <anchor>.
+#
 # This file is meant to be SOURCED for its `permission_grant_add`
 # function (re-exported from permission_grant_shell.sh, unchanged); the
 # CLI dispatcher at the bottom is a secondary, direct-invocation
@@ -56,7 +63,7 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
       # shellcheck source=engine_dispatch.sh
       # shellcheck disable=SC1091
       source "${_PERMISSION_GRANT_LIB_DIR}/engine_dispatch.sh"
-      engine_dispatch "$anchor" permission-grant-add "${_PERMISSION_GRANT_LIB_DIR}/permission_grant_shell.sh" -- "$anchor" "$@"
+      engine_dispatch "$anchor" permission-grant-add "${_PERMISSION_GRANT_LIB_DIR}/permission_grant_shell.sh" --path-arg=2:rw-mkdir -- "$anchor" "$@"
       ;;
     *)
       echo "Usage: $0 <anchor> add <file> <pattern>" >&2
