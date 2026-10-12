@@ -11,8 +11,8 @@
 # migration-status.json status is `"docker"` (#745), with only the repo
 # mount (no `--needs`). If docker is unavailable, engine_dispatch falls
 # back to native on the host with a warning — see
-# docs/agents/specs/docker/dispatch.md. save/push are not in that batch
-# and keep their current status.
+# docs/agents/architecture/docker-engine.md#fallback-rules.
+# save/push are not in that batch and keep their current status.
 #
 # Under engine.mode=docker save/push run core/bin/arcanum inside the
 # container, now that their migration-status.json status is `"docker"`
@@ -23,8 +23,8 @@
 # GH_HOST`/`-e GH_ENTERPRISE_TOKEN` on a GitHub Enterprise host), never
 # as a value in argv. HOME stays in the allowlist for the native path.
 # If docker is unavailable, engine_dispatch falls back to native on the
-# host with a warning — see docs/agents/specs/docker/dispatch.md and
-# docs/agents/specs/docker/environment.md.
+# host with a warning — see docs/agents/architecture/docker-engine.md#fallback-rules and
+# docs/agents/architecture/docker-engine.md#environment.
 #
 # State is stored in .claude/state/auto-fix-all-queue.json — a JSON array of
 # entry objects (currently just {"id": "<id>"} each), so future fields (e.g.

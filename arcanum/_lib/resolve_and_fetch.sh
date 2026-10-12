@@ -31,8 +31,8 @@
 # the gh credential helper is configured so git authenticates with the
 # forwarded GH_TOKEN. HOME stays in the allowlist for the native path.
 # If docker is unavailable, engine_dispatch falls back to native on the
-# host with a warning — see docs/agents/specs/docker/dispatch.md and
-# docs/agents/specs/docker/environment.md.
+# host with a warning — see docs/agents/architecture/docker-engine.md#fallback-rules and
+# docs/agents/architecture/docker-engine.md#environment.
 #
 # Usage: resolve_and_fetch.sh <repo_path> <issues_folder> <arg_string>
 #

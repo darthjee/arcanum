@@ -35,7 +35,7 @@
 # exists. HOME stays in the allowlist for the native path; under docker
 # the version comes from the image's own arcanum.json instead. If docker
 # is unavailable, engine_dispatch falls back to native on the host with
-# a warning — see docs/agents/specs/docker/dispatch.md.
+# a warning — see docs/agents/architecture/docker-engine.md#fallback-rules.
 #
 # Output and exit code: unchanged from before this migration — no
 # output, always exits 0; see stamp_arcanum_version_shell.sh's own

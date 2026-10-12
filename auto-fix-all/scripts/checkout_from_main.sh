@@ -22,8 +22,8 @@
 # host is forwarded by name only as `-e GH_TOKEN` (`-e GH_HOST`/`-e
 # GH_ENTERPRISE_TOKEN` on a GitHub Enterprise host), never as a value in
 # argv. If docker is unavailable, engine_dispatch falls back to native
-# on the host with a warning — see docs/agents/specs/docker/dispatch.md
-# and docs/agents/specs/docker/environment.md.
+# on the host with a warning — see docs/agents/architecture/docker-engine.md#fallback-rules
+# and docs/agents/architecture/docker-engine.md#environment.
 #
 # Usage: checkout_from_main.sh <repo_path> <id>
 #

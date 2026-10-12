@@ -8,7 +8,7 @@
 #
 # Status `host-only`: under engine.mode=docker the command runs native on
 # the host, never in the container, so it keeps the host's real /dev/tty
-# for the prompt — see docs/agents/specs/docker/dispatch.md.
+# for the prompt — see docs/agents/architecture/docker-engine.md#resolution-order.
 #
 # Env forwarded to the native path: CLAUDE_CONFIG_DIR and HOME (global
 # config tier of the next_step.auto.<skill> lookup) and ARCANUM_TTY_DEVICE

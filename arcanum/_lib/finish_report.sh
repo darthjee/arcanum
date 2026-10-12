@@ -12,7 +12,7 @@
 # now that its migration-status.json status is `"docker"` (#745), with
 # only the repo mount (no `--needs`). If docker is unavailable,
 # engine_dispatch falls back to native on the host with a warning — see
-# docs/agents/specs/docker/dispatch.md.
+# docs/agents/architecture/docker-engine.md#fallback-rules.
 #
 # Pure formatting plus local git-origin parsing — no gh/GitHub API
 # dependency, so no env vars are forwarded to the native path.

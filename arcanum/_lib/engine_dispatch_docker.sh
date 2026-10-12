@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # Docker-only helpers for arcanum/_lib/engine_dispatch.sh (the
-# engine.mode=docker branch, see docs/agents/specs/docker/dispatch.md).
+# engine.mode=docker branch, see docs/agents/architecture/docker-engine.md#dispatch).
 # Every function here is an `_engine_dispatch_docker_*` helper; shims
 # never call them directly, and specs keep sourcing only
 # engine_dispatch.sh, which sources this file.
@@ -22,8 +22,8 @@ _ENGINE_DISPATCH_DOCKER_REPOSITORY="darthjee/arcanum"
 # The `--needs=<tag>` values engine_dispatch accepts.
 _ENGINE_DISPATCH_DOCKER_NEEDS_TAGS="global-config gitconfig gh remote"
 
-# The container infrastructure env (docs/agents/specs/docker/
-# environment.md#container-infrastructure-env) a nested call inside the
+# The container infrastructure env (docs/agents/architecture/
+# docker-engine.md#container-infrastructure-env) a nested call inside the
 # container forwards on top of its own allowlist, each only when set.
 # GIT_CONFIG_KEY_<n>/GIT_CONFIG_VALUE_<n> are added per GIT_CONFIG_COUNT
 # by _engine_dispatch_docker_infra_env_names.
@@ -157,8 +157,9 @@ _engine_dispatch_docker_acquire_image() {
 }
 
 # _engine_dispatch_docker_available <ref>
-#   The Docker availability check (docs/agents/specs/docker/dispatch.md
-#   "Docker availability check"). Exits 0, printing nothing, when <ref>
+#   The Docker availability check
+#   (docs/agents/architecture/docker-engine.md#docker-availability-check).
+#   Exits 0, printing nothing, when <ref>
 #   can run; otherwise prints the row-4 <reason> (`docker not found`,
 #   `daemon not reachable`, `image <ref> unavailable`) and exits 1. The
 #   image lock is taken only when a pull or build is actually needed.
@@ -183,7 +184,7 @@ _engine_dispatch_docker_available() {
 }
 
 # Fixed in-container paths for the forwarded SSH agent socket
-# (docs/agents/specs/docker/environment.md#git-remote-access).
+# (docs/agents/architecture/docker-engine.md#git-remote-access).
 _ENGINE_DISPATCH_DOCKER_LINUX_SSH_SOCK="/run/arcanum/ssh-agent.sock"
 _ENGINE_DISPATCH_DOCKER_MACOS_SSH_SOCK="/run/host-services/ssh-auth.sock"
 
@@ -242,8 +243,9 @@ _engine_dispatch_docker_gh_token() {
 #   scoping): repo_path, command, prepend_repo_path, env_allowlist,
 #   needs_tags, path_args and args.
 #
-#   argv, in order (docs/agents/specs/docker/dispatch.md "`docker run`
-#   invocation shape"): the fixed flags; `-v <repo>:<repo>`; the git
+#   argv, in order
+#   (docs/agents/architecture/docker-engine.md#docker-run-invocation-shape):
+#   the fixed flags; `-v <repo>:<repo>`; the git
 #   common dir (worktrees) and log directory mounts; the --needs mounts;
 #   the --path-arg mounts (equal or nested sources collapsed); `-e NAME`
 #   entries (fixed env, --needs env, then each set allowlisted name

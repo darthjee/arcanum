@@ -13,7 +13,7 @@
 # repo mount plus `--path-arg=4:ro`: <body_file> is mounted read-only at
 # its own host path when it sits outside the repo. If docker is
 # unavailable, engine_dispatch falls back to native on the host with a
-# warning — see docs/agents/specs/docker/dispatch.md.
+# warning — see docs/agents/architecture/docker-engine.md#fallback-rules.
 #
 # Usage: create_sub_issue_file.sh <repo_path> <issue_id> <title> <body_file>
 #

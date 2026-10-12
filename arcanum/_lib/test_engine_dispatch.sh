@@ -86,11 +86,11 @@ echo "OK: engine.mode=shell runs the shell fixture directly"
 
 # --- Case 2: engine.mode=native, migration-status.json says
 #     auto-fix-all-config-get:"docker" (since #745; under engine.mode=native
-#     a `docker` status runs native on the host, per dispatch.md's mode
-#     table) -> runs the NATIVE path (core/bin/
-#     arcanum auto-fix-all-config-get); stdout/exit code must byte-match
-#     the shell fixture's (the parity assertion — the shared contract
-#     with node) ---
+#     a `docker` status runs native on the host, per the mode table in
+#     docs/agents/architecture/docker-engine.md#resolution-order)
+#     -> runs the NATIVE path (core/bin/arcanum auto-fix-all-config-get);
+#     stdout/exit code must byte-match the shell fixture's (the parity
+#     assertion — the shared contract with node) ---
 
 set_engine_mode "native"
 

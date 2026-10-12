@@ -10,7 +10,7 @@
 #
 # Status `host-only`: under engine.mode=docker the command runs native on
 # the host, never in the container, so its `git push` uses the host's git
-# credentials — see docs/agents/specs/docker/dispatch.md.
+# credentials — see docs/agents/architecture/docker-engine.md#resolution-order.
 #
 # Env forwarded to the native path: CLAUDE_CONFIG_DIR and HOME (global
 # config tier of next_step.auto.auto-plan-issue), ARCANUM_TTY_DEVICE
