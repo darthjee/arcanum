@@ -22,9 +22,11 @@ import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 // proven through core/bin/arcanum's invocation log: every case seeds
 // `engine.log.location`, which only the native side ever writes to
 // (`command <name> invoked at ...`). write_label_config.sh passes its
-// <config_path> made absolute against its cwd with `--path-arg=1:rw`:
-// a relative path inside the repo needs no mount, an absolute one
-// outside it gets its directory mounted read-write. sync_labels.sh is
+// <config_path> made absolute against its cwd with
+// `--path-arg=1:rw-mkdir` (issue #753): a relative path inside the repo
+// needs no mount, an absolute one outside it gets its directory mounted
+// read-write — created on the host first when missing, matching the
+// shell and native sides' own `mkdir -p`. sync_labels.sh is
 // answered "n", so neither side reaches GitHub.
 //
 // sync_labels.sh under engine.mode=docker (issue #747, docker batch 3)
@@ -135,6 +137,33 @@ describe('init-claude label commands engine_dispatch routing (via the real shims
       check: (result) => expectLabels(path.join(configDir, 'labels.json'))(result),
       dockerArgs: ({ repoPath }) => [repoPath, path.join(configDir, 'labels.json'), ...items],
       dockerMounts: () => [`${configDir}:${configDir}`]
+    });
+  });
+
+  [
+    { sub: 'replace', items: ['A:111111'], expected: ['A:111111'] },
+    { sub: 'add', items: ['New:444444'], expected: ['New:444444'] }
+  ].forEach(({ sub, items, expected }) => {
+    let configDir;
+    let configFile;
+
+    itRoutesWithInvocationLog(`write_label_config.sh ${sub} (config outside the repo, missing parent)`, WRITE_SHIM, {
+      command: `init-claude-write-label-config-${sub}`,
+      prepare: async () => {
+        configDir = await realpath(await createTempDir('arcanum-core-labels-missing-'));
+        configFile = path.join(configDir, 'new-dir', 'labels.json');
+
+        return { args: [sub, configFile, ...items], cleanup: () => removeTempDir(configDir) };
+      },
+      check: async (result) => {
+        expect(result).toEqual({ stdout: '', stderr: '', code: 0 });
+
+        const { labels } = JSON.parse(await readFile(configFile, 'utf8'));
+
+        expect(labels.map(({ name, color }) => `${name}:${color}`)).toEqual(expected);
+      },
+      dockerArgs: ({ repoPath }) => [repoPath, configFile, ...items],
+      dockerMounts: () => [`${path.dirname(configFile)}:${path.dirname(configFile)}`]
     });
   });
 

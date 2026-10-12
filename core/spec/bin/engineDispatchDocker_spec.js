@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
@@ -353,6 +354,8 @@ describe('engine_dispatch.sh (engine.mode docker)', () => {
       ['--needs=gh,', '--needs', 'gh,'],
       ['--path-arg=0:ro', '--path-arg', '0:ro'],
       ['--path-arg=1:rx', '--path-arg', '1:rx'],
+      ['--path-arg=1:rw-mkdirs', '--path-arg', '1:rw-mkdirs'],
+      ['--path-arg=1:ro-mkdir', '--path-arg', '1:ro-mkdir'],
       ['--path-arg=x', '--path-arg', 'x']
     ].forEach(([flag, name, value]) => {
       it(`rejects ${flag}`, async () => {
@@ -629,7 +632,7 @@ describe('engine_dispatch.sh (engine.mode docker)', () => {
     /**
      * Dispatches with one extra path argument at index 3.
      * @param {string} value - the path argument.
-     * @param {string} mode - `ro` or `rw`.
+     * @param {string} mode - `ro`, `rw` or `rw-mkdir`.
      * @param {object} [opts] - extra dispatch options (e.g. `cwd`).
      * @returns {Promise<{mounts: string[], after: string[]}>} the run's mounts and native argv.
      */
@@ -713,6 +716,51 @@ describe('engine_dispatch.sh (engine.mode docker)', () => {
       const run = await dispatchPathArg(path.join(outside, 'no-such-dir', 'out.json'), 'rw');
 
       expect(run.mounts).toEqual([repoMount()]);
+    });
+
+    it('mounts the parent directory read-write for rw-mkdir, like rw', async () => {
+      const run = await dispatchPathArg(path.join(outside, 'out.json'), 'rw-mkdir');
+
+      expect(run.mounts).toEqual([repoMount(), `${outside}:${outside}`]);
+    });
+
+    it('mounts nothing extra for an rw-mkdir path inside the repo', async () => {
+      const run = await dispatchPathArg(path.join(world.repoPath, 'nested', 'out.json'), 'rw-mkdir');
+
+      expect(run.mounts).toEqual([repoMount()]);
+      expect(existsSync(path.join(world.repoPath, 'nested'))).toBeFalse();
+    });
+
+    it('creates a missing rw-mkdir parent on the host, then mounts it read-write', async () => {
+      const parent = path.join(outside, 'no-such-dir', 'deeper');
+      const run = await dispatchPathArg(path.join(parent, 'out.json'), 'rw-mkdir');
+
+      expect(existsSync(parent)).toBeTrue();
+      expect(run.mounts).toEqual([repoMount(), `${parent}:${parent}`]);
+    });
+
+    it('rewrites a relative rw-mkdir path landing outside the repo to absolute', async () => {
+      const parent = path.join(outside, 'new-dir');
+      const run = await dispatchPathArg('new-dir/out.json', 'rw-mkdir', { cwd: outside });
+
+      expect(existsSync(parent)).toBeTrue();
+      expect(run.mounts).toEqual([repoMount(), `${parent}:${parent}`]);
+      expect(run.after).toEqual([CONFIG_GET, world.repoPath, 'auto_merge', path.join(parent, 'out.json')]);
+    });
+
+    it('collapses an ro file nested under an rw-mkdir parent into one read-write mount', async () => {
+      const file = path.join(outside, 'body.md');
+
+      await writeFile(file, 'body');
+      const env = await useFakeDocker();
+
+      await world.dispatch({
+        env,
+        flags: ['--path-arg=3:rw-mkdir', '--path-arg=4:ro'],
+        args: [world.repoPath, 'auto_merge', path.join(outside, 'out.json'), file]
+      });
+
+      expect(splitRunArgv((await onlyRunCall()).argv).mounts).toEqual([repoMount(), `${outside}:${outside}`]);
     });
 
     it('collapses an ro file nested under an rw parent, and duplicate sources, into one mount', async () => {
