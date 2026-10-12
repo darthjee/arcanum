@@ -98,6 +98,4 @@ docs/agents/specs/<topic>.md          # index: status, goal, decisions, links to
 docs/agents/specs/<topic>/<part>.md   # one file per part
 ```
 
-Example: `docs/agents/specs/docker.md` with its parts under `docs/agents/specs/docker/`.
-
 Every spec is listed in [`docs/agents/specs.md`](docs/agents/specs.md), the permanent specs index. Add an entry there when you create a spec, and remove it when the spec is removed.
