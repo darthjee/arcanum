@@ -86,7 +86,7 @@ Native-only commands (dispatched with `engine_dispatch --native-only`, e.g. `arc
 | `monitor-issues-monitor-issues` | `docker` | #230 |
 | `monitor-issues-rewrite-queue-pop` | `docker` | #586 |
 | `monitor-issues-rewrite-queue-push` | `docker` | #586 |
-| `permission-grant-add` | `native` | #328 |
+| `permission-grant-add` | `docker` | #328 |
 | `resolve-and-fetch` | `docker` | #193 |
 | `resolve-id-and-file` | `docker` | #227 |
 | `resolve-plan-paths` | `docker` | #230 |

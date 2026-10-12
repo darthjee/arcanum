@@ -84,7 +84,7 @@ The shim already passes `engine_dispatch` a per-command env allowlist and flags 
 | Flag | Repeatable | Values | Drives |
 | --- | --- | --- | --- |
 | `--needs=<tag>[,<tag>...]` | yes | `global-config`, `gitconfig`, `gh`, `remote` | the checklist `mounts` and `env` columns |
-| `--path-arg=<index>:<ro\|rw>` | yes | 1-based index into `<args...>` | `args:ro` / `args:rw` mounts |
+| `--path-arg=<index>:<ro\|rw\|rw-mkdir>` | yes | 1-based index into `<args...>` | `args:ro` / `args:rw` mounts |
 
 `--needs` maps to the checklist shorthands:
 
@@ -99,7 +99,7 @@ Both flags are ignored outside the container path, so adding them to a shim chan
 
 ### Argument path declaration
 
-`--path-arg=<index>:<mode>` marks `<args...>[index]` (1-based, counting only the args after `--`, never the repo path `--prepend-repo-path` adds) as a file path. For each declared index present on this call, dispatch resolves the mount on the host:
+`--path-arg=<index>:<mode>` (`<mode>` is `ro`, `rw` or `rw-mkdir`) marks `<args...>[index]` (1-based, counting only the args after `--`, never the repo path `--prepend-repo-path` adds) as a file path. For each declared index present on this call, dispatch resolves the mount on the host:
 
 | Case | Rule |
 | --- | --- |
@@ -108,9 +108,10 @@ Both flags are ignored outside the container path, so adding them to a shim chan
 | relative path | resolved against the shim's `$PWD`. If it lands outside the repo, the container gets the absolute path in its argv instead of the relative one, since the container's working directory is the repo |
 | inside `$REPO_PATH` | nothing extra, the repo is already mounted |
 | outside the repo, `ro` | the file itself, at the same path, `:ro`. Missing file: not mounted, and the command fails in the container the way it would natively |
-| outside the repo, `rw` | the parent directory, at the same path, `rw`, since the file may not exist yet. Missing parent: not mounted, same failure as natively |
+| outside the repo, `rw` | the parent directory, at the same path, `rw`, since the file may not exist yet. Missing parent: not mounted, same failure as natively. For writers that don't create the parent themselves (`discuss-issue-render-issue`) |
+| outside the repo, `rw-mkdir` | like `rw`, but a missing parent is created on the host (`mkdir -p`) before it is mounted, so the write lands where native would put it. For writers that `mkdir -p` the parent natively (`permission-grant-add`, `init-claude-write-label-config-*`). If the `mkdir -p` fails, nothing is mounted and the command fails in the container the way it would natively |
 
-Mount sources that are the same path or nested in one another are collapsed into one `-v` (an `rw` parent wins over an `ro` file under it). Only positional path arguments exist today (`github-issue-create <repo_path> <title> <file>`, `permission-grant-add <anchor> add <file> <pattern>`, …). A future option-style path (`--body-file <path>`) gets a sibling flag when it appears, not before.
+Mount sources that are the same path or nested in one another are collapsed into one `-v` (an `rw` parent wins over an `ro` file under it; `rw-mkdir` counts as `rw`). Only positional path arguments exist today (`github-issue-create <repo_path> <title> <file>`, `permission-grant-add <anchor> add <file> <pattern>`, …). A future option-style path (`--body-file <path>`) gets a sibling flag when it appears, not before.
 
 ## `docker run` invocation shape
 

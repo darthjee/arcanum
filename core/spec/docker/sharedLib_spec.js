@@ -1,9 +1,10 @@
+import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { MARK_TRANSITIONS } from '../../lib/commands/shared/GithubIssueMark.js';
 import { TAG_TO_LABEL } from '../../lib/utils/issue/Tags.js';
 import { itMatchesNativeInDockerWithGh } from '../support/factories/dockerGhParitySetup.js';
 import {
-  describeParityRepos, itMatchesNativeInDocker, nativeWrites, seedRepoFile
+  describeParityRepos, itMatchesNativeInDocker, nativeOutsideWrites, nativeWrites, seedRepoFile
 } from '../support/factories/dockerParitySetup.js';
 import { requireParityImage } from '../support/utils/dockerParity.js';
 import { REPO_ROOT } from '../support/utils/runCommand.js';
@@ -11,6 +12,8 @@ import { REPO_ROOT } from '../support/utils/runCommand.js';
 const LIB_DIR = path.join(REPO_ROOT, 'arcanum', '_lib');
 const ISSUE_FILE = 'docs/issues/12-fix-it.md';
 const STATE_FILE = '.claude/state/issue-12.json';
+const SETTINGS_FILE = '.claude/settings.json';
+const GRANT_PATTERN = 'Bash(make test:*)';
 
 /**
  * The real arcanum/_lib shims' `engine_dispatch` call: every one passes
@@ -136,6 +139,65 @@ describe('arcanum/_lib commands docker parity', () => {
       check: ({ native }) => expect(native.stdout).toContain('PLAN_FILE=docs/plans/12-fix-it/plan.md\n')
     });
   });
+
+  // permission-grant-add (#753): permission_grant.sh's `add` dispatches
+  // `--path-arg=2:rw-mkdir -- <anchor> <file> <pattern>`. An out-of-repo
+  // <file> gets its parent mounted read-write, created on the host first
+  // when missing (native `mkdir -p`s it too).
+  describeParityRepos('permission-grant-add', (getWorld) => {
+    /**
+     * @param {(repoPath: string, world: object) => string} file - the <file> argument.
+     * @returns {(repoPath: string, world: object) => string[]} `engine_dispatch`'s arguments.
+     */
+    const grantDispatch = (file) => (repoPath, world) => [
+      repoPath, 'permission-grant-add', path.join(LIB_DIR, 'permission_grant_shell.sh'),
+      '--path-arg=2:rw-mkdir', '--', repoPath, file(repoPath, world), GRANT_PATTERN
+    ];
+
+    itMatchesNativeInDocker('creates the repo-local settings.json', getWorld, {
+      command: 'permission-grant-add',
+      dispatchArgs: grantDispatch(() => SETTINGS_FILE),
+      check: (parity, repoPath) => {
+        expect(parity.native).toEqual({ stdout: '', stderr: '', code: 0 });
+        expect(nativeWrites(parity, repoPath)).toEqual([SETTINGS_FILE]);
+      }
+    });
+
+    itMatchesNativeInDocker('appends to a seeded repo-local settings.json', getWorld, {
+      command: 'permission-grant-add',
+      seed: (repoPath) => seedRepoFile(repoPath, SETTINGS_FILE, '{"permissions":{"allow":["Bash(ls:*)"]}}\n'),
+      dispatchArgs: grantDispatch((repoPath) => path.join(repoPath, SETTINGS_FILE)),
+      check: (parity, repoPath) => {
+        expect(parity.native).toEqual({ stdout: '', stderr: '', code: 0 });
+        expect(nativeWrites(parity, repoPath)).toEqual([SETTINGS_FILE]);
+      }
+    });
+
+    itMatchesNativeInDocker('appends to an existing settings.json outside the repo', getWorld, {
+      command: 'permission-grant-add',
+      seed: (_repoPath, { outsideDir }) => writeFile(
+        path.join(outsideDir, 'settings.json'), '{"permissions":{"allow":["Bash(ls:*)"]}}\n'
+      ),
+      dispatchArgs: grantDispatch((_repoPath, { outsideDir }) => path.join(outsideDir, 'settings.json')),
+      watchOutside: true,
+      check: (parity, repoPath, { outsideDir }) => {
+        expect(parity.native).toEqual({ stdout: '', stderr: '', code: 0 });
+        expect(nativeOutsideWrites(parity, outsideDir)).toEqual(['settings.json']);
+        expect(nativeWrites(parity, repoPath)).toEqual([]);
+      }
+    });
+
+    itMatchesNativeInDocker('creates a settings.json outside the repo whose parent does not exist yet', getWorld, {
+      command: 'permission-grant-add',
+      dispatchArgs: grantDispatch((_repoPath, { outsideDir }) => path.join(outsideDir, 'new-dir', 'settings.json')),
+      watchOutside: true,
+      check: (parity, repoPath, { outsideDir }) => {
+        expect(parity.native).toEqual({ stdout: '', stderr: '', code: 0 });
+        expect(nativeOutsideWrites(parity, outsideDir)).toEqual([path.join('new-dir', 'settings.json')]);
+        expect(nativeWrites(parity, repoPath)).toEqual([]);
+      }
+    });
+  }, { worktree: true });
 
   // Opt-in gh cases (docker batch 3, #747): real GitHub calls against the
   // ARCANUM_DOCKER_PARITY_GH_* sandbox, pending unless

@@ -117,6 +117,54 @@ describe('arcanum/_lib engine_dispatch routing (via the real shims)', () => {
     dockerArgs: ({ repoPath }) => [repoPath, 'docs/issues', 'docs/plans', '12']
   });
 
+  // Issue #753: permission_grant.sh's `add` declares
+  // `--path-arg=2:rw-mkdir` on <file>. A repo-relative target needs no
+  // extra mount; an out-of-repo target whose parent does not exist yet
+  // gets that parent created on the host and mounted read-write, so the
+  // pattern lands there in every mode.
+  const SETTINGS_PATTERN = 'Bash(make test:*)';
+
+  /**
+   * @param {string} file - the settings file to read.
+   * @returns {Promise<object>} its parsed JSON.
+   */
+  const readSettings = async (file) => JSON.parse(await readFile(file, 'utf8'));
+
+  itRoutesWithInvocationLog('permission_grant.sh add (repo-relative target)', path.join(LIB_DIR, 'permission_grant.sh'), {
+    command: 'permission-grant-add',
+    prepare: async ({ repoPath }) => ({ args: [repoPath, 'add', '.claude/settings.json', SETTINGS_PATTERN] }),
+    check: async (result, { repoPath }) => {
+      expect(result).toEqual({ stdout: '', stderr: '', code: 0 });
+      expect((await readSettings(path.join(repoPath, '.claude', 'settings.json'))).permissions.allow)
+        .toEqual([SETTINGS_PATTERN]);
+    },
+    dockerArgs: ({ repoPath }) => [repoPath, '.claude/settings.json', SETTINGS_PATTERN]
+  });
+
+  describe('permission_grant.sh add (out-of-repo target, missing parent)', () => {
+    let outsideDir;
+    let target;
+
+    itRoutesWithInvocationLog('permission_grant.sh add', path.join(LIB_DIR, 'permission_grant.sh'), {
+      command: 'permission-grant-add',
+      prepare: async ({ repoPath }) => {
+        outsideDir = await realpath(await createTempDir('arcanum-core-permission-grant-outside-'));
+        target = path.join(outsideDir, 'new-dir', 'settings.json');
+
+        return {
+          args: [repoPath, 'add', target, SETTINGS_PATTERN],
+          cleanup: () => removeTempDir(outsideDir)
+        };
+      },
+      check: async (result) => {
+        expect(result).toEqual({ stdout: '', stderr: '', code: 0 });
+        expect((await readSettings(target)).permissions.allow).toEqual([SETTINGS_PATTERN]);
+      },
+      dockerArgs: ({ repoPath }) => [repoPath, target, SETTINGS_PATTERN],
+      dockerMounts: () => [`${path.dirname(target)}:${path.dirname(target)}`]
+    });
+  });
+
   // Docker batch 3 (issue #747): resolve_and_fetch.sh and spawn_issue.sh
   // need GitHub, so their cases run in a repo with no `origin` and fail
   // before any GitHub call — core/bin/arcanum (native, and the

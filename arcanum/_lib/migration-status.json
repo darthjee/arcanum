@@ -13,7 +13,7 @@
   "github-issue-mark-planning": "docker",
   "github-issue-mark-split": "docker",
   "issue-state": "docker",
-  "permission-grant-add": "native",
+  "permission-grant-add": "docker",
   "checkout-safe-branch": "docker",
   "list-agents": "docker",
   "resolve-plan-paths": "docker",

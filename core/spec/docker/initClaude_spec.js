@@ -168,12 +168,32 @@ describe('init-claude commands docker parity', () => {
         ),
         dispatchArgs: (repoPath, { outsideDir }) => [
           repoPath, command, path.join(SCRIPTS_DIR, `write_label_config_${sub}_shell.sh`),
-          '--prepend-repo-path', '--path-arg=1:rw', '--', path.join(outsideDir, 'labels.json'), ...items
+          '--prepend-repo-path', '--path-arg=1:rw-mkdir', '--', path.join(outsideDir, 'labels.json'), ...items
         ],
         watchOutside: true,
         check: (parity, repoPath, { outsideDir }) => {
           expect(parity.native).toEqual({ stdout: '', stderr: '', code: 0 });
           expect(nativeOutsideWrites(parity, outsideDir)).toEqual(['labels.json']);
+          expect(nativeWrites(parity, repoPath)).toEqual([]);
+        }
+      });
+    });
+
+    // `rw-mkdir` (#753): a missing out-of-repo parent is created on the
+    // host before mounting, as LabelConfig `mkdir -p`s it natively.
+    LABEL_CASES.filter(({ sub }) => sub !== 'remove').forEach(({ sub, items }) => {
+      const command = `init-claude-write-label-config-${sub}`;
+
+      itMatchesNativeInDocker(`${sub} creates a config file outside the repo whose parent does not exist yet`, getWorld, {
+        command,
+        dispatchArgs: (repoPath, { outsideDir }) => [
+          repoPath, command, path.join(SCRIPTS_DIR, `write_label_config_${sub}_shell.sh`),
+          '--prepend-repo-path', '--path-arg=1:rw-mkdir', '--', path.join(outsideDir, 'new-dir', 'labels.json'), ...items
+        ],
+        watchOutside: true,
+        check: (parity, repoPath, { outsideDir }) => {
+          expect(parity.native).toEqual({ stdout: '', stderr: '', code: 0 });
+          expect(nativeOutsideWrites(parity, outsideDir)).toEqual([path.join('new-dir', 'labels.json')]);
           expect(nativeWrites(parity, repoPath)).toEqual([]);
         }
       });
