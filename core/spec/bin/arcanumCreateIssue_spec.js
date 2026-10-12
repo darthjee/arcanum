@@ -1,9 +1,11 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { notDockerReadyWarning } from '../support/factories/engineDispatchDockerSetup.js';
+import {
+  createGhNeedsWorld, dockerUnavailableWarning, expectGhNeedsRun, runCalls, splitRunArgv
+} from '../support/factories/engineDispatchDockerSetup.js';
 import { seedGithubLikeRepo } from '../support/factories/githubParitySetup.js';
 import { seedEngineMode } from '../support/utils/engineMode.js';
-import { createFakeDockerBin } from '../support/utils/fakeDockerBin.js';
+import { DOCKER_PRESETS, createFakeDockerBin } from '../support/utils/fakeDockerBin.js';
 import { createFakeGhBin } from '../support/utils/fakeGhBin.js';
 import { createGitFixtureRepo } from '../support/utils/gitFixtureRepo.js';
 import { REPO_ROOT, runCommand } from '../support/utils/runCommand.js';
@@ -23,8 +25,15 @@ const DRAFTS_DIR = path.join('.claude', 'state', 'create-issue');
 // HOME surviving the native path's `env -i`), and that under
 // engine.mode=docker both follow the native-only rule of
 // docs/agents/specs/docker/dispatch.md: with their real
-// migration-status.json status (`native`, not docker-ready yet) they run
-// native on the host with the row-3 warning, never reaching docker.
+// migration-status.json status (`docker`, issue #749) they reach
+// `docker run` (a passthrough fake `docker`) through their
+// `--needs=global-config,gitconfig,gh`: the global config and global
+// gitconfig mounted read-only, `GH_TOKEN` forwarded by name only, the
+// repo mounted at its own path (so absolute draft paths mean the same
+// thing on both sides) and no TTY flag; with Docker unavailable they fall
+// back to native on the host with the "Docker is unavailable" warning.
+// The real container is compared with native in core/spec/docker/
+// (local only).
 //
 // GitHub access is stubbed by a fake `gh` on PATH; no case reaches a
 // REST call (start's preflight only needs `gh auth token`, and publish's
@@ -154,31 +163,128 @@ describe('arcanum-create-issue native-only routing (via the real start.sh / publ
     });
   });
 
-  it('runs both shims native on the host with the not-docker-ready warning when engine.mode is docker', async () => {
-    const fakeDocker = await createFakeDockerBin();
+  describe('with engine.mode docker', () => {
+    let fakeDocker;
+    let world;
 
-    try {
+    /**
+     * Seeds `engine.mode=docker`, builds the gh-needs world and a
+     * passthrough fake `docker`, and returns the env to run a shim with:
+     * the fake `docker` and fake `gh` first on `PATH`, `HOME`, plus the
+     * world's `CLAUDE_CONFIG_DIR`, `GIT_CONFIG_GLOBAL` and `GH_TOKEN`.
+     * @param {object} [options] - `createFakeDockerBin` options (default
+     *   passthrough).
+     * @returns {Promise<object>} the env.
+     */
+    async function buildDockerEnv(options = { mode: 'passthrough' }) {
       await seedEngineMode(repo, 'docker');
-      const draft = await seedDraft('# Only a title\n');
+      world = await createGhNeedsWorld();
+      fakeDocker = await createFakeDockerBin(options);
       const ghEnv = await buildEnv();
-      const env = { ...ghEnv, PATH: `${fakeDocker.binDir}${path.delimiter}${ghEnv.PATH}` };
+
+      return { ...ghEnv, ...world.env, PATH: `${fakeDocker.binDir}${path.delimiter}${ghEnv.PATH}` };
+    }
+
+    /**
+     * Asserts the single `docker run` carries the gh-needs mounts and
+     * env (`GH_TOKEN` by name only), the repo mounted at its own path,
+     * no TTY flag, and `after` following the image.
+     * @param {object[]} calls - the fake docker's logged calls.
+     * @param {string[]} after - the expected argv after the image.
+     * @returns {void}
+     */
+    function expectCreateIssueRun(calls, after) {
+      expectGhNeedsRun(calls, repo.repoPath, after, world);
+
+      runCalls(calls).forEach(({ argv }) => {
+        const { flags } = splitRunArgv(argv);
+
+        expect(flags).not.toContain('-t');
+        expect(flags).not.toContain('-it');
+        expect(flags).not.toContain('--tty');
+      });
+    }
+
+    afterEach(async () => {
+      await fakeDocker.cleanup();
+      await world.cleanup();
+    });
+
+    it('start.sh --new runs in docker and creates a draft under the repo mount', async () => {
+      const result = await runShim(START_SCRIPT, await buildDockerEnv(), repo.repoPath, '--new');
+      const match = result.stdout.match(/^STATUS=new\nFILE=(.+\/\.claude\/state\/create-issue\/\d{8}-\d{6}\.md)\n$/);
+
+      expect(result.code).toEqual(0);
+      expect(result.stderr).toEqual('');
+      expect(match).not.toBeNull();
+      expect(match[1].startsWith(path.join(repo.repoPath, DRAFTS_DIR))).toBeTrue();
+      expect(await readFile(match[1], 'utf8')).toEqual('');
+      expectCreateIssueRun(await fakeDocker.readCalls(), ['arcanum-create-issue-start', repo.repoPath, '--new']);
+    });
+
+    it('start.sh --resume runs in docker with the absolute draft path forwarded as-is', async () => {
+      const draft = await seedDraft('# A title\n');
+      const result = await runShim(START_SCRIPT, await buildDockerEnv(), repo.repoPath, '--resume', draft);
+
+      expect(result).toEqual({ stdout: `STATUS=resumed\nFILE=${draft}\n`, stderr: '', code: 0 });
+      expectCreateIssueRun(
+        await fakeDocker.readCalls(), ['arcanum-create-issue-start', repo.repoPath, '--resume', draft]
+      );
+    });
+
+    it('start.sh exits 2 in docker on an unknown --resume draft', async () => {
+      const result = await runShim(START_SCRIPT, await buildDockerEnv(), repo.repoPath, '--resume', 'nope.md');
+
+      expect(result).toEqual({ stdout: 'ERROR=unknown draft: nope.md\n', stderr: '', code: 2 });
+      expectCreateIssueRun(
+        await fakeDocker.readCalls(), ['arcanum-create-issue-start', repo.repoPath, '--resume', 'nope.md']
+      );
+    });
+
+    it('publish.sh runs in docker and exits 2 on an empty draft body, creating nothing', async () => {
+      const draft = await seedDraft('# Only a title\n');
+      const result = await runShim(
+        PUBLISH_SCRIPT, await buildDockerEnv(), repo.repoPath, draft, 'Title', '--confirmed', 'bug'
+      );
+
+      expect(result).toEqual({ stdout: 'ERROR=the draft body is empty\n', stderr: '', code: 2 });
+      expectCreateIssueRun(
+        await fakeDocker.readCalls(),
+        ['arcanum-create-issue-publish', repo.repoPath, draft, 'Title', '--confirmed', 'bug']
+      );
+    });
+
+    it('publish.sh runs in docker and exits 2 on a malformed label', async () => {
+      const draft = await seedDraft('# T\n\nBody.\n');
+      const result = await runShim(
+        PUBLISH_SCRIPT, await buildDockerEnv(), repo.repoPath, draft, 'Title', '--confirmed', 'a,b'
+      );
+
+      expect(result).toEqual({ stdout: 'ERROR=malformed label: "a,b"\n', stderr: '', code: 2 });
+      expectCreateIssueRun(
+        await fakeDocker.readCalls(),
+        ['arcanum-create-issue-publish', repo.repoPath, draft, 'Title', '--confirmed', 'a,b']
+      );
+    });
+
+    it('falls back to native on the host with the Docker-unavailable warning when the daemon is down', async () => {
+      const draft = await seedDraft('# Only a title\n');
+      const env = await buildDockerEnv({ inspect: DOCKER_PRESETS.daemonDown });
       const start = await runShim(START_SCRIPT, env, repo.repoPath, '--resume', 'nope.md');
       const publish = await runShim(PUBLISH_SCRIPT, env, repo.repoPath, draft, 'Title', '--confirmed', 'bug');
 
       expect(start).toEqual({
         stdout: 'ERROR=unknown draft: nope.md\n',
-        stderr: notDockerReadyWarning('arcanum-create-issue-start'),
+        stderr: dockerUnavailableWarning('daemon not reachable', 'arcanum-create-issue-start'),
         code: 2
       });
       expect(publish).toEqual({
         stdout: 'ERROR=the draft body is empty\n',
-        stderr: notDockerReadyWarning('arcanum-create-issue-publish'),
+        stderr: dockerUnavailableWarning('daemon not reachable', 'arcanum-create-issue-publish'),
         code: 2
       });
-      expect(await fakeDocker.readCalls()).toEqual([]);
-    } finally {
-      await fakeDocker.cleanup();
-    }
+      expect(runCalls(await fakeDocker.readCalls())).toEqual([]);
+    });
   });
 
   it('rejects missing shim arguments with exit 2 and usage on stderr', async () => {
