@@ -35,6 +35,7 @@ const REPO_CONTEXT_COMMANDS = [
   'auto-monitor-issue-pr-resolve-pr-number',
   'auto-monitor-pr-monitor-pr',
   'auto-new-issue-commit-issue',
+  'auto-plan-issue-auto-next',
   'auto-plan-issue-commit-plan',
   'checkout-safe-branch',
   'discuss-issue-render-issue',
@@ -93,7 +94,7 @@ describe('COMMANDS', () => {
     expect(COMMANDS['arcanum-update-run-update-apply'].method).toBe('apply');
   });
 
-  it('sets validateRepoPath: false on arcanum-check-config, the file-only auto-fix-all-queue subcommands, finish-report, github-issue-info, the github-issue-mark-* family, github-issue-update, the init-claude-* family and the monitor-issues-rewrite-queue-* family', () => {
+  it('sets validateRepoPath: false on arcanum-check-config, auto-plan-issue-auto-next, the file-only auto-fix-all-queue subcommands, finish-report, github-issue-info, the github-issue-mark-* family, github-issue-update, the init-claude-* family and the monitor-issues-rewrite-queue-* family', () => {
     const skipValidation = Object.keys(COMMANDS).filter((name) => COMMANDS[name].validateRepoPath === false);
 
     expect(skipValidation).toEqual([
@@ -103,6 +104,7 @@ describe('COMMANDS', () => {
       'auto-fix-all-queue-next',
       'auto-fix-all-queue-pop',
       'auto-fix-all-queue-wait-next',
+      'auto-plan-issue-auto-next',
       'finish-report',
       'github-issue-info',
       'github-issue-mark-created',
@@ -136,6 +138,14 @@ describe('COMMANDS', () => {
 
     Object.entries(expected).forEach(([name, method]) => {
       expect(COMMANDS[name]).toEqual({ module: 'commands/monitor-issues/MonitorIssuesConfig.js', method });
+    });
+  });
+
+  it('routes next-step-prompt to NextStepPrompt#run with context: \'none\'', () => {
+    expect(COMMANDS['next-step-prompt']).toEqual({
+      module: 'commands/shared/NextStepPrompt.js',
+      method: 'run',
+      context: 'none'
     });
   });
 

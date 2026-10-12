@@ -15,7 +15,7 @@ Part of the [Docker Engine spec](../docker.md) (epic #724). This checklist track
 | --- | --- |
 | `command` | Dispatch command name. In the "not routed through dispatch" section, the file name. |
 | `script` | Shim path, plus the subcommand(s) where the shim is a router. |
-| `kind` | `dispatched` (dual entrypoint, in `migration-status.json`) / `native-only`. In the "not routed through dispatch" section: `sourced` (a library only ever `source`d by other scripts; it runs wherever its caller runs and is unused inside the container, where native code runs) / `wrapper` (a per-skill script that `exec`s a dispatched `arcanum/_lib` shim, covered by that shim's rows) / `entrypoint` (called directly by skills, never dispatched, so always bash on the host) / `bootstrap` (install/update bootstrap, runs before or outside an installed arcanum, so it can never be dispatched). Only `dispatched` and `native-only` rows can ever be ✅. Every non-dispatched kind is permanently `n/a`. |
+| `kind` | `dispatched` (dual entrypoint, in `migration-status.json`) / `native-only`. In the "not routed through dispatch" section: `sourced` (a library only ever `source`d by other scripts; it runs wherever its caller runs and is unused inside the container, where native code runs) / `wrapper` (a per-skill script that `exec`s a dispatched `arcanum/_lib` shim, covered by that shim's rows) / `bootstrap` (install/update bootstrap, runs before or outside an installed arcanum, so it can never be dispatched). Only `dispatched` and `native-only` rows can ever be ✅. Every non-dispatched kind is permanently `n/a`. |
 | `status` | ☐ not docker-ready / ✅ docker-ready / `blocked (no native)` / `n/a`. |
 | `credentials` | `none` / `gh` / `git-push (ssh)` / `inherits target` / `?`. `git-push (ssh)` covers any git remote access (fetch or push), whatever the transport. `inherits target` means the command runs the target project's own script, so its needs are that project's. `?` means not determinable yet. |
 | `mounts` | Extra mounts beyond the implicit ones (repo, git common dir for worktrees, log location): `global-config:ro`, `gitconfig:ro`, `remote`, `args:ro`/`args:rw`, `host-only`, or `—` for none. Derived by the rule in [mounts.md](mounts.md#deriving-the-checklist-mounts-column). `?` means not determinable yet. |
@@ -51,6 +51,7 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 | `github-issue-update` | `arcanum/_lib/github_issue.sh` `update` | dispatched | ✅ | gh | global-config:ro, gitconfig:ro, args:ro | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN | #747 | No parity case: it overwrites an issue body. The routing spec covers the docker wiring. `--path-arg=4:ro`: `<file>` is mounted read-only at its own path when it sits outside the repo. |
 | `issue-state` | `arcanum/_lib/issue_state.sh` | dispatched | ✅ | none | — | — | #745 | |
 | `list-agents` | `arcanum/_lib/list_agents.sh` | dispatched | ✅ | none | — | — | #745 | |
+| `next-step-prompt` | `arcanum/_lib/next_step_prompt.sh` | dispatched | n/a | none | host-only | — | #760 | Host-only: TTY-owning, it must prompt on the host's real `/dev/tty`, which the container doesn't have. The shim reads the repo path from `--repo` and execs the shell twin on a usage error. |
 | `permission-grant-add` | `arcanum/_lib/permission_grant.sh` `add` | dispatched | ✅ | none | args:rw | — | #753 | `--path-arg=2:rw-mkdir`: the directory of `<file>` is mounted read-write when it sits outside the repo, created first if missing (matching native `mkdir -p`). Callers target the repo's own `.claude/settings.json`; an out-of-repo target exposes its whole parent directory read-write (see [mounts.md](mounts.md)). A relative `<file>` assumes the caller's cwd is `<anchor>`: dispatch resolves it against `$PWD`, `PermissionGrant` against `<anchor>`. |
 | `resolve-and-fetch` | `arcanum/_lib/resolve_and_fetch.sh` | dispatched | ✅ | gh, git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, GH_TOKEN, remote | #747 | `remote` because it runs checkout-safe-branch, whose `git fetch` needs git remote access. |
 | `resolve-id-and-file` | `arcanum/_lib/resolve_id_and_file.sh` | dispatched | ✅ | none | — | — | #745 | |
@@ -150,6 +151,7 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 
 | command | script | kind | status | credentials | mounts | env | issue | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `auto-plan-issue-auto-next` | `auto-plan-issue/scripts/auto_next.sh` | dispatched | n/a | git-push (ssh) | host-only | — | #760 | Host-only: it runs `next-step-prompt` in-process (a `host-only` command) and pushes with the host's git credentials. `GIT_CONFIG_GLOBAL`, `SSH_AUTH_SOCK` and `GIT_SSH_COMMAND` are forwarded to the native path so the host-side push can use the SSH agent. |
 | `auto-plan-issue-commit-plan` | `auto-plan-issue/scripts/commit_plan.sh` | dispatched | ✅ | git-push (ssh) | global-config:ro, gitconfig:ro, remote | CLAUDE_CONFIG_DIR, GIT_CONFIG_GLOBAL, remote | #748 | |
 
 ## discuss-issue
@@ -188,7 +190,7 @@ Shorthands used in `mounts` and `env` (full rules in [mounts.md](mounts.md) and 
 
 ## Not routed through dispatch
 
-Scripts under `<skill>/scripts/` and `arcanum/_lib/` that are not routed through `engine_dispatch.sh` (excluding shell twins and `test_*` files), plus the install/update bootstraps. Each row has a non-dispatched kind and is permanently `n/a`: `sourced` libraries run wherever their caller runs, each `wrapper` is covered by the dispatched row named in its `notes`, the two `entrypoint`s stay bash on the host until #760 makes them dispatched `host-only` commands, and a `bootstrap` can never be dispatched. The full rule is in [dispatch.md](dispatch.md#scripts-not-routed-through-dispatch) (#733).
+Scripts under `<skill>/scripts/` and `arcanum/_lib/` that are not routed through `engine_dispatch.sh` (excluding shell twins and `test_*` files), plus the install/update bootstraps. Each row has a non-dispatched kind and is permanently `n/a`: `sourced` libraries run wherever their caller runs, each `wrapper` is covered by the dispatched row named in its `notes`, and a `bootstrap` can never be dispatched. The full rule is in [dispatch.md](dispatch.md#scripts-not-routed-through-dispatch) (#733). The two former `entrypoint`s, `next_step_prompt.sh` and `auto_next.sh`, became dispatched `host-only` commands in #760 and moved to their skill sections.
 
 | command | script | kind | status | credentials | mounts | env | issue | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -201,7 +203,6 @@ Scripts under `<skill>/scripts/` and `arcanum/_lib/` that are not routed through
 | `global_config.sh` | `arcanum/_lib/global_config.sh` | sourced | n/a | | | | #733 | |
 | `lock.sh` | `arcanum/_lib/lock.sh` | sourced | n/a | | | | #733 | |
 | `merge_body.sh` | `arcanum/_lib/merge_body.sh` | sourced | n/a | | | | #733 | Sourced, not an entrypoint. |
-| `next_step_prompt.sh` | `arcanum/_lib/next_step_prompt.sh` | entrypoint | n/a | | | | #733 | Bash on the host. Owns `/dev/tty`. Becomes a dispatched `host-only` command in #760. |
 | `origin.sh` | `arcanum/_lib/origin.sh` | sourced | n/a | | | | #733 | |
 | `push.sh` | `arcanum/_lib/push.sh` | sourced | n/a | | | | #733 | Sourced, not an entrypoint. |
 | `repo_config.sh` | `arcanum/_lib/repo_config.sh` | sourced | n/a | | | | #733 | |
@@ -216,7 +217,6 @@ Scripts under `<skill>/scripts/` and `arcanum/_lib/` that are not routed through
 | `resolve_plan_paths.sh` | `auto-fix-issue/scripts/resolve_plan_paths.sh` | wrapper | n/a | | | | #733 | Covered by the `resolve-plan-paths` row. |
 | `github.sh` | `auto-new-issue/scripts/github.sh` | wrapper | n/a | | | | #733 | Covered by the `github-issue-*` rows. |
 | `resolve_id_and_file.sh` | `auto-new-issue/scripts/resolve_id_and_file.sh` | wrapper | n/a | | | | #733 | Covered by the `resolve-id-and-file` row. |
-| `auto_next.sh` | `auto-plan-issue/scripts/auto_next.sh` | entrypoint | n/a | | | | #733 | Bash on the host. Runs `next_step_prompt.sh --no-prompt` and `git push`. Becomes a dispatched `host-only` command in #760. |
 | `list_agents.sh` | `auto-plan-issue/scripts/list_agents.sh` | wrapper | n/a | | | | #733 | Covered by the `list-agents` row. |
 | `resolve_plan_paths.sh` | `auto-plan-issue/scripts/resolve_plan_paths.sh` | wrapper | n/a | | | | #733 | Covered by the `resolve-plan-paths` row. |
 | `github.sh` | `discuss-issue/scripts/github.sh` | wrapper | n/a | | | | #733 | Covered by the `github-issue-*` rows. |

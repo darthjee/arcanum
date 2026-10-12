@@ -7,6 +7,7 @@ import { itRoutesGhEngineDispatch } from '../support/sharedExamples/ghEngineDisp
 import { itRoutesWithInvocationLog } from '../support/sharedExamples/invocationLogRouting.js';
 import { itRoutesRemoteEngineDispatch } from '../support/sharedExamples/remoteEngineDispatchRouting.js';
 import { seedEngineMode } from '../support/utils/engineMode.js';
+import { createGitFixtureRepo } from '../support/utils/gitFixtureRepo.js';
 import { FAKE_SSH_ERROR, SSH_REMOTE_FAILURE, createFakeSshBin } from '../support/utils/fakeSshBin.js';
 import { REPO_ROOT, runCommand, seedOriginUrl } from '../support/utils/runCommand.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
@@ -162,6 +163,77 @@ describe('arcanum/_lib engine_dispatch routing (via the real shims)', () => {
       },
       dockerArgs: ({ repoPath }) => [repoPath, target, SETTINGS_PATTERN],
       dockerMounts: () => [`${path.dirname(target)}:${path.dirname(target)}`]
+    });
+  });
+
+  // Issue #760: next_step_prompt.sh is `host-only` — under
+  // engine.mode=docker it runs native on the host (logged, no `docker`
+  // call, no fallback warning), keeping the host's /dev/tty. Its shim
+  // forwards CLAUDE_CONFIG_DIR/HOME and ARCANUM_TTY_DEVICE to the native
+  // side: the no-TTY case would hang or answer differently without the
+  // latter, and the auto-key case reads the global tier through the former.
+  describe('next_step_prompt.sh (host-only)', () => {
+    const NEXT_STEP_SHIM = path.join(LIB_DIR, 'next_step_prompt.sh');
+
+    itRoutesWithInvocationLog('next_step_prompt.sh (no TTY)', NEXT_STEP_SHIM, {
+      command: 'next-step-prompt',
+      hostOnly: true,
+      prepare: async ({ repoPath }) => ({
+        args: ['--repo', repoPath, '--command', '/auto-fix-issue 1', '--command', '/auto-fix-issue 2'],
+        env: { ARCANUM_TTY_DEVICE: path.join(repoPath, 'missing-tty') }
+      }),
+      check: (result) => {
+        expect(result).toEqual({
+          stdout: 'FALLBACK=chat\nCOMMAND=/auto-fix-issue 1\nCOMMAND=/auto-fix-issue 2\n',
+          stderr: '',
+          code: 4
+        });
+      }
+    });
+
+    itRoutesWithInvocationLog('next_step_prompt.sh (auto key set in the global tier)', NEXT_STEP_SHIM, {
+      command: 'next-step-prompt',
+      hostOnly: true,
+      prepare: async ({ repoPath, configDir }) => {
+        await writeFile(
+          path.join(configDir, 'arcanum-config.json'),
+          JSON.stringify({ next_step: { auto: { 'discuss-issue': true } } })
+        );
+
+        return {
+          args: ['--repo', repoPath, '--command', '/auto-plan-issue 9', '--auto-key', 'discuss-issue'],
+          env: { ARCANUM_TTY_DEVICE: path.join(repoPath, 'missing-tty') }
+        };
+      },
+      check: (result) => {
+        expect(result).toEqual({
+          stdout: 'CHOICE=yes\nAUTO=true\n',
+          stderr: 'auto-continuing: /auto-plan-issue 9 (next_step.auto.discuss-issue=true)\n',
+          code: 0
+        });
+      }
+    });
+
+    ['shell', 'native', 'docker'].forEach((mode) => {
+      it(`keeps the shell usage error with no --repo when engine.mode=${mode}`, async () => {
+        const repo = await createGitFixtureRepo();
+
+        try {
+          await seedEngineMode(repo, mode);
+
+          const result = await runCommand([NEXT_STEP_SHIM, '--command', '/x'], repo.repoPath);
+
+          expect(result.code).toEqual(1);
+          expect(result.stdout).toEqual('');
+          expect(result.stderr).toEqual(
+            'Error: --repo is required\n' +
+            `Usage: ${path.join(LIB_DIR, 'next_step_prompt_shell.sh')} --repo <repo_path> --command "<command>" ` +
+            '[--command "<command>"]... [--auto-key <skill>] [--no-prompt]\n'
+          );
+        } finally {
+          await repo.cleanup();
+        }
+      });
     });
   });
 
