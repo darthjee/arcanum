@@ -51,6 +51,7 @@ Native-only commands (dispatched with `engine_dispatch --native-only`, e.g. `arc
 | `auto-monitor-issue-pr-resolve-pr-number` | `docker` | #230 |
 | `auto-monitor-pr-monitor-pr` | `docker` | #230 |
 | `auto-new-issue-commit-issue` | `docker` | #230 |
+| `auto-plan-issue-auto-next` | `host-only` | #760 |
 | `auto-plan-issue-commit-plan` | `docker` | #230 |
 | `checkout-safe-branch` | `docker` | #230 |
 | `discuss-issue-confirm` | `docker` | #230 |
@@ -86,6 +87,7 @@ Native-only commands (dispatched with `engine_dispatch --native-only`, e.g. `arc
 | `monitor-issues-monitor-issues` | `docker` | #230 |
 | `monitor-issues-rewrite-queue-pop` | `docker` | #586 |
 | `monitor-issues-rewrite-queue-push` | `docker` | #586 |
+| `next-step-prompt` | `host-only` | #760 |
 | `permission-grant-add` | `docker` | #328 |
 | `resolve-and-fetch` | `docker` | #193 |
 | `resolve-id-and-file` | `docker` | #227 |
