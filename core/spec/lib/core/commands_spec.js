@@ -139,6 +139,14 @@ describe('COMMANDS', () => {
     });
   });
 
+  it('routes next-step-prompt to NextStepPrompt#run with context: \'none\'', () => {
+    expect(COMMANDS['next-step-prompt']).toEqual({
+      module: 'commands/shared/NextStepPrompt.js',
+      method: 'run',
+      context: 'none'
+    });
+  });
+
   it('routes github-issue-fetch/github-issue-update to GithubIssue#fetchIssue/#update', () => {
     expect(COMMANDS['github-issue-fetch']).toEqual({
       module: 'commands/shared/GithubIssue.js',

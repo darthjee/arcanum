@@ -53,7 +53,10 @@
  *     docs/agents/plans/431-migrate-auto-fix-issue-list-plan-agents-entrypoint-to-native-node-js/node.md,
  *     docs/agents/plans/432-migrate-auto-fix-issue-list-plan-steps-entrypoint-to-native-node-js/node.md,
  *     and
- *     docs/agents/plans/434-migrate-auto-fix-issue-run-checks-entrypoint-to-native-node-js/node.md).
+ *     docs/agents/plans/434-migrate-auto-fix-issue-run-checks-entrypoint-to-native-node-js/node.md),
+ *     and to `next-step-prompt` (host-only; its shim forwards the raw
+ *     `--repo <path> --command <cmd>...` flags, which the command parses
+ *     and validates itself).
  * @property {boolean} [validateRepoPath] - defaults to `true` for
  *   `context: 'repo'`; set `false` to skip the Dispatcher-level
  *   `RepoContext#validate()` (e.g. entries with their own not-a-repo error
@@ -455,6 +458,7 @@ export const COMMANDS = {
     context: 'repo',
     validateRepoPath: false
   },
+  'next-step-prompt': { module: 'commands/shared/NextStepPrompt.js', method: 'run', context: 'none' },
   'permission-grant-add': { module: 'commands/shared/PermissionGrant.js', method: 'add', context: 'claude' },
   'resolve-and-fetch': {
     module: 'commands/shared/ResolveAndFetch.js',
