@@ -9,4 +9,4 @@ Index of every spec under [`docs/agents/specs/`](specs/). A spec is a forward-lo
 | Spec | Summary | Status |
 | --- | --- | --- |
 | [Shell Engine Removal](specs/shell-engine-removal.md) | Remove `engine.mode=shell` and every `*_shell.sh` implementation once every entrypoint has a native counterpart. | Proposed |
-| [Docker Engine](specs/docker.md) | Implement `engine.mode=docker`: run arcanum's scripts inside a container instead of on the host. Split spec: index plus parts under `specs/docker/`. Design: [Docker Engine](architecture/docker-engine.md). | Implemented — pending removal (#732) |
+| [Docker Engine](architecture/docker-engine.md) | Implement `engine.mode=docker`: run arcanum's scripts inside a container instead of on the host. The design now lives in the linked architecture doc; the split spec files are deleted in #732. | Implemented — pending removal (#732) |
