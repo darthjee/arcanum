@@ -394,7 +394,7 @@ _engine_dispatch_docker_run() (
         if [[ ! -d "$src" && "$mode" == "rw-mkdir" ]]; then
           # Parity with natives that `mkdir -p` the parent themselves;
           # a failed mkdir skips the mount, like `rw`.
-          mkdir -p "$src" 2>/dev/null
+          mkdir -p "$src" 2>/dev/null || true
         fi
         [[ -d "$src" ]] || continue
         # From here on rw-mkdir is plain rw (collapse and -v emission).
