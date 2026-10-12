@@ -1,7 +1,7 @@
 #!/bin/sh
 # Entrypoint for the core/ runtime image (the `runtime` target of
 # core/Dockerfile, used by engine.mode=docker). See
-# docs/agents/specs/docker/image.md#runtime-user-and-entrypoint.
+# docs/agents/architecture/docker-engine.md#runtime-user-and-entrypoint.
 #
 # Gives the arbitrary, non-root container uid a passwd/group entry via
 # nss_wrapper (see core/docker-runtime-env.sh), then execs the arcanum
