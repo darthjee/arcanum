@@ -14,7 +14,7 @@ import { TIMEOUT } from './dockerParitySetup.js';
 // the git common dir mount) and every `make docker-parity` run compares
 // real fetch/push behavior. The real ssh transport is covered by the
 // opt-in `itMatchesNativeInDockerWithSsh` (see
-// docs/agents/specs/docker/testing.md -> "Credentials"). Local only,
+// docs/agents/architecture/docker-engine.md#credentials). Local only,
 // never part of `yarn test`.
 
 /** The bare origin's directory name, inside the fixture's git common dir. */

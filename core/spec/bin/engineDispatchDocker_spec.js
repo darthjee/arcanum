@@ -30,7 +30,7 @@ import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 const STATUSES = ['shell', 'native', 'docker', 'host-only'];
 
 // Dispatch-level specs for arcanum/_lib/engine_dispatch.sh (see
-// docs/agents/specs/docker/testing.md). Each case sources the lib in a
+// docs/agents/architecture/docker-engine.md#dispatch-level-specs). Each case sources the lib in a
 // `bash -c` wrapper and points the sourced
 // _ENGINE_DISPATCH_MIGRATION_STATUS_FILE at a per-test fixture map.
 // The engine.mode=docker cases (resolution table, native-only, argv,

@@ -8,7 +8,7 @@ import { mergeEngineMode } from './engineMode.js';
 import { createTempDir, removeTempDir } from './tempDir.js';
 
 // Helpers for the local-only docker parity suite under core/spec/docker/
-// (see docs/agents/specs/docker/testing.md -> "Parity specs (local only)").
+// (see docs/agents/architecture/docker-engine.md#parity-specs-local-only).
 // Run through `yarn test:docker` (spec/support/jasmine-docker.json),
 // normally via `make docker-parity`; never part of `yarn test`.
 
@@ -312,7 +312,7 @@ export const itWithGh = gatedIt('ARCANUM_DOCKER_PARITY_GH', 'needs a gh token re
 
 /**
  * The gh sandbox the opt-in gh cases run against, one env var per
- * fixture (see docs/agents/specs/docker/testing.md -> "Credentials"),
+ * fixture (see docs/agents/architecture/docker-engine.md#credentials),
  * each with the format it must match and what it must point to.
  */
 export const GH_SANDBOX_VARS = {

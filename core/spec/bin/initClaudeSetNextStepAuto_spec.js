@@ -17,7 +17,7 @@ const SHIM_SCRIPT = path.join(REPO_ROOT, 'init-claude', 'scripts', 'set_next_ste
 // shell-vs-native parity spec: this spec instead proves the shim reaches
 // core/bin/arcanum in every non-docker engine.mode, and that under
 // engine.mode=docker it follows the native-only rule of
-// docs/agents/specs/docker/dispatch.md: with its real
+// docs/agents/architecture/docker-engine.md#native-only-commands: with its real
 // migration-status.json status (`docker`, batch 1 of #745) it reaches
 // `docker run` (a passthrough fake `docker`) with only the repo mount
 // and no extra env; with Docker unavailable it falls back to native on

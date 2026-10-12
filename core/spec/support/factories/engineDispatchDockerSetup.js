@@ -8,7 +8,7 @@ import { createTempDir, removeTempDir } from '../utils/tempDir.js';
 
 // Shared setup for the docker cases of
 // core/spec/bin/engineDispatchDocker_spec.js (see
-// docs/agents/specs/docker/testing.md -> "Dispatch-level specs").
+// docs/agents/architecture/docker-engine.md#dispatch-level-specs).
 
 /** `auto-fix-all-config-get`'s shell twin: prints the key's value. */
 export const SHELL_TWIN = path.join(REPO_ROOT, 'auto-fix-all', 'scripts', 'config_get_shell.sh');

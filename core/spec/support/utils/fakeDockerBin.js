@@ -4,7 +4,7 @@ import { NATIVE_BIN } from './runCommand.js';
 import { createTempDir, removeTempDir } from './tempDir.js';
 
 // A `docker` CLI stand-in for the docker-engine routing specs (see
-// docs/agents/specs/docker/testing.md -> "Fake `docker`"), built like
+// docs/agents/architecture/docker-engine.md#fake-docker), built like
 // `fakeGhBin.js`: an executable `docker` written into a fresh temp dir
 // the spec puts first on `PATH`. Its behavior is baked into the script
 // at build time (never read from env), so it survives whatever env the
