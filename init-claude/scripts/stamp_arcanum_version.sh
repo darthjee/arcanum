@@ -28,6 +28,15 @@
 # strips the ambient environment down (same reasoning as
 # auto-new-issue/scripts/commit_issue.sh).
 #
+# Under engine.mode=docker it runs core/bin/arcanum inside the container,
+# now that its migration-status.json status is `"docker"` (#746), with the
+# repo mount plus `--needs=global-config`: the global arcanum config
+# ($CLAUDE_CONFIG_DIR/arcanum-config.json) is mounted read-only when it
+# exists. HOME stays in the allowlist for the native path; under docker
+# the version comes from the image's own arcanum.json instead. If docker
+# is unavailable, engine_dispatch falls back to native on the host with
+# a warning — see docs/agents/architecture/docker-engine.md#fallback-rules.
+#
 # Output and exit code: unchanged from before this migration — no
 # output, always exits 0; see stamp_arcanum_version_shell.sh's own
 # header for the full behavior contract.
@@ -41,4 +50,4 @@ source "${SCRIPT_DIR}/../../arcanum/_lib/engine_dispatch.sh"
 
 REPO_PATH="$PWD"
 
-engine_dispatch "$REPO_PATH" init-claude-stamp-arcanum-version "${SCRIPT_DIR}/stamp_arcanum_version_shell.sh" --prepend-repo-path HOME -- "$@"
+engine_dispatch "$REPO_PATH" init-claude-stamp-arcanum-version "${SCRIPT_DIR}/stamp_arcanum_version_shell.sh" --prepend-repo-path --needs=global-config HOME -- "$@"

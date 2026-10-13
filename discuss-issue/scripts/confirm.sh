@@ -7,6 +7,12 @@
 # via either the shell implementation (confirm_shell.sh) or the native
 # one (core/bin/arcanum), per engine.mode / arcanum/_lib/migration-status.json.
 #
+# Under engine.mode=docker it runs core/bin/arcanum inside the container,
+# now that its migration-status.json status is `"docker"` (#745), with
+# only the repo mount (no `--needs`). If docker is unavailable,
+# engine_dispatch falls back to native on the host with a warning — see
+# docs/agents/architecture/docker-engine.md#fallback-rules.
+#
 # No env vars are forwarded to the native path's allowlist — this
 # entrypoint does no git/GitHub/filesystem I/O, only string
 # normalization on its one argument.

@@ -102,7 +102,7 @@ async function runWithDispatchFailure(exitCode) {
 
 describe('bin/arcanum', () => {
   // Exit codes 125-127 are reserved for Docker (see
-  // docs/agents/specs/docker/dispatch.md -> "Exit codes and streams").
+  // docs/agents/architecture/docker-engine.md#exit-codes-and-streams).
   describe('DispatchFailure exit-code contract', () => {
     [125, 126, 127].forEach((exitCode) => {
       it(`maps a DispatchFailure exit code ${exitCode} to 1, still printing the stdout payload`, async () => {

@@ -16,7 +16,7 @@ You do not own the Node.js source/config those tools build and run (`core/lib/`,
 
 - `core/Dockerfile` is multi-stage, built from the install root (`-f core/Dockerfile`, with the root `.dockerignore`): a shared `base` stage (`darthjee/node` plus every pinned tool), a `test` stage and a `runtime` stage. Keep all pins in `base` so the two targets can't drift apart.
 - The `test` stage (used by `core/docker-compose.yml` and the `core-*` targets) bind-mounts the source at runtime rather than baking it in, so local edits are picked up without a rebuild — dependency installation happens at container start, reusing the base image's warm Yarn cache.
-- The `runtime` stage is the image `engine.mode=docker` runs in (see `docs/agents/specs/docker/image.md`): the install baked in under `/opt/arcanum`, no root phase, and its own entrypoint (`core/docker-runtime-entrypoint.sh`, sourcing `core/docker-runtime-env.sh` for the `nss_wrapper` passwd entry). Build and smoke-check it with `make core-build-runtime` / `make core-smoke-runtime`.
+- The `runtime` stage is the image `engine.mode=docker` runs in (see `docs/agents/architecture/docker-engine.md#image`): the install baked in under `/opt/arcanum`, no root phase, and its own entrypoint (`core/docker-runtime-entrypoint.sh`, sourcing `core/docker-runtime-env.sh` for the `nss_wrapper` passwd entry). Build and smoke-check it with `make core-build-runtime` / `make core-smoke-runtime`.
 - Absolute paths required inside a script or Makefile target must be extracted into a variable, never repeated inline.
 
 ## How to coordinate with the architect

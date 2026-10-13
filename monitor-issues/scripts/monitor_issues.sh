@@ -10,6 +10,18 @@
 # `HOME` is forwarded to the native path's env-var allowlist (gh auth /
 # config resolution).
 #
+# Under engine.mode=docker it runs core/bin/arcanum inside the
+# container, now that its migration-status.json status is `"docker"` (#747),
+# with the repo mount plus `--needs=global-config,gitconfig,gh`: the
+# global arcanum config ($CLAUDE_CONFIG_DIR/arcanum-config.json) and the
+# global git config are mounted read-only, and a GitHub token resolved
+# on the host is forwarded by name only as `-e GH_TOKEN` (`-e
+# GH_HOST`/`-e GH_ENTERPRISE_TOKEN` on a GitHub Enterprise host), never
+# as a value in argv. HOME stays in the allowlist for the native path.
+# If docker is unavailable, engine_dispatch falls back to native on the
+# host with a warning — see docs/agents/architecture/docker-engine.md#fallback-rules and
+# docs/agents/architecture/docker-engine.md#environment.
+#
 # Runs forever; stop with Ctrl-C or SIGTERM. engine_dispatch runs the
 # chosen implementation as a child process (it does not exec), so this
 # shim runs it in the background and forwards INT/TERM/HUP to it as
@@ -44,7 +56,7 @@ _forward_termination() {
 
 trap '_forward_termination' INT TERM HUP
 
-engine_dispatch "$REPO_PATH" monitor-issues-monitor-issues "${SCRIPT_DIR}/monitor_issues_shell.sh" HOME -- "$REPO_PATH" &
+engine_dispatch "$REPO_PATH" monitor-issues-monitor-issues "${SCRIPT_DIR}/monitor_issues_shell.sh" --needs=global-config,gitconfig,gh HOME -- "$REPO_PATH" &
 DISPATCH_PID=$!
 
 # `wait` returns early (status > 128) whenever a trapped signal arrives;

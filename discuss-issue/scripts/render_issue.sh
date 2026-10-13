@@ -12,6 +12,13 @@
 # template and writing the output file (both already covered by
 # repoPath/positional args, not env vars).
 #
+# Under engine.mode=docker it runs core/bin/arcanum inside the container,
+# now that its migration-status.json status is `"docker"` (#746), with the
+# repo mount plus `--path-arg=1:rw`: the directory of <output_file> is
+# mounted read-write at its own host path when it sits outside the repo.
+# If docker is unavailable, engine_dispatch falls back to native on the
+# host with a warning — see docs/agents/architecture/docker-engine.md#fallback-rules.
+#
 # Usage: render_issue.sh <output_file> <title> [description] [problem] [expected_behavior] [solution] [benefits]
 #
 # Unlike commit_change.sh, this entrypoint does not take
@@ -47,4 +54,4 @@ source "${SCRIPT_DIR}/../../arcanum/_lib/engine_dispatch.sh"
 
 REPO_PATH="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
-engine_dispatch "$REPO_PATH" discuss-issue-render-issue "${SCRIPT_DIR}/render_issue_shell.sh" --prepend-repo-path -- "$@"
+engine_dispatch "$REPO_PATH" discuss-issue-render-issue "${SCRIPT_DIR}/render_issue_shell.sh" --prepend-repo-path --path-arg=1:rw -- "$@"

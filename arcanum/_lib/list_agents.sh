@@ -7,6 +7,12 @@
 # (list_agents_shell.sh) or the native one (core/bin/arcanum), per
 # engine.mode / arcanum/_lib/migration-status.json.
 #
+# Under engine.mode=docker it runs core/bin/arcanum inside the container,
+# now that its migration-status.json status is `"docker"` (#745), with
+# only the repo mount (no `--needs`). If docker is unavailable,
+# engine_dispatch falls back to native on the host with a warning — see
+# docs/agents/architecture/docker-engine.md#fallback-rules.
+#
 # Purely filesystem-based — no environment dependency, so no extra
 # env-var allowlist entries (beyond PATH, which engine_dispatch always
 # includes) are needed for the native path.

@@ -7,8 +7,8 @@ CORE_COMPOSE := docker compose -f core/docker-compose.yml
 
 # The engine.mode=docker runtime image (the `runtime` target of
 # core/Dockerfile, built from the install root). See
-# docs/agents/specs/docker/image.md. #729's docker-parity reuses
-# core-build-runtime.
+# docs/agents/architecture/docker-engine.md#image. #729's docker-parity
+# reuses core-build-runtime.
 CORE_DOCKERFILE := core/Dockerfile
 RUNTIME_IMAGE ?= darthjee/arcanum:local-test
 RUNTIME_VERSION ?= $(shell tr -d '[:space:]' < arcanum.version 2>/dev/null)
@@ -19,7 +19,7 @@ RUNTIME_RUN := docker run --rm --user "$$(id -u):$$(id -g)" --read-only --tmpfs 
 RUNTIME_SMOKE_COMMAND := arcanum-smoke-check
 
 # Docker-engine parity specs and benchmark (#741), run on the host. See
-# docs/agents/specs/docker/testing.md.
+# docs/agents/architecture/docker-engine.md#testing.
 CORE_DIR := core
 PARITY_IMAGE_VAR := ARCANUM_DOCKER_PARITY_IMAGE
 BENCH_IMAGE_VAR := ARCANUM_BENCH_IMAGE
@@ -71,8 +71,8 @@ core-smoke-runtime: core-build-runtime
 
 # Parity specs (core/spec/docker/, yarn test:docker): each case runs a
 # command natively and inside the runtime image and compares the two.
-# Local-only, not in CI (docs/agents/specs/docker/testing.md, "Not in CI,
-# and why"): it needs a real Docker daemon and the host's Docker CLI, so
+# Local-only, not in CI (docs/agents/architecture/docker-engine.md#not-in-ci-and-why):
+# it needs a real Docker daemon and the host's Docker CLI, so
 # it runs node on the host rather than inside the `core` compose service.
 # ARCANUM_DOCKER_PARITY_GH=1 / ARCANUM_DOCKER_PARITY_SSH=1 pass through
 # from the caller's env to enable the opt-in credential cases.

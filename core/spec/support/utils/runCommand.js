@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
@@ -42,6 +42,37 @@ export const FAKE_FETCH_PRELOAD = pathToFileURL(
 ).href;
 
 /**
+ * `runCommand`'s detached path: `spawn` with `detached: true` (which
+ * calls `setsid()`; `execFile` drops that option), stdin from
+ * `/dev/null` unless `input` is given.
+ * @param {string} file - the executable.
+ * @param {string[]} args - its arguments.
+ * @param {string} cwd - the directory to run it in.
+ * @param {object} env - the environment.
+ * @param {string} [input] - written to stdin, which is then closed.
+ * @returns {Promise<{stdout: string, stderr: string, code: number}>} the process result.
+ */
+function runDetached(file, args, cwd, env, input) {
+  return new Promise((resolve) => {
+    const child = spawn(file, args, {
+      cwd, env, detached: true, stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe']
+    });
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (chunk) => { stdout += chunk; });
+    child.stderr.on('data', (chunk) => { stderr += chunk; });
+    if (input !== undefined) {
+      // The child may exit before draining stdin (EPIPE) — irrelevant here.
+      child.stdin.on('error', () => {});
+      child.stdin.end(input);
+    }
+    child.on('error', (error) => resolve({ stdout, stderr: stderr || error.message, code: 1 }));
+    child.on('close', (code) => resolve({ stdout, stderr, code: code ?? 1 }));
+  });
+}
+
+/**
  * Run a command and capture its stdout/stderr/exit code.
  * @param {string[]} commandAndArgs - `[file, ...args]` to `execFile`.
  * @param {string} cwd - the directory to run the command in.
@@ -49,9 +80,19 @@ export const FAKE_FETCH_PRELOAD = pathToFileURL(
  * @param {string} [input] - when given, written to the child's stdin,
  *   which is then closed (so `''` means "immediate EOF"); when omitted,
  *   stdin is left untouched.
+ * @param {object} [options] - further options.
+ * @param {boolean} [options.detached] - run the child in a new session
+ *   (`spawn`'s `detached: true`, i.e. `setsid()`), so it has no
+ *   controlling terminal and `/dev/tty` cannot be opened; stdin comes
+ *   from `/dev/null` when no `input` is given. Works on macOS too
+ *   (which has no `setsid` binary).
  * @returns {Promise<{stdout: string, stderr: string, code: number}>} the process result.
  */
-export async function runCommand([file, ...args], cwd, env = process.env, input = undefined) {
+export async function runCommand([file, ...args], cwd, env = process.env, input = undefined, { detached = false } = {}) {
+  if (detached) {
+    return runDetached(file, args, cwd, env, input);
+  }
+
   const pending = execFileAsync(file, args, { cwd, env });
 
   if (input !== undefined) {

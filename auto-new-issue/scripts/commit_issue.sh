@@ -12,6 +12,22 @@
 # identity/config once native's `env -i PATH="$PATH"` strips the ambient
 # environment down.
 #
+# Under engine.mode=docker it runs core/bin/arcanum inside the
+# container, now that its migration-status.json status is `"docker"`
+# (#748), with the repo mount plus `--needs=global-config,gitconfig,remote`: the
+# global arcanum config ($CLAUDE_CONFIG_DIR/arcanum-config.json) and the
+# global git config are mounted read-only. `remote` is needed for its
+# git remote access (fetch/push): for an ssh origin the host's SSH agent
+# socket and known_hosts are mounted (`SSH_AUTH_SOCK`/`GIT_SSH_COMMAND`
+# forwarded); for an https origin the gh credential helper is configured
+# and a GitHub token resolved on the host is forwarded by name only as
+# `-e GH_TOKEN` (`-e GH_HOST`/`-e GH_ENTERPRISE_TOKEN` on a GitHub
+# Enterprise host), never as a value in argv. HOME stays in the
+# allowlist for the native path. If docker is unavailable,
+# engine_dispatch falls back to native on the host with a warning — see
+# docs/agents/architecture/docker-engine.md#fallback-rules and
+# docs/agents/architecture/docker-engine.md#environment.
+#
 # Usage: commit_issue.sh <repo_path> <file_path> <id> <model_name> <model_email>
 #
 # Output and exit code: unchanged from before this migration — see
@@ -34,4 +50,4 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # shellcheck source=../../arcanum/_lib/engine_dispatch.sh
 source "${SCRIPT_DIR}/../../arcanum/_lib/engine_dispatch.sh"
-engine_dispatch "$REPO_PATH" auto-new-issue-commit-issue "${SCRIPT_DIR}/commit_issue_shell.sh" HOME -- "$@"
+engine_dispatch "$REPO_PATH" auto-new-issue-commit-issue "${SCRIPT_DIR}/commit_issue_shell.sh" --needs=global-config,gitconfig,remote HOME -- "$@"

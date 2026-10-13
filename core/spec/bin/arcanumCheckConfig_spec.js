@@ -17,7 +17,7 @@ const SHIM_SCRIPT = path.join(REPO_ROOT, 'arcanum-check-config', 'scripts', 'che
 // spec instead proves the shim reaches core/bin/arcanum in every
 // non-docker engine.mode (and that CLAUDE_CONFIG_DIR survives the
 // native path's `env -i`), and that under engine.mode=docker it follows
-// the native-only rule of docs/agents/specs/docker/dispatch.md: with its
+// the native-only rule of docs/agents/architecture/docker-engine.md#native-only-commands: with its
 // real migration-status.json status (`docker`, the pilot of #741) it
 // reaches `docker run` (a passthrough fake `docker`) with the global
 // config mounted read-only and CLAUDE_CONFIG_DIR forwarded, through its

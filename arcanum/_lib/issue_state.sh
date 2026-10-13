@@ -3,6 +3,12 @@
 # see docs/agents/architecture/script-engine.md and
 # docs/agents/plans/238-migrate-issue-state-entrypoint-to-native-node-js/plan.md.
 #
+# Under engine.mode=docker it runs core/bin/arcanum inside the container,
+# now that its migration-status.json status is `"docker"` (#745), with
+# only the repo mount (no `--needs`). If docker is unavailable,
+# engine_dispatch falls back to native on the host with a warning — see
+# docs/agents/architecture/docker-engine.md#fallback-rules.
+#
 # Usage: issue_state.sh <repo_path> get <id> <field>
 #        issue_state.sh <repo_path> set <id> <field> <value>
 #        issue_state.sh <repo_path> set-json <id> <field> <json_value>

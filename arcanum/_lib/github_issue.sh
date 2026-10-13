@@ -12,6 +12,21 @@
 # engine needs usage-error handling. Unknown subcommands get the usage
 # error below (exit 1).
 #
+# Under engine.mode=docker all ten subcommands run core/bin/arcanum
+# inside the container, now that their migration-status.json status is
+# `"docker"` (#747), with the repo mount plus
+# `--needs=global-config,gitconfig,gh`: the global arcanum config
+# ($CLAUDE_CONFIG_DIR/arcanum-config.json) and the global git config are
+# mounted read-only, and a GitHub token resolved on the host is
+# forwarded by name only as `-e GH_TOKEN` (`-e GH_HOST`/`-e
+# GH_ENTERPRISE_TOKEN` on a GitHub Enterprise host), never as a value in
+# argv. `create` adds `--path-arg=3:ro` and `update` adds
+# `--path-arg=4:ro`, mounting <file> read-only at its own host path when
+# it sits outside the repo. HOME stays in the allowlist for the native
+# path. If docker is unavailable, engine_dispatch falls back to native
+# on the host with a warning — see docs/agents/architecture/docker-engine.md#fallback-rules
+# and docs/agents/architecture/docker-engine.md#environment.
+#
 # Usage: github_issue.sh <command> [args]
 # Commands:
 #   info <repo_path>                            Print DOMAIN and REPO from git origin
@@ -42,43 +57,43 @@ REPO_PATH="${1:-}"
 
 case "$COMMAND" in
   info)
-    engine_dispatch "$REPO_PATH" github-issue-info "${SCRIPT_DIR}/github_issue_info_shell.sh" HOME -- "$@"
+    engine_dispatch "$REPO_PATH" github-issue-info "${SCRIPT_DIR}/github_issue_info_shell.sh" --needs=global-config,gitconfig,gh HOME -- "$@"
     ;;
   create)
-    engine_dispatch "$REPO_PATH" github-issue-create "${SCRIPT_DIR}/github_issue_create_shell.sh" HOME -- "$@"
+    engine_dispatch "$REPO_PATH" github-issue-create "${SCRIPT_DIR}/github_issue_create_shell.sh" --needs=global-config,gitconfig,gh --path-arg=3:ro HOME -- "$@"
     ;;
   fetch)
     [[ -n "${2:-}" ]] || { echo "Usage: $0 fetch <repo_path> <id>" >&2; exit 1; }
-    engine_dispatch "$REPO_PATH" github-issue-fetch "${SCRIPT_DIR}/github_issue_fetch_shell.sh" HOME -- "$@"
+    engine_dispatch "$REPO_PATH" github-issue-fetch "${SCRIPT_DIR}/github_issue_fetch_shell.sh" --needs=global-config,gitconfig,gh HOME -- "$@"
     ;;
   update)
     [[ -n "${2:-}" && -n "${3:-}" && -n "${4:-}" ]] \
       || { echo "Usage: $0 update <repo_path> <id> <title> <file>" >&2; exit 1; }
-    engine_dispatch "$REPO_PATH" github-issue-update "${SCRIPT_DIR}/github_issue_update_shell.sh" HOME -- "$@"
+    engine_dispatch "$REPO_PATH" github-issue-update "${SCRIPT_DIR}/github_issue_update_shell.sh" --needs=global-config,gitconfig,gh --path-arg=4:ro HOME -- "$@"
     ;;
   mark-created)
     [[ -n "${2:-}" ]] || { echo "Usage: $0 mark-created <repo_path> <id>" >&2; exit 1; }
-    engine_dispatch "$REPO_PATH" github-issue-mark-created "${SCRIPT_DIR}/github_issue_mark_created_shell.sh" HOME -- "$@"
+    engine_dispatch "$REPO_PATH" github-issue-mark-created "${SCRIPT_DIR}/github_issue_mark_created_shell.sh" --needs=global-config,gitconfig,gh HOME -- "$@"
     ;;
   mark-refined)
     [[ -n "${2:-}" ]] || { echo "Usage: $0 mark-refined <repo_path> <id>" >&2; exit 1; }
-    engine_dispatch "$REPO_PATH" github-issue-mark-refined "${SCRIPT_DIR}/github_issue_mark_refined_shell.sh" HOME -- "$@"
+    engine_dispatch "$REPO_PATH" github-issue-mark-refined "${SCRIPT_DIR}/github_issue_mark_refined_shell.sh" --needs=global-config,gitconfig,gh HOME -- "$@"
     ;;
   mark-ready)
     [[ -n "${2:-}" ]] || { echo "Usage: $0 mark-ready <repo_path> <id>" >&2; exit 1; }
-    engine_dispatch "$REPO_PATH" github-issue-mark-ready "${SCRIPT_DIR}/github_issue_mark_ready_shell.sh" HOME -- "$@"
+    engine_dispatch "$REPO_PATH" github-issue-mark-ready "${SCRIPT_DIR}/github_issue_mark_ready_shell.sh" --needs=global-config,gitconfig,gh HOME -- "$@"
     ;;
   mark-enhancing)
     [[ -n "${2:-}" ]] || { echo "Usage: $0 mark-enhancing <repo_path> <id>" >&2; exit 1; }
-    engine_dispatch "$REPO_PATH" github-issue-mark-enhancing "${SCRIPT_DIR}/github_issue_mark_enhancing_shell.sh" HOME -- "$@"
+    engine_dispatch "$REPO_PATH" github-issue-mark-enhancing "${SCRIPT_DIR}/github_issue_mark_enhancing_shell.sh" --needs=global-config,gitconfig,gh HOME -- "$@"
     ;;
   mark-planning)
     [[ -n "${2:-}" ]] || { echo "Usage: $0 mark-planning <repo_path> <id>" >&2; exit 1; }
-    engine_dispatch "$REPO_PATH" github-issue-mark-planning "${SCRIPT_DIR}/github_issue_mark_planning_shell.sh" HOME -- "$@"
+    engine_dispatch "$REPO_PATH" github-issue-mark-planning "${SCRIPT_DIR}/github_issue_mark_planning_shell.sh" --needs=global-config,gitconfig,gh HOME -- "$@"
     ;;
   mark-split)
     [[ -n "${2:-}" ]] || { echo "Usage: $0 mark-split <repo_path> <id>" >&2; exit 1; }
-    engine_dispatch "$REPO_PATH" github-issue-mark-split "${SCRIPT_DIR}/github_issue_mark_split_shell.sh" HOME -- "$@"
+    engine_dispatch "$REPO_PATH" github-issue-mark-split "${SCRIPT_DIR}/github_issue_mark_split_shell.sh" --needs=global-config,gitconfig,gh HOME -- "$@"
     ;;
   *)
     echo "Usage: $0 <command> [args]" >&2

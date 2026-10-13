@@ -10,8 +10,15 @@
 # Native-only: this command has NO shell implementation (no *_shell.sh
 # twin). It is listed in arcanum/_lib/migration-status.json with a
 # non-`shell` status, but never falls back to a shell twin. It is
-# dispatched with `engine_dispatch --native-only`, which always runs
-# core/bin/arcanum (except engine.mode=docker, which errors out).
+# dispatched with `engine_dispatch --native-only`, so it never runs a
+# shell twin: under engine.mode=shell or native it runs core/bin/arcanum
+# on the host.
+#
+# Under engine.mode=docker it runs core/bin/arcanum inside the container,
+# now that its migration-status.json status is `"docker"` (#745), with
+# only the repo mount (no `--needs`). If docker is unavailable,
+# engine_dispatch falls back to native on the host with a warning — see
+# docs/agents/architecture/docker-engine.md#fallback-rules.
 #
 # No env vars are forwarded to the native path's allowlist — this
 # entrypoint only writes a config file under the target project.
@@ -26,8 +33,8 @@
 # Output and exit code: passed through unchanged from core/bin/arcanum
 # init-claude-set-next-step-auto (`NEXT_STEP_AUTO=<skill>=<true|false>`
 # on stdout, exit 0; `arcanum: <message>` on stderr, exit 1, for an
-# unknown skill or a bad value) or from engine_dispatch's docker error.
-# A missing argument is rejected here, before dispatch (usage on stderr,
+# unknown skill or a bad value), whether it ran on the host or in the
+# container; engine_dispatch's own errors/warnings go to stderr. A missing argument is rejected here, before dispatch (usage on stderr,
 # exit 1).
 
 set -euo pipefail

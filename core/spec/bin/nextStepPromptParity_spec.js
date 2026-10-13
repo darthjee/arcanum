@@ -1,66 +1,68 @@
-import { execFile } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
+import { NATIVE_BIN, REPO_ROOT, expectParity, runCommand } from '../support/utils/runCommand.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
-// Contract spec for arcanum/_lib/next_step_prompt.sh (issue #681). This is
-// NOT a parity spec: the script has no native counterpart. It pins the
-// "TTY-first with AskUserQuestion fallback" contract from
-// docs/agents/plans/681-*/plan.md's "Shared contracts": when the TTY device
-// cannot be opened the script prints `FALLBACK=chat` plus one `COMMAND=`
-// line per `--command` and exits 4, while usage errors exit 1 with empty
-// stdout — even with no TTY, since argument validation runs before the TTY
-// probe. The test-only `ARCANUM_TTY_DEVICE` override points the TTY at a
-// path that doesn't exist to simulate "no TTY". The interactive TTY paths
-// (CHOICE=yes/no/chat) are out of scope here.
+// Parity spec for the "next-step-prompt" dispatched command (issue #760,
+// originally the #681/#714 contract spec for arcanum/_lib/next_step_prompt.sh).
+// Every case runs arcanum/_lib/next_step_prompt_shell.sh directly (NOT
+// through the next_step_prompt.sh engine_dispatch shim, so this spec isn't
+// circular) and `core/bin/arcanum next-step-prompt` with the same flags,
+// env and cwd, asserting identical stdout, stderr and exit code (the
+// `Usage:` line's script name is normalized, since the shell prints its
+// own `$0`), then pins the contract on the shell result.
 //
-// It also pins the #714 auto-next flags (docs/agents/plans/714-*/plan.md's
-// "Shared contracts"): `--auto-key <skill>` skips the offer (CHOICE=yes +
-// AUTO=true, exit 0, notice on stderr) only when `next_step.auto.<skill>`
-// resolves to JSON `true` through the local -> repo -> global config chain,
-// and `--no-prompt` answers CHOICE=no without probing the TTY. Every run
-// points CLAUDE_CONFIG_DIR/HOME at a temp folder so the real user's global
-// config never leaks in, and runs from a cwd outside the temp repo so the
-// local/repo tiers are proven to resolve from `--repo`, not the cwd.
+// The contract (docs/agents/architecture/skill-finish.md): when the TTY
+// device cannot be opened the command prints `FALLBACK=chat` plus one
+// `COMMAND=` line per `--command` and exits 4, while usage errors exit 1
+// with empty stdout — even with no TTY, since argument validation runs
+// before the TTY probe. The test-only `ARCANUM_TTY_DEVICE` override points
+// the TTY at a path that doesn't exist to simulate "no TTY". The
+// interactive TTY paths (CHOICE=yes/no/chat) are out of scope here.
+//
+// It also pins the #714 auto-next flags: `--auto-key <skill>` skips the
+// offer (CHOICE=yes + AUTO=true, exit 0, notice on stderr) only when
+// `next_step.auto.<skill>` resolves to JSON `true` through the local ->
+// repo -> global config chain, and `--no-prompt` answers CHOICE=no without
+// probing the TTY. Every run points CLAUDE_CONFIG_DIR/HOME at a temp folder
+// so the real user's global config never leaks in, and runs from a cwd
+// outside the temp repo so the local/repo tiers are proven to resolve from
+// `--repo`, not the cwd.
 
-const execFileAsync = promisify(execFile);
-
-const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const SCRIPT = path.join(REPO_ROOT, 'arcanum', '_lib', 'next_step_prompt.sh');
+const SHELL_SCRIPT = path.join(REPO_ROOT, 'arcanum', '_lib', 'next_step_prompt_shell.sh');
 
 /**
- * Run next_step_prompt.sh with a non-existent TTY device and an isolated
- * config environment, and capture its stdout/stderr/exit code.
- * @param {string[]} args - the CLI arguments to pass to the script.
+ * Replaces the script name on `Usage:` lines, which the shell takes from
+ * its own `$0`.
+ * @param {string} stderr - a side's stderr.
+ * @returns {string} the normalized stderr.
+ */
+function normalizeUsage(stderr) {
+  return stderr.replace(/^Usage: \S+ /gm, 'Usage: <script> ');
+}
+
+/**
+ * Run next-step-prompt on both engines with a non-existent TTY device and
+ * an isolated config environment, assert shell/native parity (stdout,
+ * normalized stderr and exit code), and return the shell side's result.
+ * @param {string[]} args - the CLI arguments to pass to the command.
  * @param {string} ttyDevice - the `ARCANUM_TTY_DEVICE` value to use.
  * @param {object} [options] - extra run options.
  * @param {string} [options.cwd] - the working directory to run from.
  * @param {string} [options.configDir] - the `CLAUDE_CONFIG_DIR`/`HOME` value
  *   to use, so the real user's global config never leaks into the run.
- * @param {object} [options.env] - extra environment variables.
- * @returns {Promise<{stdout: string, stderr: string, code: number}>} the process result.
+ * @returns {Promise<{stdout: string, stderr: string, code: number}>} the shell side's result.
  */
-async function runPrompt(args, ttyDevice, { cwd, configDir, env = {} } = {}) {
+async function runPrompt(args, ttyDevice, { cwd, configDir } = {}) {
   const isolatedDir = configDir ?? path.join(path.dirname(ttyDevice), 'global-config');
+  const env = { ...process.env, CLAUDE_CONFIG_DIR: isolatedDir, HOME: isolatedDir, ARCANUM_TTY_DEVICE: ttyDevice };
+  const shell = await runCommand([SHELL_SCRIPT, ...args], cwd, env);
+  const native = await runCommand([process.execPath, NATIVE_BIN, 'next-step-prompt', ...args], cwd, env);
 
-  try {
-    const { stdout, stderr } = await execFileAsync(SCRIPT, args, {
-      cwd,
-      env: {
-        ...process.env,
-        CLAUDE_CONFIG_DIR: isolatedDir,
-        HOME: isolatedDir,
-        ARCANUM_TTY_DEVICE: ttyDevice,
-        ...env
-      }
-    });
+  expectParity(shell, native);
+  expect(normalizeUsage(native.stderr)).toEqual(normalizeUsage(shell.stderr));
 
-    return { stdout, stderr, code: 0 };
-  } catch (error) {
-    return { stdout: error.stdout || '', stderr: error.stderr || '', code: error.code ?? 1 };
-  }
+  return shell;
 }
 
 /**
@@ -118,7 +120,7 @@ async function writeGlobalConfig(configDir, content) {
   await writeJson(path.join(configDir, 'arcanum-config.json'), content);
 }
 
-describe('arcanum/_lib/next_step_prompt.sh (no TTY available)', () => {
+describe('next-step-prompt parity (shell vs. native, no TTY available)', () => {
   let tempDir;
   let ttyDevice;
 
@@ -200,10 +202,28 @@ describe('arcanum/_lib/next_step_prompt.sh (no TTY available)', () => {
       expect(result.code).toBe(1);
       expect(result.stdout).toBe('');
     });
+
+    const moreUsageErrors = {
+      'when --repo is empty': () => ['--repo', '', '--command', '/x'],
+      'when --repo does not exist': (dir) => ['--repo', path.join(dir, 'missing'), '--command', '/x'],
+      'when --repo has no value': () => ['--command', '/x', '--repo'],
+      'on an unknown argument': (dir) => ['--repo', dir, '--command', '/x', '--bogus'],
+      'when --no-prompt is given with no --command': (dir) => ['--repo', dir, '--no-prompt']
+    };
+
+    Object.entries(moreUsageErrors).forEach(([label, buildArgs]) => {
+      it(`exits 1 with empty stdout ${label}`, async () => {
+        const result = await runPrompt(buildArgs(tempDir), ttyDevice);
+
+        expect(result.code).toBe(1);
+        expect(result.stdout).toBe('');
+        expect(result.stderr).toMatch(/^Error: .*\nUsage: /);
+      });
+    });
   });
 });
 
-describe('arcanum/_lib/next_step_prompt.sh auto-next flags (issue #714)', () => {
+describe('next-step-prompt parity: auto-next flags (issue #714)', () => {
   const SKILL = 'enhance-issue';
   const COMMAND = '/discuss-issue 714';
   const FALLBACK = `FALLBACK=chat\nCOMMAND=${COMMAND}\n`;
@@ -330,6 +350,36 @@ describe('arcanum/_lib/next_step_prompt.sh auto-next flags (issue #714)', () => 
         expect(result.stdout).toBe(FALLBACK);
         expect(result.stdout).not.toContain('AUTO=');
         expect(result.stderr).not.toContain('auto-continuing');
+      });
+    });
+  });
+
+  describe('every tier and value', () => {
+    const writers = {
+      local: (content) => writeLocalConfig(repo, content),
+      repo: (content) => writeRepoConfig(repo, content),
+      global: (content) => writeGlobalConfig(configDir, content)
+    };
+    const values = { 'true': true, 'false': false, 'the string "true"': 'true', 'absent': undefined };
+
+    Object.entries(writers).forEach(([tier, write]) => {
+      Object.entries(values).forEach(([label, value]) => {
+        it(`matches when the ${tier} tier holds ${label}, with and without --no-prompt`, async () => {
+          if (value !== undefined) {
+            await write(autoConfig(SKILL, value));
+          }
+
+          const prompted = await run(['--command', COMMAND, '--auto-key', SKILL]);
+          const silent = await run(['--command', COMMAND, '--auto-key', SKILL, '--no-prompt']);
+
+          if (value === true) {
+            expect(prompted).toEqual({ stdout: AUTO_OUTPUT, stderr: `${NOTICE}\n`, code: 0 });
+            expect(silent).toEqual({ stdout: AUTO_OUTPUT, stderr: `${NOTICE}\n`, code: 0 });
+          } else {
+            expect(prompted).toEqual({ stdout: FALLBACK, stderr: '', code: 4 });
+            expect(silent).toEqual({ stdout: 'CHOICE=no\n', stderr: '', code: 0 });
+          }
+        });
       });
     });
   });

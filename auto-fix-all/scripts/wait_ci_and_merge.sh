@@ -15,6 +15,18 @@
 # ambient environment down; without it, native-mode auth would fail in
 # a way shell-mode never does.
 #
+# Under engine.mode=docker it runs core/bin/arcanum inside the
+# container, now that its migration-status.json status is `"docker"` (#747),
+# with the repo mount plus `--needs=global-config,gitconfig,gh`: the
+# global arcanum config ($CLAUDE_CONFIG_DIR/arcanum-config.json) and the
+# global git config are mounted read-only, and a GitHub token resolved
+# on the host is forwarded by name only as `-e GH_TOKEN` (`-e
+# GH_HOST`/`-e GH_ENTERPRISE_TOKEN` on a GitHub Enterprise host), never
+# as a value in argv. HOME stays in the allowlist for the native path.
+# If docker is unavailable, engine_dispatch falls back to native on the
+# host with a warning — see docs/agents/architecture/docker-engine.md#fallback-rules and
+# docs/agents/architecture/docker-engine.md#environment.
+#
 # Usage: wait_ci_and_merge.sh <repo_path> [model_email]
 #
 # Output and exit code: unchanged from before this migration — see
@@ -29,4 +41,4 @@ MODEL_EMAIL="${2:-}"
 
 # shellcheck source=../../arcanum/_lib/engine_dispatch.sh
 source "${SCRIPT_DIR}/../../arcanum/_lib/engine_dispatch.sh"
-engine_dispatch "$REPO_PATH" auto-fix-all-wait-ci-and-merge "${SCRIPT_DIR}/wait_ci_and_merge_shell.sh" HOME -- "$REPO_PATH" "$MODEL_EMAIL"
+engine_dispatch "$REPO_PATH" auto-fix-all-wait-ci-and-merge "${SCRIPT_DIR}/wait_ci_and_merge_shell.sh" --needs=global-config,gitconfig,gh HOME -- "$REPO_PATH" "$MODEL_EMAIL"
