@@ -64,6 +64,7 @@ Pieces introduced by this spec's decisions:
 | CircleCI job running the `cli/` specs on Node 22.13 | `infra` |
 | Repo-root normalizing helper (`rev-parse --show-toplevel`), if placed in the shared surface (placement detailed in [Shared Config Logic](arcanum-cli/shared-config-logic.md)) | `node` |
 | `no-restricted-imports` rule in `core/eslint.config.mjs` | `node` |
+| Optional bounded wait (timeout or max attempts) on `core/lib/utils/file/Lock.js`, default unchanged for skills (see [Command Surface](arcanum-cli/command-surface.md#lock-contention)) | `node` |
 
 The key registry's owner is decided in [Key Registry](arcanum-cli/key-registry.md), not here.
 
@@ -210,20 +211,20 @@ Details: [Packaging and Release](arcanum-cli/packaging-and-release.md).
 
 ## Exit codes
 
-Besides the generic codes, the index fixes two dedicated exit codes, named here by meaning only. Their numbers and identifiers are defined in [Command Surface](arcanum-cli/command-surface.md).
+Besides the generic codes, the index fixes two dedicated exit codes. The full numbered table and identifiers are in [Command Surface](arcanum-cli/command-surface.md#exit-codes).
 
-| Meaning | When |
-| --- | --- |
-| **Version skew refused** | A write to a tier whose pointer is ahead of the CLI, without `--force`. |
-| **Target unavailable** | Nowhere to read or write the requested tier: no repo, an unconfigured repo, or an unresolved or missing Claude config directory. One code covers every tier, so scripts handle "nowhere to write" in one place. |
+| Code | Meaning | When |
+| --- | --- | --- |
+| `5` | **Version skew refused** | A write to a tier whose pointer is ahead of the CLI, without `--force`. |
+| `4` | **Target unavailable** | Nowhere to read or write the requested tier: no repo, an unconfigured repo, or an unresolved or missing Claude config directory. One code covers every tier, so scripts handle "nowhere to write" in one place. |
 
-- `--force` bypasses registry validation and version skew. It **never** bypasses "target unavailable".
-- A Node.js older than the floor exits with the generic error code (no dedicated code).
-- Usage errors (e.g. `--repo` pointing at a non-existent path) use the generic usage code.
+- `--force` bypasses only the unknown-key refusal and version skew. It **never** bypasses "target unavailable". Its full scope is in [Command Surface](arcanum-cli/command-surface.md#--force-scope).
+- A Node.js older than the floor exits with the generic error code, `1` (no dedicated code).
+- Usage errors (e.g. `--repo` pointing at a non-existent path) use the usage code, `2`.
 
 ## Parts
 
-- [Command Surface](arcanum-cli/command-surface.md): the generic `arcanum config` layer (`get/set/unset/list/info`), tier rules, value parsing, global flags, output, exit codes (including the numbers for "version skew refused" and "target unavailable"), `--force`'s scope, `--repo` normalization, the `info` JSON shape, `--help`/`--version`.
+- [Command Surface](arcanum-cli/command-surface.md): the generic `arcanum config` layer (`get/set/unset/list/info`), tier rules, value parsing, global flags, output, exit codes (including the numbers for "version skew refused" and "target unavailable"), `--force`'s scope, `--repo` normalization, the `--json` shapes (including `info`'s), error wording, missing and malformed tier files, lock contention and `--lock-timeout`, `--help`/`--version`.
 - [Shortcuts and Setup](arcanum-cli/shortcuts-and-setup.md): the curated shortcuts, their default tiers and design rules, and the TTY-only `config setup` wizard.
 - [Key Registry](arcanum-cli/key-registry.md): the shared, machine-readable registry of known config keys that drives validation, listing, help, the wizard and the shortcuts; `--force` and per-key skew granularity.
 - [Shared Config Logic](arcanum-cli/shared-config-logic.md): the declared shared surface in `core/lib`, `ConfigError` decoupling, the import lint rule, `esbuild` bundling, CI coupling, and where the repo-root normalizing helper lives.
