@@ -71,11 +71,79 @@ A new root-level folder needs a new specialist agent. A `client` agent owns `cli
 
 - The `CLAUDE_CONFIG_DIR` environment variable is honoured. For example, `CLAUDE_CONFIG_DIR=~/.claude-favini arcanum config agents email set ...` targets `~/.claude-favini/arcanum-config.json`.
 - `--claude-config-dir <dir>` overrides the environment variable.
-- The CLI expands a leading `~` itself, because the shell does not expand it in every position (e.g. `--claude-config-dir=~/...`).
 - When neither is set, the default is `$HOME/.claude`, which matches Claude Code and arcanum's own resolution.
+- An empty `CLAUDE_CONFIG_DIR=""` counts as unset, as with bash's `${CLAUDE_CONFIG_DIR:-...}`.
 - `arcanum config info` shows which directory was resolved and where it came from (flag, env or default).
 
+`~` expansion differs between the flag and the environment variable:
+
+- **`--claude-config-dir`:** the CLI expands a leading `~` and `~/...` itself, because the shell does not expand it in every position (e.g. `--claude-config-dir=~/...`). `~user` is not supported and is a usage error. A relative path resolves against the current directory to an absolute path, which `info` shows.
+- **`CLAUDE_CONFIG_DIR`:** used **verbatim, with no `~` expansion**, matching `ConfigChain` (`core/lib/utils/config/ConfigChain.js`), the shell helpers and Claude Code. Expanding it in the CLI only would make the CLI and the skills write to different places for a quoted `CLAUDE_CONFIG_DIR="~/.claude-favini"`. When the value starts with `~`, the CLI warns that it was not expanded.
+
+Account edge cases:
+
+| Case | Reads (global tier) | Writes `--global` |
+| --- | --- | --- |
+| **Unresolved** (no flag, no `CLAUDE_CONFIG_DIR`, no `$HOME`) | Tier empty, stderr warning. | Error, "target unavailable". |
+| **Directory missing** (e.g. a typo such as `~/.claude-favni`) | Tier empty, warning naming the path. | **Refused**, "target unavailable". The CLI never creates the directory, so a typo cannot silently create a phantom account. |
+| **Path is a file**, not a directory | Error. | Error. |
+| **Directory exists, no `arcanum-config.json`** | Tier empty. | Normal. The file is created on first write, as `global_config_write` does. |
+| **Directory exists, no arcanum install in it** | Normal. | Normal. Not checked, consistent with not depending on the install (see "Version skew"). |
+
 **Repo (repo and local tiers).** These resolve from the current directory, which `--repo <path>` overrides.
+
+- Both are normalized with `git -C <path> rev-parse --show-toplevel`. A subdirectory targets the repo root. Inside a worktree, the root is that worktree's own directory, since each worktree has its own `.claude/state/`. `info` shows the resolved root.
+- `--repo` pointing at a non-existent path or a non-directory is a usage error, reusing `RepoPath`'s messages (`core/lib/utils/file/RepoPath.js`).
+- Git is required for the repo and local tiers. With no `git` on PATH, the CLI treats the target as "no repo", with a warning. The global tier keeps working.
+- The normalization rule is detailed in [Command Surface](arcanum-cli/command-surface.md). Where the root-normalizing helper lives is detailed in [Shared Config Logic](arcanum-cli/shared-config-logic.md).
+
+Repo states:
+
+| State | Detection | Reads | Writes `--repo` / `--local` |
+| --- | --- | --- | --- |
+| **No repo** (not git, bare repo, or no git) | `rev-parse --show-toplevel` fails | `get`/`list` without a tier read the global tier only, with a stderr note. An explicit `--repo`/`--local` is an error. | Error. |
+| **Git repo, not arcanum-configured** | `.claude/configuration/arcanum-repo-config.json` is missing | Missing tiers read as empty. | **Refused**, hinting at `/init-claude`. |
+| **Configured** | That file exists | Normal. | Normal. The local file is created on first write, as the skills do. |
+
+- Writing into an unconfigured repo is refused because creating the file by hand would half-initialize the repo outside `init-claude`: with no version pointer it reads as `0.0.0`, so every migration would look pending.
+- **No override.** `--force` does not bypass this refusal. Initializing a repo is `init-claude`'s job.
+- "No repo" and "not configured" errors use the "target unavailable" exit code (see "Exit codes").
+
+### `arcanum config info`
+
+`info` describes the CLI's **environment**: where it would read and write, and whether writing there is safe. It never shows config values; that is `get`/`list`'s job.
+
+Example (human output):
+
+```text
+arcanum-cli 2.4.0 (node 22.14.0, requires >=22.13.0)
+
+Account
+  claude config dir  /Users/x/.claude-favini   (from: env CLAUDE_CONFIG_DIR)
+  global config      /Users/x/.claude-favini/arcanum-config.json   [exists]
+  global version     2.3.0   behind — 1 pending migration, run /arcanum-migrate
+
+Repo
+  root               /Users/x/projects/foo   (from: cwd)
+  repo config        .claude/configuration/arcanum-repo-config.json   [exists]
+  repo version       2.4.0   up to date
+  local config       .claude/state/arcanum-config.json   [missing]
+  local version      0.0.0 (no pointer)   behind — 3 pending migrations, run /arcanum-migrate
+```
+
+Fields:
+
+- **CLI:** CLI version, running Node version, required Node floor.
+- **Account:** resolved Claude config directory and its source (`flag`, `env`, `default` or `unresolved`); global config file path and whether it exists; global pointer and skew status.
+- **Repo:** root and its source (`flag` or `cwd`); for each of the repo and local files: path, whether it exists, pointer and skew status.
+- **Skew status:** one of `up to date`, `behind (N pending)`, or `ahead (writes refused without --force)`. `N` is a **count** of pending migrations for that tier's scope, not the list.
+
+Behaviour:
+
+- `--json` emits the same data as a stable object with `cli`, `account` and `repo` blocks. `repo` is `null` when no repo is found. The shape is detailed in [Command Surface](arcanum-cli/command-surface.md).
+- `info` never fails because of environment state: no repo, an unresolved account directory and missing files are reported, not errors. It **always exits 0**, except on usage errors. Scripts inspect the JSON.
+- Read-only: it never creates files and never takes locks.
+- It deliberately leaves out the arcanum install's location and version, consistent with "Version skew" not depending on the install.
 
 ## Version skew
 
