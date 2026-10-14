@@ -8,4 +8,5 @@ Index of every spec under [`docs/agents/specs/`](specs/). A spec is a forward-lo
 
 | Spec | Summary | Status |
 | --- | --- | --- |
+| [Arcanum CLI](specs/arcanum-cli.md) | Optional npm package `arcanum-cli` providing an `arcanum config ...` CLI to manage global / repo / local arcanum configuration outside Claude Code. | Proposed |
 | [Shell Engine Removal](specs/shell-engine-removal.md) | Remove `engine.mode=shell` and every `*_shell.sh` implementation once every entrypoint has a native counterpart. | Proposed |
