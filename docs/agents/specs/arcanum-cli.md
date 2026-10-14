@@ -54,9 +54,30 @@ A new root-level folder needs a new specialist agent. A `client` agent owns `cli
 | `infra` | Docker, docker-compose and Makefile `cli-*` targets; `.circleci/`, including the npm publish job and npm token setup. `.circleci/` is formally added to `infra`'s scope. |
 | `architect` | `AGENTS.md`, the root `README.md`, the agent roster, and this spec. |
 
+Pieces introduced by this spec's decisions:
+
+| Piece | Owner |
+| --- | --- |
+| Runtime Node-version check in `cli/bin/arcanum` (see "Runtime") | `client` |
+| Spec asserting `cli/`'s `engines.node` equals `core/`'s | `client` |
+| Embedding the per-scope migration-version list in the build (read-only on `arcanum/migrations/repos/*/migrations.json`) | `client` |
+| CircleCI job running the `cli/` specs on Node 22.13 | `infra` |
+| Repo-root normalizing helper (`rev-parse --show-toplevel`), if placed in the shared surface (placement detailed in [Shared Config Logic](arcanum-cli/shared-config-logic.md)) | `node` |
+| `no-restricted-imports` rule in `core/eslint.config.mjs` | `node` |
+
+The key registry's owner is decided in [Key Registry](arcanum-cli/key-registry.md), not here.
+
 `client` gets `Read, Edit, Write, Bash` and no `Agent` tool. Its delegation goes through `architect`.
 
-**`client` conventions:**
+**Cross-boundary changes:**
+
+- A PR changing a shared-surface file keeps the CLI specs green in the same PR.
+- The planner (`plan-issue` / `auto-plan-issue`) splits such plans across `node` and `client`, using the usual per-agent split.
+- `client` never edits `core/lib`; `node` never edits `cli/`.
+
+**Commit identity:** `client` gets a `git.agents` entry in this repo's `.claude/configuration/arcanum-repo-config.json`. It reuses an existing persona alias rather than a new one (as `node` reuses `+backend`), since that config is shared with other contributors. The alias is chosen in #775.
+
+**`client` conventions.** This list is the input for #775. Once #775 lands, `.claude/agents/client.md` is the source of truth for `client`'s working conventions, and this spec keeps only the ownership table and the agent boundaries, so the two lists do not drift.
 
 - Node.js ESM, Yarn, Jasmine, c8, and ESLint with the same style rules as `core/`.
 - Zero runtime npm dependencies (see [Command Surface](arcanum-cli/command-surface.md)).
