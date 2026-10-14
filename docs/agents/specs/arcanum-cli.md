@@ -223,11 +223,11 @@ Besides the generic codes, the index fixes two dedicated exit codes, named here 
 
 ## Parts
 
-- [Command Surface](arcanum-cli/command-surface.md): the generic `arcanum config` layer (`get/set/unset/list/info`), tier rules, value parsing, global flags, output, exit codes, `--help`/`--version`.
+- [Command Surface](arcanum-cli/command-surface.md): the generic `arcanum config` layer (`get/set/unset/list/info`), tier rules, value parsing, global flags, output, exit codes (including the numbers for "version skew refused" and "target unavailable"), `--force`'s scope, `--repo` normalization, the `info` JSON shape, `--help`/`--version`.
 - [Shortcuts and Setup](arcanum-cli/shortcuts-and-setup.md): the curated shortcuts, their default tiers and design rules, and the TTY-only `config setup` wizard.
-- [Key Registry](arcanum-cli/key-registry.md): the shared, machine-readable registry of known config keys that drives validation, listing, help, the wizard and the shortcuts.
-- [Shared Config Logic](arcanum-cli/shared-config-logic.md): the declared shared surface in `core/lib`, `ConfigError` decoupling, the import lint rule, `esbuild` bundling and CI coupling.
-- [Packaging and Release](arcanum-cli/packaging-and-release.md): the `cli/` layout, `package.json`, build output, and the CircleCI npm publish job.
+- [Key Registry](arcanum-cli/key-registry.md): the shared, machine-readable registry of known config keys that drives validation, listing, help, the wizard and the shortcuts; `--force` and per-key skew granularity.
+- [Shared Config Logic](arcanum-cli/shared-config-logic.md): the declared shared surface in `core/lib`, `ConfigError` decoupling, the import lint rule, `esbuild` bundling, CI coupling, and where the repo-root normalizing helper lives.
+- [Packaging and Release](arcanum-cli/packaging-and-release.md): the `cli/` layout, `package.json` (`engines.node`), build output (`esbuild` target, embedded migration-version list), the runtime-check entrypoint, the Node 22.13 CI job, and the CircleCI npm publish job.
 
 ## Related work outside this spec
 
@@ -241,12 +241,34 @@ Besides the generic codes, the index fixes two dedicated exit codes, named here 
 - **Shipping the CLI inside each arcanum install**, plus a PATH migration. Rejected: users with several installs would get several competing clients.
 - **Detecting version skew against the arcanum install's own version** (`arcanum.json`). Rejected: the CLI cannot reliably locate the install serving a repo, and the tier pointers are what describe the files' shape.
 
+## Backward compatibility, testing and security
+
+**Backward compatibility:**
+
+- The CLI never changes config shapes. It reads and writes the existing tier files through the shared config logic.
+- "Version skew" protects both older and newer repos and accounts: writes to a newer shape are refused, and older ones get a migration hint only when migrations are actually pending.
+- `core/bin/arcanum` is untouched, and no per-repo migration is needed.
+
+**Testing:**
+
+- `cli/` specs use temp dirs as fake `CLAUDE_CONFIG_DIR`s and repos, never the real `~/.claude`.
+- They cover each skew case, each repo state, each account edge case, and the `info` JSON shape.
+- A CircleCI job runs the `cli/` specs on Node 22.13 (see "Runtime").
+- The CLI specs also run when a shared-surface file changes. Detailed in [Shared Config Logic](arcanum-cli/shared-config-logic.md).
+
+**Security:**
+
+- Zero runtime npm dependencies.
+- No directory creation for an unknown account, and no write into an unconfigured repo.
+- No `~` expansion of `CLAUDE_CONFIG_DIR`, so the CLI never diverges from the skills.
+- `child_process` only through `execFile`/`spawn` with argument arrays.
+- Writes only through the shared locking logic.
+
+**Performance:** nothing load-sensitive. The CLI is a single-file bundle and runs one `git rev-parse` per invocation.
+
 ## Open points
 
-- Exact version-skew behaviour: when to warn and when to refuse writes, and how "newer than understood" is detected.
-- Minimum supported Node.js version (also `engines.node`, see [Packaging and Release](arcanum-cli/packaging-and-release.md)).
-- The exact fields of `arcanum config info`.
-- Behaviour when `--repo` (or the current directory) is not inside an arcanum-configured repo.
+The index has no open points of its own. Each part keeps its own list; there is no consolidated copy here, since it would drift.
 
 ## See also
 
