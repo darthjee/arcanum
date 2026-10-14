@@ -31,6 +31,8 @@ The CLI build uses **`esbuild`** to bundle three things into a single self-conta
 
 - **Declared shared surface.** This spec lists exactly which `core/lib` files the CLI may bundle (the list above). They may import only node built-ins and each other. An ESLint `no-restricted-imports` rule enforces this.
 - **Decouple `DispatchFailure`.** Today `BooleanKeyConfig.js` imports `core/lib/utils/errors/DispatchFailure.js`, which is the shared surface's only non-built-in import outside itself. The shared code instead throws a neutral error (e.g. `ConfigError`). The dispatcher maps it to `DispatchFailure`, keeping today's stdout and exit codes. The CLI maps it to its own messages and exit codes.
+- **Bounded lock for the CLI.** `Lock` gains an optional bound (timeout or max attempts). Skills keep the default, which waits forever. The CLI passes a bound and maps a timeout to its lock-timeout exit code (see [Command Surface](command-surface.md#lock-contention)).
+- **Malformed files stay the CLI's concern.** `RepoConfigWriter._readBase` keeps reading a malformed file as `{}`. The CLI refuses to write such a file by checking it itself before calling the writer (see [Command Surface](command-surface.md#missing-and-malformed-tier-files)).
 - **CI coupling.** CLI specs and the bundle build also run when a shared-surface file or the registry changes, so `core` edits cannot silently break the CLI.
 
 ### Future work
@@ -47,6 +49,6 @@ Extracting the shared config logic into its own npm package is a separate follow
 ## Open points
 
 - The exact shared-surface file list, including whether the JSDoc type-only references to `core/lib/context/RepoContext.js` in `ConfigChain` and `RepoConfig` need to change.
-- The shape of `ConfigError` and how it maps to `DispatchFailure` and to CLI exit codes.
+- The shape of `ConfigError` and how it maps to `DispatchFailure` and to the CLI exit codes defined in [Command Surface](command-surface.md#exit-codes).
 - How CI detects shared-surface changes (path filters versus always running the CLI job).
-- Lock interoperability details with the shell `arcanum/_lib/lock.sh`, when the CLI and a running skill touch the same file (see [Lock System](../../architecture/lock-system.md)).
+- Lock interoperability details with the shell `arcanum/_lib/lock.sh`, when the CLI and a running skill touch the same file (see [Lock System](../../architecture/lock-system.md)). The CLI's side, a bounded wait with `--lock-timeout`, is decided in [Command Surface](command-surface.md#lock-contention).
