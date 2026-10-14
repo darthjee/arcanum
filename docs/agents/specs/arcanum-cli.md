@@ -30,7 +30,7 @@ Resolution order is local → repo → global, as described in [Shared State & C
 - The CLI is **optional**. It is packaged and installed **separately** from arcanum, as the npm package `arcanum-cli` (`npm i -g arcanum-cli`). The installed command is `arcanum`.
 - One machine-wide install serves every arcanum install and every Claude account on the machine. Users with more than one arcanum install (for example one per `CLAUDE_CONFIG_DIR`) must not end up with several competing clients.
 - No per-repo migration installs the CLI or nudges the user to install it. The docs (README and guides) explain how to install it.
-- It runs on the **host's Node.js**, with no Docker fallback. Node is already a prerequisite of arcanum's native engine.
+- It runs on the **host's Node.js**, with no Docker fallback. Node is already a prerequisite of arcanum's native engine. The minimum version is set in [Runtime](#runtime).
 
 Details: [Packaging and Release](arcanum-cli/packaging-and-release.md).
 
@@ -79,7 +79,58 @@ A new root-level folder needs a new specialist agent. A `client` agent owns `cli
 
 ## Version skew
 
-One CLI may face repos on different arcanum versions. The CLI reads the repo's recorded version (`.version` in `.claude/configuration/arcanum-repo-config.json`, see [the repo version guide](../../guides/arcanum-repo-version.md)). It warns, or refuses to write, when the config shape is newer than it understands.
+One CLI may face repos and accounts on different arcanum versions.
+
+**Version pointers.** Each tier records the shape of its own file:
+
+| Tier | Pointer |
+| --- | --- |
+| Global | `.migrations.version` in `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/arcanum-config.json` |
+| Repo | `.version` in `.claude/configuration/arcanum-repo-config.json` (see [the repo version guide](../../guides/arcanum-repo-version.md)) |
+| Local | `.migrations.version` in `.claude/state/arcanum-config.json` |
+
+- Migrations are scoped per tier (`applies_to: repo|local|global`), so the three files can sit at different versions.
+- A pointer holds an arcanum version (e.g. stamped by `init-claude`), not a migration number.
+- A missing pointer counts as `0.0.0`, as in `arcanum/migrations/run.sh`.
+
+**Detection.** The CLI compares a tier's pointer with its own version. The CLI ships in lockstep with arcanum, so its version is the newest shape it can know. On a write, only the target tier's pointer matters: `set --global` ignores the repo pointer.
+
+| Case | Reads | Writes |
+| --- | --- | --- |
+| **Tier ahead** (pointer > CLI version) | Allowed, with a stderr warning suggesting `npm i -g arcanum-cli@latest`. | Refused with the "version skew refused" exit code, unless `--force` is passed. The CLI may not know renamed or moved keys. |
+| **Tier behind** (pointer < CLI version) | Allowed. | Allowed. |
+| **Equal** | Silent. | Silent. |
+
+- "Tier behind" is the common case: the repo is not migrated yet. The CLI prints a stderr warning suggesting `/arcanum-migrate` **only** when that tier's scope has pending migrations between the pointer and the CLI version. Patch bumps with no shape change raise no warning.
+- To know which migrations are pending, the build embeds the per-scope list of migration versions, read from `arcanum/migrations/repos/*/migrations.json`. Detailed in [Packaging and Release](arcanum-cli/packaging-and-release.md).
+- `--force` is the same flag that bypasses key registry validation. Detailed in [Command Surface](arcanum-cli/command-surface.md) and [Key Registry](arcanum-cli/key-registry.md).
+
+**Future work:** per-key granularity. A `since`/`moved_in` field in the key registry would let the CLI refuse a write to a key touched by a pending migration, not just warn. Detailed in [Key Registry](arcanum-cli/key-registry.md).
+
+## Runtime
+
+The CLI runs on the host's Node.js (see "Distribution").
+
+- **Floor: `>=22.13.0`, in lockstep with `core`.** `core/package.json` already declares `"engines": { "node": ">=22.13.0" }`. The CLI bundles `core/lib` shared code, so it accepts exactly the Node versions `core` supports: no lower (the shared code would break), no higher (the host Node is the one the native engine already requires).
+- **Lockstep is enforced.** A `cli/` spec (or CI check) asserts that `cli/package.json`'s `engines.node` equals `core/package.json`'s. The `esbuild` `target` (`node22.13`) derives from the same value, so the bundle never emits newer syntax.
+- **Runtime check.** npm only warns on `engines` (unless `engine-strict` is set). So `cli/bin/arcanum` is a tiny, syntax-conservative entrypoint: it compares `process.versions.node` with the floor, prints `Node.js >= 22.13.0 required, found X` and exits with the generic error code when too old, and only then dynamically `import()`s the bundle.
+- **Tested at the floor.** A CircleCI job, owned by `infra`, runs the `cli/` specs on Node 22.13 exactly, in addition to the default image.
+- **Raising the floor** follows `core`, decided by `node` with `architect`. It is called out in the release notes as breaking for both the native engine and the CLI. It needs no per-repo migration, since no config shape changes.
+
+Details: [Packaging and Release](arcanum-cli/packaging-and-release.md).
+
+## Exit codes
+
+Besides the generic codes, the index fixes two dedicated exit codes, named here by meaning only. Their numbers and identifiers are defined in [Command Surface](arcanum-cli/command-surface.md).
+
+| Meaning | When |
+| --- | --- |
+| **Version skew refused** | A write to a tier whose pointer is ahead of the CLI, without `--force`. |
+| **Target unavailable** | Nowhere to read or write the requested tier: no repo, an unconfigured repo, or an unresolved or missing Claude config directory. One code covers every tier, so scripts handle "nowhere to write" in one place. |
+
+- `--force` bypasses registry validation and version skew. It **never** bypasses "target unavailable".
+- A Node.js older than the floor exits with the generic error code (no dedicated code).
+- Usage errors (e.g. `--repo` pointing at a non-existent path) use the generic usage code.
 
 ## Parts
 
@@ -99,6 +150,7 @@ One CLI may face repos on different arcanum versions. The CLI reads the repo's r
 - **Renaming `core/bin/arcanum` to free the name.** Rejected: it touches `engine_dispatch.sh`, the Docker image and older installs, for no user benefit, since the internal dispatcher is never on PATH.
 - **One binary for both internal and user commands**, with an `internal` namespace. Rejected: it mixes two argv conventions and exposes internal commands to users.
 - **Shipping the CLI inside each arcanum install**, plus a PATH migration. Rejected: users with several installs would get several competing clients.
+- **Detecting version skew against the arcanum install's own version** (`arcanum.json`). Rejected: the CLI cannot reliably locate the install serving a repo, and the tier pointers are what describe the files' shape.
 
 ## Open points
 
