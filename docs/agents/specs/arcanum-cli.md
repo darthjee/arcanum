@@ -67,7 +67,7 @@ Pieces introduced by this spec's decisions:
 | Optional bounded wait (timeout or max attempts) on `core/lib/utils/file/Lock.js`, default unchanged for skills (see [Command Surface](arcanum-cli/command-surface.md#lock-contention)) | `node` |
 | Shared agent-email resolution helper on the shared surface, replacing the private `_agentEmailGet` copies (proposed; see [Shared Config Logic](arcanum-cli/shared-config-logic.md#open-points)) | `node` |
 
-The key registry's owner is decided in [Key Registry](arcanum-cli/key-registry.md), not here.
+The key registry (`core/lib/utils/config/keys.json` and its `KeyRegistry.js`) is owned by `node`, as decided in [Key Registry](arcanum-cli/key-registry.md#location); `architect` owns the docs rule that a new config key means a registry entry.
 
 `client` gets `Read, Edit, Write, Bash` and no `Agent` tool. Its delegation goes through `architect`.
 
@@ -196,7 +196,7 @@ One CLI may face repos and accounts on different arcanum versions.
 - To know which migrations are pending, the build embeds the per-scope list of migration versions, read from `arcanum/migrations/repos/*/migrations.json`. Detailed in [Packaging and Release](arcanum-cli/packaging-and-release.md).
 - `--force` is the same flag that bypasses key registry validation. Detailed in [Command Surface](arcanum-cli/command-surface.md) and [Key Registry](arcanum-cli/key-registry.md).
 
-**Future work:** per-key granularity. A `since`/`moved_in` field in the key registry would let the CLI refuse a write to a key touched by a pending migration, not just warn. Detailed in [Key Registry](arcanum-cli/key-registry.md).
+**Future work:** per-key granularity. A `since`/`moved_in` field in the key registry would let the CLI refuse a write to a key touched by a pending migration, not just warn. The intended design is recorded in [Key Registry → Per-key skew granularity](arcanum-cli/key-registry.md#per-key-skew-granularity).
 
 ## Runtime
 
@@ -227,7 +227,7 @@ Besides the generic codes, the index fixes two dedicated exit codes. The full nu
 
 - [Command Surface](arcanum-cli/command-surface.md): the generic `arcanum config` layer (`get/set/unset/list/info`), tier rules, value parsing, global flags, output, exit codes (including the numbers for "version skew refused" and "target unavailable"), `--force`'s scope, `--repo` normalization, the `--json` shapes (including `info`'s), error wording, missing and malformed tier files, lock contention and `--lock-timeout`, `--help`/`--version`.
 - [Shortcuts and Setup](arcanum-cli/shortcuts-and-setup.md): the curated shortcuts, their default tiers, design rules and output; the `agents email` resolution view with per-agent detail; the repo-only `ignore-checks` add/remove; and the TTY-only, sectioned, registry-driven `config setup` wizard.
-- [Key Registry](arcanum-cli/key-registry.md): the shared, machine-readable registry of known config keys that drives validation, listing, help, the wizard and the shortcuts; `--force` and per-key skew granularity.
+- [Key Registry](arcanum-cli/key-registry.md): the shared, machine-readable registry of known config keys (`core/lib/utils/config/keys.json`, owned by `node`) that drives validation, listing, help, the wizard and the shortcuts; its JSON entry shape, wildcard matching, registry-specific validation and `--force`, the specs that keep it in sync with what arcanum reads, the final seed list, and per-key skew granularity as future work.
 - [Shared Config Logic](arcanum-cli/shared-config-logic.md): the declared shared surface in `core/lib`, `ConfigError` decoupling, the import lint rule, `esbuild` bundling, CI coupling, and where the repo-root normalizing helper lives.
 - [Packaging and Release](arcanum-cli/packaging-and-release.md): the `cli/` layout, `package.json` (`engines.node`), build output (`esbuild` target, embedded migration-version list), the runtime-check entrypoint, the Node 22.13 CI job, and the CircleCI npm publish job.
 
