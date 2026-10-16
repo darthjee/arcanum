@@ -13,9 +13,12 @@ Define how the CLI reuses arcanum's existing config read/write code, so that it 
 The config logic stays in `core/` as the single source, owned by `node`:
 
 - `core/lib/utils/config/`: `ConfigChain`, `RepoConfig`, `RepoConfigWriter`, `BooleanKeyConfig`;
+- `core/lib/utils/config/keys.json` and `core/lib/utils/config/KeyRegistry.js`: the [Key Registry](key-registry.md#location) and its loader, validator and matcher;
 - `core/lib/utils/file/Lock.js`, which is compatible with the shell lock.
 
-Together these are about 900 lines.
+Together the code files are about 900 lines.
+
+`ConfigChain#read` and `RepoConfig`'s read also gain the registry's test-only strict-keys guard: under `ARCANUM_STRICT_CONFIG_KEYS=1`, set by core's spec runner, they throw on a key that matches no registry entry. Production behaviour is unchanged (see [Key Registry](key-registry.md#enforcing-a-new-key-means-a-registry-entry)).
 
 ### Bundle at build time with `esbuild`
 
@@ -25,15 +28,15 @@ The CLI build uses **`esbuild`** to bundle three things into a single self-conta
 - the shared `core/lib` files above;
 - the [Key Registry](key-registry.md).
 
-`esbuild` is a devDependency only, so the runtime stays zero-dependency. `core/` is not part of the npm package, so the CLI cannot import `core/lib` at runtime.
+`KeyRegistry.js` loads `keys.json` with a static JSON import (`with { type: 'json' }`), which `esbuild` inlines, so the bundle carries the registry with no runtime file read. `esbuild` is a devDependency only, so the runtime stays zero-dependency. `core/` is not part of the npm package, so the CLI cannot import `core/lib` at runtime.
 
 ### Guardrails
 
-- **Declared shared surface.** This spec lists exactly which `core/lib` files the CLI may bundle (the list above). They may import only node built-ins and each other. An ESLint `no-restricted-imports` rule enforces this.
+- **Declared shared surface.** This spec lists exactly which `core/lib` files the CLI may bundle (the list above). They may import only node built-ins and each other (including `keys.json`). An ESLint `no-restricted-imports` rule enforces this.
 - **Decouple `DispatchFailure`.** Today `BooleanKeyConfig.js` imports `core/lib/utils/errors/DispatchFailure.js`, which is the shared surface's only non-built-in import outside itself. The shared code instead throws a neutral error (e.g. `ConfigError`). The dispatcher maps it to `DispatchFailure`, keeping today's stdout and exit codes. The CLI maps it to its own messages and exit codes.
 - **Bounded lock for the CLI.** `Lock` gains an optional bound (timeout or max attempts). Skills keep the default, which waits forever. The CLI passes a bound and maps a timeout to its lock-timeout exit code (see [Command Surface](command-surface.md#lock-contention)).
 - **Malformed files stay the CLI's concern.** `RepoConfigWriter._readBase` keeps reading a malformed file as `{}`. The CLI refuses to write such a file by checking it itself before calling the writer (see [Command Surface](command-surface.md#missing-and-malformed-tier-files)).
-- **CI coupling.** CLI specs and the bundle build also run when a shared-surface file or the registry changes, so `core` edits cannot silently break the CLI.
+- **CI coupling.** CLI specs and the bundle build also run when a shared-surface file changes, the registry included, so `core` edits cannot silently break the CLI.
 
 ### Future work
 

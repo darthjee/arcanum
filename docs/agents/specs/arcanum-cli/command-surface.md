@@ -56,6 +56,7 @@ Each command also accepts the [global flags](#global-flags) and `--help`.
 - `true`, `false`, numbers, `null`, JSON arrays and JSON objects are parsed as JSON. Anything else is a string.
 - `--string` forces the value to be stored as a string. This matters because, for example, `next_step.auto.*` accepts only the JSON boolean `true`, not the string `"true"`.
 - After parsing, the value is checked against the registry type and enum of a known key. A mismatch is exit `3`. An unknown key passed with `--force` skips this check.
+- `null` on a **known** key is a type mismatch (exit `3`, `hint: use 'config unset' to remove it`). Storing `null` is therefore only possible for an unknown key with `--force`. The registry-specific checks (order, empty strings, number ranges, regex) are in [Key Registry](key-registry.md#validation).
 
 Edge cases:
 
@@ -65,10 +66,10 @@ Edge cases:
 | `true` / `false` | boolean | `"true"` / `"false"` |
 | `42`, `-1.5`, `1e3` | number | string |
 | `9007199254740993` (beyond `Number.MAX_SAFE_INTEGER`) | refused, exit `3`: precision would be lost. Pass `--string` to store it as text. | string |
-| `null` | JSON `null`, stored as a value. This is **not** `unset`: the key stays present. | `"null"` |
+| `null` | JSON `null`. For a known key this is exit `3` (see above); for an unknown key with `--force` it is stored as a value. This is **not** `unset`: the key stays present. | `"null"` |
 | `[1,2]`, `{"a":1}` | array / object | string |
 | `"quoted"` (JSON string literal) | the string `quoted`, quotes removed | the string `"quoted"`, quotes kept |
-| `[1,` or `{a:1}` (looks like JSON, is not) | stored as a string, unless the key's registry type is array or object, in which case exit `3` with the JSON parse error | string |
+| `[1,` or `{a:1}` (looks like JSON, is not) | stored as a string, unless the key's registry type is array, in which case exit `3` with the JSON parse error | string |
 | ` 42 ` (surrounding whitespace) | the string ` 42 `; values are never trimmed | string |
 
 - "Looks like JSON" means the value starts with `[`, `{` or `"`, after no trimming.
@@ -303,6 +304,8 @@ Examples:
 | `3` | `arcanum: next_step.auto.enhance-issue must be a boolean, got string "true"` + `hint: drop --string` |
 | `3` | `arcanum: version is read-only; it is managed by migrations` |
 | `3` | `arcanum: auto-fix-all.ignored_check_patterns is repo-only` |
+| `3` | `arcanum: auto-fix-all.ignored_check_patterns[2] is not a valid regex: Unterminated group` |
+| `3` | `arcanum: git.safe_branch must be a string, got null` + `hint: use 'config unset' to remove it` |
 | `4` | `arcanum: /x/foo is not arcanum-configured (no .claude/configuration/arcanum-repo-config.json)` + `hint: run /init-claude in that repo` |
 | `4` | `arcanum: claude config dir /Users/x/.claude-favni does not exist` |
 | `5` | `arcanum: repo config is at 2.5.0, newer than this CLI (2.4.0)` + `hint: npm i -g arcanum-cli@latest, or pass --force` |

@@ -60,7 +60,7 @@ Example: `arcanum config auto-fix-all ignore-checks add '^codacy'`.
 - **`off` writes JSON `false`** at the target tier rather than removing the key, so it can shadow an `on` from a lower-precedence tier (e.g. turning off locally an auto-advance enabled globally). Removing the key is `--unset`.
 - **Writes** go to the default tier in the table above. `--global`, `--repo` or `--local` overrides it, within the tiers the registry allows for the key.
 - **Reads ignore the default tier.** Without a tier flag, a shortcut read shows the resolved value and its source tier, like `config get`. With a tier flag, it reads only that tier. `--all-tiers` is accepted on reads, as on `get`.
-- **`next-step auto`** without `<skill>` lists every `next_step.auto.*` key that is set (see [Output](#output)). Whether `<skill>` must name an existing skill follows the registry's wildcard-matching rule (see [Open points](#open-points)).
+- **`next-step auto`** without `<skill>` lists every `next_step.auto.*` key that is set (see [Output](#output)). Any well-formed `<skill>` name is accepted, per the registry's [wildcard-matching rule](key-registry.md#wildcard-matching).
 - **Flags.** Shortcuts accept the tier flags, the [global flags](command-surface.md#global-flags), and `--lock-timeout` on writes. They do **not** accept `--force` or `--string`: shortcuts only target known keys with known types. Unknown or experimental keys go through generic `config set --force`.
 - **Validation** is the generic layer's. Enum values (`engine`, `git merge-body`) are checked against the registry, and failures use the same exit codes and error wording as `config set` (see [Command Surface](command-surface.md#exit-codes)).
 - **Tuning knobs** such as `plan-issues.max-retry-count` and `plan-issues.error-sleep-time` get no shortcut. They stay reachable through generic `config set`.
@@ -271,7 +271,7 @@ For each setting:
 
 1. Show the key, its registry description, its current resolved value and its source tier.
 2. Ask for the new value. Enter keeps the current one; `-` unsets the key at the chosen tier.
-3. Ask for the target tier, offering only the tiers the registry allows for the key and defaulting to the shortcut's default tier. Repo-only keys skip this question.
+3. Ask for the target tier, offering only the tiers the registry allows for the key and defaulting to the shortcut's default tier. Single-tier keys (e.g. the repo-only `ci` key, the local-only `git.safe_branch`) skip this question.
 4. Show the exact write and ask `[Y/n]`.
 5. Write immediately, through the same code path as `config set`/`unset`, so the lock, skew, malformed-file and validation rules all apply.
 
@@ -319,7 +319,8 @@ summary
 - **Positional value plus `--unset`.** Usage error (exit `2`).
 - **Boolean token in another case (`ON`, `True`).** Exit `3` with the accepted tokens.
 - **Writing to a shadowed tier.** Allowed. The shortcut prints the generic `set` output plus a stderr note naming the overriding tier; the wizard shows the same note before confirming.
-- **`next-step auto <skill>` for a skill that does not exist.** Accepted or refused per the registry's wildcard-matching rule (see [Open points](#open-points)).
+- **`next-step auto <skill>` for a skill that does not exist.** Accepted: the CLI cannot reliably know arcanum's skill list, so any well-formed name is valid (see [Key Registry](key-registry.md#wildcard-matching)).
+- **`git safe-branch --repo` or `--global`.** Exit `3`: the registry marks `git.safe_branch` local-only, because `safe_branch.sh` reads only the local tier.
 - **`agents email` with an agents folder entry that is not a `.md` file.** Ignored.
 - **`agents email` outside a repo.** Only configured agents are listed; the local and repo tiers show `"file": null`.
 - **Wizard with no repo.** Global-tier items only; `ci` and per-agent overrides are skipped with a note.
@@ -373,5 +374,4 @@ Nothing load-sensitive. Shortcuts cost the same as their generic equivalents. `a
 
 ## Open points
 
-- Whether `next-step auto`'s `<skill>` must name an existing skill. Owned by the registry's wildcard-matching rule (#777, see [Key Registry](key-registry.md#open-points)).
-- The final shape of the registry's `setup` field and `instances` list, which #777 must include (see [Key Registry](key-registry.md#open-points)).
+None owned by the registry: whether `<skill>` must name an existing skill is decided in [Key Registry → Wildcard matching](key-registry.md#wildcard-matching), and the final `setup` / `instances` assignments in [Key Registry → Seed keys](key-registry.md#seed-keys).
