@@ -47,6 +47,7 @@ Each command also accepts the [global flags](#global-flags) and `--help`.
 - A key segment may not be empty: `a..b`, a leading `.` and a trailing `.` are usage errors.
 - Writes use the same nested `setpath` semantics as `global_config_write` and `RepoConfigWriter`: missing intermediate objects are created and sibling keys are kept.
 - `set` and `unset` validate the key against the [Key Registry](key-registry.md): key, type, enum, tier and read-only-ness. Unknown keys are refused unless `--force` is passed.
+- A registry tier restriction can make a key single-tier. For example, `auto-fix-all.ignored_check_patterns` is repo-only, because the runtime reads it only from the repo tier; `set`/`unset` of it with `--global` or `--local` is exit `3`.
 - `unset` of a key that is not set in the target tier is a no-op that exits `0`, like `rm -f`; the JSON output reports `"changed": false`.
 - `unset` of the last key in an intermediate object leaves the now-empty parent object in place, matching the shell helpers. It does not prune.
 
@@ -179,6 +180,9 @@ See [Targeting](../arcanum-cli.md#targeting) for how the account and repo are re
 $ arcanum config get engine.mode
 native   (repo: .claude/configuration/arcanum-repo-config.json)
 
+$ arcanum config get git.safe_branch
+(unset; default: origin/main)
+
 $ arcanum config get engine.mode --all-tiers
 local    -        (unset)
 repo     native   <- resolved
@@ -191,6 +195,8 @@ $ arcanum config list --repo
 engine.mode = "native"   Script engine mode (shell|native)
 ```
 
+- An unset key prints `(unset)`, or `(unset; default: <value>)` when the registry has a default, and exits `1`.
+- `config setup` writes its prompts to stderr too, so stdout stays results-only (see [Shortcuts and Setup](shortcuts-and-setup.md#tty-requirement)).
 - `get` with a tier flag prints the raw value only, so `$(arcanum config get k --repo)` is usable in shell scripts. Strings print without quotes; other values print as compact JSON.
 
 ### JSON output
@@ -203,7 +209,8 @@ Each command prints one stable object. New fields may be added; existing fields 
 {"key": "engine.mode", "set": true, "value": "native", "source": "repo"}
 ```
 
-- Unset: `{"key": "engine.mode", "set": false, "value": null, "source": null}`, exit `1`.
+- Unset: `{"key": "engine.mode", "set": false, "value": null, "source": null, "default": null}`, exit `1`.
+- `default` is the registry default for a known key, or `null` when it has none or the key is unknown. It is present on every `get` output, set or not. It is an additive field under the rule above, and the [shortcuts](shortcuts-and-setup.md#output) print the same shape.
 - `source` is `"local"`, `"repo"`, `"global"` or `null`. With a tier flag it is that tier.
 
 `get --all-tiers`:
@@ -211,7 +218,7 @@ Each command prints one stable object. New fields may be added; existing fields 
 ```json
 {
   "key": "engine.mode",
-  "resolved": {"set": true, "value": "native", "source": "repo"},
+  "resolved": {"set": true, "value": "native", "source": "repo", "default": null},
   "tiers": {
     "local":  {"set": false, "value": null, "file": "/x/foo/.claude/state/arcanum-config.json"},
     "repo":   {"set": true,  "value": "native", "file": "/x/foo/.claude/configuration/arcanum-repo-config.json"},
@@ -241,7 +248,7 @@ Each command prints one stable object. New fields may be added; existing fields 
 ```
 
 - One entry per key per tier, so a shadowed key appears once per tier that sets it. `description` is `null` for unknown keys.
-- Registry defaults for unset keys are not listed (see [Open points](#open-points)).
+- Registry defaults for unset keys are not listed (see [Open points](#open-points)); `get` reports them in its `default` field.
 
 `info`:
 
@@ -295,6 +302,7 @@ Examples:
 | `3` | `arcanum: unknown key 'next_step.auto.enhanse-issue'` + `hint: check the spelling, or pass --force for a key newer than this CLI` |
 | `3` | `arcanum: next_step.auto.enhance-issue must be a boolean, got string "true"` + `hint: drop --string` |
 | `3` | `arcanum: version is read-only; it is managed by migrations` |
+| `3` | `arcanum: auto-fix-all.ignored_check_patterns is repo-only` |
 | `4` | `arcanum: /x/foo is not arcanum-configured (no .claude/configuration/arcanum-repo-config.json)` + `hint: run /init-claude in that repo` |
 | `4` | `arcanum: claude config dir /Users/x/.claude-favni does not exist` |
 | `5` | `arcanum: repo config is at 2.5.0, newer than this CLI (2.4.0)` + `hint: npm i -g arcanum-cli@latest, or pass --force` |
@@ -359,5 +367,5 @@ Nothing load-sensitive. Each invocation runs at most one `git rev-parse`, reads 
 
 ## Open points
 
-- Whether `list --json` should also report registry defaults for keys that are unset in every tier.
+- Whether `list --json` should also report registry defaults for keys that are unset in every tier. `get` already reports them in its `default` field.
 - Whether the `--repo` overload (path versus tier flag) should be replaced by separate names (e.g. `--repo-path`) before the first release, if the parser rule proves confusing in practice.
