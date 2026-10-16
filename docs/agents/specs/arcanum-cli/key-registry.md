@@ -16,7 +16,17 @@ The registry has one entry per key or key pattern. Patterns use wildcard segment
 - **allowed tiers**: any of global, repo, local;
 - **read-only flag**, e.g. for `version` and `migrations.version`;
 - **default** value;
-- a short **description**.
+- a short **description**;
+- an optional **`setup`** field, `{section, order, prompt, instances?}`, for keys the [`config setup` wizard](shortcuts-and-setup.md#arcanum-config-setup-wizard) asks.
+
+The `default` value feeds the `default` field of `config get` and of the shortcuts' reads (see [Command Surface](command-surface.md#json-output)).
+
+The `setup` field:
+
+- The wizard asks exactly the entries that carry it, ordered by `section` (in the canonical order `identity`, `engine`, `git`, `flow`, `ci`), then by `order`. `prompt` is the question shown.
+- `instances` lists the concrete names to ask for a wildcard key, e.g. `next_step.auto.<skill>` → `enhance-issue`, `discuss-issue`, `auto-plan-issue`.
+- `git.agents.<agent>` is the exception: its instances come from the target repo's `.claude/agents/*.md`, not from the registry.
+- Adding a key to the wizard is a registry edit, not CLI code.
 
 ### Location
 
@@ -53,7 +63,7 @@ This table is indicative. The registry issue (#777) finalizes it. Sources: [Shar
 | `git.safe_branch` | string | ref, default `origin/main` |
 | `git.merge_body_mode` | enum `full` / `empty` / `coauthors` | |
 | `next_step.auto.<skill>` | boolean | only JSON `true` enables it |
-| `auto-fix-all.ignored_check_patterns` | array of strings | repo |
+| `auto-fix-all.ignored_check_patterns` | array of strings | **repo only**; each entry is a case-insensitive regex, validated with `new RegExp(p, 'i')` |
 | `auto-fix-all.clear_context` | boolean | local |
 | `auto-fix-all.finish_on_empty_queue` | boolean | local |
 | `monitor-issues.clear_context` | boolean | local, after #776 |
@@ -74,3 +84,4 @@ This table is indicative. The registry issue (#777) finalizes it. Sources: [Shar
 - Wildcard matching rules, e.g. whether `<skill>` must name an existing skill.
 - How arcanum's own code consumes the registry, if at all (defaults, validation).
 - How the "new key means a registry entry" rule is enforced: a docs checklist only, or a test that scans for config reads.
+- Input for #777: the final registry must include the `setup` field and the `instances` list that drive the wizard (see [Shortcuts and Setup](shortcuts-and-setup.md#registry-driven)).

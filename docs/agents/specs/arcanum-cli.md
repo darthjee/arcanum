@@ -65,6 +65,7 @@ Pieces introduced by this spec's decisions:
 | Repo-root normalizing helper (`rev-parse --show-toplevel`), if placed in the shared surface (placement detailed in [Shared Config Logic](arcanum-cli/shared-config-logic.md)) | `node` |
 | `no-restricted-imports` rule in `core/eslint.config.mjs` | `node` |
 | Optional bounded wait (timeout or max attempts) on `core/lib/utils/file/Lock.js`, default unchanged for skills (see [Command Surface](arcanum-cli/command-surface.md#lock-contention)) | `node` |
+| Shared agent-email resolution helper on the shared surface, replacing the private `_agentEmailGet` copies (proposed; see [Shared Config Logic](arcanum-cli/shared-config-logic.md#open-points)) | `node` |
 
 The key registry's owner is decided in [Key Registry](arcanum-cli/key-registry.md), not here.
 
@@ -225,7 +226,7 @@ Besides the generic codes, the index fixes two dedicated exit codes. The full nu
 ## Parts
 
 - [Command Surface](arcanum-cli/command-surface.md): the generic `arcanum config` layer (`get/set/unset/list/info`), tier rules, value parsing, global flags, output, exit codes (including the numbers for "version skew refused" and "target unavailable"), `--force`'s scope, `--repo` normalization, the `--json` shapes (including `info`'s), error wording, missing and malformed tier files, lock contention and `--lock-timeout`, `--help`/`--version`.
-- [Shortcuts and Setup](arcanum-cli/shortcuts-and-setup.md): the curated shortcuts, their default tiers and design rules, and the TTY-only `config setup` wizard.
+- [Shortcuts and Setup](arcanum-cli/shortcuts-and-setup.md): the curated shortcuts, their default tiers, design rules and output; the `agents email` resolution view with per-agent detail; the repo-only `ignore-checks` add/remove; and the TTY-only, sectioned, registry-driven `config setup` wizard.
 - [Key Registry](arcanum-cli/key-registry.md): the shared, machine-readable registry of known config keys that drives validation, listing, help, the wizard and the shortcuts; `--force` and per-key skew granularity.
 - [Shared Config Logic](arcanum-cli/shared-config-logic.md): the declared shared surface in `core/lib`, `ConfigError` decoupling, the import lint rule, `esbuild` bundling, CI coupling, and where the repo-root normalizing helper lives.
 - [Packaging and Release](arcanum-cli/packaging-and-release.md): the `cli/` layout, `package.json` (`engines.node`), build output (`esbuild` target, embedded migration-version list), the runtime-check entrypoint, the Node 22.13 CI job, and the CircleCI npm publish job.
