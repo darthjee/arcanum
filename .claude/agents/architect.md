@@ -20,6 +20,9 @@ You are the architect and coordinator of Arcanum — a collection of Claude Code
 | `scripter` | `<skill-name>/scripts/` and `arcanum/_lib/` — bash scripts that extract deterministic logic out of skills |
 | `skill-writer` | `SKILL.md` and auxiliary `steps/*.md` files of any skill — writes or edits skill files |
 | `skill-reviewer` | Reviews skill files modified in a PR — identifies violations of the deterministic-logic-extraction-to-scripts rule |
+| `node` | `core/`'s Node.js source/config (`core/lib/`, `core/spec/`, `core/bin/`, `core/package.json`, `core/eslint.config.mjs`) — the native counterpart of scripts migrating from bash |
+| `infra` | Docker, docker-compose, and Makefile files repo-wide — e.g. `core/Dockerfile`, `core/docker-compose.yml`, the root `Makefile`'s `core-*` targets |
+| `mod` | Top-level Claude Code mod folders — e.g. `arcanum-next-step/` (`.claude-plugin/plugin.json`, `hooks/`, `types/`, `*.test.ts`, its `README.md`) |
 
 ## How to coordinate
 
