@@ -437,3 +437,137 @@ describe('next-step-prompt parity: auto-next flags (issue #714)', () => {
     });
   });
 });
+
+describe('next-step-prompt parity: clear key (issue #796)', () => {
+  const SKILL = 'enhance-issue';
+  const COMMAND = '/discuss-issue 796';
+  const AUTO_OUTPUT = 'CHOICE=yes\nAUTO=true\n';
+  const CLEAR_OUTPUT = 'CHOICE=yes\nAUTO=true\nCLEAR=true\n';
+  const NOTICE = `auto-continuing: ${COMMAND} (next_step.auto.${SKILL}=true)\n`;
+  const CLEAR_NOTICE = `auto-continuing: ${COMMAND} (next_step.auto.${SKILL}=true, next_step.clear.${SKILL}=true)\n`;
+  const PLAIN_AUTO = { stdout: AUTO_OUTPUT, stderr: NOTICE, code: 0 };
+
+  let tempDir;
+  let repo;
+  let configDir;
+  let ttyDevice;
+
+  /**
+   * Run the script against the temp repo with the isolated config dir, from
+   * a cwd outside the repo.
+   * @param {string[]} extraArgs - arguments appended after `--repo <repo>`.
+   * @returns {Promise<{stdout: string, stderr: string, code: number}>} the process result.
+   */
+  const run = (extraArgs = []) => runPrompt(
+    ['--repo', repo, '--command', COMMAND, '--auto-key', SKILL, ...extraArgs],
+    ttyDevice,
+    { cwd: tempDir, configDir }
+  );
+
+  /**
+   * Build the `next_step` config with the given auto/clear values for SKILL.
+   * @param {object} values - the values to set.
+   * @param {(boolean|string|number|null)} [values.auto] - `next_step.auto.<skill>` (omitted when undefined).
+   * @param {(boolean|string|number|null)} [values.clear] - `next_step.clear.<skill>` (omitted when undefined).
+   * @returns {object} the config object.
+   */
+  function nextStepConfig({ auto, clear }) {
+    const nextStep = {};
+
+    if (auto !== undefined) {
+      nextStep.auto = { [SKILL]: auto };
+    }
+
+    if (clear !== undefined) {
+      nextStep.clear = { [SKILL]: clear };
+    }
+
+    return { next_step: nextStep };
+  }
+
+  beforeEach(async () => {
+    tempDir = await createTempDir();
+    repo = path.join(tempDir, 'repo');
+    configDir = path.join(tempDir, 'global-config');
+    ttyDevice = path.join(tempDir, 'missing-tty');
+    await mkdir(repo, { recursive: true });
+    await mkdir(configDir, { recursive: true });
+  });
+
+  afterEach(async () => {
+    await removeTempDir(tempDir);
+  });
+
+  it('prints CLEAR=true and the two-key notice when both keys are true', async () => {
+    await writeRepoConfig(repo, nextStepConfig({ auto: true, clear: true }));
+
+    expect(await run()).toEqual({ stdout: CLEAR_OUTPUT, stderr: CLEAR_NOTICE, code: 0 });
+    expect(await run(['--no-prompt'])).toEqual({ stdout: CLEAR_OUTPUT, stderr: CLEAR_NOTICE, code: 0 });
+  });
+
+  it('keeps the plain auto output when the clear key is false', async () => {
+    await writeRepoConfig(repo, nextStepConfig({ auto: true, clear: false }));
+
+    expect(await run()).toEqual(PLAIN_AUTO);
+  });
+
+  it('resolves mixed tiers (auto in global, clear in repo)', async () => {
+    await writeGlobalConfig(configDir, nextStepConfig({ auto: true }));
+    await writeRepoConfig(repo, nextStepConfig({ clear: true }));
+
+    expect(await run()).toEqual({ stdout: CLEAR_OUTPUT, stderr: CLEAR_NOTICE, code: 0 });
+  });
+
+  it('lets a local false shadow a repo true', async () => {
+    await writeRepoConfig(repo, nextStepConfig({ auto: true, clear: true }));
+    await writeLocalConfig(repo, nextStepConfig({ clear: false }));
+
+    expect(await run()).toEqual(PLAIN_AUTO);
+  });
+
+  [
+    ['the string "true"', 'true'],
+    ['1', 1],
+    ['null', null]
+  ].forEach(([label, value]) => {
+    it(`keeps the plain auto output when the clear key is ${label}`, async () => {
+      await writeRepoConfig(repo, nextStepConfig({ auto: true, clear: value }));
+
+      expect(await run()).toEqual(PLAIN_AUTO);
+    });
+  });
+
+  it('keeps the plain auto output when the clear key is absent', async () => {
+    await writeRepoConfig(repo, nextStepConfig({ auto: true }));
+
+    expect(await run()).toEqual(PLAIN_AUTO);
+  });
+
+  it('keeps the auto result when the clear key\'s tiers are malformed', async () => {
+    await writeLocalConfig(repo, nextStepConfig({ auto: true }));
+    await mkdir(path.join(repo, '.claude', 'configuration'), { recursive: true });
+    await writeFile(path.join(repo, '.claude', 'configuration', 'arcanum-repo-config.json'), '{ not json\n');
+    await writeFile(path.join(configDir, 'arcanum-config.json'), '{ not json\n');
+
+    expect(await run()).toEqual(PLAIN_AUTO);
+  });
+
+  it('never emits CLEAR when auto is off, with or without --no-prompt', async () => {
+    await writeRepoConfig(repo, nextStepConfig({ auto: false, clear: true }));
+
+    expect(await run(['--no-prompt'])).toEqual({ stdout: 'CHOICE=no\n', stderr: '', code: 0 });
+    expect(await run()).toEqual({ stdout: `FALLBACK=chat\nCOMMAND=${COMMAND}\n`, stderr: '', code: 4 });
+  });
+
+  it('never emits CLEAR without --auto-key', async () => {
+    await writeRepoConfig(repo, nextStepConfig({ auto: true, clear: true }));
+
+    const result = await runPrompt(
+      ['--repo', repo, '--command', COMMAND, '--no-prompt'],
+      ttyDevice,
+      { cwd: tempDir, configDir }
+    );
+
+    expect(result).toEqual({ stdout: 'CHOICE=no\n', stderr: '', code: 0 });
+  });
+});
