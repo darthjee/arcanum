@@ -52,6 +52,7 @@ const REPO_CONTEXT_COMMANDS = [
   'github-issue-update',
   'init-claude-set-ci-ignored-patterns',
   'init-claude-set-next-step-auto',
+  'init-claude-set-next-step-clear',
   'init-claude-setup-docs-structure',
   'init-claude-setup-templates',
   'init-claude-stamp-arcanum-version',
@@ -116,6 +117,7 @@ describe('COMMANDS', () => {
       'github-issue-update',
       'init-claude-set-ci-ignored-patterns',
       'init-claude-set-next-step-auto',
+      'init-claude-set-next-step-clear',
       'init-claude-setup-docs-structure',
       'init-claude-setup-templates',
       'init-claude-stamp-arcanum-version',
@@ -187,6 +189,7 @@ describe('COMMANDS', () => {
     const expected = {
       'init-claude-set-ci-ignored-patterns': 'InitClaudeSetCiIgnoredPatterns',
       'init-claude-set-next-step-auto': 'InitClaudeSetNextStepAuto',
+      'init-claude-set-next-step-clear': 'InitClaudeSetNextStepClear',
       'init-claude-setup-docs-structure': 'InitClaudeSetupDocsStructure',
       'init-claude-setup-templates': 'InitClaudeSetupTemplates',
       'init-claude-stamp-arcanum-version': 'InitClaudeStampArcanumVersion'
