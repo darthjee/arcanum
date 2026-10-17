@@ -2,6 +2,11 @@
 # docs/agents/architecture/script-engine.md and core/docker-compose.yml —
 # these targets run core/'s suite inside the darthjee/node-based test
 # image, with core/ bind-mounted rather than baked into the image.
+#
+# mod-check gates the Claude Code mods shipped with arcanum (MOD_DIRS):
+# for each, `claude plugin validate`, `tsc -p` and `claude plugin test`,
+# run on the host (the Claude Code CLI must be on PATH), stopping at the
+# first failure.
 
 CORE_COMPOSE := docker compose -f core/docker-compose.yml
 
@@ -26,8 +31,19 @@ BENCH_IMAGE_VAR := ARCANUM_BENCH_IMAGE
 BENCH_SCRIPT := scripts/docker_benchmark.sh
 BENCH_ARGS ?=
 
+# Claude Code mods (#797), checked on the host by mod-check. tsc is the
+# host's if installed, else a pinned TypeScript through npx. tsc -p needs
+# the engine-generated .claude-plugin/types/ (never committed), which the
+# engine writes when it loads the mod from its folder in a session.
+MOD_DIRS := arcanum-next-step
+CLAUDE ?= claude
+TYPESCRIPT_VERSION := 5.9.3
+TSC ?= $(shell command -v tsc 2>/dev/null || echo npx --yes -p typescript@$(TYPESCRIPT_VERSION) tsc)
+MOD_TYPES_TSCONFIG := .claude-plugin/types/tsconfig.json
+
 .PHONY: core-test core-lint core-check core-shell core-report core-audit \
-	core-build-runtime core-smoke-runtime docker-parity docker-benchmark
+	core-build-runtime core-smoke-runtime docker-parity docker-benchmark \
+	mod-check
 
 core-test:
 	$(CORE_COMPOSE) run --rm core sh -c "yarn install --frozen-lockfile && yarn test"
@@ -85,3 +101,15 @@ docker-parity: core-build-runtime
 # or `BENCH_ARGS="--runs 50"`.
 docker-benchmark: core-build-runtime
 	$(BENCH_IMAGE_VAR)=$(RUNTIME_IMAGE) $(BENCH_SCRIPT) $(BENCH_ARGS)
+
+mod-check:
+	@set -e; for dir in $(MOD_DIRS); do \
+		echo "mod-check: $$dir: validate"; \
+		$(CLAUDE) plugin validate "$$dir"; \
+		echo "mod-check: $$dir: tsc"; \
+		test -f "$$dir/$(MOD_TYPES_TSCONFIG)" || { echo "mod-check: $$dir/$(MOD_TYPES_TSCONFIG) is missing; start a Claude Code session with the mod loaded so the engine writes its types" >&2; exit 1; }; \
+		$(TSC) -p "$$dir" --noEmit; \
+		echo "mod-check: $$dir: test"; \
+		$(CLAUDE) plugin test "$$dir"; \
+	done
+	@echo "mod-check: ok"
