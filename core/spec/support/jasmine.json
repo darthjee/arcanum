@@ -2,7 +2,8 @@
   "spec_dir": "spec",
   "spec_files": [
     "lib/**/*_spec.js",
-    "bin/**/*_spec.js"
+    "bin/**/*_spec.js",
+    "release/**/*_spec.js"
   ],
   "helpers": [],
   "env": {
