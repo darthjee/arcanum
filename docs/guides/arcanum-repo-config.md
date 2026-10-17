@@ -99,8 +99,9 @@ automatic hops. `/init-claude`'s auto-next step offers them in the same
 table as the auto keys (a `Clear` column, written to repo config). No
 `/arcanum-migrate` migration sets them yet. Run
 `/arcanum-check-config next_step.clear.<skill>` to see which tier a
-value resolves from. The scripts only report the decision for now;
-skills act on `CLEAR=true` in a follow-up (#798).
+value resolves from. On `CLEAR=true`, skills hand the next command off
+to a cleared context as described in
+[Clearing](../agents/architecture/skill-finish.md#clearing).
 
 ## A third, global tier on top of this pair
 
