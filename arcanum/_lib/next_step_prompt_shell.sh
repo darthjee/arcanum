@@ -26,6 +26,13 @@
 #                       goes to stderr, CHOICE=yes and AUTO=true go to stdout,
 #                       exit 0 — /dev/tty is never probed (with or without
 #                       --no-prompt).
+#                       Only when auto fired, next_step.clear.<skill> is read
+#                       through the same chain; when it is the exact JSON
+#                       value `true`, the notice becomes
+#                         auto-continuing: <first --command> (next_step.auto.<skill>=true, next_step.clear.<skill>=true)
+#                       and CLEAR=true follows AUTO=true on stdout. Any other
+#                       value, absence or a read failure keeps the plain auto
+#                       output — never an error.
 #   --no-prompt         when auto mode did not fire, print CHOICE=no and exit 0
 #                       without probing /dev/tty or prompting.
 #   Neither applies     today's behavior, unchanged (TTY prompt or fallback).
@@ -41,6 +48,9 @@
 #
 # Output (stdout) and exit code:
 #   auto-key enabled -> CHOICE=yes, AUTO=true       exit 0
+#   auto + clear key -> CHOICE=yes, AUTO=true,
+#                       CLEAR=true                  exit 0
+#   (CLEAR is never printed on any other path)
 #   --no-prompt      -> CHOICE=no                   exit 0
 #   [Y]es  -> CHOICE=yes                            exit 0
 #   [N]o   -> CHOICE=no                             exit 0
@@ -118,9 +128,16 @@ if [[ "$AUTO_KEY_SET" == "true" ]]; then
   # failure or empty result means "disabled" — never abort here.
   auto_value="$(cd "$REPO_PATH" && config_chain_read "$REPO_PATH" next_step "auto.${AUTO_KEY}" 2>/dev/null || true)"
   if [[ "$auto_value" == "true" ]]; then
-    printf 'auto-continuing: %s (next_step.auto.%s=true)\n' "${COMMANDS[0]}" "$AUTO_KEY" >&2
+    clear_value="$(cd "$REPO_PATH" && config_chain_read "$REPO_PATH" next_step "clear.${AUTO_KEY}" 2>/dev/null || true)"
+    if [[ "$clear_value" == "true" ]]; then
+      printf 'auto-continuing: %s (next_step.auto.%s=true, next_step.clear.%s=true)\n' \
+        "${COMMANDS[0]}" "$AUTO_KEY" "$AUTO_KEY" >&2
+    else
+      printf 'auto-continuing: %s (next_step.auto.%s=true)\n' "${COMMANDS[0]}" "$AUTO_KEY" >&2
+    fi
     echo "CHOICE=yes"
     echo "AUTO=true"
+    [[ "$clear_value" != "true" ]] || echo "CLEAR=true"
     exit 0
   fi
 fi

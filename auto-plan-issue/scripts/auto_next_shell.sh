@@ -20,11 +20,15 @@
 #      "auto-continuing: ..." notice) passes through untouched. On
 #      CHOICE=no: CHAIN=no, REASON=config.
 #   3. On CHOICE=yes: runs `git -C <repo_path> push` (git's output goes to
-#      stderr). On failure: CHAIN=no, REASON=push. On success: CHAIN=yes.
+#      stderr). On failure: CHAIN=no, REASON=push. On success: CHAIN=yes,
+#      followed by CLEAR=true when the prompt printed CLEAR=true
+#      (next_step.clear.auto-plan-issue is true).
 #
 # Output (stdout, key=value lines only) and exit code:
 #   CHAIN=yes                                   exit 0
+#   CHAIN=yes + CLEAR=true                      exit 0
 #   CHAIN=no + REASON=branch|config|push        exit 0
+#   (CLEAR never follows CHAIN=no)
 #   usage error (missing args, <repo_path> not a directory), or
 #   next_step_prompt.sh failed -> nothing on stdout, error on stderr, exit 1
 
@@ -66,6 +70,10 @@ prompt_output=$("$NEXT_STEP_PROMPT" --repo "$REPO_PATH" --command "$NEXT_COMMAND
 choice=$(printf '%s\n' "$prompt_output" | sed -n 's/^CHOICE=//p' | head -n 1)
 [[ "$choice" == "yes" ]] || chain_no config
 
+clear=false
+printf '%s\n' "$prompt_output" | grep -qx 'CLEAR=true' && clear=true
+
 git -C "$REPO_PATH" push >&2 || chain_no push
 
 echo "CHAIN=yes"
+[[ "$clear" != "true" ]] || echo "CLEAR=true"
