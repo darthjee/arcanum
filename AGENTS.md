@@ -35,6 +35,7 @@ Specialist agents are defined in `.claude/agents/`. Each has a specific scope wi
 | `skill-reviewer` | Reviews skill files (SKILL.md and step `.md` files) modified in a PR and flags any complex inline bash that should be extracted to a script. Reports violations to the architect; does not fix them. |
 | `node` | `core/`'s Node.js source/config (`core/lib/`, `core/spec/`, `core/bin/`, `core/package.json`, `core/eslint.config.mjs`) — the native counterpart of scripts migrating from bash. |
 | `infra` | Docker, docker-compose, and Makefile files repo-wide — e.g. `core/Dockerfile`, `core/docker-compose.yml`, the root `Makefile`'s `core-*` targets. |
+| `mod` | Top-level Claude Code mod folders — e.g. `arcanum-next-step/` (`.claude-plugin/plugin.json`, `hooks/`, `types/`, `*.test.ts`, its `README.md`). |
 
 ## Boundaries
 
