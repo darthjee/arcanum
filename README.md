@@ -97,6 +97,17 @@ Before doing anything, the script prints the resolved repo/version/method (relea
 
 A `git clone` install with uncommitted local changes fails fast with a message to commit/stash/discard first — no auto-stash, no checkout over local work.
 
+## The `arcanum-next-step` mod
+
+Arcanum ships a small Claude Code mod, [`arcanum-next-step/`](arcanum-next-step/), next to its skills. It gives skills one tool, `mcp__arcanum-next-step__handoff`. When a skill calls it, the mod waits for the current turn to end, then runs `/clear` and the next arcanum skill command. This is the only way a skill can start its next step from a clean context. The mod only accepts arcanum skill commands (`/<skill> ...` or `/loop /<skill> ...`).
+
+- **Ships and loads with arcanum:** the release zip, `curl | bash`, `git clone` and `/arcanum-update` all bring it in. Claude Code loads it automatically from a skills folder (`~/.claude/skills/`, `$CLAUDE_CONFIG_DIR/skills/` or a project's `.claude/skills/`), in new sessions.
+- **Inert for now:** it does nothing until a skill calls the tool, and no skill does yet (#798).
+- **Custom install path:** if arcanum is installed outside a skills folder, the mod is not loaded. Skills then go to the next step without clearing context.
+- **Interactive sessions only:** under `claude -p` or an SDK host, the tool is not registered.
+
+See [`arcanum-next-step/README.md`](arcanum-next-step/README.md) for the tool contract, opting out and development notes.
+
 ## Skill structure
 
 Each skill is a folder containing a `SKILL.md` entry point and optional auxiliary markdown files:
