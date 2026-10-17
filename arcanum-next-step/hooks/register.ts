@@ -23,17 +23,14 @@ const scheduled = (command: string) =>
 
 const pending = { plugin: 'arcanum-next-step', key: 'pending' } as const
 
-/**
- * The arcanum skills of this install: the sibling folders of the mod's own
- * folder that hold a SKILL.md. Rebuilt on every load, at `session.start`.
- */
-let skills: ReadonlySet<string> = new Set()
+const interactive = { plugin: 'arcanum-next-step', key: 'interactive' } as const
 
 /**
- * Whether a person is at the prompt. A headless run (`claude -p`) may exit
- * before the turn's end runs the handoff, so the tool is not offered there.
+ * The arcanum skills of this install: the sibling folders of the mod's own
+ * folder that hold a SKILL.md. Built at `session.start`, and again on the
+ * first call after a hot reload (which runs no `session.start`).
  */
-let isInteractive = false
+let skills: ReadonlySet<string> | undefined
 
 const parentOf = (path: string): string =>
   path.replace(/[\\/]+$/, '').replace(/[\\/][^\\/]*$/, '')
@@ -68,7 +65,7 @@ const split = (line: string): { name: string; args: string } | undefined => {
  */
 export const parseHandoff = (
   command: unknown,
-  allowed: ReadonlySet<string> = skills,
+  allowed: ReadonlySet<string>,
 ): ArcanumNextStepHandoff | undefined => {
   if (typeof command !== 'string') return undefined
 
@@ -114,8 +111,10 @@ const runHandoff = async ($: EngineInterface, handoff: ArcanumNextStepHandoff) =
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    isInteractive = e.isInteractive
-    if (!isInteractive) return next(e)
+    // A headless run (`claude -p`) may exit before the turn's end runs the
+    // handoff, so the tool is offered only where a person is at the prompt.
+    await $.state.set(interactive, e.isInteractive)
+    if (!e.isInteractive) return next(e)
 
     skills = await listSkills($)
 
@@ -134,9 +133,11 @@ export const register: Register = on => {
 
   on('tool.call', { tool: TOOL }, async ($, e) => {
     if (e.agentId !== undefined) return failure(NOT_MAIN_LOOP)
+    const { value: isInteractive = false } = await $.state.get(interactive)
     if (!isInteractive) return failure(NOT_INTERACTIVE)
 
-    const handoff = parseHandoff(e.command)
+    skills ??= await listSkills($)
+    const handoff = parseHandoff(e.command, skills)
     if (!handoff) return failure(NOT_ARCANUM)
 
     const { value: current } = await $.state.get(pending)

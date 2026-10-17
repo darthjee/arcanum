@@ -17,6 +17,11 @@ declare module 'claude-code' {
        * (or never written) when none is pending.
        */
       pending: ArcanumNextStepHandoff | null
+      /**
+       * Whether a person is at the prompt (`session.start`'s `isInteractive`);
+       * the tool is not offered, and a call is denied, where it is false.
+       */
+      interactive: boolean
     }
   }
 }
