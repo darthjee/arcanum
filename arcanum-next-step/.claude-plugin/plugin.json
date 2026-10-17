@@ -1,0 +1,9 @@
+{
+  "name": "arcanum-next-step",
+  "version": "0.1.0",
+  "description": "Clears context and runs the next arcanum skill command at a next-step handoff.",
+  "author": {
+    "name": "darthjee"
+  },
+  "types": "./types/index.d.ts"
+}

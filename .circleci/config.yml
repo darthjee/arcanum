@@ -22,6 +22,12 @@
 # darthjee/arcanum repository. Only the version tag is pushed (no
 # `latest`), and published tags are immutable: the job fails if
 # darthjee/arcanum:<tag> already exists, including on workflow re-runs.
+#
+# The `mod-checks` job (test workflow) runs `claude plugin validate` and
+# `claude plugin test` for the arcanum-next-step mod. Both work headless
+# with no credential. `tsc -p` is left out: it extends the engine-generated
+# .claude-plugin/types/ folder, which only a live session writes, so
+# `make mod-check` (run locally) is the full gate for it.
 
 version: 2.1
 
@@ -109,6 +115,23 @@ jobs:
           name: Commit-message template sync check (non-blocking)
           command: ../scripts/check_commit_template_sync.sh || true
 
+  mod-checks:
+    docker:
+      - image: darthjee/circleci_node:0.2.1
+    working_directory: ~/project
+    steps:
+      - checkout:
+          path: ~/project
+      - run:
+          name: Install the Claude Code CLI
+          command: npm i -g @anthropic-ai/claude-code@2.1.302
+      - run:
+          name: Validate the arcanum-next-step mod
+          command: claude plugin validate arcanum-next-step
+      - run:
+          name: Test the arcanum-next-step mod
+          command: claude plugin test arcanum-next-step
+
 workflows:
   release:
     jobs:
@@ -133,6 +156,10 @@ workflows:
             tags:
               ignore: /.*/
       - checks:
+          filters:
+            tags:
+              ignore: /.*/
+      - mod-checks:
           filters:
             tags:
               ignore: /.*/
