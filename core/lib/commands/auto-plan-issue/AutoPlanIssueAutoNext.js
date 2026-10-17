@@ -40,8 +40,10 @@ function runGit(args, { capture = false } = {}) {
  * docs/agents/architecture/skill-finish.md#next-step-map. Checks the
  * branch is `issue-<id>`, asks `NextStepPrompt` (in-process, never via
  * the shim) whether `next_step.auto.auto-plan-issue` is on, then pushes.
- * Prints `CHAIN=yes`, or `CHAIN=no` + `REASON=branch|config|push`, and
- * exits 0; usage errors and a failed prompt exit 1 with nothing on
+ * Prints `CHAIN=yes` (followed by `CLEAR=true` when the prompt printed
+ * `CLEAR=true`, i.e. `next_step.clear.auto-plan-issue` is on), or
+ * `CHAIN=no` + `REASON=branch|config|push` (never followed by `CLEAR`),
+ * and exits 0; usage errors and a failed prompt exit 1 with nothing on
  * stdout. Status `host-only`, so the push uses the host's credentials.
  */
 class AutoPlanIssueAutoNext {
@@ -68,7 +70,8 @@ class AutoPlanIssueAutoNext {
 
   /**
    * @param {string} [id] - the issue id.
-   * @returns {Promise<string>} the `CHAIN=`/`REASON=` lines (exit `0`).
+   * @returns {Promise<string>} the `CHAIN=`/`REASON=`/`CLEAR=` lines
+   *   (exit `0`).
    * @throws {DispatchFailure} exit `1` with empty stdout on a usage error
    *   or a failed next-step prompt (the message goes to stderr).
    */
@@ -79,13 +82,19 @@ class AutoPlanIssueAutoNext {
       return this.chainNo('branch');
     }
 
-    if (!(await this.autoEnabled(id))) {
+    const { auto, clear } = await this.promptFlags(id);
+
+    if (!auto) {
       return this.chainNo('config');
     }
 
     const { code } = await this._git(['-C', this._repoPath, 'push']);
 
-    return code === 0 ? 'CHAIN=yes\n' : this.chainNo('push');
+    if (code !== 0) {
+      return this.chainNo('push');
+    }
+
+    return clear ? 'CHAIN=yes\nCLEAR=true\n' : 'CHAIN=yes\n';
   }
 
   /**
@@ -130,13 +139,14 @@ class AutoPlanIssueAutoNext {
 
   /**
    * Asks `NextStepPrompt` (in-process, `--no-prompt`) whether
-   * `next_step.auto.auto-plan-issue` is on, passing its stderr notice
-   * through.
+   * `next_step.auto.auto-plan-issue` (and `next_step.clear.auto-plan-issue`)
+   * is on, passing its stderr notice through.
    * @param {string} id - the issue id.
-   * @returns {Promise<boolean>} whether it answered `CHOICE=yes`.
+   * @returns {Promise<{auto: boolean, clear: boolean}>} whether it
+   *   answered `CHOICE=yes`, and whether it printed a `CLEAR=true` line.
    * @throws {DispatchFailure} exit `1` when the prompt fails.
    */
-  async autoEnabled(id) {
+  async promptFlags(id) {
     const { stdout, stderr, exitCode } = await this._nextStepPrompt.evaluate([
       '--repo', this._repoPath,
       '--command', `/loop /auto-resolve-issue ${id}`,
@@ -152,9 +162,10 @@ class AutoPlanIssueAutoNext {
       this.fail(`Error: next_step_prompt.sh failed for auto key '${AUTO_KEY}'`);
     }
 
-    const choice = stdout.split('\n').find((line) => line.startsWith('CHOICE='));
+    const lines = stdout.split('\n');
+    const choice = lines.find((line) => line.startsWith('CHOICE='));
 
-    return choice === 'CHOICE=yes';
+    return { auto: choice === 'CHOICE=yes', clear: lines.includes('CLEAR=true') };
   }
 
   /**
