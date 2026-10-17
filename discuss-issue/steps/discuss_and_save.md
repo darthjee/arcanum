@@ -142,7 +142,7 @@ Only reached right after a successful push above. Offer planning through the sha
 ../../arcanum/_lib/next_step_prompt.sh --repo "$REPO_PATH" --command "/auto-plan-issue <id>" --auto-key discuss-issue
 ```
 
-> Resolve `../../arcanum/_lib/next_step_prompt.sh` relative to this file's directory. It prints `CHOICE=yes` / `CHOICE=no` (exit 0) — with `--auto-key` and `next_step.auto.<skill>` set to `true`, `CHOICE=yes` followed by `AUTO=true` (exit 0, no prompt, an `auto-continuing: ...` notice on stderr) — `CHOICE=chat` + `CHAT_CONTEXT=next_step` (exit 3), `FALLBACK=chat` + one `COMMAND=<cmd>` line per `--command`, in order (exit 4, no TTY available), or nothing with an error on stderr (exit 1, prompt failed). The full contract lives in [Next-step offer](../../docs/agents/architecture/skill-finish.md#next-step-offer-interactive-skills).
+> Resolve `../../arcanum/_lib/next_step_prompt.sh` relative to this file's directory. It prints `CHOICE=yes` / `CHOICE=no` (exit 0) — with `--auto-key` and `next_step.auto.<skill>` set to `true`, `CHOICE=yes` followed by `AUTO=true` (followed by `CLEAR=true` when `next_step.clear.<skill>` is also `true`) (exit 0, no prompt, an `auto-continuing: ...` notice on stderr) — `CHOICE=chat` + `CHAT_CONTEXT=next_step` (exit 3), `FALLBACK=chat` + one `COMMAND=<cmd>` line per `--command`, in order (exit 4, no TTY available), or nothing with an error on stderr (exit 1, prompt failed). The full contract lives in [Next-step offer](../../docs/agents/architecture/skill-finish.md#next-step-offer-interactive-skills).
 
 On **exit 4** (`FALLBACK=chat`, no TTY), ask once with `AskUserQuestion` before picking a path below — the question names the exact command from the `COMMAND=` line, with options **Yes** (plan it now), **No**, **Chat** — and treat the answer as the matching choice: Yes → `CHOICE=yes` (plan it), No → `CHOICE=no` (push only), Chat → `CHOICE=chat` (push only). A free-text "Other" answer → `CHOICE=chat`, with the text as context; a dismissed or rejected question → `CHOICE=no`. If `AskUserQuestion` is unavailable (headless, tool denied), take the push-only path and, in step 3, print "Next step: `/auto-plan-issue <id>` (run it manually)" and end.
 
@@ -210,6 +210,7 @@ Do not show a second offer on this path.
 
    - **`CHOICE=yes`**: invoke `/loop /auto-resolve-issue <id>` inline, in the same session, through the `loop` skill (`Skill(loop, "/auto-resolve-issue <id>")`), as a **chained** top-level run — no `NESTED=true`. It prints its own report and next step.
    - **`CHOICE=yes` with `AUTO=true`**: relay the `auto-continuing: ...` stderr notice line to the user, then proceed exactly as on `CHOICE=yes` (a chained top-level run, never `NESTED=true`).
+   - **`CHOICE=yes` with `AUTO=true` and `CLEAR=true`**: after relaying the notice, hand off `/loop /auto-resolve-issue <id>` per [Clearing](../../docs/agents/architecture/skill-finish.md#clearing) (through `mcp__arcanum-next-step__handoff` when available) instead of invoking it inline. The working tree was already released in step 6, so nothing else changes.
    - **`CHOICE=no`**: end.
    - **`CHOICE=chat`** (exit 3): return to the conversation. Do not run `/loop /auto-resolve-issue <id>` unless the user asks for it in chat.
    - **exit 1**: say in one line that the next-step prompt failed: <stderr>, then end.
