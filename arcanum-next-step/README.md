@@ -14,11 +14,14 @@ settings hooks nor a `ScheduleWakeup` restart can run `/clear`. Only the person,
 a Claude Code mod through `$.command.run`, can. This mod is that mod (part of epic
 #790).
 
-## Status: inert until a skill calls it
+## Status: called by skills at clearing next-step hops
 
 The mod ships with arcanum and loads automatically, but it does nothing on its own:
-it acts only when a skill calls its tool. Until #798 no skill calls it. Without the
-mod, hops fall back to `ScheduleWakeup` plus asking you to type `/clear`.
+it acts only when a skill calls its tool. Skills call it at automatic next-step hops
+where `next_step.clear.<skill>` is `true`: enhance-issue, discuss-issue's two
+offers, plan-issue, and the `auto-plan-issue` coordinator, per the
+[Clearing](../docs/agents/architecture/skill-finish.md#clearing) subsection (#798).
+Without the mod, hops fall back to `ScheduleWakeup` plus asking you to type `/clear`.
 
 ## Tool contract
 
