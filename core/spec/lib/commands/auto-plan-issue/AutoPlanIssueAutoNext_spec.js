@@ -115,6 +115,47 @@ describe('AutoPlanIssueAutoNext#run', () => {
     expect(await newCommand().run('42')).toEqual('CHAIN=no\nREASON=push\n');
   });
 
+  describe('with next_step.clear.auto-plan-issue on', () => {
+    beforeEach(() => {
+      promptOutcome = {
+        stdout: 'CHOICE=yes\nAUTO=true\nCLEAR=true\n',
+        stderr: 'auto-continuing: /loop /auto-resolve-issue 42 ' +
+          '(next_step.auto.auto-plan-issue=true, next_step.clear.auto-plan-issue=true)\n',
+        exitCode: 0
+      };
+    });
+
+    it('pushes and forwards CLEAR=true after CHAIN=yes', async () => {
+      expect(await newCommand().run('42')).toEqual('CHAIN=yes\nCLEAR=true\n');
+      expect(git).toHaveBeenCalledWith(['-C', repoPath, 'push']);
+    });
+
+    it('passes the two-key notice through to stderr', async () => {
+      await newCommand().run('42');
+
+      expect(stderr.output).toEqual('auto-continuing: /loop /auto-resolve-issue 42 ' +
+        '(next_step.auto.auto-plan-issue=true, next_step.clear.auto-plan-issue=true)\n');
+    });
+
+    it('answers REASON=push without CLEAR when the push fails', async () => {
+      pushCode = 1;
+
+      expect(await newCommand().run('42')).toEqual('CHAIN=no\nREASON=push\n');
+    });
+
+    it('answers REASON=branch without CLEAR on another branch', async () => {
+      branch = { code: 0, stdout: 'main\n' };
+
+      expect(await newCommand().run('42')).toEqual('CHAIN=no\nREASON=branch\n');
+    });
+  });
+
+  it('ignores a CLEAR line that is not exactly CLEAR=true', async () => {
+    promptOutcome = { stdout: 'CHOICE=yes\nAUTO=true\nCLEAR=truex\n', stderr: '', exitCode: 0 };
+
+    expect(await newCommand().run('42')).toEqual('CHAIN=yes\n');
+  });
+
   describe('with the default git runner', () => {
     it('answers REASON=branch on a non-git directory', async () => {
       const command = new AutoPlanIssueAutoNext(createRepoContextMock({ repoPath }), { nextStepPrompt, stderr });

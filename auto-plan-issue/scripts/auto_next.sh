@@ -26,7 +26,8 @@
 # identical in every mode.
 #
 # Output and exit code: see auto_next_shell.sh's own header for the full
-# contract (CHAIN=yes / CHAIN=no + REASON=... with exit 0, exit 1 with
+# contract (CHAIN=yes, optionally followed by CLEAR=true / CHAIN=no +
+# REASON=... with exit 0, exit 1 with
 # nothing on stdout on any usage error).
 
 set -euo pipefail

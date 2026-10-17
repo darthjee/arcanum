@@ -22,8 +22,10 @@ import { NATIVE_BIN, REPO_ROOT, expectParity, runCommand } from '../support/util
 // answers CHAIN=no/REASON=branch without reading config; an absent/false
 // `next_step.auto.auto-plan-issue` answers CHAIN=no/REASON=config; a true
 // key pushes the plan commit and answers CHAIN=yes (or
-// CHAIN=no/REASON=push when the push fails). stdout only ever carries
-// those key=value lines.
+// CHAIN=no/REASON=push when the push fails). When
+// `next_step.clear.auto-plan-issue` is also true (issue #796), CHAIN=yes
+// is followed by CLEAR=true; CLEAR never follows CHAIN=no. stdout only
+// ever carries those key=value lines.
 //
 // Every run isolates the global config (CLAUDE_CONFIG_DIR/HOME and git's
 // global/system config) and points ARCANUM_TTY_DEVICE at a missing path:
@@ -39,6 +41,8 @@ const ID = '715';
 const BRANCH = `issue-${ID}`;
 const AUTO_KEY = 'auto-plan-issue';
 const NOTICE = `auto-continuing: /loop /auto-resolve-issue ${ID} (next_step.auto.${AUTO_KEY}=true)\n`;
+const CLEAR_NOTICE = `auto-continuing: /loop /auto-resolve-issue ${ID} ` +
+  `(next_step.auto.${AUTO_KEY}=true, next_step.clear.${AUTO_KEY}=true)\n`;
 const GIT_IDENTITY = {
   GIT_AUTHOR_NAME: 'Test',
   GIT_AUTHOR_EMAIL: 't@example.com',
@@ -104,10 +108,30 @@ class World {
    * @returns {Promise<void>} resolves once written.
    */
   async writeAutoKey(value) {
+    await this.writeNextStep({ auto: { [AUTO_KEY]: value } });
+  }
+
+  /**
+   * Write `next_step.auto.auto-plan-issue` and
+   * `next_step.clear.auto-plan-issue` to the repo config tier.
+   * @param {boolean} auto - the auto key's value.
+   * @param {boolean} clear - the clear key's value.
+   * @returns {Promise<void>} resolves once written.
+   */
+  async writeAutoAndClearKeys(auto, clear) {
+    await this.writeNextStep({ auto: { [AUTO_KEY]: auto }, clear: { [AUTO_KEY]: clear } });
+  }
+
+  /**
+   * Write the `next_step` section of the repo config tier.
+   * @param {object} nextStep - the section's content.
+   * @returns {Promise<void>} resolves once written.
+   */
+  async writeNextStep(nextStep) {
     const file = path.join(this.repo, '.claude', 'configuration', 'arcanum-repo-config.json');
 
     await mkdir(path.dirname(file), { recursive: true });
-    await writeFile(file, `${JSON.stringify({ next_step: { auto: { [AUTO_KEY]: value } } })}\n`);
+    await writeFile(file, `${JSON.stringify({ next_step: nextStep })}\n`);
   }
 
   /**
@@ -299,6 +323,72 @@ describe('auto-plan-issue-auto-next parity (shell vs. native)', () => {
       expect(shell.stdout).toBe('CHAIN=no\nREASON=push\n');
       expect(native.stderr.startsWith(NOTICE)).toBeTrue();
       expect(native.stderr.length).toBeGreaterThan(NOTICE.length);
+    });
+  });
+
+  describe('when the auto and clear keys are true (issue #796)', () => {
+    let planShas;
+
+    beforeEach(async () => {
+      planShas = await inBoth((world) => world.preparePlanCommit());
+      await inBoth((world) => world.writeAutoAndClearKeys(true, true));
+    });
+
+    it('pushes and answers CHAIN=yes + CLEAR=true with the two-key notice', async () => {
+      const { shell, native } = await runBoth((world) => [world.repo, ID], { sameStderr: false });
+
+      expect(shell.code).toBe(0);
+      expect(shell.stdout).toBe('CHAIN=yes\nCLEAR=true\n');
+      expect(shell.stderr).toContain(CLEAR_NOTICE);
+      expect(native.stderr).toContain(CLEAR_NOTICE);
+      expect(await shellWorld.remoteSha()).toEqual(planShas[0]);
+      expect(await nativeWorld.remoteSha()).toEqual(planShas[1]);
+    });
+
+    it('answers CHAIN=no / REASON=push without CLEAR when the push fails', async () => {
+      await inBoth((world) => world.git(['remote', 'set-url', 'origin', path.join(world.configDir, 'missing.git')]));
+
+      const { shell, native } = await runBoth((world) => [world.repo, ID], { sameStderr: false });
+
+      expect(shell.code).toBe(0);
+      expect(shell.stdout).toBe('CHAIN=no\nREASON=push\n');
+      expect(native.stderr.startsWith(CLEAR_NOTICE)).toBeTrue();
+    });
+
+    it('answers CHAIN=no / REASON=branch without CLEAR on another branch', async () => {
+      await inBoth((world) => world.git(['checkout', '--quiet', '-b', 'issue-7150']));
+
+      const { shell } = await runBoth((world) => [world.repo, ID]);
+
+      expect(shell).toEqual({ stdout: 'CHAIN=no\nREASON=branch\n', stderr: '', code: 0 });
+    });
+  });
+
+  describe('when the clear key is true but the auto key is not (issue #796)', () => {
+    beforeEach(async () => {
+      await inBoth((world) => world.preparePlanCommit());
+      await inBoth((world) => world.writeAutoAndClearKeys(false, true));
+    });
+
+    it('answers CHAIN=no / REASON=config without CLEAR', async () => {
+      const { shell } = await runBoth((world) => [world.repo, ID]);
+
+      expect(shell).toEqual({ stdout: 'CHAIN=no\nREASON=config\n', stderr: '', code: 0 });
+    });
+  });
+
+  describe('when the auto key is true and the clear key false (issue #796)', () => {
+    beforeEach(async () => {
+      await inBoth((world) => world.preparePlanCommit());
+      await inBoth((world) => world.writeAutoAndClearKeys(true, false));
+    });
+
+    it('answers a plain CHAIN=yes with the one-key notice', async () => {
+      const { shell, native } = await runBoth((world) => [world.repo, ID], { sameStderr: false });
+
+      expect(shell.stdout).toBe('CHAIN=yes\n');
+      expect(shell.stderr).toContain(NOTICE);
+      expect(native.stderr).toContain(NOTICE);
     });
   });
 });

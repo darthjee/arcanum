@@ -33,7 +33,8 @@ class UsageError extends Error {}
  * their closing report. Byte-for-byte port of
  * `arcanum/_lib/next_step_prompt_shell.sh` — see
  * docs/agents/architecture/skill-finish.md for the stdout/exit-code
- * contract (auto mode `CHOICE=yes`/`AUTO=true`, `--no-prompt`
+ * contract (auto mode `CHOICE=yes`/`AUTO=true`, followed by
+ * `CLEAR=true` when `next_step.clear.<skill>` is also `true`, `--no-prompt`
  * `CHOICE=no`, the `/dev/tty` prompt with exits `0`/`3`, the
  * `FALLBACK=chat` + `COMMAND=` exit-`4` fallback, and exit `1` with
  * nothing on stdout on usage errors). Status `host-only`, so it always
@@ -111,11 +112,7 @@ class NextStepPrompt {
     }
 
     if (await this.autoEnabled(options)) {
-      return this.outcome(
-        'CHOICE=yes\nAUTO=true\n',
-        `auto-continuing: ${options.commands[0]} (next_step.auto.${options.autoKey}=true)\n`,
-        EXIT_OK
-      );
+      return this.autoOutcome(options, await this.clearEnabled(options));
     }
 
     if (options.noPrompt) {
@@ -235,6 +232,40 @@ class NextStepPrompt {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Reads `next_step.clear.<skill>` through the config chain, with the
+   * local/repo tiers resolved under `--repo`. Only called once auto mode
+   * fired. Only the JSON value `true` enables it; any read failure means
+   * "disabled" and keeps the plain auto result.
+   * @param {{repoPath: string, autoKey: string}} options - the parsed
+   *   options.
+   * @returns {Promise<boolean>} whether `CLEAR=true` is reported.
+   */
+  async clearEnabled({ repoPath, autoKey }) {
+    try {
+      return (await this._configChain.read(path.resolve(repoPath), 'next_step', `clear.${autoKey}`)) === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * @param {{commands: string[], autoKey: string}} options - the parsed
+   *   options.
+   * @param {boolean} clear - whether `next_step.clear.<skill>` is `true`.
+   * @returns {{stdout: string, stderr: string, exitCode: number}} the
+   *   auto-mode outcome: `CHOICE=yes`/`AUTO=true` (plus `CLEAR=true`)
+   *   and the `auto-continuing:` notice naming the enabled keys.
+   */
+  autoOutcome({ commands, autoKey }, clear) {
+    const keys = clear
+      ? `next_step.auto.${autoKey}=true, next_step.clear.${autoKey}=true`
+      : `next_step.auto.${autoKey}=true`;
+    const stdout = clear ? 'CHOICE=yes\nAUTO=true\nCLEAR=true\n' : 'CHOICE=yes\nAUTO=true\n';
+
+    return this.outcome(stdout, `auto-continuing: ${commands[0]} (${keys})\n`, EXIT_OK);
   }
 
   /**
