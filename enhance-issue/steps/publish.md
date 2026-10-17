@@ -96,10 +96,11 @@ Then run the offer. Add `--auto-key enhance-issue` **only** if `has-label` exite
 ../../arcanum/_lib/next_step_prompt.sh --repo "$REPO_PATH" --command "/discuss-issue <id>" [--auto-key enhance-issue]
 ```
 
-> Resolve `../../arcanum/_lib/next_step_prompt.sh` relative to this file's directory. It prints `CHOICE=yes` / `CHOICE=no` (exit 0) — with `--auto-key` and `next_step.auto.<skill>` set to `true`, `CHOICE=yes` followed by `AUTO=true` (exit 0, no prompt, an `auto-continuing: ...` notice on stderr) — `CHOICE=chat` + `CHAT_CONTEXT=next_step` (exit 3), `FALLBACK=chat` + one `COMMAND=<cmd>` line per `--command`, in order (exit 4, no TTY available), or nothing with an error on stderr (exit 1, prompt failed). The full contract lives in [Next-step offer](../../docs/agents/architecture/skill-finish.md#next-step-offer-interactive-skills).
+> Resolve `../../arcanum/_lib/next_step_prompt.sh` relative to this file's directory. It prints `CHOICE=yes` / `CHOICE=no` (exit 0) — with `--auto-key` and `next_step.auto.<skill>` set to `true`, `CHOICE=yes` followed by `AUTO=true` (followed by `CLEAR=true` when `next_step.clear.<skill>` is also `true`) (exit 0, no prompt, an `auto-continuing: ...` notice on stderr) — `CHOICE=chat` + `CHAT_CONTEXT=next_step` (exit 3), `FALLBACK=chat` + one `COMMAND=<cmd>` line per `--command`, in order (exit 4, no TTY available), or nothing with an error on stderr (exit 1, prompt failed). The full contract lives in [Next-step offer](../../docs/agents/architecture/skill-finish.md#next-step-offer-interactive-skills).
 
 - **`CHOICE=yes`**: invoke `/discuss-issue <id>` inline, in the same session, as a **chained** top-level run — no `NESTED=true`. It prints its own report and next step.
 - **`CHOICE=yes` with `AUTO=true`**: relay the `auto-continuing: ...` stderr notice line to the user, then proceed exactly as on `CHOICE=yes` (a chained top-level run, never `NESTED=true`).
+- **`CHOICE=yes` with `AUTO=true` and `CLEAR=true`**: after relaying the notice, hand off `/discuss-issue <id>` per [Clearing](../../docs/agents/architecture/skill-finish.md#clearing) (through `mcp__arcanum-next-step__handoff` when available) instead of invoking it inline.
 - **`CHOICE=no`**: end.
 - **`CHOICE=chat`** (exit 3): return to the conversation. Do not run `discuss-issue` unless the user asks for it in chat.
 - **exit 1**: say in one line that the next-step prompt failed: <stderr>, then end.

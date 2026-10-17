@@ -14,3 +14,5 @@ Spawn:
 Wait for the agent to finish, then relay its final report to the user verbatim — do not summarize or reinterpret it.
 
 If the report's last line is `AUTO_NEXT=<cmd>` (only a top-level run whose `next_step.auto.auto-plan-issue` is `true` prints it; see the Auto-next section of steps/run.md), relay everything above that line, but not the line itself. Then invoke `<cmd>` (always `/loop /auto-resolve-issue <id>`) inline, in the same session, through the `loop` skill (`Skill(loop, "/auto-resolve-issue <id>")`), as a **chained** top-level run — no `NESTED=true`. It prints its own report.
+
+If the line just before `AUTO_NEXT=<cmd>` is `AUTO_CLEAR=true` (the run's `auto_next.sh` also printed `CLEAR=true`), relay everything above both lines, never either control line. Then, instead of the inline `Skill(loop, …)` call, hand off `<cmd>` per [Clearing](../docs/agents/architecture/skill-finish.md#clearing) (through `mcp__arcanum-next-step__handoff` when available). Its in-place level is the inline `Skill(loop, "/auto-resolve-issue <id>")` call above, preceded by the `clear skipped: <reason>` line. Never re-read config: the control lines are the only source of truth.

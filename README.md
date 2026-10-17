@@ -102,8 +102,8 @@ A `git clone` install with uncommitted local changes fails fast with a message t
 Arcanum ships a small Claude Code mod, [`arcanum-next-step/`](arcanum-next-step/), next to its skills. It gives skills one tool, `mcp__arcanum-next-step__handoff`. When a skill calls it, the mod waits for the current turn to end, then runs `/clear` and the next arcanum skill command. This is the only way a skill can start its next step from a clean context. The mod only accepts arcanum skill commands (`/<skill> ...` or `/loop /<skill> ...`).
 
 - **Ships and loads with arcanum:** the release zip, `curl | bash`, `git clone` and `/arcanum-update` all bring it in. Claude Code loads it automatically from a skills folder (`~/.claude/skills/`, `$CLAUDE_CONFIG_DIR/skills/` or a project's `.claude/skills/`), in new sessions.
-- **Inert for now:** it does nothing until a skill calls the tool, and no skill does yet (#798).
-- **Custom install path:** if arcanum is installed outside a skills folder, the mod is not loaded. Skills then go to the next step without clearing context.
+- **Used at automatic hops:** skills call it when an automatic next-step hop also has its `next_step.clear.<skill>` key set to `true` (see [Clearing](docs/agents/architecture/skill-finish.md#clearing)).
+- **Custom install path:** if arcanum is installed outside a skills folder, the mod is not loaded. Skills then schedule the next command about a minute ahead and ask you to type `/clear` in the meantime; if that is not possible either, they run it without clearing context.
 - **Interactive sessions only:** under `claude -p` or an SDK host, the tool is not registered.
 
 See [`arcanum-next-step/README.md`](arcanum-next-step/README.md) for the tool contract, opting out and development notes.

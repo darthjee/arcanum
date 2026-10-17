@@ -87,11 +87,12 @@ Before printing the success report, run:
 scripts/auto_next.sh "$REPO_PATH" <id>
 ```
 
-> Resolve `scripts/auto_next.sh` relative to the `auto-plan-issue` skill folder. It decides whether to chain: it checks that HEAD is `issue-<id>`, reads `next_step.auto.auto-plan-issue`, and pushes the plan commit before agreeing to chain. It prints `CHAIN=yes`, or `CHAIN=no` plus `REASON=branch|config|push`, and exits `0`. On a usage error or a failed config read it prints nothing on stdout, an error on stderr, and exits `1`. When it chains, its stderr carries the `auto-continuing: ...` notice.
+> Resolve `scripts/auto_next.sh` relative to the `auto-plan-issue` skill folder. It decides whether to chain: it checks that HEAD is `issue-<id>`, reads `next_step.auto.auto-plan-issue`, and pushes the plan commit before agreeing to chain. It prints `CHAIN=yes` (followed by `CLEAR=true` when `next_step.clear.auto-plan-issue` is also `true`), or `CHAIN=no` plus `REASON=branch|config|push`, and exits `0`. On a usage error or a failed config read it prints nothing on stdout, an error on stderr, and exits `1`. When it chains, its stderr carries the `auto-continuing: ...` notice.
 
 Then print the success report as usual (`--next "/loop /auto-resolve-issue <id>"`), and:
 
 - **`CHAIN=yes`**: print the `auto-continuing: ...` notice line from its stderr, then the report, then one last line, exactly `AUTO_NEXT=/loop /auto-resolve-issue <id>`. The coordinator in [SKILL.md](../SKILL.md) reads that line and runs the chain (see there). Do not invoke `/loop` or `auto-resolve-issue` yourself.
+- **`CHAIN=yes` followed by `CLEAR=true`**: same as `CHAIN=yes`, but end with two lines, in this order: `AUTO_CLEAR=true`, then `AUTO_NEXT=/loop /auto-resolve-issue <id>`. `AUTO_NEXT=` is always the last line; without `CLEAR=true` there is no `AUTO_CLEAR` line. The coordinator hands the command off per [Clearing](../../docs/agents/architecture/skill-finish.md#clearing).
 - **`CHAIN=no` with `REASON=push`**: after the report, add one line saying the plan push failed so the chain was skipped, quoting the git error from its stderr. Then end.
 - **`CHAIN=no`** (any other reason): end after the report, as without Auto-next.
 - **exit `1`**: after the report, add one line saying the auto-next check failed, quoting its stderr. Then end.

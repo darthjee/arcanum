@@ -142,11 +142,13 @@ Only reached right after a successful push above. Offer planning through the sha
 ../../arcanum/_lib/next_step_prompt.sh --repo "$REPO_PATH" --command "/auto-plan-issue <id>" --auto-key discuss-issue
 ```
 
-> Resolve `../../arcanum/_lib/next_step_prompt.sh` relative to this file's directory. It prints `CHOICE=yes` / `CHOICE=no` (exit 0) — with `--auto-key` and `next_step.auto.<skill>` set to `true`, `CHOICE=yes` followed by `AUTO=true` (exit 0, no prompt, an `auto-continuing: ...` notice on stderr) — `CHOICE=chat` + `CHAT_CONTEXT=next_step` (exit 3), `FALLBACK=chat` + one `COMMAND=<cmd>` line per `--command`, in order (exit 4, no TTY available), or nothing with an error on stderr (exit 1, prompt failed). The full contract lives in [Next-step offer](../../docs/agents/architecture/skill-finish.md#next-step-offer-interactive-skills).
+> Resolve `../../arcanum/_lib/next_step_prompt.sh` relative to this file's directory. It prints `CHOICE=yes` / `CHOICE=no` (exit 0) — with `--auto-key` and `next_step.auto.<skill>` set to `true`, `CHOICE=yes` followed by `AUTO=true` (followed by `CLEAR=true` when `next_step.clear.<skill>` is also `true`) (exit 0, no prompt, an `auto-continuing: ...` notice on stderr) — `CHOICE=chat` + `CHAT_CONTEXT=next_step` (exit 3), `FALLBACK=chat` + one `COMMAND=<cmd>` line per `--command`, in order (exit 4, no TTY available), or nothing with an error on stderr (exit 1, prompt failed). The full contract lives in [Next-step offer](../../docs/agents/architecture/skill-finish.md#next-step-offer-interactive-skills).
 
 On **exit 4** (`FALLBACK=chat`, no TTY), ask once with `AskUserQuestion` before picking a path below — the question names the exact command from the `COMMAND=` line, with options **Yes** (plan it now), **No**, **Chat** — and treat the answer as the matching choice: Yes → `CHOICE=yes` (plan it), No → `CHOICE=no` (push only), Chat → `CHOICE=chat` (push only). A free-text "Other" answer → `CHOICE=chat`, with the text as context; a dismissed or rejected question → `CHOICE=no`. If `AskUserQuestion` is unavailable (headless, tool denied), take the push-only path and, in step 3, print "Next step: `/auto-plan-issue <id>` (run it manually)" and end.
 
 On **`CHOICE=yes` with `AUTO=true`** (`next_step.auto.discuss-issue` is `true`), relay the `auto-continuing: ...` stderr notice line to the user, then take the plan-it path exactly as on `CHOICE=yes`.
+
+On **`CHOICE=yes` with `AUTO=true` and `CLEAR=true`** (`next_step.clear.discuss-issue` is also `true`), relay the notice the same way, then take the [hand-off path](#choiceyes-with-cleartrue--hand-off-planning) below instead of the plan-it path.
 
 ### `CHOICE=no`, `CHOICE=chat` (exit 3, or mapped from exit 4), or exit 1 — push only
 
@@ -173,7 +175,25 @@ The issue is already pushed; no branch or plan is created.
 
 Do not show a second offer on this path.
 
-### `CHOICE=yes` (with or without `AUTO=true`, or mapped from exit 4) — plan it
+### `CHOICE=yes` with `CLEAR=true` — hand off planning
+
+Planning runs as a **top-level** `/auto-plan-issue <id>` from a cleared context, not nested here.
+
+1. Run steps 1–2 of the plan-it path below unchanged — `checkout_from_main.sh` (including its `STATUS=conflict` handling) and then `commit_issue.sh` — with the same **fail with** rules. The issue file is now committed and pushed on `issue-<id>`.
+2. Do **not** run the nested plan, the plan push, `mark-ready` or `checkout_safe_branch.sh`: stay on `issue-<id>`, so the top-level `auto-plan-issue`'s `auto_next.sh` branch check passes.
+3. Print the push-only `success` report and relay it verbatim:
+
+   ```bash
+   ../../arcanum/_lib/finish_report.sh "$REPO_PATH" --skill discuss-issue --status success --issue <id> \
+     --summary "Issue #<id> refined and pushed to GitHub; planning hands off to /auto-plan-issue <id>." \
+     --label-change <refine change>
+   ```
+
+4. Hand off `/auto-plan-issue <id>` per [Clearing](../../docs/agents/architecture/skill-finish.md#clearing) (through `mcp__arcanum-next-step__handoff` when available). At its in-place level, invoke `/auto-plan-issue <id>` inline as a **chained** top-level run — no `NESTED=true`, not the nested plan-it path — so every level runs the same command.
+
+Do not show a second offer on this path: the top-level `auto-plan-issue` makes its own chaining decision.
+
+### `CHOICE=yes` (with or without `AUTO=true` but without `CLEAR=true`, or mapped from exit 4) — plan it
 
 1. Run `../../auto-fix-all/scripts/checkout_from_main.sh "$REPO_PATH" <id>` — a cross-skill reference to the same reuse-and-merge branch bootstrap script `auto-fix-all` uses (resolved relative to this file's directory: `../../auto-fix-all/scripts/checkout_from_main.sh`). It fetches `origin`, reuses branch `issue-<id>` merged up to date with `origin/main` if it already exists locally or remotely, or creates it fresh from `origin/main` otherwise. If it exits non-zero, **fail with** `checkout_from_main.sh` (passing the refine change). Otherwise parse `STATUS` from its output.
    - **`STATUS=conflict`**: apply the same responsible-agent-selection approach as [`auto-resolve-issue/steps/handle_comment.md`](../../auto-resolve-issue/steps/handle_comment.md)'s "Choosing the responsible agent(s)" section, treating each conflicted path it printed like a failed check-run name — dispatch the responsible specialist(s) (or resolve it yourself, as architect, if none seem responsible) to fix the conflict, then run `git -C "$REPO_PATH" add` on the resolved paths and `git -C "$REPO_PATH" commit` with no message argument (the merge-commit message `git merge --no-edit` already prepared is reused as-is) — never bare `git add`/`git commit`, which would operate against the Bash tool's ambient cwd instead of the target repo. No user interaction. If the conflict cannot be resolved, **fail with** `checkout_from_main.sh (merge conflict)`.
@@ -210,6 +230,7 @@ Do not show a second offer on this path.
 
    - **`CHOICE=yes`**: invoke `/loop /auto-resolve-issue <id>` inline, in the same session, through the `loop` skill (`Skill(loop, "/auto-resolve-issue <id>")`), as a **chained** top-level run — no `NESTED=true`. It prints its own report and next step.
    - **`CHOICE=yes` with `AUTO=true`**: relay the `auto-continuing: ...` stderr notice line to the user, then proceed exactly as on `CHOICE=yes` (a chained top-level run, never `NESTED=true`).
+   - **`CHOICE=yes` with `AUTO=true` and `CLEAR=true`**: after relaying the notice, hand off `/loop /auto-resolve-issue <id>` per [Clearing](../../docs/agents/architecture/skill-finish.md#clearing) (through `mcp__arcanum-next-step__handoff` when available) instead of invoking it inline. The working tree was already released in step 6, so nothing else changes.
    - **`CHOICE=no`**: end.
    - **`CHOICE=chat`** (exit 3): return to the conversation. Do not run `/loop /auto-resolve-issue <id>` unless the user asks for it in chat.
    - **exit 1**: say in one line that the next-step prompt failed: <stderr>, then end.
