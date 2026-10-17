@@ -15,6 +15,11 @@ const DESCRIPTION = [
 
 const NOT_ARCANUM = 'handoff only runs arcanum skills'
 const NOT_MAIN_LOOP = 'handoff is only available on the main loop'
+const NOT_INTERACTIVE = 'handoff is only available in an interactive session'
+const CANCELLED = 'arcanum-next-step: handoff cancelled'
+
+const scheduled = (command: string) =>
+  `scheduled: will /clear then run ${command} once this turn ends — end your turn now without further output`
 
 const pending = { plugin: 'arcanum-next-step', key: 'pending' } as const
 
@@ -23,6 +28,12 @@ const pending = { plugin: 'arcanum-next-step', key: 'pending' } as const
  * folder that hold a SKILL.md. Rebuilt on every load, at `session.start`.
  */
 let skills: ReadonlySet<string> = new Set()
+
+/**
+ * Whether a person is at the prompt. A headless run (`claude -p`) may exit
+ * before the turn's end runs the handoff, so the tool is not offered there.
+ */
+let isInteractive = false
 
 const parentOf = (path: string): string =>
   path.replace(/[\\/]+$/, '').replace(/[\\/][^\\/]*$/, '')
@@ -79,8 +90,33 @@ export const parseHandoff = (
 
 const failure = (text: string) => ({ deny: text })
 
+const messageOf = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error)
+
+/**
+ * The prompt's origins that are the person's own input: typed at the
+ * terminal, sent through the Remote Control bridge, or the SDK host's turn.
+ */
+const USER_ORIGINS: ReadonlySet<string> = new Set(['composer', 'bridge', 'sdk'])
+
+/**
+ * Runs `/clear`, then the handoff's command, as if the person typed them.
+ * A failure of either toasts the error and the command to re-type.
+ */
+const runHandoff = async ($: EngineInterface, handoff: ArcanumNextStepHandoff) => {
+  try {
+    await $.command.run({ command: 'clear' })
+    await $.command.run({ command: handoff.name, args: handoff.args })
+  } catch (error) {
+    $.ui.toast(`arcanum-next-step: ${messageOf(error)} — run ${handoff.command} manually`)
+  }
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
+    isInteractive = e.isInteractive
+    if (!isInteractive) return next(e)
+
     skills = await listSkills($)
 
     await $.tool.register({
@@ -98,6 +134,7 @@ export const register: Register = on => {
 
   on('tool.call', { tool: TOOL }, async ($, e) => {
     if (e.agentId !== undefined) return failure(NOT_MAIN_LOOP)
+    if (!isInteractive) return failure(NOT_INTERACTIVE)
 
     const handoff = parseHandoff(e.command)
     if (!handoff) return failure(NOT_ARCANUM)
@@ -105,8 +142,40 @@ export const register: Register = on => {
     const { value: current } = await $.state.get(pending)
     if (current) return failure(`a handoff is already pending: ${current.command}`)
 
-    return failure('handoff scheduling is not implemented yet')
+    await $.state.set(pending, handoff)
+    return { result: scheduled(handoff.command) }
   }).catch(($, e, next) =>
     next.called ? next(e) : failure(`${$.plugin.name}: handoff failed`),
   )
+
+  on('turn.complete', async ($, e, next) => {
+    const result = await next(e)
+    if (e.agentId !== undefined) return result
+
+    const { value: handoff } = await $.state.get(pending)
+    if (!handoff) return result
+
+    await $.state.set(pending, null)
+
+    if (e.reason !== 'answer') {
+      $.ui.toast(CANCELLED)
+      return result
+    }
+
+    $.clock.after(0, () => {
+      void runHandoff($, handoff)
+    })
+    return result
+  })
+
+  on('prompt.submit', async ($, e, next) => {
+    if (USER_ORIGINS.has(e.origin.kind)) {
+      const { value: handoff } = await $.state.get(pending)
+      if (handoff) {
+        await $.state.set(pending, null)
+        $.ui.toast(CANCELLED)
+      }
+    }
+    return next(e)
+  }).catch(($, e, next) => next(e))
 }
