@@ -151,6 +151,122 @@ describe('NextStepPrompt', () => {
     });
   });
 
+  describe('#evaluate clear key', () => {
+    const args = () => ['--repo', repoPath, '--command', '/first', '--auto-key', 'skill'];
+    const plainAuto = {
+      stdout: 'CHOICE=yes\nAUTO=true\n',
+      stderr: 'auto-continuing: /first (next_step.auto.skill=true)\n',
+      exitCode: 0
+    };
+
+    it('adds CLEAR=true and the two-key notice when both keys are true', async () => {
+      await writeRepoConfig({ next_step: { auto: { skill: true }, clear: { skill: true } } });
+
+      expect(await evaluate(...args())).toEqual({
+        stdout: 'CHOICE=yes\nAUTO=true\nCLEAR=true\n',
+        stderr: 'auto-continuing: /first (next_step.auto.skill=true, next_step.clear.skill=true)\n',
+        exitCode: 0
+      });
+      expect(devices).toEqual([]);
+    });
+
+    it('reads the clear key across tiers (global auto, repo clear)', async () => {
+      await writeFile(path.join(globalDir, 'arcanum-config.json'), JSON.stringify({ next_step: { auto: { skill: true } } }));
+      await writeRepoConfig({ next_step: { clear: { skill: true } } });
+
+      expect((await evaluate(...args())).stdout).toEqual('CHOICE=yes\nAUTO=true\nCLEAR=true\n');
+    });
+
+    it('lets a local false shadow a repo true', async () => {
+      await writeRepoConfig({ next_step: { auto: { skill: true }, clear: { skill: true } } });
+      const localDir = path.join(repoPath, '.claude', 'state');
+
+      await mkdir(localDir, { recursive: true });
+      await writeFile(path.join(localDir, 'arcanum-config.json'), JSON.stringify({ next_step: { clear: { skill: false } } }));
+
+      expect(await evaluate(...args())).toEqual(plainAuto);
+    });
+
+    [
+      ['false', false],
+      ['the string "true"', 'true'],
+      ['1', 1]
+    ].forEach(([label, value]) => {
+      it(`keeps the plain auto output when the clear key is ${label}`, async () => {
+        await writeRepoConfig({ next_step: { auto: { skill: true }, clear: { skill: value } } });
+
+        expect(await evaluate(...args())).toEqual(plainAuto);
+      });
+    });
+
+    it('keeps the plain auto output when the clear key is absent', async () => {
+      await writeRepoConfig({ next_step: { auto: { skill: true } } });
+
+      expect(await evaluate(...args())).toEqual(plainAuto);
+    });
+
+    it('keeps the auto result when the clear read fails', async () => {
+      const configChain = {
+        read: (_repo, _section, key) => (key === 'auto.skill' ? Promise.resolve(true) : Promise.reject(new Error('boom')))
+      };
+      const command = new NextStepPrompt({ env, configChain, ttyFactory: () => tty, stderr });
+
+      expect(await command.evaluate(args())).toEqual(plainAuto);
+    });
+
+    it('never emits CLEAR when auto is off (with --no-prompt)', async () => {
+      await writeRepoConfig({ next_step: { clear: { skill: true } } });
+
+      expect(await evaluate(...args(), '--no-prompt')).toEqual({ stdout: 'CHOICE=no\n', stderr: '', exitCode: 0 });
+    });
+
+    it('never emits CLEAR when auto is off (TTY fallback)', async () => {
+      tty = new FakeTty({ available: false });
+      await writeRepoConfig({ next_step: { clear: { skill: true } } });
+
+      expect((await evaluate(...args())).stdout).toEqual('FALLBACK=chat\nCOMMAND=/first\n');
+    });
+
+    it('never emits CLEAR on a manual TTY yes', async () => {
+      tty = new FakeTty({ answers: ['y'] });
+      await writeRepoConfig({ next_step: { clear: { skill: true } } });
+
+      expect(await evaluate(...args())).toEqual({ stdout: 'CHOICE=yes\n', stderr: '', exitCode: 0 });
+    });
+
+    it('does not read the clear key when auto did not fire', async () => {
+      const configChain = jasmine.createSpyObj('configChain', ['read']);
+      configChain.read.and.resolveTo(false);
+      const command = new NextStepPrompt({ env, configChain, ttyFactory: () => tty, stderr });
+
+      await command.evaluate([...args(), '--no-prompt']);
+
+      expect(configChain.read.calls.allArgs()).toEqual([[path.resolve(repoPath), 'next_step', 'auto.skill']]);
+    });
+
+    it('does not read any key without --auto-key', async () => {
+      const configChain = jasmine.createSpyObj('configChain', ['read']);
+      const command = new NextStepPrompt({ env, configChain, ttyFactory: () => tty, stderr });
+
+      await command.evaluate(['--repo', repoPath, '--command', '/first', '--no-prompt']);
+
+      expect(configChain.read).not.toHaveBeenCalled();
+    });
+
+    it('reads the clear key once auto fired', async () => {
+      const configChain = jasmine.createSpyObj('configChain', ['read']);
+      configChain.read.and.resolveTo(true);
+      const command = new NextStepPrompt({ env, configChain, ttyFactory: () => tty, stderr });
+
+      await command.evaluate(args());
+
+      expect(configChain.read.calls.allArgs()).toEqual([
+        [path.resolve(repoPath), 'next_step', 'auto.skill'],
+        [path.resolve(repoPath), 'next_step', 'clear.skill']
+      ]);
+    });
+  });
+
   describe('#evaluate TTY prompt', () => {
     it('falls back to chat when the TTY cannot be opened', async () => {
       tty = new FakeTty({ available: false });
