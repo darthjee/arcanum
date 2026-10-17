@@ -81,6 +81,27 @@ per tier (local, repo, global), each asking `[Y]es/[N]o/[S]kip` per
 key. An explicit `false` shadows a `true` in a lower tier. Run `/arcanum-check-config next_step.auto.<skill>` to see
 which tier a value resolves from.
 
+A second key per skill asks for the conversation context to be cleared
+at that automatic hop. A clear key only does something when the
+matching `next_step.auto.<skill>` is `true`; with auto off it is never
+read:
+
+| Key | Type | Default | Chain | Notes |
+| --- | --- | --- | --- | --- |
+| `next_step.clear.enhance-issue` | boolean | `false` | local → repo → global | When `true` (and `next_step.auto.enhance-issue` is `true`), the automatic `/discuss-issue <id>` hop is reported with `CLEAR=true`, asking for the context to be cleared before it runs. |
+| `next_step.clear.discuss-issue` | boolean | `false` | local → repo → global | When `true` (and `next_step.auto.discuss-issue` is `true`), the automatic `/auto-plan-issue <id>` hop is reported with `CLEAR=true`. |
+| `next_step.clear.auto-plan-issue` | boolean | `false` | local → repo → global | When `true` (and `next_step.auto.auto-plan-issue` is `true`), the automatic `/loop /auto-resolve-issue <id>` hop is reported with `CLEAR=true` (also forwarded by `auto-plan-issue/scripts/auto_next.sh` with `CHAIN=yes`). |
+
+The clear keys follow the same rules as the auto keys: only the JSON
+boolean `true` enables one, and an explicit `false` shadows a `true` in
+a lower tier. A manual `[Y]es` never clears; clearing applies only to
+automatic hops. `/init-claude`'s auto-next step offers them in the same
+table as the auto keys (a `Clear` column, written to repo config). No
+`/arcanum-migrate` migration sets them yet. Run
+`/arcanum-check-config next_step.clear.<skill>` to see which tier a
+value resolves from. The scripts only report the decision for now;
+skills act on `CLEAR=true` in a follow-up (#798).
+
 ## A third, global tier on top of this pair
 
 Both files described above are repo-scoped — neither survives outside
