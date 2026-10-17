@@ -11,8 +11,8 @@ resolve in one session, so context keeps growing across stages. The
 `next_step.clear.*` keys and the `CLEAR=true` protocol (#796) say *when* a hop should
 start from a clean context, but spike #791 showed that neither a skill, the model,
 settings hooks nor a `ScheduleWakeup` restart can run `/clear`. Only the person, or
-a Claude Code mod through `$.command.run`, can. This mod is that mod (part of epic
-#790).
+a Claude Code mod through `$.command.run`, can. This mod is that mod (part of
+epic #790).
 
 ## Status: called by skills at clearing next-step hops
 
