@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build the trimmed release zip published as a GitHub Release asset.
-# Usage: build_release_zip.sh [output_dir]
+# Usage: build_release_zip.sh [--list] [output_dir]
 #
 # Dev-only tooling — this script (and the rest of this top-level scripts/
 # folder) is NOT itself shipped inside the zip it produces, unlike
@@ -18,16 +18,22 @@
 # installer.sh/updater.sh can reconcile an install without needing git.
 # Prints the absolute path of the produced zip as the last line of
 # stdout.
+#
+# With --list (must be the first argument), prints the would-be MANIFEST
+# instead (the same filtered paths, same order, one per line, nothing
+# else on stdout) and exits 0 without creating the zip, the output
+# directory or a MANIFEST file — so it does not need `zip` installed.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-OUTPUT_DIR="${1:-dist}"
-[[ "$OUTPUT_DIR" = /* ]] || OUTPUT_DIR="${REPO_ROOT}/${OUTPUT_DIR}"
-
-VERSION="$(tr -d '[:space:]' < "${REPO_ROOT}/arcanum.version")"
+LIST_ONLY=false
+if [[ "${1:-}" == "--list" ]]; then
+  LIST_ONLY=true
+  shift
+fi
 
 EXCLUDES=(
   "AGENTS.md"
@@ -58,16 +64,36 @@ is_excluded() {
   return 1
 }
 
+# Fills FILES with every git-tracked path not matched by is_excluded,
+# in `git ls-files` order. Shared by the --list and zip-building paths.
+collect_files() {
+  FILES=()
+  local path
+  while IFS= read -r path; do
+    is_excluded "$path" || FILES+=("$path")
+  done < <(git -C "$REPO_ROOT" ls-files)
+}
+
+if [[ "$LIST_ONLY" == true ]]; then
+  collect_files
+  if (( ${#FILES[@]} > 0 )); then
+    printf '%s\n' "${FILES[@]}"
+  fi
+  exit 0
+fi
+
+OUTPUT_DIR="${1:-dist}"
+[[ "$OUTPUT_DIR" = /* ]] || OUTPUT_DIR="${REPO_ROOT}/${OUTPUT_DIR}"
+
+VERSION="$(tr -d '[:space:]' < "${REPO_ROOT}/arcanum.version")"
+
 mkdir -p "$OUTPUT_DIR"
 ZIP_PATH="${OUTPUT_DIR}/arcanum-${VERSION}.zip"
 rm -f "$ZIP_PATH"
 
 cd "$REPO_ROOT"
 
-FILES=()
-while IFS= read -r path; do
-  is_excluded "$path" || FILES+=("$path")
-done < <(git ls-files)
+collect_files
 
 zip -q "$ZIP_PATH" "${FILES[@]}"
 
