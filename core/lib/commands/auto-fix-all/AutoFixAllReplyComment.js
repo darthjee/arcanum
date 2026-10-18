@@ -3,6 +3,7 @@ import { readFile as defaultReadFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import IssueClient from '../../utils/github/IssueClient.js';
 import { resolveInstallPath } from '../../utils/file/InstallRoot.js';
+import { fillTemplate } from '../../utils/template/TemplateFiller.js';
 
 const defaultExecFileAsync = promisify(execFile);
 const DEFAULT_TIMEOUT_MS = 30000;
@@ -126,9 +127,12 @@ class AutoFixAllReplyComment {
    * Reads `auto-fix-all/templates/reply.tmpl.md` from the arcanum
    * install (resolved via `resolveInstallPath`, never the target
    * `repoPath`), matching how `reply_comment_shell.sh` reads its own
-   * installed copy, and substitutes its placeholders, matching bash's
-   * `${var/pattern/repl}` (single, first-occurrence substitution per
-   * placeholder, no templating library).
+   * installed copy, and substitutes its placeholders in a single pass
+   * (see `fillTemplate`): every value is inserted verbatim — `$&`,
+   * `` $` ``, `$'`, `$$`, `$<n>`, `&` and `\` are never interpreted —
+   * and never re-scanned, so e.g. a reply body containing `%%AGENT%%`
+   * keeps it literally. Matches `reply_comment_shell.sh`'s own
+   * single-pass substitution byte-for-byte.
    * @param {object} fields - the substitution fields.
    * @param {string} fields.body - replaces `%%BODY%%`.
    * @param {string} fields.agent - replaces `%%AGENT%%`.
@@ -140,36 +144,12 @@ class AutoFixAllReplyComment {
     const templatePath = resolveInstallPath('auto-fix-all', 'templates', 'reply.tmpl.md');
     const template = await this._readFile(templatePath, 'utf8');
 
-    let content = template;
-    content = this._replaceFirst(content, '%%BODY%%', body);
-    content = this._replaceFirst(content, '%%AGENT%%', agent);
-    content = this._replaceFirst(content, '%%MODEL_NAME%%', modelName);
-    content = this._replaceFirst(content, '%%MODEL_EMAIL%%', modelEmail);
-
-    return content;
-  }
-
-  /**
-   * Replaces only the first occurrence of `search` in `str` with
-   * `replacement`, treating `replacement` as a plain literal string
-   * (deliberately not `String#replace`, whose string-`replaceValue`
-   * form still honors `$&`/`$\``/`$'`/`$$`/`$<name>` substitution
-   * patterns — bash's `${var/pattern/repl}` has no such magic
-   * characters, and `replacement` here is untrusted content, e.g. the
-   * reply body).
-   * @param {string} str - the source string.
-   * @param {string} search - the literal substring to replace.
-   * @param {string} replacement - the literal replacement text.
-   * @returns {string} `str` with the first `search` occurrence replaced.
-   */
-  _replaceFirst(str, search, replacement) {
-    const index = str.indexOf(search);
-
-    if (index === -1) {
-      return str;
-    }
-
-    return str.slice(0, index) + replacement + str.slice(index + search.length);
+    return fillTemplate(template, {
+      BODY: body,
+      AGENT: agent,
+      MODEL_NAME: modelName,
+      MODEL_EMAIL: modelEmail
+    });
   }
 
   /**

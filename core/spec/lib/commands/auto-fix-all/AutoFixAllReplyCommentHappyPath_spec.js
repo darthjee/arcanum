@@ -17,8 +17,9 @@ describe('AutoFixAllReplyComment (happy path)', () => {
 
   describe('#run', () => {
     it('resolves the PR number, posts the rendered comment, pushes the branch, and resolves with the push stdout', async () => {
-      // The template repeats %%AGENT%% so the first-occurrence-only
-      // substitution rule is actually exercised.
+      // The template repeats %%AGENT%% so the single-pass, every-occurrence
+      // substitution rule (matching reply_comment_shell.sh's perl `s///g`)
+      // is actually exercised.
       const deps = stubDeps({
         readFile: fakeReadFile(
           '%%BODY%%\n\n_Replied by: %%AGENT%% agent (%%MODEL_NAME%% %%MODEL_EMAIL%%)_\nagain: %%AGENT%%\n'
@@ -44,7 +45,7 @@ describe('AutoFixAllReplyComment (happy path)', () => {
         },
         body: JSON.stringify({
           body: 'Fixed in the latest commit.\n\n_Replied by: node agent (Node Agent node@example.com)_\n' +
-            'again: %%AGENT%%\n'
+            'again: node\n'
         }),
         signal: jasmine.any(AbortSignal)
       });
