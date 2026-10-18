@@ -1,6 +1,6 @@
 ---
 name: toggle-clear-context
-description: Toggles the clear_context setting for auto-fix-all. When enabled and invoked via /loop, auto-fix-all clears its conversation context between issues using ScheduleWakeup. Usage: /toggle-clear-context
+description: Toggles the clear_context setting for auto-fix-all. When enabled and invoked via /loop, auto-fix-all clears its conversation context between issues through the arcanum-next-step mod, or, without the mod, restarts via ScheduleWakeup without freeing context. Usage: /toggle-clear-context
 ---
 
 You are acting as the **architect**. Toggle the `clear_context` setting — no user interaction.
@@ -21,4 +21,4 @@ Run:
 
 Report the new value: "clear_context is now ON" or "clear_context is now OFF (auto-fix-all will loop in the same context)".
 
-Note: context clearing only takes effect when `auto-fix-all` is invoked via `/loop /auto-fix-all <ids>` — `ScheduleWakeup` requires /loop dynamic mode. There is a 60-second gap between issues.
+Note: the setting only takes effect when `auto-fix-all` is invoked via `/loop /auto-fix-all <ids>`. With the `arcanum-next-step` mod loaded, the context is really cleared and the next issue starts right after the turn ends. Without the mod, `auto-fix-all` prints a `clear skipped: <reason>` line and restarts through a 60-second `ScheduleWakeup`, which keeps the conversation context.
