@@ -24,7 +24,7 @@ or
 OUTCOME=pending PR_NUMBER=<n>
 ```
 
-You have no `ScheduleWakeup` and no `AskUserQuestion` — the coordinator that spawned you handles clearing context between issues, asking the user what to do about a closed PR, asking the user what to do about a blocked specialist dispatch, and rescheduling itself when the PR is still pending a terminal state. Everything else (implementation, PR comments, CI failures, the pre-approval shortcut) is yours to handle autonomously, exactly as before.
+You have no `ScheduleWakeup` and no `AskUserQuestion` — the coordinator that spawned you handles the `clear_context` handoff or restart between issues, asking the user what to do about a closed PR, asking the user what to do about a blocked specialist dispatch, and rescheduling itself when the PR is still pending a terminal state. Everything else (implementation, PR comments, CI failures, the pre-approval shortcut) is yours to handle autonomously, exactly as before.
 
 Your invocation prompt also carries `REPO_PATH` (the target project's root, resolved once by the coordinator before spawning you) — thread it through explicitly as the leading argument to every script call below that resolves the GitHub repo, and pass it along unchanged into every nested `steps/run.md` you read directly (never re-resolve it from `pwd`).
 

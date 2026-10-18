@@ -3,7 +3,7 @@ name: auto-fix-all
 description: Autonomously runs the full pipeline (new issue → plan → fix → monitor) for a queue of issue IDs, one at a time, forever — waiting for new IDs to be pushed onto the queue whenever it runs dry — with no user interaction except when a PR is closed without merging or a specialist dispatch is blocked. Usage: /auto-fix-all <id1> <id2> ...
 ---
 
-You are the coordinator. Your job is to manage the queue and the things the `architect` agent cannot do itself (`ScheduleWakeup` between issues, asking the user what to do about a closed PR, asking the user what to do about a blocked specialist dispatch) — everything else (implementation, PR review, comments, CI) is delegated to a spawned `architect` agent, one per issue. Follow the steps below precisely and in order.
+You are the coordinator. Your job is to manage the queue and the things the `architect` agent cannot do itself (the `clear_context` handoff or `ScheduleWakeup` between issues, asking the user what to do about a closed PR, asking the user what to do about a blocked specialist dispatch) — everything else (implementation, PR review, comments, CI) is delegated to a spawned `architect` agent, one per issue. Follow the steps below precisely and in order.
 
 The per-issue pipeline lives in `auto-resolve-issue` ([process_one_issue.md](../auto-resolve-issue/steps/process_one_issue.md)), and `auto-fix-all` is the queue wrapper around it. `/auto-resolve-issue <id>` runs the same pipeline for a single issue without the queue.
 
@@ -11,7 +11,7 @@ The issues folder is always `docs/agents/issues` and the plans folder is always 
 
 ## Step 0 — Resolve REPO_PATH
 
-Resolve `REPO_PATH="$(pwd)"` — the one moment the target project's root can be trusted from ambient cwd. This coordinator layer runs every script call in this file directly (not via a spawned architect for its own queue/config bookkeeping), so `REPO_PATH` must be resolved fresh here on every invocation (including each `ScheduleWakeup` re-entry, since a fresh invocation is a fresh trust point) and threaded explicitly through every script call below, plus into the per-issue `Agent(architect, ...)` spawn in Step 2.
+Resolve `REPO_PATH="$(pwd)"` — the one moment the target project's root can be trusted from ambient cwd. This coordinator layer runs every script call in this file directly (not via a spawned architect for its own queue/config bookkeeping), so `REPO_PATH` must be resolved fresh here on every invocation (including each handoff or `ScheduleWakeup` re-entry, since a fresh invocation is a fresh trust point) and threaded explicitly through every script call below, plus into the per-issue `Agent(architect, ...)` spawn in Step 2.
 
 ## Step 1 — Initialize the queue
 
@@ -21,7 +21,7 @@ If skill arguments were provided (space-separated IDs), run:
 scripts/queue.sh save "$REPO_PATH" <id1> <id2> ...
 ```
 
-If no arguments were given, this is a re-invocation after context clearing — the queue already contains the remaining issues. Skip this step and go directly to Step 2.
+If no arguments were given, this is a re-invocation (a `clear_context` handoff, a `clear_context` wakeup restart, or the `pending` wakeup) — the queue already contains the remaining issues. Skip this step and go directly to Step 2.
 
 ## Step 2 — Process the next issue
 
@@ -49,7 +49,7 @@ scripts/github.sh has-label "$REPO_PATH" <id> Epic
   scripts/queue.sh empty "$REPO_PATH" && scripts/config.sh is-enabled "$REPO_PATH" finish_on_empty_queue
   ```
 
-  If it exits 0, go to Step 4. Otherwise go back to the start of Step 2. Do not ask the user anything, do not change any label, and do not schedule a `clear_context` wakeup.
+  If it exits 0, go to Step 4. Otherwise go back to the start of Step 2. Do not ask the user anything, do not change any label, and do not hand off or schedule a `clear_context` restart.
 - **Any non-zero exit**: treat it as not an Epic (a label-fetch failure must not block the queue) and continue with the spawn below.
 
 This check runs before every spawn, so re-invocations (`clear_context`, `pending`) also re-check the id at the front of the queue. That is intended.
@@ -74,7 +74,7 @@ Check whether the run should finish now that the queue may be empty:
 scripts/queue.sh empty "$REPO_PATH" && scripts/config.sh is-enabled "$REPO_PATH" finish_on_empty_queue
 ```
 
-- **Exit 0 (both true)**: the queue is empty and the user has opted into finishing instead of waiting. Skip the `clear_context` check below entirely — no `ScheduleWakeup`, no looping back to Step 2. Go straight to Step 4 and report the summary.
+- **Exit 0 (both true)**: the queue is empty and the user has opted into finishing instead of waiting. Skip the `clear_context` check below entirely — no handoff, no `ScheduleWakeup`, no looping back to Step 2. Go straight to Step 4 and report the summary.
 - **Exit 1 (otherwise)**: continue to the `clear_context` check below, unchanged.
 
 Check whether to clear context:
@@ -83,7 +83,12 @@ Check whether to clear context:
 scripts/config.sh is-enabled "$REPO_PATH" clear_context
 ```
 
-- **Exit 0 (`true`)**: call `ScheduleWakeup(delaySeconds=60, prompt="/auto-fix-all", reason="clearing context before next issue")` and stop. Do not loop back to Step 2. (Requires that `auto-fix-all` was invoked via `/loop /auto-fix-all <ids>`; the 60-second wakeup fires a fresh iteration that reads the queue and continues.)
+- **Exit 0 (`true`)**: hand off to a fresh iteration instead of looping back to Step 2, using the first level that works (the unattended-loop variant of [Clearing](../docs/agents/architecture/skill-finish.md#clearing), which holds the shared contract):
+  1. **Mod.** If `mcp__arcanum-next-step__handoff` is in the tool list (the `arcanum-next-step` mod is loaded), call it with `{ command: "/loop /auto-fix-all" }`. On a success result, end the turn with no further output. The mod runs `/clear`, then the command, and the fresh iteration re-reads the queue (Step 1's "no arguments" branch), so the context really is freed.
+     - Error `a handoff is already pending: ...`: end the turn. Do not fall back, so the command doesn't fire twice.
+  2. **Fallback.** On any other error result, or if the tool is missing, print one line, `clear skipped: <reason>`, then call `ScheduleWakeup(delaySeconds=60, prompt="/auto-fix-all", reason="restarting before next issue")` and stop. This restart re-runs the skill from the top in the **same** conversation and keeps all earlier context; it does not clear anything.
+
+  There is deliberately no "type /clear now" level: the loop runs unattended. Do not loop back to Step 2 in either case. (Requires that `auto-fix-all` was invoked via `/loop /auto-fix-all <ids>`, since the fallback wakeup and the `pending` wakeup depend on it.)
 - **Exit 1 (`false` or absent)**: go back to Step 2 to process the next issue.
 
 ### `OUTCOME=closed PR_NUMBER=<n>`
@@ -120,7 +125,7 @@ Deliberately no "do it yourself" option here — that would recreate the exact b
 
 ### `OUTCOME=pending PR_NUMBER=<n>`
 
-The PR isn't at a terminal state yet — nothing to do until it is. Do **not** pop the queue (the id stays at the front, still in progress). Call `ScheduleWakeup(delaySeconds=300, prompt="/auto-fix-all", reason="waiting for PR #<n> to reach a terminal state")` and stop. (Requires `auto-fix-all` to have been invoked via `/loop /auto-fix-all <ids>`, same as the existing `clear_context` wakeup — flag this clearly instead of silently doing nothing if it wasn't.) The next wakeup re-invokes `/auto-fix-all` fresh with no arguments, which re-reads the queue (Step 1's "no arguments" branch) and spawns a brand-new `architect` agent for the same id at Step 2 — `process_one_issue.md`'s existing idempotent guards (branch reuse in `checkout_from_main.sh`, "plan already exists" skip, PR already exists) let it fast-forward straight back to "Monitor the PR" with no wasted rework, then perform one more one-shot check.
+The PR isn't at a terminal state yet — nothing to do until it is. Do **not** pop the queue (the id stays at the front, still in progress). Call `ScheduleWakeup(delaySeconds=300, prompt="/auto-fix-all", reason="waiting for PR #<n> to reach a terminal state")` and stop. (Requires `auto-fix-all` to have been invoked via `/loop /auto-fix-all <ids>`, the same `/loop` requirement as the `clear_context` fallback restart — flag this clearly instead of silently doing nothing if it wasn't.) The next wakeup re-invokes `/auto-fix-all` fresh with no arguments, which re-reads the queue (Step 1's "no arguments" branch) and spawns a brand-new `architect` agent for the same id at Step 2 — `process_one_issue.md`'s existing idempotent guards (branch reuse in `checkout_from_main.sh`, "plan already exists" skip, PR already exists) let it fast-forward straight back to "Monitor the PR" with no wasted rework, then perform one more one-shot check.
 
 ## Step 4 — Done
 

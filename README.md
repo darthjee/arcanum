@@ -103,7 +103,8 @@ Arcanum ships a small Claude Code mod, [`arcanum-next-step/`](arcanum-next-step/
 
 - **Ships and loads with arcanum:** the release zip, `curl | bash`, `git clone` and `/arcanum-update` all bring it in. Claude Code loads it automatically from a skills folder (`~/.claude/skills/`, `$CLAUDE_CONFIG_DIR/skills/` or a project's `.claude/skills/`), in new sessions.
 - **Used at automatic hops:** skills call it when an automatic next-step hop also has its `next_step.clear.<skill>` key set to `true` (see [Clearing](docs/agents/architecture/skill-finish.md#clearing)).
-- **Custom install path:** if arcanum is installed outside a skills folder, the mod is not loaded. Skills then schedule the next command about a minute ahead and ask you to type `/clear` in the meantime; if that is not possible either, they run it without clearing context.
+- **Used by unattended loops:** `auto-fix-all` and `monitor-issues` call it between iterations when their `clear_context` toggle is on, handing off `/loop /auto-fix-all` or `/loop /monitor-issues`.
+- **Custom install path:** if arcanum is installed outside a skills folder, the mod is not loaded. Skills then schedule the next command about a minute ahead and ask you to type `/clear` in the meantime; if that is not possible either, they run it without clearing context. `auto-fix-all` and `monitor-issues` skip the "type `/clear`" step: they print `clear skipped: <reason>` and restart through a 60-second wakeup that keeps context.
 - **Interactive sessions only:** under `claude -p` or an SDK host, the tool is not registered.
 
 See [`arcanum-next-step/README.md`](arcanum-next-step/README.md) for the tool contract, opting out and development notes.
@@ -147,10 +148,10 @@ Arcanum configuration keys are resolved through a 3-tier chain, in order of prec
 | `git.email` | Global fallback email for agents without a specific email configured. |
 | `git.safe_branch` | Reference branch for safe fetch/merge operations (default: `origin/main`). |
 | `engine.mode` | Defines which implementation to run for migrated entrypoints (`shell`, `native`, or `docker`). |
-| `auto-fix-all.clear_context` | Clears context between issues processed in the `auto-fix-all` pipeline. |
+| `auto-fix-all.clear_context` | Clears context between issues in the `auto-fix-all` pipeline through the `arcanum-next-step` mod (run via `/loop`); without the mod, restarts via a wakeup that keeps context. |
 | `auto-fix-all.finish_on_empty_queue` | Finishes the pipeline when the issue queue is empty. |
 | `auto-fix-all.ignored_check_patterns` | CI check name patterns to ignore when deciding pass/fail. |
-| `monitor-issues.clear_context` | Clears context between `monitor-issues` cycles. |
+| `monitor-issues.clear_context` | Clears context between `monitor-issues` cycles through the `arcanum-next-step` mod (run via `/loop`); without the mod, restarts via a wakeup that keeps context. |
 | `plan-issues.max-retry-count` | Max retries for GitHub issue creation in `arcanum/_lib/spawn_issue.sh` (default: 5). |
 | `plan-issues.error-sleep-time` | Seconds to sleep between retries in `arcanum/_lib/spawn_issue.sh` (default: 5). |
 | `next_step.auto.enhance-issue` | When `true`, skips `enhance-issue`'s `/discuss-issue` offer and runs it automatically (default: `false`). |

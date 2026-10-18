@@ -22,6 +22,9 @@ where `next_step.clear.<skill>` is `true`: enhance-issue, discuss-issue's two
 offers, plan-issue, and the `auto-plan-issue` coordinator, per the
 [Clearing](../docs/agents/architecture/skill-finish.md#clearing) subsection (#798).
 Without the mod, hops fall back to `ScheduleWakeup` plus asking you to type `/clear`.
+`auto-fix-all` and `monitor-issues` also call it between iterations when their
+`clear_context` toggle is on (#795). Without the mod, they fall back to a
+`ScheduleWakeup` restart that keeps context.
 
 ## Tool contract
 
