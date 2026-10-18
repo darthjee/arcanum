@@ -105,7 +105,7 @@ export async function seedGithubLikeRepo(repo) {
  * Runs a single "auto-fix-all-reply-comment" shell-vs-native parity case
  * end to end: builds a fake `gh` binary and a pair of independent
  * github.com-shaped fixture repos (one per side), runs both
- * implementations against `ARGS_TAIL`, asserts the shared byte-identical
+ * implementations against `argsTail`, asserts the shared byte-identical
  * stdout/exit-code contract, hands off to `assert` for the case-specific
  * checks, and tears every fixture down — replacing the setup/run/assert/
  * cleanup block previously re-authored per spec file (issue #538).
@@ -116,12 +116,17 @@ export async function seedGithubLikeRepo(repo) {
  * @param {boolean} [options.useFakeFetchPreload] - whether the native
  *   invocation should preload `FAKE_FETCH_PRELOAD` (only needed by cases
  *   that reach the native `fetch` call).
+ * @param {string[]} [options.argsTail] - the `<id> <agent> <model_name>
+ *   <model_email> <reply_body>` arguments both sides are run with
+ *   (defaults to `ARGS_TAIL`).
  * @param {Function} options.assert - called with `{shell, native}` once
  *   the shared parity checks pass, for the case-specific assertions.
  * @returns {Promise<void>} resolves once the case has run and all
  *   fixtures have been cleaned up.
  */
-export async function runReplyCommentParityCase({ extraEnv = {}, useFakeFetchPreload = false, assert }) {
+export async function runReplyCommentParityCase({
+  extraEnv = {}, useFakeFetchPreload = false, argsTail = ARGS_TAIL, assert
+}) {
   const fakeGh = await createFakeGhBin();
   const shellRepo = await createGitFixtureRepo();
   const nativeRepo = await createGitFixtureRepo();
@@ -134,9 +139,9 @@ export async function runReplyCommentParityCase({ extraEnv = {}, useFakeFetchPre
       ? [process.execPath, '--import', FAKE_FETCH_PRELOAD, NATIVE_BIN]
       : [process.execPath, NATIVE_BIN];
 
-    const shell = await runCommand([SHELL_SCRIPT, shellRepo.repoPath, ...ARGS_TAIL], shellRepo.repoPath, env);
+    const shell = await runCommand([SHELL_SCRIPT, shellRepo.repoPath, ...argsTail], shellRepo.repoPath, env);
     const native = await runCommand(
-      [...nativeCommand, 'auto-fix-all-reply-comment', nativeRepo.repoPath, ...ARGS_TAIL],
+      [...nativeCommand, 'auto-fix-all-reply-comment', nativeRepo.repoPath, ...argsTail],
       nativeRepo.repoPath,
       env
     );

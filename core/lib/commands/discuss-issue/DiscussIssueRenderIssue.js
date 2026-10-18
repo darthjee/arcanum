@@ -1,5 +1,6 @@
 import { readFile as defaultReadFile, writeFile } from 'node:fs/promises';
 import { resolveInstallPath } from '../../utils/file/InstallRoot.js';
+import { fillTemplate } from '../../utils/template/TemplateFiller.js';
 
 /**
  * Native implementation of the `discuss-issue-render-issue` migrated
@@ -7,9 +8,12 @@ import { resolveInstallPath } from '../../utils/file/InstallRoot.js';
  * `discuss-issue/scripts/render_issue.sh`. Renders
  * `discuss-issue/templates/issue.tmpl.md` (resolved from the arcanum
  * install, never the target `repoPath` — see `InstallRoot.js`) by
- * substituting each `%%PLACEHOLDER%%` with its corresponding argument,
- * collapsing the blank-line runs left behind by omitted sections, and
- * writing the result to `outputFile`. Purely filesystem-based — no
+ * substituting each `%%PLACEHOLDER%%` with its corresponding argument
+ * in a single pass (values are inserted verbatim — `$`/`&`/`\`
+ * sequences are never interpreted, and a value containing another
+ * `%%PLACEHOLDER%%` keeps it literally, never re-scanned), collapsing
+ * the blank-line runs left behind by omitted sections, and writing
+ * the result to `outputFile`. Purely filesystem-based — no
  * GitHub/network dependency. See
  * docs/agents/plans/448-migrate-discuss-issue-render-issue-entrypoint-to-native-node-js/plan.md
  * for the full design/shared contracts.
@@ -31,7 +35,8 @@ class DiscussIssueRenderIssue {
   /**
    * Render the issue template into `outputFile`. Each section argument
    * is the full block including its own "## Heading" line; pass `''`
-   * (the default) to omit a section entirely.
+   * (the default) to omit a section entirely. All values are
+   * substituted in one pass and inserted verbatim (see `fillTemplate`).
    * @param {string} outputFile - the local file to write the rendered
    *   content to.
    * @param {string} title - the issue title (`%%TITLE%%`).
@@ -56,13 +61,14 @@ class DiscussIssueRenderIssue {
     const templatePath = resolveInstallPath('discuss-issue', 'templates', 'issue.tmpl.md');
     const template = await this._readFile(templatePath, 'utf8');
 
-    let content = template
-      .replace('%%TITLE%%', title)
-      .replace('%%DESCRIPTION%%', description)
-      .replace('%%PROBLEM%%', problem)
-      .replace('%%EXPECTED_BEHAVIOR%%', expectedBehavior)
-      .replace('%%SOLUTION%%', solution)
-      .replace('%%BENEFITS%%', benefits);
+    let content = fillTemplate(template, {
+      TITLE: title,
+      DESCRIPTION: description,
+      PROBLEM: problem,
+      EXPECTED_BEHAVIOR: expectedBehavior,
+      SOLUTION: solution,
+      BENEFITS: benefits
+    });
 
     content = content
       .replace(/^\n+/, '')

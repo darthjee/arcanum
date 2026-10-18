@@ -203,7 +203,7 @@ class AutoNewIssueCommitIssue {
       return modelEmail;
     }
 
-    return String(value).replaceAll('{agent}', AGENT);
+    return String(value).replaceAll('{agent}', () => AGENT);
   }
 
   /**

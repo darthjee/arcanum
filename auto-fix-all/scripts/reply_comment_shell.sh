@@ -49,11 +49,10 @@ PR_NUMBER=$("$RESOLVE_PR_NUMBER" "$REPO_PATH" "$ID")
 _ensure_gh_user
 REPO_REF=$(get_repo_ref "$REPO_PATH")
 
-content=$(cat "$TEMPLATE")
-content="${content/\%\%BODY\%\%/$REPLY_BODY}"
-content="${content/\%\%AGENT\%\%/$AGENT}"
-content="${content/\%\%MODEL_NAME\%\%/$MODEL_NAME}"
-content="${content/\%\%MODEL_EMAIL\%\%/$MODEL_EMAIL}"
+# Single-pass perl substitution (not bash ${var/…/…}, which interprets "&"
+# and "\\" on bash >= 5.2): values are inserted verbatim, never re-scanned.
+content=$(R_BODY="$REPLY_BODY" R_AGENT="$AGENT" R_MODEL_NAME="$MODEL_NAME" R_MODEL_EMAIL="$MODEL_EMAIL" \
+  perl -0777 -pe 's/%%(BODY|AGENT|MODEL_NAME|MODEL_EMAIL)%%/$ENV{"R_$1"}/g' "$TEMPLATE")
 
 printf '%s\n' "$content" | gh pr comment "$PR_NUMBER" -R "$REPO_REF" --body-file -
 

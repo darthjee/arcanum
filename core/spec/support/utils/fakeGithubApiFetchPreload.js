@@ -15,13 +15,26 @@
 // so both the shell side (fake `gh pr comment`/`gh pr view`/`gh api`)
 // and the native side (this fake `fetch`) can be steered from the same
 // parity-spec scenario. Left inert (real `fetch` untouched) when unset.
+import { writeFileSync } from 'node:fs';
+
 const mode = process.env.ARCANUM_TEST_FAKE_FETCH;
 
 if (mode === 'success') {
-  globalThis.fetch = async () =>
-    new Response(JSON.stringify({ html_url: 'https://github.com/darthjee/arcanum/pull/1#issuecomment-1' }), {
+  // When `FAKE_FETCH_COMMENT_CAPTURE_FILE` is set, the posted comment's
+  // `body` field is written there verbatim, so a spec can assert the
+  // exact posted body (mirroring fakeGhBin.js's
+  // `FAKE_GH_COMMENT_CAPTURE_FILE`).
+  const captureFile = process.env.FAKE_FETCH_COMMENT_CAPTURE_FILE;
+
+  globalThis.fetch = async (_url, init = {}) => {
+    if (captureFile) {
+      writeFileSync(captureFile, JSON.parse(init.body).body);
+    }
+
+    return new Response(JSON.stringify({ html_url: 'https://github.com/darthjee/arcanum/pull/1#issuecomment-1' }), {
       status: 201
     });
+  };
 } else if (mode === 'failure') {
   globalThis.fetch = async () => new Response(JSON.stringify({ message: 'Validation Failed' }), { status: 422 });
 } else if (mode === 'wait-ci') {

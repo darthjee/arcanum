@@ -213,7 +213,8 @@ class AutoFixIssueCommitChange {
    * @param {string} modelEmail - the acting model's email, used as the
    *   fallback when no config value resolves.
    * @returns {Promise<string>} the resolved commit-author email for
-   *   `agent`, with any `{agent}` placeholder substituted.
+   *   `agent`, with any `{agent}` placeholder substituted (verbatim, via
+   *   a replacer function).
    */
   async _agentEmailGet(repoPath, agent, modelEmail) {
     const value = await this._configChain.read(repoPath, 'git', `agents.${agent}`, 'email');
@@ -222,7 +223,7 @@ class AutoFixIssueCommitChange {
       return modelEmail;
     }
 
-    return String(value).replaceAll('{agent}', agent);
+    return String(value).replaceAll('{agent}', () => agent);
   }
 
   /**

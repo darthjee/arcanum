@@ -214,6 +214,18 @@ describe('AutoFixIssueCommitChange', () => {
             expected: 'Co-Authored-By: backend agent <backend@example.com>'
           });
         });
+
+        it('inserts a "$&"-containing agent name verbatim into the "{agent}" placeholder', async () => {
+          await expectCommitMessage({
+            CommandClass: AutoFixIssueCommitChange,
+            repoPath,
+            runArgs: [TYPE, SCOPE, ID, SUBJECT, 'x$&$`y', MODEL_NAME, MODEL_EMAIL],
+            execFileAsyncOpts: EXEC_FILE_ASYNC_OPTS,
+            configChainOpts: { agentEmail: '{agent}@example.com', omitModelCoauthor: false },
+            matcher: 'toContain',
+            expected: 'Co-Authored-By: x$&$`y agent <x$&$`y@example.com>'
+          });
+        });
       });
     });
 
