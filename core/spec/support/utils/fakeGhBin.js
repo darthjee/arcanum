@@ -50,7 +50,9 @@ import { createTempDir, removeTempDir } from './tempDir.js';
 //     <subject> [--body <body>]` -> succeeds (prints nothing) unless
 //     `$FAKE_GH_PR_MERGE_FAIL` is `1` — used by `github.sh`'s
 //     `cmd_pr_merge`.
-//   - `gh pr comment <number> -R <ref> --body-file -` -> drains stdin;
+//   - `gh pr comment <number> -R <ref> --body-file -` -> drains stdin
+//     (into `$FAKE_GH_COMMENT_CAPTURE_FILE` when set, so a spec can
+//     assert the exact posted body);
 //     fails when `$FAKE_GH_COMMENT_FAIL` is `1`, otherwise succeeds
 //     printing nothing (matching this migration's "gh pr comment isn't
 //     captured/echoed" contract — see AutoFixAllReplyComment.js).
@@ -199,7 +201,11 @@ function buildPrMutationCase() {
         exit 0
         ;;
       comment)
-        cat >/dev/null
+        if [[ -n "\${FAKE_GH_COMMENT_CAPTURE_FILE:-}" ]]; then
+          cat >"\${FAKE_GH_COMMENT_CAPTURE_FILE}"
+        else
+          cat >/dev/null
+        fi
         if [[ "\${FAKE_GH_COMMENT_FAIL:-}" == "1" ]]; then
           echo "HTTP 422: Validation Failed" >&2
           exit 1

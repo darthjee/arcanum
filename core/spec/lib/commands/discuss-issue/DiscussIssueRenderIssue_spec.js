@@ -3,6 +3,7 @@ import path from 'node:path';
 import DiscussIssueRenderIssue from '../../../../lib/commands/discuss-issue/DiscussIssueRenderIssue.js';
 import RepoContext from '../../../../lib/context/RepoContext.js';
 import { resolveInstallPath } from '../../../../lib/utils/file/InstallRoot.js';
+import { HOSTILE_VALUE } from '../../../support/fixtures/hostileTemplateValue.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 const TEMPLATE = [
@@ -286,6 +287,54 @@ describe('DiscussIssueRenderIssue', () => {
       expect(content).toEqual(
         ['# Issue: Something broke', '', '## Description', 'Desc text', '', '## Benefits', 'Ben text', ''].join('\n')
       );
+    });
+
+    it('inserts hostile values verbatim in a single pass, keeping stray placeholders literal', async () => {
+      const discussIssueRenderIssue = new DiscussIssueRenderIssue(new RepoContext({ repoPath }), { readFile: readFileStub });
+
+      await discussIssueRenderIssue.run(
+        outputFile,
+        HOSTILE_VALUE,
+        `## Description\n${HOSTILE_VALUE}`,
+        `## Problem\n${HOSTILE_VALUE}`,
+        `## Expected Behavior\n${HOSTILE_VALUE}`,
+        `## Solution\n${HOSTILE_VALUE}`,
+        `## Benefits\n${HOSTILE_VALUE}`
+      );
+
+      const content = await readFile(outputFile, 'utf8');
+
+      expect(content).toEqual(
+        [
+          '# Issue: a $& b $` c $\' d $$ e $1 f & g \\ h \\\\ i %%SOLUTION%% j %%BODY%%',
+          '',
+          '## Description',
+          HOSTILE_VALUE,
+          '',
+          '## Problem',
+          HOSTILE_VALUE,
+          '',
+          '## Expected Behavior',
+          HOSTILE_VALUE,
+          '',
+          '## Solution',
+          HOSTILE_VALUE,
+          '',
+          '## Benefits',
+          HOSTILE_VALUE,
+          ''
+        ].join('\n')
+      );
+    });
+
+    it('still collapses blank-line runs around omitted sections when values are hostile', async () => {
+      const discussIssueRenderIssue = new DiscussIssueRenderIssue(new RepoContext({ repoPath }), { readFile: readFileStub });
+
+      await discussIssueRenderIssue.run(outputFile, HOSTILE_VALUE, '', '', '', `## Solution\n${HOSTILE_VALUE}`, '');
+
+      const content = await readFile(outputFile, 'utf8');
+
+      expect(content).toEqual(`# Issue: ${HOSTILE_VALUE}\n\n## Solution\n${HOSTILE_VALUE}\n`);
     });
 
     it('throws and writes no file when outputFile is missing', async () => {

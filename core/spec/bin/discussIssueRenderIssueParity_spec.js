@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { HOSTILE_VALUE } from '../support/fixtures/hostileTemplateValue.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
 // Parity test for the "discuss-issue-render-issue" migrated entrypoint
@@ -107,6 +108,57 @@ describe('discuss-issue-render-issue parity (shell vs. native)', () => {
       ]);
 
       expect(nativeContent).toEqual(shellContent);
+    });
+  });
+
+  describe('hostile values ($ patterns, &, \\, stray placeholders)', () => {
+    it('matches shell output byte-for-byte and both write the verbatim rendering', async () => {
+      const args = [
+        HOSTILE_VALUE,
+        `## Description\n${HOSTILE_VALUE}`,
+        `## Problem\n${HOSTILE_VALUE}`,
+        `## Expected Behavior\n${HOSTILE_VALUE}`,
+        `## Solution\n${HOSTILE_VALUE}`,
+        `## Benefits\n${HOSTILE_VALUE}`
+      ];
+
+      const shell = await runCommand([SHELL_SCRIPT, shellOutputFile, ...args], repoPath);
+      const native = await runCommand(
+        [process.execPath, NATIVE_BIN, 'discuss-issue-render-issue', repoPath, nativeOutputFile, ...args],
+        repoPath
+      );
+
+      expect(native.stdout).toEqual(shell.stdout);
+      expect(native.code).toEqual(shell.code);
+      expect(shell.code).toEqual(0);
+
+      const [shellContent, nativeContent] = await Promise.all([
+        readFile(shellOutputFile, 'utf8'),
+        readFile(nativeOutputFile, 'utf8')
+      ]);
+
+      expect(nativeContent).toEqual(shellContent);
+      expect(shellContent).toEqual(
+        [
+          `# Issue: ${HOSTILE_VALUE}`,
+          '',
+          '## Description',
+          HOSTILE_VALUE,
+          '',
+          '## Problem',
+          HOSTILE_VALUE,
+          '',
+          '## Expected Behavior',
+          HOSTILE_VALUE,
+          '',
+          '## Solution',
+          HOSTILE_VALUE,
+          '',
+          '## Benefits',
+          HOSTILE_VALUE,
+          ''
+        ].join('\n')
+      );
     });
   });
 

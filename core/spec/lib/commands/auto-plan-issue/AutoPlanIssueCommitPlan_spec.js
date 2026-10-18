@@ -182,6 +182,17 @@ describe('AutoPlanIssueCommitPlan', () => {
             expected: 'Co-Authored-By: architect agent <architect@example.com>'
           });
         });
+
+        it('leaves "$" patterns around the "{agent}" placeholder literal', async () => {
+          await expectCommitMessage({
+            CommandClass: AutoPlanIssueCommitPlan,
+            repoPath,
+            runArgs: [planDir, ID, MODEL_NAME, MODEL_EMAIL],
+            configChainOpts: { agentEmail: '{agent}$&$\'@example.com', omitModelCoauthor: false },
+            matcher: 'toContain',
+            expected: 'Co-Authored-By: architect agent <architect$&$\'@example.com>'
+          });
+        });
       });
     });
 
