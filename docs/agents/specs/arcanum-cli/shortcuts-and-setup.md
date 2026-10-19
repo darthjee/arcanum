@@ -119,8 +119,9 @@ Resolution matches `arcanum/_lib/agent_email.sh` exactly, so the CLI shows what 
 3. A tier is fully resolved before the next one is consulted. So a generic `git.email` at a higher tier beats a `git.agents.<agent>` at a lower tier.
 4. A JSON `null` counts as absent.
 5. `{agent}` in the resolved value is replaced by the agent's name.
+6. An explicit `""` at the winning tier and key stops the chain and means "no email": the commit falls back to the model's email. The CLI shows `(model default)` together with where the empty value sits, e.g. `(empty at repo: git.agents.node)`.
 
-The CLI implements this through the shared config logic, not by reimplementing it ad hoc (see [Shared Config Logic](shared-config-logic.md#open-points)). When no tier has a value, the commit falls back to the model's email, which the CLI cannot know: it shows `(model default)` and `source: null`.
+The CLI implements this through `AgentEmail#resolve`, built on `ConfigChain#readWithSource`, the same helper the native commit commands use (see [Shared Config Logic → Shared agent-email helper](shared-config-logic.md#shared-agent-email-helper)), not by reimplementing it ad hoc. When no tier has a value, the commit falls back to the model's email, which the CLI cannot know: it shows `(model default)` and `source: null`.
 
 #### Which agents are listed
 
@@ -156,6 +157,7 @@ reviewer   rev@example.com              global git.agents.reviewer   (not in thi
 ```
 
 - When the model default applies, `email`, `source` and `key` are `null`, and the human row shows `(model default)`.
+- When the model default applies because of an explicit `""` (rule 6), `email` is `null` but `source` and `key` name the tier and key holding the empty value, and the human row shows e.g. `scripter   (model default)   (empty at repo: git.agents.scripter)`.
 - Outside a repo, `in_repo` is `null` and no row is marked.
 
 #### Detail: `arcanum config agents email <agent>`
@@ -344,7 +346,7 @@ summary
 - Boolean token specs: each accepted token, an uppercase token, a non-boolean token.
 - `ignore-checks` specs: add one and many, duplicate add, remove missing, remove the last pattern, absent key, non-array value, invalid regex in a multi-pattern call (nothing written), patterns after `--`, `--local`/`--global` refused, and `added`/`removed` fields.
 - A concurrency spec running two `add` calls against a pre-held lock, asserting both patterns are kept.
-- `agents email` resolution specs that mirror `agent_email.sh`'s cases, including the cross-tier precedence where a higher-tier `git.email` beats a lower-tier `git.agents.<agent>`, JSON `null` as absent, `{agent}` substitution, and the model default. A shared fixture runs both `agent_email.sh` and the CLI and asserts they agree.
+- `agents email` resolution specs that mirror `agent_email.sh`'s cases, including the cross-tier precedence where a higher-tier `git.email` beats a lower-tier `git.agents.<agent>`, JSON `null` as absent, `{agent}` substitution, the model default, and an explicit `""` falling back to the model default (rule 6). The fixture table is the same one used by the shell/native parity specs of `AgentEmail` (see [Shared Config Logic](shared-config-logic.md#shared-agent-email-helper)); it runs both `agent_email.sh` and the CLI and asserts they agree.
 - `agents email` listing specs: in a repo, outside a repo, a configured agent not in the repo.
 - Wizard specs that drive a pseudo-TTY, covering: keep, set, unset with `-`, an invalid value then re-prompt, the tier prompt, the shadowing note, the `ci` add/remove loop, the per-agent opt-in, Ctrl-C mid-run, EOF, a write failure followed by a later success, no TTY, `--json`, no repo, an unknown section, and the summary in each case.
 
