@@ -61,11 +61,15 @@ Pieces introduced by this spec's decisions:
 | Runtime Node-version check in `cli/bin/arcanum` (see "Runtime") | `client` |
 | Spec asserting `cli/`'s `engines.node` equals `core/`'s | `client` |
 | Embedding the per-scope migration-version list in the build (read-only on `arcanum/migrations/repos/*/migrations.json`) | `client` |
+| CircleCI `cli` job in the `test` workflow, running on every push with no path filters (lint, build, specs, smoke specs on the bundle; see [Shared Config Logic](arcanum-cli/shared-config-logic.md#ci-coupling)) | `infra` |
 | CircleCI job running the `cli/` specs on Node 22.13 | `infra` |
-| Repo-root normalizing helper (`rev-parse --show-toplevel`), if placed in the shared surface (placement detailed in [Shared Config Logic](arcanum-cli/shared-config-logic.md)) | `node` |
-| `no-restricted-imports` rule in `core/eslint.config.mjs` | `node` |
-| Optional bounded wait (timeout or max attempts) on `core/lib/utils/file/Lock.js`, default unchanged for skills (see [Command Surface](arcanum-cli/command-surface.md#lock-contention)) | `node` |
-| Shared agent-email resolution helper on the shared surface, replacing the private `_agentEmailGet` copies (proposed; see [Shared Config Logic](arcanum-cli/shared-config-logic.md#open-points)) | `node` |
+| `RepoPath#toplevel` (`rev-parse --show-toplevel`) on the shared surface (see [Shared Config Logic](arcanum-cli/shared-config-logic.md#repo-root-normalizing-helper)) | `node` |
+| Core-side shared-surface block in `core/eslint.config.mjs`, whose `files` list is the authoritative surface declaration (see [Shared Config Logic](arcanum-cli/shared-config-logic.md#shared-surface-lint-rule)) | `node` |
+| CLI-side rule in `cli/eslint.config.mjs` restricting `core/lib` imports to the surface entry files | `client` |
+| `cli/scripts/build.mjs`: the `esbuild` build with the metafile shared-surface check (see [Shared Config Logic](arcanum-cli/shared-config-logic.md#bundle-at-build-time-with-esbuild)) | `client` |
+| `core/lib/utils/config/ConfigError.js` and its adoption in `RepoConfigWriter`, `Lock` and the strict-keys guard (see [Shared Config Logic](arcanum-cli/shared-config-logic.md#configerror)) | `node` |
+| Lock protocol fix in `arcanum/_lib/lock.sh` and `core/lib/utils/file/Lock.js` (atomic acquire, owner-checked release, stale-lock detection, optional bound for the CLI), **#807**, a hard blocker for the CLI's write commands (see [Shared Config Logic](arcanum-cli/shared-config-logic.md#lock)) | `node` + `scripter` |
+| `core/lib/utils/config/AgentEmail.js` and `ConfigChain#readWithSource`, replacing the private `_agentEmailGet` copies (see [Shared Config Logic](arcanum-cli/shared-config-logic.md#shared-agent-email-helper)) | `node` |
 
 The key registry (`core/lib/utils/config/keys.json` and its `KeyRegistry.js`) is owned by `node`, as decided in [Key Registry](arcanum-cli/key-registry.md#location); `architect` owns the docs rule that a new config key means a registry entry.
 
@@ -118,7 +122,7 @@ Account edge cases:
 - Both are normalized with `git -C <path> rev-parse --show-toplevel`. A subdirectory targets the repo root. Inside a worktree, the root is that worktree's own directory, since each worktree has its own `.claude/state/`. `info` shows the resolved root.
 - `--repo` pointing at a non-existent path or a non-directory is a usage error, reusing `RepoPath`'s messages (`core/lib/utils/file/RepoPath.js`).
 - Git is required for the repo and local tiers. With no `git` on PATH, the CLI treats the target as "no repo", with a warning. The global tier keeps working.
-- The normalization rule is detailed in [Command Surface](arcanum-cli/command-surface.md). Where the root-normalizing helper lives is detailed in [Shared Config Logic](arcanum-cli/shared-config-logic.md).
+- The normalization rule is detailed in [Command Surface](arcanum-cli/command-surface.md). Where the root-normalizing helper lives is detailed in [Shared Config Logic](arcanum-cli/shared-config-logic.md#repo-root-normalizing-helper).
 
 Repo states:
 
@@ -228,7 +232,7 @@ Besides the generic codes, the index fixes two dedicated exit codes. The full nu
 - [Command Surface](arcanum-cli/command-surface.md): the generic `arcanum config` layer (`get/set/unset/list/info`), tier rules, value parsing, global flags, output, exit codes (including the numbers for "version skew refused" and "target unavailable"), `--force`'s scope, `--repo` normalization, the `--json` shapes (including `info`'s), error wording, missing and malformed tier files, lock contention and `--lock-timeout`, `--help`/`--version`.
 - [Shortcuts and Setup](arcanum-cli/shortcuts-and-setup.md): the curated shortcuts, their default tiers, design rules and output; the `agents email` resolution view with per-agent detail; the repo-only `ignore-checks` add/remove; and the TTY-only, sectioned, registry-driven `config setup` wizard.
 - [Key Registry](arcanum-cli/key-registry.md): the shared, machine-readable registry of known config keys (`core/lib/utils/config/keys.json`, owned by `node`) that drives validation, listing, help, the wizard and the shortcuts; its JSON entry shape, wildcard matching, registry-specific validation and `--force`, the specs that keep it in sync with what arcanum reads, the final seed list, and per-key skew granularity as future work.
-- [Shared Config Logic](arcanum-cli/shared-config-logic.md): the declared shared surface in `core/lib`, `ConfigError` decoupling, the import lint rule, `esbuild` bundling, CI coupling, and where the repo-root normalizing helper lives.
+- [Shared Config Logic](arcanum-cli/shared-config-logic.md): the declared shared surface in `core/lib`, the `ConfigError` contract, the lock protocol dependency (#807), the shared agent-email helper, the two-sided import lint rule, `esbuild` bundling, CI coupling, and where the repo-root normalizing helper lives.
 - [Packaging and Release](arcanum-cli/packaging-and-release.md): the `cli/` layout, `package.json` (`engines.node`), build output (`esbuild` target, embedded migration-version list), the runtime-check entrypoint, the Node 22.13 CI job, and the CircleCI npm publish job.
 
 ## Related work outside this spec
@@ -250,13 +254,14 @@ Besides the generic codes, the index fixes two dedicated exit codes. The full nu
 - The CLI never changes config shapes. It reads and writes the existing tier files through the shared config logic.
 - "Version skew" protects both older and newer repos and accounts: writes to a newer shape are refused, and older ones get a migration hint only when migrations are actually pending.
 - `core/bin/arcanum` is untouched, and no per-repo migration is needed.
+- One deliberate native change: an explicit `""` agent email now falls back to the model email, as the shell already does (see [Shared Config Logic](arcanum-cli/shared-config-logic.md#shared-agent-email-helper)).
 
 **Testing:**
 
 - `cli/` specs use temp dirs as fake `CLAUDE_CONFIG_DIR`s and repos, never the real `~/.claude`.
 - They cover each skew case, each repo state, each account edge case, and the `info` JSON shape.
 - A CircleCI job runs the `cli/` specs on Node 22.13 (see "Runtime").
-- The CLI specs also run when a shared-surface file changes. Detailed in [Shared Config Logic](arcanum-cli/shared-config-logic.md).
+- A `cli` CI job runs on every push, so `core` edits cannot silently break the CLI. Detailed in [Shared Config Logic](arcanum-cli/shared-config-logic.md#ci-coupling).
 
 **Security:**
 
@@ -264,7 +269,7 @@ Besides the generic codes, the index fixes two dedicated exit codes. The full nu
 - No directory creation for an unknown account, and no write into an unconfigured repo.
 - No `~` expansion of `CLAUDE_CONFIG_DIR`, so the CLI never diverges from the skills.
 - `child_process` only through `execFile`/`spawn` with argument arrays.
-- Writes only through the shared locking logic.
+- Writes only through the shared locking logic (mutually exclusive once #807 lands).
 
 **Performance:** nothing load-sensitive. The CLI is a single-file bundle and runs one `git rev-parse` per invocation.
 

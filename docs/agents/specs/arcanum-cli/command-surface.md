@@ -145,14 +145,16 @@ A tier file is **malformed** when it is not valid JSON, or is valid JSON whose t
 - **How.** Before calling the shared writer, the CLI reads and parses the target file itself and refuses on any malformed state. The check and the write are not atomic, but the window is the same one a hand edit already has, and the shared writer still takes the lock.
 - `--force` does not bypass this. The fix is to repair or remove the file by hand.
 - `get` with an explicit tier flag on a malformed file prints the warning and behaves as if the key is unset (exit `1`), so scripts see a stable code; the warning tells the human why.
+- **Non-object intermediate.** A file that is a valid object can still hold a non-object on the written key's path, e.g. a hand-edited file where `.git` is a string, then `set git.authors …`. The shared writer refuses it with `ConfigError('NOT_AN_OBJECT')`, which the CLI maps to exit `7`; the file is left unchanged. The problem is the file's content, not the key.
+- **Error mapping.** How shared-code errors become exit codes (`LOCK_TIMEOUT` → `6`; `NOT_AN_OBJECT`, `INVALID_JSON` and OS errors → `7`) is defined once in [Shared Config Logic → `ConfigError`](shared-config-logic.md#configerror).
 
 ### Lock contention
 
-- Writes go through the shared `Lock` (`core/lib/utils/file/Lock.js`) on `<file>.lock`, the same protocol as `arcanum/_lib/lock.sh` (see [Lock System](../../architecture/lock-system.md)), so the CLI and running skills exclude each other.
+- Writes go through the shared `Lock` (`core/lib/utils/file/Lock.js`) on `<file>.lock`, the same protocol as `arcanum/_lib/lock.sh` (see [Lock System](../../architecture/lock-system.md)). The CLI and running skills exclude each other with the protocol fixed in #807 (atomic create-if-absent acquire, owner-checked release). #807 is a hard blocker for the CLI's write commands, so this holds from the CLI's first release.
 - Unlike skills, the CLI **bounds the wait**. The default is `10` seconds; `--lock-timeout <seconds>` changes it. `0` means try once and fail if the lock is held. Negative or non-numeric values are usage errors.
-- On timeout the CLI exits `6`, names the lock file, and hints at removing it by hand if no process holds it. Nothing is written.
+- On timeout the CLI exits `6`, names the lock file, and hints at removing it by hand if no process holds it. A timeout means the lock file existed for the whole wait: the CLI wrote nothing, so there is nothing to clean up, on timeout or on a signal.
 - Reads take **no lock**. A read racing a write sees either the old or the new file, since writes replace the file whole.
-- **Dependency.** Today `Lock.acquire` never gives up: it warns once after 10 failed attempts and retries forever. The CLI needs an optional bound (a timeout or a max-attempts option) on `Lock`, with skills keeping the current wait-forever default. That change is owned by `node` and is listed in the index's "Pieces introduced" table. See also [Shared Config Logic](shared-config-logic.md)'s lock-interoperability open point.
+- **Dependency: #807.** The protocol fix, including the optional bound on `Lock` that the CLI passes (skills keep waiting forever), is #807. A bound exhausted surfaces as `ConfigError('LOCK_TIMEOUT')`. See [Shared Config Logic → Lock](shared-config-logic.md#lock).
 - `Lock`'s own "seems stuck" warning is not printed by the CLI; the timeout message replaces it.
 
 ### Meta commands
@@ -323,10 +325,10 @@ The CLI has **zero runtime npm dependencies**. Argument parsing uses the built-i
 ## Edge cases
 
 - **Same file for two tiers.** Not possible by construction: the tiers live at fixed, distinct paths.
-- **Key that is both a leaf and a parent.** `set a.b 1` when `a` is a string replaces `a` with `{"b": 1}`, per `setpath`. For a known key whose registry type forbids it this is caught by validation first.
+- **Key that is both a leaf and a parent.** `set a.b 1` when `a` holds a non-object is refused with exit `7`, file unchanged (see [Missing and malformed tier files](#missing-and-malformed-tier-files)). A `null` intermediate is replaced by an object, as the shared writer does.
 - **Concurrent CLI writes.** Serialized by the lock; the second either waits or exits `6`.
 - **Ctrl-C while waiting for the lock.** Exits `130`, writes nothing, leaves no lock behind (the CLI does not hold it yet).
-- **Ctrl-C while holding the lock.** The CLI releases the lock in a signal handler before exiting `130`.
+- **Ctrl-C while holding the lock.** The CLI releases the lock in a signal handler before exiting `130`. With #807's owner-checked release, it only removes a lock file that still holds its own id.
 - **Non-UTF-8 or BOM-prefixed file.** A UTF-8 BOM is tolerated on read and not written back; other encodings count as malformed.
 - **Very large values.** No size limit beyond the filesystem.
 
