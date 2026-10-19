@@ -70,6 +70,11 @@ Pieces introduced by this spec's decisions:
 | `core/lib/utils/config/ConfigError.js` and its adoption in `RepoConfigWriter`, `Lock` and the strict-keys guard (see [Shared Config Logic](arcanum-cli/shared-config-logic.md#configerror)) | `node` |
 | Lock protocol fix in `arcanum/_lib/lock.sh` and `core/lib/utils/file/Lock.js` (atomic acquire, owner-checked release, stale-lock detection, optional bound for the CLI), **#807**, a hard blocker for the CLI's write commands (see [Shared Config Logic](arcanum-cli/shared-config-logic.md#lock)) | `node` + `scripter` |
 | `core/lib/utils/config/AgentEmail.js` and `ConfigChain#readWithSource`, replacing the private `_agentEmailGet` copies (see [Shared Config Logic](arcanum-cli/shared-config-logic.md#shared-agent-email-helper)) | `node` |
+| `cli/scripts/build.mjs`'s embedded per-scope migration-version list (see [Packaging and Release](arcanum-cli/packaging-and-release.md#embedded-migration-version-list)) | `client` |
+| `cli/` specs asserting `cli/package.json`'s `version` equals `arcanum.version`, the manifest shape (no runtime dependencies, no install scripts) and the `npm pack` contents (see [Packaging and Release](arcanum-cli/packaging-and-release.md#testing-strategy)) | `client` |
+| CircleCI `publish-cli` job in the `release` workflow and `scripts/publish_cli_package.sh` (version check, already-published no-op, build, specs, `npm publish`, verify), plus the `NPM_TOKEN` secret (see [Packaging and Release](arcanum-cli/packaging-and-release.md#release)) | `infra` |
+| `scripts/bump-version.sh` also bumping `cli/package.json`'s `version` (see [Packaging and Release](arcanum-cli/packaging-and-release.md#version-lockstep)) | `infra` |
+| `core/spec` check that no `cli/` path is in the release zip (see [Packaging and Release](arcanum-cli/packaging-and-release.md#code-layout)) | `node` |
 
 The key registry (`core/lib/utils/config/keys.json` and its `KeyRegistry.js`) is owned by `node`, as decided in [Key Registry](arcanum-cli/key-registry.md#location); `architect` owns the docs rule that a new config key means a registry entry.
 
@@ -188,7 +193,7 @@ One CLI may face repos and accounts on different arcanum versions.
 - A pointer holds an arcanum version (e.g. stamped by `init-claude`), not a migration number.
 - A missing pointer counts as `0.0.0`, as in `arcanum/migrations/run.sh`.
 
-**Detection.** The CLI compares a tier's pointer with its own version. The CLI ships in lockstep with arcanum, so its version is the newest shape it can know. On a write, only the target tier's pointer matters: `set --global` ignores the repo pointer.
+**Detection.** The CLI compares a tier's pointer with its own version. The CLI ships in lockstep with arcanum, published on every release (see [Packaging and Release](arcanum-cli/packaging-and-release.md#version-lockstep)), so its version is the newest shape it can know. On a write, only the target tier's pointer matters: `set --global` ignores the repo pointer.
 
 | Case | Reads | Writes |
 | --- | --- | --- |
@@ -197,7 +202,7 @@ One CLI may face repos and accounts on different arcanum versions.
 | **Equal** | Silent. | Silent. |
 
 - "Tier behind" is the common case: the repo is not migrated yet. The CLI prints a stderr warning suggesting `/arcanum-migrate` **only** when that tier's scope has pending migrations between the pointer and the CLI version. Patch bumps with no shape change raise no warning.
-- To know which migrations are pending, the build embeds the per-scope list of migration versions, read from `arcanum/migrations/repos/*/migrations.json`. Detailed in [Packaging and Release](arcanum-cli/packaging-and-release.md).
+- To know which migrations are pending, the build embeds the per-scope list of migration versions, read from the released `arcanum/migrations/repos/<X.Y.Z>/migrations.json` files (`next/` excluded). Detailed in [Packaging and Release](arcanum-cli/packaging-and-release.md#embedded-migration-version-list).
 - `--force` is the same flag that bypasses key registry validation. Detailed in [Command Surface](arcanum-cli/command-surface.md) and [Key Registry](arcanum-cli/key-registry.md).
 
 **Future work:** per-key granularity. A `since`/`moved_in` field in the key registry would let the CLI refuse a write to a key touched by a pending migration, not just warn. The intended design is recorded in [Key Registry → Per-key skew granularity](arcanum-cli/key-registry.md#per-key-skew-granularity).
@@ -207,7 +212,7 @@ One CLI may face repos and accounts on different arcanum versions.
 The CLI runs on the host's Node.js (see "Distribution").
 
 - **Floor: `>=22.13.0`, in lockstep with `core`.** `core/package.json` already declares `"engines": { "node": ">=22.13.0" }`. The CLI bundles `core/lib` shared code, so it accepts exactly the Node versions `core` supports: no lower (the shared code would break), no higher (the host Node is the one the native engine already requires).
-- **Lockstep is enforced.** A `cli/` spec (or CI check) asserts that `cli/package.json`'s `engines.node` equals `core/package.json`'s. The `esbuild` `target` (`node22.13`) derives from the same value, so the bundle never emits newer syntax.
+- **Lockstep is enforced.** A `cli/` spec asserts that `cli/package.json`'s `engines.node` equals `core/package.json`'s, and that the floor literal in `cli/bin/arcanum` equals both. The `esbuild` `target` (`node22.13`) derives from the same value, so the bundle never emits newer syntax.
 - **Runtime check.** npm only warns on `engines` (unless `engine-strict` is set). So `cli/bin/arcanum` is a tiny, syntax-conservative entrypoint: it compares `process.versions.node` with the floor, prints `Node.js >= 22.13.0 required, found X` and exits with the generic error code when too old, and only then dynamically `import()`s the bundle.
 - **Tested at the floor.** A CircleCI job, owned by `infra`, runs the `cli/` specs on Node 22.13 exactly, in addition to the default image.
 - **Raising the floor** follows `core`, decided by `node` with `architect`. It is called out in the release notes as breaking for both the native engine and the CLI. It needs no per-repo migration, since no config shape changes.
@@ -233,7 +238,7 @@ Besides the generic codes, the index fixes two dedicated exit codes. The full nu
 - [Shortcuts and Setup](arcanum-cli/shortcuts-and-setup.md): the curated shortcuts, their default tiers, design rules and output; the `agents email` resolution view with per-agent detail; the repo-only `ignore-checks` add/remove; and the TTY-only, sectioned, registry-driven `config setup` wizard.
 - [Key Registry](arcanum-cli/key-registry.md): the shared, machine-readable registry of known config keys (`core/lib/utils/config/keys.json`, owned by `node`) that drives validation, listing, help, the wizard and the shortcuts; its JSON entry shape, wildcard matching, registry-specific validation and `--force`, the specs that keep it in sync with what arcanum reads, the final seed list, and per-key skew granularity as future work.
 - [Shared Config Logic](arcanum-cli/shared-config-logic.md): the declared shared surface in `core/lib`, the `ConfigError` contract, the lock protocol dependency (#807), the shared agent-email helper, the two-sided import lint rule, `esbuild` bundling, CI coupling, and where the repo-root normalizing helper lives.
-- [Packaging and Release](arcanum-cli/packaging-and-release.md): the `cli/` layout, `package.json` (`engines.node`), build output (`esbuild` target, embedded migration-version list), the runtime-check entrypoint, the Node 22.13 CI job, and the CircleCI npm publish job.
+- [Packaging and Release](arcanum-cli/packaging-and-release.md): the `cli/` layout (kept out of the release zip), every `package.json` field (`engines.node`, `files`, no install scripts), build output (the embedded per-scope migration-version list), the runtime-check entrypoint, the CircleCI `publish-cli` job (version lockstep, `NPM_TOKEN` storage, provenance, failure handling and re-runs, the `latest` dist-tag), supply-chain rules, and its testing strategy.
 
 ## Related work outside this spec
 

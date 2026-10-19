@@ -187,9 +187,9 @@ The surface is enforced on **both sides**, following the precedent of `core/esli
 
 Shape:
 
-- A new **`cli` job in the `test` workflow**, owned by `infra` (whose scope gains `.circleci/`, see [Packaging and Release](packaging-and-release.md)). Same image as `test`/`checks` (`darthjee/circleci_node:0.2.1`), `working_directory: ~/project/cli` (the full-repo checkout provides `core/lib`), tag pushes ignored like its siblings. Steps: `yarn install --frozen-lockfile` → lint → **build the bundle** → CLI specs, including the smoke specs against the built bundle.
+- A new **`cli` job in the `test` workflow**, owned by `infra` (whose scope gains `.circleci/`, see [Packaging and Release](packaging-and-release.md)). Same image as `test`/`checks` (`darthjee/circleci_node:0.2.1`), `working_directory: ~/project/cli` (the full-repo checkout provides `core/lib` and the `arcanum/migrations/` files the build reads), tag pushes ignored like its siblings. Steps: `yarn install --frozen-lockfile` → lint → **build the bundle** → CLI specs, including the smoke specs against the built bundle → `yarn audit` (non-blocking, as in `checks`).
 - It complements the index's Node 22.13 floor job (see [Runtime](../arcanum-cli.md#runtime)), which runs the same specs at the floor.
-- **The bundle is never committed.** It is built in CI and again at publish, so no freshness check is needed. The release pipeline's npm publish job uses **the same build script** as the `cli` job, so the tested artefact is the shipped artefact (see [Packaging and Release](packaging-and-release.md#release)).
+- **The bundle is never committed.** It is built in CI and again at publish, so no freshness check is needed. The release pipeline's npm publish job, `publish-cli`, uses **the same build script** as the `cli` job, so the tested artefact is the shipped artefact (see [Packaging and Release](packaging-and-release.md#release)).
 - **The reverse direction is already covered.** The core-side lint rule lives in `core`'s ESLint config, so the existing `checks` job enforces it on every `core` edit.
 - **Revisit** path filtering only if the `cli` job's runtime grows noticeably, as a separate `infra` issue outside epic #767.
 
