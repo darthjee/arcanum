@@ -1,6 +1,7 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import LockTimeoutError from './LockTimeoutError.js';
 
 const DEFAULT_SLEEP_MS = 1000;
 const WARN_AFTER_ATTEMPTS = 10;
@@ -19,6 +20,9 @@ const WARN_AFTER_ATTEMPTS = 10;
  *   warning once after 10 consecutive failed attempts. Never gives up.
  * - release removes the file only if it still holds this instance's id.
  *
+ * `acquire` can optionally be bounded with `timeoutMs`, throwing a
+ * `LockTimeoutError` once it runs out (the shell twin has no bound).
+ *
  * See docs/agents/architecture/lock-system.md.
  */
 class Lock {
@@ -33,17 +37,28 @@ class Lock {
   }
 
   /**
-   * Acquire the lock at `<lockFile>`, retrying indefinitely on
-   * contention.
+   * Acquire the lock at `<lockFile>`, retrying on contention —
+   * indefinitely unless `timeoutMs` is given.
    * @param {string} lockFile - the lock file's path.
+   * @param {object} [opts] - options.
+   * @param {number} [opts.timeoutMs] - give up after this many
+   *   milliseconds (`0` makes a single attempt). Waits forever when
+   *   omitted.
+   * @param {boolean} [opts.warn] - whether to print the "seems stuck"
+   *   warning (defaults to true).
    * @returns {Promise<void>} resolves once this instance holds the lock.
+   * @throws {TypeError} when `timeoutMs` isn't a non-negative finite
+   *   number.
+   * @throws {LockTimeoutError} when `timeoutMs` runs out first.
    */
-  async acquire(lockFile) {
+  async acquire(lockFile, { timeoutMs, warn = true } = {}) {
+    const deadline = this._deadline(timeoutMs);
+
     await mkdir(path.dirname(lockFile), { recursive: true });
 
     const id = this._newId();
     let attempt = 0;
-    let warned = false;
+    let warned = !warn;
 
     for (;;) {
       if (await this._tryCreate(lockFile, id)) {
@@ -51,11 +66,12 @@ class Lock {
         return;
       }
 
-      if (await this._breakIfStale(lockFile)) {
-        continue;
+      if (await this._breakIfStale(lockFile) && await this._tryCreate(lockFile, id)) {
+        this._held.set(lockFile, id);
+        return;
       }
 
-      await this._sleep(this._sleepMs);
+      await this._sleep(this._retrySleep(lockFile, deadline));
       attempt += 1;
 
       if (attempt % WARN_AFTER_ATTEMPTS === 0) {
@@ -69,6 +85,44 @@ class Lock {
         attempt = 0;
       }
     }
+  }
+
+  /**
+   * @param {number|undefined} timeoutMs - the optional bound.
+   * @returns {number|null} the absolute deadline, or null for no bound.
+   * @throws {TypeError} when `timeoutMs` isn't a non-negative finite
+   *   number.
+   */
+  _deadline(timeoutMs) {
+    if (timeoutMs === undefined) {
+      return null;
+    }
+
+    if (typeof timeoutMs !== 'number' || !Number.isFinite(timeoutMs) || timeoutMs < 0) {
+      throw new TypeError(`timeoutMs must be a non-negative finite number, got ${String(timeoutMs)}`);
+    }
+
+    return Date.now() + timeoutMs;
+  }
+
+  /**
+   * @param {string} lockFile - the lock file's path.
+   * @param {number|null} deadline - the absolute deadline, or null.
+   * @returns {number} the retry sleep, clamped to the time left.
+   * @throws {LockTimeoutError} when no time is left.
+   */
+  _retrySleep(lockFile, deadline) {
+    if (deadline === null) {
+      return this._sleepMs;
+    }
+
+    const remaining = deadline - Date.now();
+
+    if (remaining <= 0) {
+      throw new LockTimeoutError(lockFile);
+    }
+
+    return Math.min(this._sleepMs, remaining);
   }
 
   /**
