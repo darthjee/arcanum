@@ -154,7 +154,7 @@ A tier file is **malformed** when it is not valid JSON, or is valid JSON whose t
 - Unlike skills, the CLI **bounds the wait**. The default is `10` seconds; `--lock-timeout <seconds>` changes it. `0` means try once and fail if the lock is held. Negative or non-numeric values are usage errors.
 - On timeout the CLI exits `6`, names the lock file, and hints at removing it by hand if no process holds it. A timeout means the lock file existed for the whole wait: the CLI wrote nothing, so there is nothing to clean up, on timeout or on a signal.
 - Reads take **no lock**. A read racing a write sees either the old or the new file, since writes replace the file whole.
-- **Dependency: #807.** The protocol fix, including the optional bound on `Lock` that the CLI passes (skills keep waiting forever), is #807. A bound exhausted surfaces as `ConfigError('LOCK_TIMEOUT')`. See [Shared Config Logic → Lock](shared-config-logic.md#lock).
+- **Dependency: #807.** The protocol fix, including the optional bound on `Lock` that the CLI passes (skills keep waiting forever), is #807. A bound exhausted throws `LockTimeoutError` (`code: 'LOCK_TIMEOUT'`). See [Shared Config Logic → Lock](shared-config-logic.md#lock).
 - `Lock`'s own "seems stuck" warning is not printed by the CLI; the timeout message replaces it.
 
 ### Meta commands

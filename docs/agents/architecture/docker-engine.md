@@ -149,7 +149,7 @@ Dispatch resolves the config dir on the host (`CLAUDE_CONFIG_DIR`, or else `$HOM
 
 All shared JSON state that commands mutate lives under the repo's `.claude/state/`. `arcanum/_lib/lock.sh` and `core/lib/utils/file/Lock.js` put the lock file next to the state file. The repo mount is `rw` at the same path, so a host process and a container process see the same lock file and exclude each other.
 
-The lock protocol writes a `${HOSTNAME}-<pid>-<time>` instance id and reads it back. Each container gets its own hostname (its container id), and the time component is per call, so ids stay unique across the host and any number of concurrent containers even though container pids restart at 1. See [Lock System](lock-system.md).
+The lock protocol creates the lock file atomically, only if absent, holding a `<hostname>:<pid>:<nonce>` instance id. Each container gets its own hostname (its container id), and the nonce is per acquire call, so ids stay unique across the host and any number of concurrent containers even though container pids restart at 1. Stale-lock detection only breaks a lock whose hostname matches the reader's and whose pid is dead. A lock left behind by a container carries the container's hostname, so the host sees it as cross-host and never breaks it automatically: it needs manual removal after the "seems stuck" warning. See [Lock System](lock-system.md).
 
 ### Log location
 

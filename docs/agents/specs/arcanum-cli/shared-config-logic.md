@@ -42,7 +42,7 @@ class ConfigError extends Error {
 | --- | --- | --- |
 | `NOT_AN_OBJECT` | `RepoConfigWriter` (`_readBase`, namespace, intermediate path) | Unchanged: `Cannot index <file\|.path>: not a JSON object`. |
 | `INVALID_JSON` | `RepoConfigWriter#_readLegacy` | The unchanged parse error. |
-| `LOCK_TIMEOUT` | `Lock`, when its optional bound is exhausted (#807) | Names the lock file. |
+| `LOCK_TIMEOUT` | `Lock`, when its optional `timeoutMs` bound is exhausted (#807). Thrown as `LockTimeoutError`, not a `ConfigError`, with the same `code` | Names the lock file. |
 | `UNREGISTERED_KEY` | The strict-keys guard in `ConfigChain#read` / `RepoConfig`'s read (test-only) | Names the key. |
 
 - **Native fs errors** (`EACCES`, `ENOSPC`, `EISDIR`, …) propagate unwrapped. They already carry `error.code`.
@@ -60,10 +60,10 @@ class ConfigError extends Error {
 
 **Decision: fix the shared protocol** rather than weakening the CLI's guarantees or giving the CLI a private lock, which would still not exclude skills. The fix is code in both shell and `core/`, so it is its own issue, **#807** (owners `node` + `scripter`):
 
-- **Atomic create-if-absent acquire:** Node `writeFile(lockFile, id, { flag: 'wx' })`; Bash `( set -o noclobber; echo "$id" > "$LOCK_FILE" )`. An existing file means wait and retry: forever for skills, bounded for the CLI. No more write → sleep → re-read.
+- **Atomic create-if-absent acquire:** Node `writeFile(lockFile, id, { flag: 'wx' })`; Bash `( set -o noclobber; printf '%s\n' "$id" > "$LOCK_FILE" )`. An existing file means wait and retry: forever for skills, bounded for the CLI. No more write → sleep → re-read.
 - **Owner-checked release:** delete the file only if it still holds this instance's id.
 - **Stale-lock detection:** same hostname and a dead pid (`kill -0` / `process.kill(pid, 0)`) breaks the lock. Cross-host locks keep today's warn-once behaviour.
-- **Optional bound on `Lock`** (a timeout or max attempts), which the CLI passes and maps to exit `6` through `ConfigError('LOCK_TIMEOUT')`. Skills keep the default, which waits forever.
+- **Optional bound on `Lock`** (`acquire(lockFile, { timeoutMs })`), which the CLI passes. Exhausting it throws `LockTimeoutError` (`code: 'LOCK_TIMEOUT'`), which the CLI's error mapping turns into exit `6` by its code. Skills keep the default, which waits forever.
 
 Consequences:
 
