@@ -14,8 +14,10 @@ The code lives in a new root-level folder, **`cli/`**, owned by the `client` age
 
 | Path | Contents |
 | --- | --- |
-| `cli/bin/arcanum` | the npm `bin` entry |
-| `cli/lib/` | CLI source |
+| `cli/bin/arcanum` | the npm `bin` entry: the unbundled Node-floor gate |
+| `cli/lib/` | CLI source; `cli/lib/main.js` is the bundle entry |
+| `cli/scripts/build.mjs` | the `esbuild` build, plus the metafile shared-surface check |
+| `cli/dist/` | the bundle output, `arcanum.mjs`; gitignored, never committed |
 | `cli/spec/` | Jasmine specs mirroring `cli/lib/` one to one, with c8 coverage |
 | `cli/package.json` | package manifest |
 | `cli/eslint.config.mjs` | lint config, same style rules as `core/` |
@@ -27,14 +29,15 @@ The stack mirrors `core/`: Node.js ESM, Yarn, Jasmine, c8, ESLint.
 
 - `name: "arcanum-cli"`;
 - `bin: {"arcanum": ...}`, so the installed command is `arcanum`;
-- a `files` whitelist;
+- a `files` whitelist: `["bin/", "dist/", "README.md"]`;
+- scripts `"build": "node scripts/build.mjs"` and `"prepack": "yarn build"`, so `npm publish` and `npm pack` always ship a fresh bundle;
 - `engines.node`;
 - zero runtime `dependencies`;
 - devDependencies for Jasmine, c8, ESLint and `esbuild`.
 
 ### Build output
 
-The build produces one bundled file containing the CLI, the shared config surface and the key registry. See [Shared Config Logic](shared-config-logic.md).
+The build produces one bundled file, `cli/dist/arcanum.mjs`, containing the CLI, the shared config surface and the key registry. `cli/bin/arcanum` is not bundled: it checks the Node floor (see the index's [Runtime](../arcanum-cli.md#runtime)) and only then dynamically imports the bundle. The `esbuild` options, the surface check and the smoke specs are in [Shared Config Logic](shared-config-logic.md#bundle-at-build-time-with-esbuild).
 
 ### Install
 
@@ -46,6 +49,7 @@ The build produces one bundled file containing the CLI, the shared config surfac
 - The package is published from the existing CircleCI release pipeline (see [Install and Release](../../architecture/install-and-release.md)), on the same semver tag as arcanum. The CLI version moves in lockstep with arcanum's version.
 - The publish job and the npm token setup are owned by `infra`, whose scope gains `.circleci/`.
 - The npm token is a CircleCI secret and is never printed.
+- The publish job runs the same `yarn build` as the CI `cli` job (see [Shared Config Logic](shared-config-logic.md#ci-coupling)), so the tested artefact is the shipped artefact.
 
 ### Local tooling
 

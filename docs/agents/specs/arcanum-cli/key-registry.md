@@ -74,8 +74,9 @@ The `setup` field:
 ### Location
 
 - The registry is **`core/lib/utils/config/keys.json`**, owned by **`node`**, next to the existing config logic. A loader, validator and matcher, **`core/lib/utils/config/KeyRegistry.js`**, sits beside it; its specs live under `core/spec/`.
-- Both files join the **declared shared surface** of [Shared Config Logic](shared-config-logic.md#guardrails), so the existing guardrails cover them as they are: `esbuild` bundling into `arcanum-cli`, the ESLint `no-restricted-imports` rule, and the CI coupling that runs the CLI specs when a shared-surface file changes. No second path is added to any filter or list.
+- Both files join the **declared shared surface** of [Shared Config Logic](shared-config-logic.md#guardrails), so the existing guardrails cover them as they are: `esbuild` bundling into `arcanum-cli`, the shared-surface lint rule, and the always-on CLI CI job. No second path is added to any filter or list.
 - `KeyRegistry.js` loads the file with a **static JSON import**, `import keys from './keys.json' with { type: 'json' }`, which core's `node >=22.13` ESM setup supports. It never uses `fs.readFileSync`: `esbuild` inlines static JSON imports, so the bundled CLI carries the registry, whereas a runtime file read would look for a file that is absent from the npm package.
+- Inside `core` the import runs **unbundled** on Node 22.13. During implementation, `node` verifies it prints no `ExperimentalWarning` there, since a stderr line would break the dispatcher's output contract. **Fallback:** rename the file to `keys.js` with `export default [...]`, which is transparent to `esbuild` and keeps the array-of-entries rule. See [Shared Config Logic](shared-config-logic.md#bundle-at-build-time-with-esbuild).
 - It is **packed into the `arcanum-cli` npm package at build time** by that bundling. The installed CLI is self-contained and never reads the registry from an arcanum install.
 - It ships with `core/` in the release zip and the Docker image, so shell scripts can read it with `jq` if they ever need to.
 - No new root-level folder.
