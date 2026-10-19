@@ -140,7 +140,11 @@ _lock_forget() {
 
 _acquire_lock() {
   local instance_id holder again
-  instance_id="$(_lock_new_id "${BASHPID:-$$}")"
+  # Resolve the pid here, in the calling shell: expanding BASHPID inside
+  # the command substitution below would capture the short-lived
+  # substitution subshell's pid, which others would then see as dead.
+  local holder_pid="${BASHPID:-$$}"
+  instance_id="$(_lock_new_id "$holder_pid")"
   local attempt=0
   local warned=false
   while true; do
