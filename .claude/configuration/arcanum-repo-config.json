@@ -19,7 +19,8 @@
       "skill-reviewer": "darthjee+product-owner@gmail.com",
       "skill-writer": "darthjee+frontend@gmail.com",
       "node": "darthjee+backend@gmail.com",
-      "infra": "darthjee+infra@gmail.com"
+      "infra": "darthjee+infra@gmail.com",
+      "client": "darthjee+frontend@gmail.com"
     }
   },
   "migrations": {

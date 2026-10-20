@@ -45,7 +45,7 @@ Decision: **separate entrypoint, shared logic.**
 
 ## Ownership
 
-A new root-level folder needs a new specialist agent. A `client` agent owns `cli/` and must be created (`.claude/agents/client.md` plus the [agent roster](../architecture/agent-roster-and-delegation.md)) before any CLI code is written. That is sub-issue #775.
+A new root-level folder needs a new specialist agent. A `client` agent owns `cli/`. It was created by #775 (`.claude/agents/client.md` plus the [agent roster](../architecture/agent-roster-and-delegation.md)), before any CLI code was written.
 
 | Agent | Owns for this feature |
 | --- | --- |
@@ -86,16 +86,9 @@ The key registry (`core/lib/utils/config/keys.json` and its `KeyRegistry.js`) is
 - The planner (`plan-issue` / `auto-plan-issue`) splits such plans across `node` and `client`, using the usual per-agent split.
 - `client` never edits `core/lib`; `node` never edits `cli/`.
 
-**Commit identity:** `client` gets a `git.agents` entry in this repo's `.claude/configuration/arcanum-repo-config.json`. It reuses an existing persona alias rather than a new one (as `node` reuses `+backend`), since that config is shared with other contributors. The alias is chosen in #775.
+**Commit identity:** `client` gets a `git.agents` entry in this repo's `.claude/configuration/arcanum-repo-config.json`. It reuses an existing persona alias rather than a new one (as `node` reuses `+backend`), since that config is shared with other contributors. `client` reuses the `+frontend` alias, shared with `skill-writer`.
 
-**`client` conventions.** This list is the input for #775. Once #775 lands, `.claude/agents/client.md` is the source of truth for `client`'s working conventions, and this spec keeps only the ownership table and the agent boundaries, so the two lists do not drift.
-
-- Node.js ESM, Yarn, Jasmine, c8, and ESLint with the same style rules as `core/`.
-- Zero runtime npm dependencies (see [Command Surface](arcanum-cli/command-surface.md)).
-- Config is written only through the shared config logic, never by writing a config file directly.
-- Human-readable output by default, `--json` for scripting.
-- Specs use temp dirs as fake `CLAUDE_CONFIG_DIR`s and repos, and never touch the real `~/.claude`.
-- `child_process` is used only through `execFile`/`spawn` with argument arrays.
+**`client` conventions.** [`.claude/agents/client.md`](../../../.claude/agents/client.md) is the source of truth for `client`'s working conventions (stack, output, spec isolation, `child_process` use). This spec keeps only the ownership tables and the agent boundaries above, so the two lists do not drift.
 
 ## Targeting
 
