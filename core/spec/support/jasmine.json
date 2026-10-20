@@ -5,7 +5,9 @@
     "bin/**/*_spec.js",
     "release/**/*_spec.js"
   ],
-  "helpers": [],
+  "helpers": [
+    "support/strictConfigKeys.js"
+  ],
   "env": {
     "stopSpecOnExpectationFailure": false,
     "random": true

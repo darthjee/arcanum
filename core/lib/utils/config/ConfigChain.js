@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { assertRegisteredConfigKey } from './KeyRegistry.js';
 
 const TIER_NAMES = ['local', 'repo', 'global'];
 
@@ -59,8 +60,14 @@ class ConfigChain {
    *   dot-separated nested path) to try, in order, within each tier.
    * @returns {Promise<*>} the raw resolved value, or `undefined` when
    *   every key in every tier is absent/null.
+   * @throws {Error} when `ARCANUM_STRICT_CONFIG_KEYS=1` (specs only) and
+   *   some `<namespace>.<key>` matches no `keys.json` entry.
    */
   async read(repoPath, namespace, ...keys) {
+    for (const key of keys) {
+      assertRegisteredConfigKey(`${namespace}.${key}`, this._env);
+    }
+
     const resolvedRepoPath = repoPath ?? this._repoContext?.repoPath;
 
     for (const file of this._tierFiles(resolvedRepoPath)) {

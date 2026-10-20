@@ -653,4 +653,30 @@ function segmentsCompatible(a, b) {
   return a.every((segment, index) => isWildcard(segment) || isWildcard(b[index]) || segment === b[index]);
 }
 
+let defaultRegistry;
+
+/**
+ * Test-mode guard shared by `ConfigChain#read` and `RepoConfig`'s
+ * reads: when `env.ARCANUM_STRICT_CONFIG_KEYS` is `1` (set by core's
+ * spec runner, never in production), throws on a read of a key that
+ * matches no registry entry. Otherwise a no-op.
+ * @param {string} key - the concrete dotted key being read.
+ * @param {object} [env] - the environment to read the flag from
+ *   (defaults to `process.env`).
+ * @throws {Error} naming `key` when the guard is on and `key` is unregistered.
+ */
+export function assertRegisteredConfigKey(key, env = process.env) {
+  if (env.ARCANUM_STRICT_CONFIG_KEYS !== '1') {
+    return;
+  }
+
+  defaultRegistry ??= new KeyRegistry();
+
+  if (!defaultRegistry.lookup(key)) {
+    throw new Error(
+      `arcanum: config key "${key}" is not in core/lib/utils/config/keys.json (ARCANUM_STRICT_CONFIG_KEYS=1)`
+    );
+  }
+}
+
 export default KeyRegistry;

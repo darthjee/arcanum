@@ -1,4 +1,4 @@
-import KeyRegistry from '../../../../lib/utils/config/KeyRegistry.js';
+import KeyRegistry, { assertRegisteredConfigKey } from '../../../../lib/utils/config/KeyRegistry.js';
 
 describe('KeyRegistry', () => {
   const ALL = ['global', 'repo', 'local'];
@@ -310,6 +310,33 @@ describe('KeyRegistry', () => {
 
     it('treats version as read-only', () => {
       expect(registry.check('set', 'version', 'repo', '1.0.0').reason).toBe('read_only');
+    });
+  });
+
+  describe('assertRegisteredConfigKey', () => {
+    const STRICT = { ARCANUM_STRICT_CONFIG_KEYS: '1' };
+
+    it('throws on an unregistered key when the guard is on', () => {
+      expect(() => assertRegisteredConfigKey('foo.bar', STRICT)).toThrowError(
+        'arcanum: config key "foo.bar" is not in core/lib/utils/config/keys.json (ARCANUM_STRICT_CONFIG_KEYS=1)'
+      );
+    });
+
+    it('accepts an exactly registered key', () => {
+      expect(() => assertRegisteredConfigKey('git.merge_body_mode', STRICT)).not.toThrow();
+    });
+
+    it('accepts a key matching a wildcard entry', () => {
+      expect(() => assertRegisteredConfigKey('next_step.auto.enhance-issue', STRICT)).not.toThrow();
+    });
+
+    it('never throws when the guard is off', () => {
+      expect(() => assertRegisteredConfigKey('foo.bar', {})).not.toThrow();
+    });
+
+    it('defaults to process.env, which the spec runner sets', () => {
+      expect(process.env.ARCANUM_STRICT_CONFIG_KEYS).toBe('1');
+      expect(() => assertRegisteredConfigKey('foo.bar')).toThrowError(/foo\.bar/);
     });
   });
 });
