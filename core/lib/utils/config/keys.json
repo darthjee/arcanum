@@ -1,0 +1,142 @@
+{
+  "format_version": 1,
+  "keys": [
+    {
+      "key": "engine.mode",
+      "type": "enum",
+      "values": ["shell", "native", "docker"],
+      "tiers": ["global", "repo", "local"],
+      "default": "shell",
+      "description": "Script engine used to run migrated skill entrypoints",
+      "setup": {"section": "engine", "order": 1, "prompt": "Script engine"}
+    },
+    {
+      "key": "engine.log.location",
+      "type": "string",
+      "tiers": ["global", "repo", "local"],
+      "description": "Host directory mounted as the Docker engine's log location"
+    },
+    {
+      "key": "git.email",
+      "type": "string",
+      "tiers": ["global", "repo", "local"],
+      "description": "Default agent commit email, or a pattern containing {agent}",
+      "setup": {"section": "identity", "order": 1, "prompt": "Default agent commit email"}
+    },
+    {
+      "key": "git.agents.<agent>",
+      "type": "string",
+      "tiers": ["global", "repo", "local"],
+      "description": "Commit email for one specific agent",
+      "setup": {"section": "identity", "order": 2, "prompt": "Commit email for this agent"}
+    },
+    {
+      "key": "git.safe_branch",
+      "type": "string",
+      "tiers": ["local"],
+      "default": "origin/main",
+      "description": "Branch treated as the safe base for new work",
+      "setup": {"section": "git", "order": 1, "prompt": "Safe base branch"}
+    },
+    {
+      "key": "git.merge_body_mode",
+      "type": "enum",
+      "values": ["full", "empty", "coauthors"],
+      "tiers": ["global", "repo", "local"],
+      "default": "empty",
+      "description": "PR merge body style",
+      "setup": {"section": "git", "order": 2, "prompt": "Squash-merge commit body"}
+    },
+    {
+      "key": "git.omit_model_coauthor",
+      "type": "boolean",
+      "tiers": ["global", "repo", "local"],
+      "default": false,
+      "description": "Omit the AI model co-author trailer from commits"
+    },
+    {
+      "key": "git.remove_coauthors",
+      "type": "array",
+      "items": "string",
+      "tiers": ["global", "repo", "local"],
+      "default": [],
+      "description": "Emails removed from the co-authors list"
+    },
+    {
+      "key": "next_step.auto.<skill>",
+      "type": "boolean",
+      "tiers": ["global", "repo", "local"],
+      "default": false,
+      "description": "Run this skill's suggested next step automatically",
+      "setup": {
+        "section": "flow",
+        "order": 1,
+        "prompt": "Run the next step automatically after this skill",
+        "instances": ["enhance-issue", "discuss-issue", "auto-plan-issue"]
+      }
+    },
+    {
+      "key": "next_step.clear.<skill>",
+      "type": "boolean",
+      "tiers": ["global", "repo", "local"],
+      "default": false,
+      "description": "Clear the context before this skill's suggested next step"
+    },
+    {
+      "key": "auto-fix-all.ignored_check_patterns",
+      "type": "array",
+      "items": "string",
+      "format": "regex",
+      "tiers": ["repo"],
+      "default": [],
+      "description": "Case-insensitive regexes of CI checks to ignore",
+      "setup": {"section": "ci", "order": 1, "prompt": "CI checks to ignore"}
+    },
+    {
+      "key": "auto-fix-all.clear_context",
+      "type": "boolean",
+      "tiers": ["local"],
+      "default": false,
+      "description": "Clear the context between auto-fix-all iterations"
+    },
+    {
+      "key": "auto-fix-all.finish_on_empty_queue",
+      "type": "boolean",
+      "tiers": ["local"],
+      "default": false,
+      "description": "Stop auto-fix-all when its queue is empty"
+    },
+    {
+      "key": "plan-issues.max-retry-count",
+      "type": "number",
+      "integer": true,
+      "min": 0,
+      "tiers": ["global", "repo", "local"],
+      "default": 5,
+      "description": "Maximum retries for a failed plan-issues spawn"
+    },
+    {
+      "key": "plan-issues.error-sleep-time",
+      "type": "number",
+      "integer": true,
+      "min": 0,
+      "tiers": ["global", "repo", "local"],
+      "default": 5,
+      "description": "Seconds to wait after a failed plan-issues spawn"
+    },
+    {
+      "key": "version",
+      "type": "string",
+      "read_only": true,
+      "tiers": ["repo"],
+      "description": "Arcanum version the repo config was migrated to, managed by migrations and init-claude"
+    },
+    {
+      "key": "migrations.version",
+      "type": "string",
+      "read_only": true,
+      "tiers": ["local"],
+      "description": "Arcanum version the local state was migrated to, managed by the migrations runner"
+    }
+  ]
+}

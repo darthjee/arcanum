@@ -11,7 +11,7 @@ export default [
       jsdoc
     },
     languageOptions: {
-      ecmaVersion: 2023,
+      ecmaVersion: 2025,
       sourceType: 'module',
       globals: {
         ...globals.node
