@@ -1,3 +1,6 @@
+/** `git.merge_body_mode`'s fallback, checked against keys.json by the defaults drift spec. */
+export const DEFAULT_MERGE_BODY_MODE = 'empty';
+
 /**
  * Merge-body-mode and co-authors resolution for `pr-merge`, extracted
  * from `PrOperations`'s `mergeBodyMode`/`_resolveMergeBody`/
@@ -38,10 +41,10 @@ class MergeBodyResolver {
     if (value !== undefined) {
       const formatted = typeof value === 'string' ? value : JSON.stringify(value);
 
-      process.stderr.write(`Warning: unrecognized git.merge_body_mode value '${formatted}' — falling back to 'empty'.\n`);
+      process.stderr.write(`Warning: unrecognized git.merge_body_mode value '${formatted}' — falling back to '${DEFAULT_MERGE_BODY_MODE}'.\n`);
     }
 
-    return 'empty';
+    return DEFAULT_MERGE_BODY_MODE;
   }
 
   /**

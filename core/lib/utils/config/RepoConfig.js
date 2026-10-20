@@ -2,7 +2,8 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { assertRegisteredConfigKey } from './KeyRegistry.js';
 
-const DEFAULT_SAFE_BRANCH = 'origin/main';
+/** `git.safe_branch`'s default, checked against keys.json by the defaults drift spec. */
+export const DEFAULT_SAFE_BRANCH = 'origin/main';
 
 /**
  * Reads single-tier config keys (no legacy-file fallback, no

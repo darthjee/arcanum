@@ -3,7 +3,8 @@ import path from 'node:path';
 import DispatchFailure from '../errors/DispatchFailure.js';
 import Lock from '../file/Lock.js';
 
-const DEFAULT_VALUE = 'false';
+/** The `// false` default every boolean key resolves to, checked against keys.json by the defaults drift spec. */
+export const DEFAULT_VALUE = 'false';
 
 /**
  * Shared base for the native `config.sh` equivalents whose 4

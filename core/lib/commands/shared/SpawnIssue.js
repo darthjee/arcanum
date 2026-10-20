@@ -9,8 +9,10 @@ import LabelApplicator from '../../utils/issue/LabelApplicator.js';
 const defaultExecFileAsync = promisify(execFile);
 const USAGE = 'Usage: spawn-issue <repo_path> <parent_id> <title> <body_file> [--as-subissue]';
 const AS_SUBISSUE_FLAG = '--as-subissue';
-const DEFAULT_MAX_RETRY_COUNT = 5;
-const DEFAULT_ERROR_SLEEP_TIME = 5;
+/** `plan-issues.max-retry-count`'s default, checked against keys.json by the defaults drift spec. */
+export const DEFAULT_MAX_RETRY_COUNT = 5;
+/** `plan-issues.error-sleep-time`'s default, checked against keys.json by the defaults drift spec. */
+export const DEFAULT_ERROR_SLEEP_TIME = 5;
 
 /**
  * Sleep for `seconds` seconds, mirroring the shell's `sleep
