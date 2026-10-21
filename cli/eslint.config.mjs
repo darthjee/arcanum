@@ -49,10 +49,29 @@ export default [
   {
     // The Node-floor gate runs before the version check has passed, so it
     // must parse on a Node older than the floor. Keep its syntax to
-    // ES2020 (dynamic import() is the newest feature it needs).
+    // ES2020 (dynamic import() is the newest feature it needs), and ban
+    // the two ES2020 operators an older Node may still choke on.
     files: ['bin/arcanum'],
     languageOptions: {
       ecmaVersion: 2020
+    },
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        { selector: 'ChainExpression', message: 'No optional chaining (?.) in the Node-floor gate.' },
+        { selector: 'LogicalExpression[operator="??"]', message: 'No ?? in the Node-floor gate.' }
+      ]
+    }
+  },
+  {
+    // Build-time constants injected by scripts/build.mjs through esbuild's
+    // `define`; a source run sees them as undeclared and falls back.
+    files: ['lib/**/*.js'],
+    languageOptions: {
+      globals: {
+        __ARCANUM_CLI_VERSION__: 'readonly',
+        __ARCANUM_MIGRATION_VERSIONS__: 'readonly'
+      }
     }
   },
   {
