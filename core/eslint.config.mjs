@@ -73,5 +73,54 @@ export default [
         }
       ]
     }
+  },
+  {
+    // The CLI's declared shared surface (see
+    // docs/agents/specs/arcanum-cli/shared-config-logic.md): these files
+    // are bundled into arcanum-cli, so they may import only `node:`
+    // built-ins and each other (KeyRegistry.js also loads `./keys.json`).
+    // This `files` list is the authoritative declaration of the surface.
+    // Replaces the commands-layering rule above for these files (flat
+    // config: last matching block wins); the allowlist already rejects
+    // commands/.
+    files: [
+      'lib/utils/config/ConfigChain.js',
+      'lib/utils/config/RepoConfig.js',
+      'lib/utils/config/RepoConfigWriter.js',
+      'lib/utils/config/ConfigError.js',
+      'lib/utils/config/AgentEmail.js',
+      'lib/utils/config/KeyRegistry.js',
+      'lib/utils/file/Lock.js',
+      'lib/utils/file/LockTimeoutError.js',
+      'lib/utils/file/RepoPath.js'
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              // An allowlist: any specifier NOT matching one of these
+              // alternatives is restricted. (A gitignore-style `group`
+              // with `**` plus `!` re-includes cannot express this: `**`
+              // also excludes the parent `.`/`..`/`node:fs` segments,
+              // which gitignore semantics never re-include.)
+              regex:
+                '^(?!(?:node:.+' +
+                '|\\./(?:ConfigChain|RepoConfig|RepoConfigWriter|ConfigError|AgentEmail|KeyRegistry)\\.js' +
+                '|\\./keys\\.json' +
+                '|\\./(?:Lock|LockTimeoutError|RepoPath)\\.js' +
+                '|\\.\\./file/(?:Lock|LockTimeoutError|RepoPath)\\.js' +
+                '|\\.\\./config/(?:ConfigChain|ConfigError)\\.js)$)',
+              message: 'Shared-surface files may import only node: built-ins and other shared-surface files.'
+            }
+          ]
+        }
+      ],
+      'no-restricted-syntax': [
+        'error',
+        { selector: 'ImportExpression', message: 'No dynamic import() on the shared surface.' }
+      ]
+    }
   }
 ];

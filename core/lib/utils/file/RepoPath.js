@@ -11,7 +11,9 @@ const defaultExecFileAsync = promisify(execFile);
  * argument is present, points at a directory, and is a git repository
  * (or worktree), throwing with the exact matching shell error message
  * (see docs/agents/plans/233-migrate-checkout-safe-branch-entrypoint-to-native-node-js/plan.md's
- * "Shared contracts") when any check fails.
+ * "Shared contracts") when any check fails. Also normalizes a path to
+ * its git toplevel (`#toplevel`). Part of the shared config surface
+ * bundled into `arcanum-cli`, so it imports only `node:` built-ins.
  */
 class RepoPath {
   /**
@@ -40,6 +42,28 @@ class RepoPath {
     if (!(await this._isGitRepository(repoPath))) {
       throw new Error(`Error: not a git repository: ${repoPath}`);
     }
+  }
+
+  /**
+   * Normalizes `repoPath` to its git toplevel (the CLI's `--repo`
+   * normalization): `git -C <repoPath> rev-parse --show-toplevel`, run
+   * through `execFile` with an argument array.
+   * @param {string} repoPath - a path inside a git repository/worktree.
+   * @returns {Promise<string>} the repository's toplevel directory, with
+   *   git's trailing newline stripped.
+   * @throws {Error} `Error: not a git repository: <repoPath>` when git
+   *   cannot resolve a toplevel (not a repo, missing path, bare repo).
+   */
+  async toplevel(repoPath) {
+    let stdout;
+
+    try {
+      ({ stdout } = await this._execFileAsync('git', ['-C', repoPath, 'rev-parse', '--show-toplevel']));
+    } catch {
+      throw new Error(`Error: not a git repository: ${repoPath}`);
+    }
+
+    return stdout.replace(/\n+$/, '');
   }
 
   /**

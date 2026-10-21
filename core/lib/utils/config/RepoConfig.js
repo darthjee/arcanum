@@ -21,6 +21,9 @@ class RepoConfig {
   /**
    * @param {import('../../context/RepoContext.js').default} repoContext -
    *   the target repo's context, supplying `repoPath` to every method.
+   *   The `RepoContext` type reference is optional, core-only
+   *   documentation — the CLI never passes a `RepoContext`, only an
+   *   object carrying `repoPath` — and pulls nothing into the bundle.
    */
   constructor(repoContext) {
     this._repoContext = repoContext;

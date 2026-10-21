@@ -116,7 +116,9 @@ export function fakeGitExecFileAsync({ branch = 'my-branch', stagesAdd = true, t
  *   `email` reads with.
  * @param {*} [opts.omitModelCoauthor] - the value to answer
  *   `omit_model_coauthor` reads with.
- * @returns {{read: Function}} a fake `ConfigChain`.
+ * @returns {{read: Function, readWithSource: Function}} a fake
+ *   `ConfigChain` (`readWithSource` answers the agent-email reads made
+ *   through `AgentEmail`, reporting a fixed `repo` tier).
  */
 export function fakeConfigChain({ agentEmail, omitModelCoauthor } = {}) {
   return {
@@ -126,6 +128,13 @@ export function fakeConfigChain({ agentEmail, omitModelCoauthor } = {}) {
       }
 
       return agentEmail;
+    }),
+    readWithSource: jasmine.createSpy('readWithSource').and.callFake(async (repoPath, namespace, ...keys) => {
+      if (agentEmail === undefined || agentEmail === null) {
+        return undefined;
+      }
+
+      return { value: agentEmail, tier: 'repo', file: `${repoPath}/fake-config.json`, key: keys[0] };
     })
   };
 }
@@ -154,7 +163,8 @@ export function fakeConfigChain({ agentEmail, omitModelCoauthor } = {}) {
  * @param {string} opts.expected - the expected/contained commit
  *   message.
  * @param {Array} [opts.configChainReadArgs] - when given, also asserts
- *   `configChain.read` was called with these args.
+ *   `configChain.readWithSource` (the agent-email read) was called with
+ *   these args.
  * @param {boolean} [opts.assertCommitArgs] - when `true`, also asserts
  *   the commit call's argv is `['commit', '-F', '-']`.
  * @returns {Promise<{execFileAsync: Function, configChain: object,
@@ -193,7 +203,7 @@ export async function expectCommitMessage({
   expect(commitCall.args[2].input)[matcher](expected);
 
   if (configChainReadArgs) {
-    expect(configChain.read).toHaveBeenCalledWith(...configChainReadArgs);
+    expect(configChain.readWithSource).toHaveBeenCalledWith(...configChainReadArgs);
   }
 
   return { execFileAsync, configChain, commitCall };

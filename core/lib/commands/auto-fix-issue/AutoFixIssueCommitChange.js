@@ -2,6 +2,7 @@ import { access } from 'node:fs/promises';
 import { execFile, spawn } from 'node:child_process';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import AgentEmail from '../../utils/config/AgentEmail.js';
 import ConfigChain from '../../utils/config/ConfigChain.js';
 
 const promisifiedExecFile = promisify(execFile);
@@ -83,11 +84,18 @@ class AutoFixIssueCommitChange {
    * @param {ConfigChain} [deps.configChain] - 3-tier config reader,
    *   reused as-is (already the native counterpart of
    *   `config_chain_read`) rather than re-derived.
+   * @param {AgentEmail} [deps.agentEmail] - the shared agent-email
+   *   resolver (defaults to one built on `configChain`).
    */
-  constructor(repoContext, { execFileAsync = defaultExecFileAsync, configChain = new ConfigChain() } = {}) {
+  constructor(repoContext, {
+    execFileAsync = defaultExecFileAsync,
+    configChain = new ConfigChain(),
+    agentEmail = new AgentEmail({ configChain })
+  } = {}) {
     this._repoContext = repoContext;
     this._execFileAsync = execFileAsync;
     this._configChain = configChain;
+    this._agentEmail = agentEmail;
   }
 
   /**
@@ -157,7 +165,7 @@ class AutoFixIssueCommitChange {
   async _buildMessage(repoPath, type, scope, id, subject, agent, modelName, modelEmail, body, commentUrl) {
     const templateEngine = await this._commitTemplateEngineGet(repoPath);
     const agentEmail = templateEngine === 'new'
-      ? await this._agentEmailGet(repoPath, agent, modelEmail)
+      ? await this._agentEmail.get(repoPath, agent, modelEmail)
       : modelEmail;
     const omitModelCoauthor = await this._modelCoauthorOmitted(repoPath);
 
@@ -203,27 +211,6 @@ class AutoFixIssueCommitChange {
     }
 
     return 'new';
-  }
-
-  /**
-   * Native re-derivation of `arcanum/_lib/agent_email.sh`'s
-   * `agent_email_get`, for this entrypoint's own use only.
-   * @param {string} repoPath - the target repo's local checkout path.
-   * @param {string} agent - the acting specialist agent's name.
-   * @param {string} modelEmail - the acting model's email, used as the
-   *   fallback when no config value resolves.
-   * @returns {Promise<string>} the resolved commit-author email for
-   *   `agent`, with any `{agent}` placeholder substituted (verbatim, via
-   *   a replacer function).
-   */
-  async _agentEmailGet(repoPath, agent, modelEmail) {
-    const value = await this._configChain.read(repoPath, 'git', `agents.${agent}`, 'email');
-
-    if (value === undefined || value === null) {
-      return modelEmail;
-    }
-
-    return String(value).replaceAll('{agent}', () => agent);
   }
 
   /**
