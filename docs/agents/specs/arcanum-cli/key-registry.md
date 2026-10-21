@@ -160,7 +160,7 @@ This is the **final** list. #777 transcribes it into `keys.json`, adding descrip
 | `auto-fix-all.ignored_check_patterns` | array of strings, `format: regex` | **repo only** | `[]` | each entry is a case-insensitive regex |
 | `auto-fix-all.clear_context` | boolean | local only | `false` | |
 | `auto-fix-all.finish_on_empty_queue` | boolean | local only | `false` | |
-| `monitor-issues.clear_context` | boolean | local only | `false` | **added together with #776 only**: today it lives in `.claude/state/monitor-issues-config.json`, outside the tier files |
+| `monitor-issues.clear_context` | boolean | local only | `false` | registered by #776, which moved it from `.claude/state/monitor-issues-config.json` into `.claude/state/arcanum-config.json` |
 | `plan-issues.max-retry-count` | number, `integer`, `min: 0` | all | `5` | |
 | `plan-issues.error-sleep-time` | number, `integer`, `min: 0` | all | `5` | seconds |
 | `version` | string, read-only | repo only | — | managed by migrations and `init-claude` |

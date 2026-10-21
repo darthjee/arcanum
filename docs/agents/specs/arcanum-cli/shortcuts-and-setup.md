@@ -45,7 +45,7 @@ arcanum config setup [<section>...]               # interactive wizard
 
 Example: `arcanum config auto-fix-all ignore-checks add '^codacy'`.
 
-`monitor-issues clear-context` becomes available only after #776 moves that key into the three-tier config (see [Related work](../arcanum-cli.md#related-work-outside-this-spec)).
+`monitor-issues clear-context` is available because #776 moved that key into the three-tier config (see [Related work](../arcanum-cli.md#related-work-outside-this-spec)).
 
 ### Design rules
 
