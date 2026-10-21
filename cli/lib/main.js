@@ -23,6 +23,16 @@ export const CLI_VERSION = typeof __ARCANUM_CLI_VERSION__ === 'undefined'
   ? '0.0.0-dev'
   : __ARCANUM_CLI_VERSION__;
 
+/**
+ * The per-scope list of arcanum versions that shipped migrations,
+ * injected by the build through `define` (see
+ * docs/agents/specs/arcanum-cli/packaging-and-release.md#embedded-migration-version-list).
+ * A source run has no define and sees empty lists.
+ */
+export const MIGRATION_VERSIONS = typeof __ARCANUM_MIGRATION_VERSIONS__ === 'undefined'
+  ? { repo: [], local: [], global: [] }
+  : __ARCANUM_MIGRATION_VERSIONS__;
+
 const DEFAULT_IO = { stdout: process.stdout, stderr: process.stderr };
 
 /**
