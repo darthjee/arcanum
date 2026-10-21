@@ -61,13 +61,35 @@ class ConfigChain {
    *   every key in every tier is absent/null.
    */
   async read(repoPath, namespace, ...keys) {
-    const resolvedRepoPath = repoPath ?? this._repoContext?.repoPath;
+    return (await this.readWithSource(repoPath, namespace, ...keys))?.value;
+  }
 
-    for (const file of this._tierFiles(resolvedRepoPath)) {
-      if (!file) {
+  /**
+   * Same resolution as `#read` (it is the single resolution loop `#read`
+   * wraps), but also reports where the winning value came from: which
+   * tier, which tier file, and which of `keys` resolved there. An
+   * explicit empty string (`""`) is reported like any other value.
+   * @param {string} [repoPath] - the target repo's local checkout path.
+   *   Falls back to the constructor-injected `repoContext`'s `repoPath`
+   *   when omitted, like `#read`.
+   * @param {string} namespace - the top-level config namespace.
+   * @param {...string} keys - one or more keys (each possibly a
+   *   dot-separated nested path) to try, in order, within each tier.
+   * @returns {Promise<({value: unknown, tier: string, file: string, key: string}|undefined)>}
+   *   the raw resolved `value`, its `tier` (`local`/`repo`/`global`),
+   *   the tier's absolute `file` path and the winning `key` as passed;
+   *   `undefined` when every key in every tier is absent/null.
+   */
+  async readWithSource(repoPath, namespace, ...keys) {
+    const resolvedRepoPath = repoPath ?? this._repoContext?.repoPath;
+    const files = this._tierFiles(resolvedRepoPath);
+
+    for (const [index, tier] of TIER_NAMES.entries()) {
+      if (!files[index]) {
         continue;
       }
 
+      const file = path.resolve(files[index]);
       const config = await this._readJson(file);
 
       if (!config) {
@@ -78,7 +100,7 @@ class ConfigChain {
         const { set, value } = this._tierValue(config, namespace, key);
 
         if (set) {
-          return value;
+          return { value, tier, file, key };
         }
       }
     }
@@ -122,10 +144,10 @@ class ConfigChain {
   }
 
   /**
-   * Single source of the per-tier resolution rule shared by `#read` and
+   * Single source of the per-tier resolution rule shared by `#readWithSource` and
    * `#readTiers`: resolves `<namespace>.<key>` within one tier's
    * already-parsed content and applies the present-and-non-null check.
-   * Takes the parsed content (not the file) so `#read` parses each tier
+   * Takes the parsed content (not the file) so `#readWithSource` parses each tier
    * file at most once, however many keys it tries.
    * @param {object|null} config - the tier's parsed content, or `null`
    *   when the file is missing/unreadable/malformed/not an object.
