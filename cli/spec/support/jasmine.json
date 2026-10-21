@@ -1,0 +1,14 @@
+{
+  "spec_dir": "spec",
+  "spec_files": [
+    "lib/**/*_spec.js",
+    "scripts/**/*_spec.js",
+    "packaging/**/*_spec.js",
+    "bin/**/*_spec.js",
+    "smoke/**/*_spec.js"
+  ],
+  "env": {
+    "stopSpecOnExpectationFailure": false,
+    "random": true
+  }
+}
