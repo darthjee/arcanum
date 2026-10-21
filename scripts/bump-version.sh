@@ -2,9 +2,12 @@
 # Bump arcanum's version.
 # Usage: bump-version.sh [new-version]
 #
-# Updates arcanum.version at the repo root, the baked-in default version
-# constant inside arcanum/install/bootstrap.sh (DEFAULT_VERSION), and the
-# "Current Version" / "Next Release" lines in README.md. Also rolls
+# Updates arcanum.version at the repo root, the "version" field of
+# cli/package.json (kept in lockstep with arcanum.version; the script
+# fails before writing anything if that file is missing), the baked-in
+# default version constant inside arcanum/install/bootstrap.sh
+# (DEFAULT_VERSION), and the "Current Version" / "Next Release" lines in
+# README.md. Also rolls
 # arcanum/migrations/repos/next/ (pending, unreleased per-repo migrations)
 # into arcanum/migrations/repos/<new-version>/, and recreates an empty
 # next/ (with a migrations.json containing []) in its place, so a
@@ -41,6 +44,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 VERSION_FILE="${REPO_ROOT}/arcanum.version"
+CLI_PACKAGE_FILE="${REPO_ROOT}/cli/package.json"
 BOOTSTRAP_FILE="${REPO_ROOT}/arcanum/install/bootstrap.sh"
 README_FILE="${REPO_ROOT}/README.md"
 MIGRATIONS_REPOS_DIR="${REPO_ROOT}/arcanum/migrations/repos"
@@ -74,6 +78,10 @@ if [[ -d "$VERSION_MIGRATIONS_DIR" ]]; then
 fi
 if [[ ! -d "$NEXT_MIGRATIONS_DIR" ]]; then
   echo "Error: ${NEXT_MIGRATIONS_DIR} is missing — expected it to always exist." >&2
+  exit 1
+fi
+if [[ ! -f "$CLI_PACKAGE_FILE" ]]; then
+  echo "Error: ${CLI_PACKAGE_FILE} is missing — its version must stay in lockstep with arcanum.version." >&2
   exit 1
 fi
 
@@ -149,6 +157,10 @@ check_stale_migration_references
 
 echo "$NEW_VERSION" > "$VERSION_FILE"
 
+CLI_PACKAGE_TMP="${CLI_PACKAGE_FILE}.tmp"
+jq --arg v "$NEW_VERSION" '.version = $v' "$CLI_PACKAGE_FILE" > "$CLI_PACKAGE_TMP"
+mv "$CLI_PACKAGE_TMP" "$CLI_PACKAGE_FILE"
+
 sed -i.bak -E "s/^DEFAULT_VERSION=\"[^\"]*\"/DEFAULT_VERSION=\"${NEW_VERSION}\"/" "$BOOTSTRAP_FILE"
 rm -f "${BOOTSTRAP_FILE}.bak"
 
@@ -171,7 +183,7 @@ is_migrations_dir_empty() {
 
 echo "New version:  ${NEW_VERSION}"
 echo "Next release: ${NEXT_RELEASE}"
-echo "Updated ${VERSION_FILE}, ${BOOTSTRAP_FILE}, ${README_FILE}, docs/agents/tag-mutations.md, and docs/agents/architecture/entrypoint-migration-status.md."
+echo "Updated ${VERSION_FILE}, ${CLI_PACKAGE_FILE}, ${BOOTSTRAP_FILE}, ${README_FILE}, docs/agents/tag-mutations.md, and docs/agents/architecture/entrypoint-migration-status.md."
 
 if is_migrations_dir_empty "$NEXT_MIGRATIONS_DIR"; then
   # defensive: keep migrations.json present even if it was missing

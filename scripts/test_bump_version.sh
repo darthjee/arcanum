@@ -10,14 +10,15 @@
 # scopes it to the fixture; the two generator scripts are stubbed as
 # no-ops) and bumps each to 1.1.0, asserting:
 #   1. Rewrite: in-scope repos/next/NNN references (core/spec, docs,
-#      README.md) are rewritten to repos/1.1.0/NNN and the files moved.
+#      README.md) are rewritten to repos/1.1.0/NNN and the files moved;
+#      cli/package.json's version becomes 1.1.0, other fields unchanged.
 #   2. Exclusions: docs/agents/issues/**, docs/agents/plans/** and
 #      scripts/ are untouched, as is generic prose about repos/next/.
 #   3. No partial match: repos/next/0010 neither trips the guard nor is
 #      rewritten.
 #   4. Empty next/: the bump succeeds and no doc changes.
 #   5. Stale reference: the bump aborts (non-zero, file:line: match on
-#      stderr) and nothing is written.
+#      stderr) and nothing is written (cli/package.json stays 1.0.0).
 
 set -uo pipefail
 
@@ -44,7 +45,8 @@ build_fixture_repo() {
   shift 2
   local next_dir="${repo}/arcanum/migrations/repos/next"
   mkdir -p "${repo}/scripts" "${repo}/arcanum/install" "$next_dir" \
-    "${repo}/core/spec" "${repo}/docs/agents/issues" "${repo}/docs/agents/plans/1-x"
+    "${repo}/core/spec" "${repo}/docs/agents/issues" "${repo}/docs/agents/plans/1-x" \
+    "${repo}/cli"
   cp "$BUMP_SCRIPT" "${repo}/scripts/bump-version.sh"
   local stub
   for stub in generate_tags_table.sh generate_entrypoint_migration_status.sh; do
@@ -52,6 +54,7 @@ build_fixture_repo() {
   done
   chmod +x "${repo}/scripts/"*.sh
   echo "1.0.0" > "${repo}/arcanum.version"
+  echo '{"name":"arcanum-cli","version":"1.0.0"}' > "${repo}/cli/package.json"
   echo 'DEFAULT_VERSION="1.0.0"' > "${repo}/arcanum/install/bootstrap.sh"
   cat > "${repo}/README.md" <<'EOF'
 **Current Version:** [1.0.0](https://github.com/darthjee/arcanum/releases/tag/1.0.0)
@@ -125,6 +128,12 @@ done
   || fail "rewrite case: expected an empty next/migrations.json"
 assert_contains "$BUMP_STDOUT" "Rewrote repos/next/NNN references in 3 file(s)."
 
+# cli/package.json lockstep
+[[ "$(jq -r '.version' "${REPO}/cli/package.json")" == "$NEW_VERSION" ]] \
+  || fail "rewrite case: cli/package.json version not bumped: $(cat "${REPO}/cli/package.json")"
+[[ "$(jq -c 'del(.version)' "${REPO}/cli/package.json")" == '{"name":"arcanum-cli"}' ]] \
+  || fail "rewrite case: cli/package.json other fields changed: $(cat "${REPO}/cli/package.json")"
+
 # Exclusions
 for f in "$ISSUE" "$PLAN" "$OTHER_SCRIPT"; do
   assert_contains "$f" "ref arcanum/migrations/repos/next/001.sh"
@@ -171,6 +180,8 @@ assert_contains "$BUMP_STDERR" "docs/b.md:2: repos/next/005"
   || fail "stale case: arcanum.version was modified"
 assert_contains "${REPO}/arcanum/install/bootstrap.sh" 'DEFAULT_VERSION="1.0.0"'
 assert_contains "${REPO}/README.md" "**Current Version:** [1.0.0]"
+[[ "$(jq -r '.version' "${REPO}/cli/package.json")" == "1.0.0" ]] \
+  || fail "stale case: cli/package.json version was modified"
 [[ -f "${REPO}/arcanum/migrations/repos/next/001.sh" ]] \
   || fail "stale case: next/ was moved"
 [[ ! -d "${REPO}/arcanum/migrations/repos/${NEW_VERSION}" ]] \
