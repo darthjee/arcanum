@@ -17,10 +17,11 @@ import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
 /**
  * @param {string} repoPath - the fixture repo.
- * @returns {string} its monitor-issues repo config file.
+ * @returns {string} its shared repo config file, whose `.monitor-issues`
+ *   namespace holds the monitor-issues keys (issue #776).
  */
 function monitorConfigFile(repoPath) {
-  return path.join(repoPath, '.claude', 'configuration', 'monitor-issues.json');
+  return path.join(repoPath, '.claude', 'configuration', 'arcanum-repo-config.json');
 }
 
 /**
@@ -137,13 +138,13 @@ describe('monitor-issues engine_dispatch routing (via the real shims)', () => {
         command: `monitor-issues-config-${sub}`,
         prepare: async ({ repoPath }) => {
           await mkdir(path.dirname(monitorConfigFile(repoPath)), { recursive: true });
-          await writeFile(monitorConfigFile(repoPath), JSON.stringify({ enabled: true }));
+          await writeFile(monitorConfigFile(repoPath), JSON.stringify({ 'monitor-issues': { enabled: true } }));
 
           return { args: [sub, ...args] };
         },
         check: async (result, { repoPath }) => {
           expect(result).toEqual({ stdout, stderr: '', code });
-          expect(JSON.parse(await readFile(monitorConfigFile(repoPath), 'utf8')).enabled).toEqual(after);
+          expect(JSON.parse(await readFile(monitorConfigFile(repoPath), 'utf8'))['monitor-issues'].enabled).toEqual(after);
         },
         dockerArgs: ({ repoPath }) => [repoPath, ...args]
       });

@@ -26,6 +26,7 @@ const execFileAsync = promisify(execFile);
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../..');
 const LIB = path.join(REPO_ROOT, 'arcanum', '_lib');
 const AUTO_FIX_ALL_SCRIPTS = path.join(REPO_ROOT, 'auto-fix-all', 'scripts');
+const MONITOR_ISSUES_SCRIPTS = path.join(REPO_ROOT, 'monitor-issues', 'scripts');
 
 const FAKE_GH = `#!/usr/bin/env bash
 echo "gh $*" >> "$FAKE_LOG"
@@ -83,6 +84,7 @@ describe('keys.json defaults drift', () => {
       new RepoConfig(createRepoContextMock({ repoPath })).getIgnoredCheckPatterns(),
     'auto-fix-all.clear_context': async () => JSON.parse(BOOLEAN_KEY_DEFAULT),
     'auto-fix-all.finish_on_empty_queue': async () => JSON.parse(BOOLEAN_KEY_DEFAULT),
+    'monitor-issues.clear_context': async () => JSON.parse(BOOLEAN_KEY_DEFAULT),
     'plan-issues.max-retry-count': async () => DEFAULT_MAX_RETRY_COUNT,
     'plan-issues.error-sleep-time': async () => DEFAULT_ERROR_SLEEP_TIME
   };
@@ -148,6 +150,10 @@ describe('keys.json defaults drift', () => {
     'auto-fix-all.finish_on_empty_queue': async () => JSON.parse(
       await runScript(path.join(AUTO_FIX_ALL_SCRIPTS, 'config_get_shell.sh'), [repoPath, 'finish_on_empty_queue'])
     ),
+    // monitor-issues' config scripts resolve their files under the cwd
+    // (runBash runs from repoPath), with no <repo_path> argument.
+    'monitor-issues.clear_context': async () =>
+      JSON.parse(await runScript(path.join(MONITOR_ISSUES_SCRIPTS, 'config_get_shell.sh'), ['clear_context'])),
     'plan-issues.max-retry-count': async () => {
       const { stdout } = await runFailingSpawn();
       const attempts = [...stdout.matchAll(/\(attempt (\d+)\/(\d+)\)/g)];

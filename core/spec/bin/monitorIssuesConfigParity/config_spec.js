@@ -9,9 +9,15 @@ import { expectParity } from '../../support/utils/runCommand.js';
 // (issue #586): runs monitor-issues/scripts/config_<subcommand>_shell.sh
 // and `core/bin/arcanum monitor-issues-config-<subcommand> <cwd>` against
 // identically-seeded directories, asserting byte-identical stdout, exit
-// code and written files.
-const CONFIG = path.join('.claude', 'configuration', 'monitor-issues.json');
-const STATE = path.join('.claude', 'state', 'monitor-issues-config.json');
+// code and written files. Issue #776 moved the layout onto the namespaced,
+// three-tier files: `clear_context` under `.monitor-issues` of the local
+// state file (no legacy fallback), every other key under `.monitor-issues`
+// of the repo config, with the legacy monitor-issues.json as a read
+// fallback and write-time seed.
+const CONFIG = path.join('.claude', 'configuration', 'arcanum-repo-config.json');
+const LEGACY = path.join('.claude', 'configuration', 'monitor-issues.json');
+const STATE = path.join('.claude', 'state', 'arcanum-config.json');
+const LEGACY_STATE = path.join('.claude', 'state', 'monitor-issues-config.json');
 
 // Each shell/native write acquires the config/state file lock, which sleeps a
 // real 1 second per acquisition (see docs/agents/architecture/lock-system.md),
@@ -49,8 +55,8 @@ describe('monitor-issues-config-* parity (shell vs. native)', () => {
   }
 
   it('get: matches for a present, an absent and a clear_context key', async () => {
-    await seed(CONFIG, { auto_rewrite: true, name: 'abc' });
-    await seed(STATE, { clear_context: true });
+    await seed(CONFIG, { 'monitor-issues': { auto_rewrite: true, name: 'abc' } });
+    await seed(STATE, { 'monitor-issues': { clear_context: true } });
 
     for (const key of ['auto_rewrite', 'name', 'missing', 'clear_context']) {
       const { shell, native } = await run('get', [key]);
@@ -60,8 +66,27 @@ describe('monitor-issues-config-* parity (shell vs. native)', () => {
     }
   });
 
+  it('get: matches for a key present only in the legacy file', async () => {
+    await seed(LEGACY, { auto_rewrite: true });
+
+    const { shell, native } = await run('get', ['auto_rewrite']);
+
+    expectParity(shell, native);
+    expect(shell.stdout).toEqual('true\n');
+  });
+
+  it('get: matches for clear_context, ignoring every legacy file', async () => {
+    await seed(LEGACY, { clear_context: true });
+    await seed(LEGACY_STATE, { clear_context: true });
+
+    const { shell, native } = await run('get', ['clear_context']);
+
+    expectParity(shell, native);
+    expect(shell.stdout).toEqual('false\n');
+  });
+
   it('is-enabled: matches for true (exit 0) and false (exit 1)', async () => {
-    await seed(CONFIG, { on: true, off: false });
+    await seed(CONFIG, { 'monitor-issues': { on: true, off: false } });
 
     const on = await run('is-enabled', ['on']);
     const off = await run('is-enabled', ['off']);
@@ -74,6 +99,7 @@ describe('monitor-issues-config-* parity (shell vs. native)', () => {
 
   it('set: matches for a valid value, writing identical files', async () => {
     await seed(CONFIG, { other: 'x' });
+    await seed(STATE, { next_step: { auto: { x: true } } });
 
     const { shell, native } = await run('set', ['auto_rewrite', 'true']);
 
@@ -87,6 +113,16 @@ describe('monitor-issues-config-* parity (shell vs. native)', () => {
     await expectSameFile(STATE);
   }, LOCKED_WRITE_TIMEOUT_MS);
 
+  it('set: matches when seeding the namespace from the legacy file', async () => {
+    await seed(LEGACY, { sibling: true });
+
+    const { shell, native } = await run('set', ['auto_rewrite', 'false']);
+
+    expectParity(shell, native);
+    expect(shell.code).toEqual(0);
+    await expectSameFile(CONFIG);
+  }, LOCKED_WRITE_TIMEOUT_MS);
+
   it('set: matches for an invalid value (exit 1, same stderr message)', async () => {
     const { shell, native } = await run('set', ['auto_rewrite', 'maybe']);
 
@@ -96,7 +132,7 @@ describe('monitor-issues-config-* parity (shell vs. native)', () => {
   });
 
   it('toggle: matches, printing the new value and writing identical files', async () => {
-    await seed(CONFIG, { auto_rewrite: true });
+    await seed(CONFIG, { 'monitor-issues': { auto_rewrite: true } });
 
     const first = await run('toggle', ['auto_rewrite']);
     const second = await run('toggle', ['clear_context']);
