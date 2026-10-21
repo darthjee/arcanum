@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import Lock from '../file/Lock.js';
+import ConfigError from './ConfigError.js';
 
 /**
  * Native equivalent of `arcanum/_lib/repo_config.sh`'s writers
@@ -58,7 +59,7 @@ class RepoConfigWriter {
         }
       }
 
-      this._setNamespaced(config, namespace, key.split('.'), value);
+      this._setNamespaced(config, namespace, key.split('.'), value, newFile);
 
       return config;
     });
@@ -79,7 +80,7 @@ class RepoConfigWriter {
       const config = await this._readBase(file);
 
       if (namespace) {
-        this._setNamespaced(config, namespace, ['version'], version);
+        this._setNamespaced(config, namespace, ['version'], version, file);
       } else {
         config.version = version;
       }
@@ -119,8 +120,8 @@ class RepoConfigWriter {
    * treated as `{}`.
    * @param {string} file - the config file's path.
    * @returns {Promise<object>} the parsed contents, or `{}`.
-   * @throws {Error} when the file holds valid JSON that is not an
-   *   object (jq itself fails to index it).
+   * @throws {ConfigError} `NOT_AN_OBJECT` when the file holds valid
+   *   JSON that is not an object (jq itself fails to index it).
    */
   async _readBase(file) {
     let parsed;
@@ -136,7 +137,7 @@ class RepoConfigWriter {
     }
 
     if (typeof parsed !== 'object' || Array.isArray(parsed)) {
-      throw new Error(`Cannot index ${file}: not a JSON object`);
+      throw new ConfigError('NOT_AN_OBJECT', `Cannot index ${file}: not a JSON object`, { file });
     }
 
     return parsed;
@@ -148,7 +149,9 @@ class RepoConfigWriter {
    *   empty/absent path never exists.
    * @returns {Promise<{exists: boolean, value: *}>} whether the legacy
    *   file exists, and its first JSON value (`null` when empty).
-   * @throws {Error} when the legacy file exists but is not valid JSON.
+   * @throws {ConfigError} `INVALID_JSON` when the legacy file exists but
+   *   is not valid JSON (the parse error's message, unchanged). Native
+   *   fs errors other than `ENOENT` propagate unwrapped.
    */
   async _readLegacy(legacyFile) {
     if (!legacyFile) {
@@ -171,7 +174,11 @@ class RepoConfigWriter {
       return { exists: true, value: null };
     }
 
-    return { exists: true, value: JSON.parse(raw) };
+    try {
+      return { exists: true, value: JSON.parse(raw) };
+    } catch (error) {
+      throw new ConfigError('INVALID_JSON', error.message, { file: legacyFile, cause: error });
+    }
   }
 
   /**
@@ -180,19 +187,21 @@ class RepoConfigWriter {
    * @param {string} namespace - the namespace key.
    * @param {string[]} keyPath - the path to set under `namespace`.
    * @param {*} value - the value to set.
+   * @param {string} file - the config file's path, for the error.
    * @returns {void}
-   * @throws {Error} when `.<namespace>` holds a non-object value.
+   * @throws {ConfigError} `NOT_AN_OBJECT` when `.<namespace>` holds a
+   *   non-object value.
    */
-  _setNamespaced(config, namespace, keyPath, value) {
+  _setNamespaced(config, namespace, keyPath, value, file) {
     let section = config[namespace];
 
     if (section === undefined || section === null || section === false) {
       section = {};
     } else if (!RepoConfigWriter._isObject(section)) {
-      throw new Error(`Cannot index .${namespace}: not a JSON object`);
+      throw new ConfigError('NOT_AN_OBJECT', `Cannot index .${namespace}: not a JSON object`, { file });
     }
 
-    RepoConfigWriter._setPath(section, keyPath, value, namespace);
+    RepoConfigWriter._setPath(section, keyPath, value, namespace, file);
     config[namespace] = section;
   }
 
@@ -203,10 +212,12 @@ class RepoConfigWriter {
    * @param {string[]} keyPath - the (non-empty) path to set.
    * @param {unknown} value - the leaf value.
    * @param {string} prefix - the path walked so far, for error messages.
+   * @param {string} file - the config file's path, for the error.
    * @returns {void}
-   * @throws {Error} when an intermediate holds a non-object value.
+   * @throws {ConfigError} `NOT_AN_OBJECT` when an intermediate holds a
+   *   non-object value.
    */
-  static _setPath(target, keyPath, value, prefix) {
+  static _setPath(target, keyPath, value, prefix, file) {
     const [head, ...rest] = keyPath;
 
     if (rest.length === 0) {
@@ -220,10 +231,10 @@ class RepoConfigWriter {
     if (child === undefined || child === null) {
       child = {};
     } else if (!RepoConfigWriter._isObject(child)) {
-      throw new Error(`Cannot index .${current}: not a JSON object`);
+      throw new ConfigError('NOT_AN_OBJECT', `Cannot index .${current}: not a JSON object`, { file });
     }
 
-    RepoConfigWriter._setPath(child, rest, value, current);
+    RepoConfigWriter._setPath(child, rest, value, current, file);
     target[head] = child;
   }
 

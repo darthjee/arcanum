@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import RepoPath from '../../../../lib/utils/file/RepoPath.js';
 import { createGitFixtureRepo } from '../../../support/utils/gitFixtureRepo.js';
@@ -71,6 +71,53 @@ describe('RepoPath', () => {
       } finally {
         await repo.cleanup();
       }
+    });
+  });
+
+  describe('#toplevel', () => {
+    it('returns the root of a repository given its root', async () => {
+      const repo = await createGitFixtureRepo();
+
+      try {
+        await expectAsync(new RepoPath().toplevel(repo.repoPath)).toBeResolvedTo(await realpath(repo.repoPath));
+      } finally {
+        await repo.cleanup();
+      }
+    });
+
+    it('returns the root of a repository given a subdirectory', async () => {
+      const repo = await createGitFixtureRepo();
+
+      try {
+        const subdir = path.join(repo.repoPath, 'a', 'b');
+
+        await mkdir(subdir, { recursive: true });
+
+        await expectAsync(new RepoPath().toplevel(subdir)).toBeResolvedTo(await realpath(repo.repoPath));
+      } finally {
+        await repo.cleanup();
+      }
+    });
+
+    it('throws when the directory is not a git repository', async () => {
+      let dir;
+
+      try {
+        dir = await createTempDir('arcanum-core-repo-path-spec-');
+
+        await expectAsync(new RepoPath().toplevel(dir)).toBeRejectedWithError(`Error: not a git repository: ${dir}`);
+      } finally {
+        if (dir) {
+          await removeTempDir(dir);
+        }
+      }
+    });
+
+    it('runs git with an argument array and strips the trailing newline', async () => {
+      const execFileAsync = jasmine.createSpy('execFileAsync').and.resolveTo({ stdout: '/some/repo\n', stderr: '' });
+
+      await expectAsync(new RepoPath({ execFileAsync }).toplevel('/some/repo/sub')).toBeResolvedTo('/some/repo');
+      expect(execFileAsync).toHaveBeenCalledWith('git', ['-C', '/some/repo/sub', 'rev-parse', '--show-toplevel']);
     });
   });
 });

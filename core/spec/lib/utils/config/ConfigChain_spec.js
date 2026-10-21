@@ -207,6 +207,7 @@ describe('ConfigChain', () => {
       }
     });
   });
+
   describe('#read with the strict-keys guard', () => {
     function strictConfigChain() {
       return newConfigChain({ ARCANUM_STRICT_CONFIG_KEYS: '1' });
@@ -251,6 +252,94 @@ describe('ConfigChain', () => {
       const tiers = await strictConfigChain().readTiers(repoPath, 'foo', 'bar');
 
       expect(tiers.map(({ set }) => set)).toEqual([false, false, false]);
+    });
+
+    it('guards #readWithSource too', async () => {
+      await expectAsync(strictConfigChain().readWithSource(repoPath, 'foo', 'bar')).toBeRejectedWithError(
+        /"foo\.bar"/
+      );
+    });
+  });
+
+  describe('#readWithSource', () => {
+    const localFile = () => path.join(repoPath, '.claude', 'state', 'arcanum-config.json');
+    const repoFile = () => path.join(repoPath, '.claude', 'configuration', 'arcanum-repo-config.json');
+    const globalFile = () => path.join(globalDir, 'arcanum-config.json');
+
+    it('returns undefined when nothing resolves', async () => {
+      await writeRepoConfig({ git: { email: null } });
+
+      await expectAsync(newConfigChain().readWithSource(repoPath, 'git', 'email')).toBeResolvedTo(undefined);
+    });
+
+    it('reports the local tier, its file and the key', async () => {
+      await writeLocalState({ git: { email: 'local@x' } });
+      await writeRepoConfig({ git: { email: 'repo@x' } });
+
+      await expectAsync(newConfigChain().readWithSource(repoPath, 'git', 'email'))
+        .toBeResolvedTo({ value: 'local@x', tier: 'local', file: localFile(), key: 'email' });
+    });
+
+    it('reports the repo tier', async () => {
+      await writeRepoConfig({ git: { email: 'repo@x' } });
+      await writeGlobalConfig({ git: { email: 'global@x' } });
+
+      await expectAsync(newConfigChain().readWithSource(repoPath, 'git', 'email'))
+        .toBeResolvedTo({ value: 'repo@x', tier: 'repo', file: repoFile(), key: 'email' });
+    });
+
+    it('reports the global tier', async () => {
+      await writeGlobalConfig({ git: { email: 'global@x' } });
+
+      await expectAsync(newConfigChain().readWithSource(repoPath, 'git', 'email'))
+        .toBeResolvedTo({ value: 'global@x', tier: 'global', file: globalFile(), key: 'email' });
+    });
+
+    it('reports the winning key as passed, a nested path included', async () => {
+      await writeRepoConfig({ git: { agents: { node: 'node@x' }, email: 'generic@x' } });
+
+      await expectAsync(newConfigChain().readWithSource(repoPath, 'git', 'agents.node', 'email'))
+        .toBeResolvedTo({ value: 'node@x', tier: 'repo', file: repoFile(), key: 'agents.node' });
+    });
+
+    it('lets a generic key in a higher tier beat a specific key in a lower tier', async () => {
+      await writeLocalState({ git: { email: 'generic@x' } });
+      await writeGlobalConfig({ git: { agents: { node: 'node@x' } } });
+
+      await expectAsync(newConfigChain().readWithSource(repoPath, 'git', 'agents.node', 'email'))
+        .toBeResolvedTo({ value: 'generic@x', tier: 'local', file: localFile(), key: 'email' });
+    });
+
+    it('reports an explicit empty string, stopping the chain there', async () => {
+      await writeRepoConfig({ git: { agents: { node: '' } } });
+      await writeGlobalConfig({ git: { email: 'global@x' } });
+
+      await expectAsync(newConfigChain().readWithSource(repoPath, 'git', 'agents.node', 'email'))
+        .toBeResolvedTo({ value: '', tier: 'repo', file: repoFile(), key: 'agents.node' });
+    });
+
+    it('skips an unresolvable global tier', async () => {
+      const configChain = new ConfigChain({ env: {} });
+
+      await expectAsync(configChain.readWithSource(repoPath, 'git', 'email')).toBeResolvedTo(undefined);
+    });
+
+    it('yields an absolute file path for a relative repoPath', async () => {
+      await writeRepoConfig({ git: { email: 'repo@x' } });
+      const relative = path.relative(process.cwd(), repoPath);
+
+      const result = await newConfigChain().readWithSource(relative, 'git', 'email');
+
+      expect(result.file).toEqual(repoFile());
+    });
+
+    it('falls back to a constructor-injected repoContext when repoPath is omitted', async () => {
+      await writeRepoConfig({ git: { email: 'repo@x' } });
+      const repoContext = createRepoContextMock({ repoPath });
+      const configChain = new ConfigChain({ env: { CLAUDE_CONFIG_DIR: globalDir }, repoContext });
+
+      await expectAsync(configChain.readWithSource(undefined, 'git', 'email'))
+        .toBeResolvedTo({ value: 'repo@x', tier: 'repo', file: repoFile(), key: 'email' });
     });
   });
 

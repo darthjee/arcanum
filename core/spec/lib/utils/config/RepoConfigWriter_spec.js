@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import RepoConfigWriter from '../../../../lib/utils/config/RepoConfigWriter.js';
 import Lock from '../../../../lib/utils/file/Lock.js';
+import ConfigError from '../../../../lib/utils/config/ConfigError.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 describe('RepoConfigWriter', () => {
@@ -153,16 +154,75 @@ describe('RepoConfigWriter', () => {
       expect(existsSync(`${newFile}.lock`)).toBeFalse();
     });
 
+    it('rejects an invalid legacy file with an INVALID_JSON ConfigError', async () => {
+      await seedFile(legacyFile, 'nope');
+      let expected;
+
+      try {
+        JSON.parse('nope');
+      } catch (error) {
+        expected = error.message;
+      }
+
+      const error = await writePatterns().catch((e) => e);
+
+      expect(error).toBeInstanceOf(ConfigError);
+      expect(error.code).toEqual('INVALID_JSON');
+      expect(error.message).toEqual(expected);
+      expect(error.file).toEqual(legacyFile);
+    });
+
+    it('propagates a native fs error on the legacy file unwrapped', async () => {
+      const fsError = Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' });
+      const failing = new RepoConfigWriter({
+        lock,
+        fs: {
+          readFile: (file, encoding) => (file === legacyFile
+            ? Promise.reject(fsError)
+            : readFile(file, encoding))
+        }
+      });
+
+      const error = await failing.write({
+        newFile, legacyFile, namespace: 'n', key: 'k', value: 1
+      }).catch((e) => e);
+
+      expect(error).toBe(fsError);
+      expect(error).not.toBeInstanceOf(ConfigError);
+    });
+
     it('rejects when the file is valid JSON but not an object', async () => {
       await seedFile(newFile, '[1]');
 
       await expectAsync(writePatterns()).toBeRejectedWithError(/not a JSON object/);
     });
 
+    it('rejects a non-object file with a NOT_AN_OBJECT ConfigError', async () => {
+      await seedFile(newFile, '[1]');
+
+      const error = await writePatterns().catch((e) => e);
+
+      expect(error).toBeInstanceOf(ConfigError);
+      expect(error.code).toEqual('NOT_AN_OBJECT');
+      expect(error.message).toEqual(`Cannot index ${newFile}: not a JSON object`);
+      expect(error.file).toEqual(newFile);
+    });
+
     it('rejects when the namespace holds a non-object', async () => {
       await seedFile(newFile, '{"auto-fix-all":"x"}');
 
       await expectAsync(writePatterns()).toBeRejectedWithError(/not a JSON object/);
+    });
+
+    it('rejects a non-object namespace with a NOT_AN_OBJECT ConfigError', async () => {
+      await seedFile(newFile, '{"auto-fix-all":"x"}');
+
+      const error = await writePatterns().catch((e) => e);
+
+      expect(error).toBeInstanceOf(ConfigError);
+      expect(error.code).toEqual('NOT_AN_OBJECT');
+      expect(error.message).toEqual('Cannot index .auto-fix-all: not a JSON object');
+      expect(error.file).toEqual(newFile);
     });
 
     it('acquires and releases <newFile>.lock', async () => {
@@ -265,6 +325,16 @@ describe('RepoConfigWriter', () => {
             .toBeRejectedWithError('Cannot index .next_step.auto: not a JSON object');
           expect(existsSync(`${newFile}.lock`)).toBeFalse();
         });
+      });
+
+      it('rejects a non-object intermediate with a NOT_AN_OBJECT ConfigError', async () => {
+        await seedFile(newFile, '{"next_step":{"auto":"x"}}');
+
+        const error = await writeNextStep('auto.enhance-issue', true).catch((e) => e);
+
+        expect(error).toBeInstanceOf(ConfigError);
+        expect(error.code).toEqual('NOT_AN_OBJECT');
+        expect(error.file).toEqual(newFile);
       });
 
       it('leaves a flat key as a plain key under the namespace', async () => {

@@ -184,6 +184,17 @@ describe('AutoNewIssueCommitIssue', () => {
           });
         });
 
+        it('falls back to the model email when the resolved config email is an explicit ""', async () => {
+          await expectCommitMessage({
+            CommandClass: AutoNewIssueCommitIssue,
+            repoPath,
+            runArgs: [filePath, ID, MODEL_NAME, MODEL_EMAIL],
+            configChainOpts: { agentEmail: '', omitModelCoauthor: false },
+            matcher: 'toContain',
+            expected: `Co-Authored-By: architect agent <${MODEL_EMAIL}>`
+          });
+        });
+
         it('substitutes a "{agent}" placeholder in the resolved config email with "architect"', async () => {
           await expectCommitMessage({
             CommandClass: AutoNewIssueCommitIssue,
