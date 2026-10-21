@@ -107,6 +107,13 @@
       "description": "Stop auto-fix-all when its queue is empty"
     },
     {
+      "key": "monitor-issues.clear_context",
+      "type": "boolean",
+      "tiers": ["local"],
+      "default": false,
+      "description": "Clear the context between monitor-issues polling cycles"
+    },
+    {
       "key": "plan-issues.max-retry-count",
       "type": "number",
       "integer": true,

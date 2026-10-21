@@ -14,15 +14,14 @@ if [[ $# -lt 1 ]]; then
   exit 1
 fi
 KEY="$1"
-TARGET_FILE="$(_config_file_for_key "$KEY")"
-_acquire_lock
-CURRENT=$(_read_config "$TARGET_FILE" | jq -r --arg k "$KEY" '.[$k] // false')
+# config-key: monitor-issues.clear_context
+CURRENT=$(repo_config_read "$(_new_file_for_key "$KEY")" "$(_legacy_file_for_key "$KEY")" "$NAMESPACE" "$KEY")
+CURRENT="${CURRENT:-false}"
 if [[ "$CURRENT" == "true" ]]; then
   NEW_VALUE="false"
 else
   NEW_VALUE="true"
 fi
-_read_config "$TARGET_FILE" | jq --arg k "$KEY" --arg v "$NEW_VALUE" '.[$k] = ($v == "true")' > "${TARGET_FILE}.tmp"
-mv "${TARGET_FILE}.tmp" "$TARGET_FILE"
-_release_lock
+# config-key: monitor-issues.clear_context
+repo_config_write "$(_new_file_for_key "$KEY")" "$(_legacy_file_for_key "$KEY")" "$NAMESPACE" "$KEY" "$NEW_VALUE"
 echo "$NEW_VALUE"

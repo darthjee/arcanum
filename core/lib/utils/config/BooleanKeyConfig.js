@@ -10,7 +10,8 @@ export const DEFAULT_VALUE = 'false';
  * Shared base for the native `config.sh` equivalents whose 4
  * subcommands (`get`, `is-enabled`, `set`, `toggle`) read and write
  * `true`/`false` keys in per-repo JSON files — currently
- * `AutoFixAllConfig` and `MonitorIssuesConfig`.
+ * `NamespacedBooleanKeyConfig` (and through it `AutoFixAllConfig` and
+ * `MonitorIssuesConfig`).
  *
  * Owns what they have in common: key/value validation (with the
  * shell scripts' exact error messages), `// false` default

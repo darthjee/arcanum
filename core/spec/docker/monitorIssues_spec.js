@@ -7,7 +7,7 @@ import { requireParityImage } from '../support/utils/dockerParity.js';
 import { REPO_ROOT } from '../support/utils/runCommand.js';
 
 const SCRIPTS_DIR = path.join(REPO_ROOT, 'monitor-issues', 'scripts');
-const CONFIG_FILE = '.claude/configuration/monitor-issues.json';
+const CONFIG_FILE = '.claude/configuration/arcanum-repo-config.json';
 const QUEUE_FILE = '.claude/state/monitor-issues-rewrite-queue.json';
 
 /**
@@ -26,10 +26,11 @@ function monitorDispatch(command, shellScript, ...args) {
 
 /**
  * @param {string} repoPath - the repo.
- * @returns {Promise<void>} seeds `enabled=true` in the repo config.
+ * @returns {Promise<void>} seeds `.monitor-issues.enabled=true` in the
+ *   shared repo config.
  */
 function seedEnabled(repoPath) {
-  return seedRepoFile(repoPath, CONFIG_FILE, '{"enabled":true}');
+  return seedRepoFile(repoPath, CONFIG_FILE, '{"monitor-issues":{"enabled":true}}');
 }
 
 /**

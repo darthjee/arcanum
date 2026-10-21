@@ -16,6 +16,8 @@ Arcanum configuration used to live in files named after the one feature that use
 | --- | --- |
 | `.claude/configuration/auto-fix-all.json` | `.claude/configuration/arcanum-repo-config.json` |
 | `.claude/state/auto-fix-all-config.json` | `.claude/state/arcanum-config.json` |
+| `.claude/configuration/monitor-issues.json` | `.claude/configuration/arcanum-repo-config.json` (under `"monitor-issues"`) |
+| `.claude/state/monitor-issues-config.json` | `.claude/state/arcanum-config.json` (`.monitor-issues.clear_context`) |
 
 The new files are shared across every arcanum feature, each keeping its own key inside them — e.g. everything `auto-fix-all` reads/writes lives under a top-level `"auto-fix-all"` key:
 
@@ -27,11 +29,13 @@ The new files are shared across every arcanum feature, each keeping its own key 
 }
 ```
 
+`monitor-issues` follows the same layout under a top-level `"monitor-issues"` key: its `clear_context` toggle lives in `.claude/state/arcanum-config.json` as `{"monitor-issues": {"clear_context": true}}`, and any other key lives in `.claude/configuration/arcanum-repo-config.json`. `clear_context` has no legacy-file fallback — the non-skippable local migration `arcanum/migrations/repos/next/001.sh` copies an existing `.claude/state/monitor-issues-config.json` value forward instead (run `/arcanum-migrate`). Other `monitor-issues` keys still fall back to `.claude/configuration/monitor-issues.json`, with the warning above.
+
 This lets future arcanum features store their own settings (under their own key) without colliding with `auto-fix-all`'s, or inventing yet another ad-hoc file.
 
 ## The fallback
 
-Every script that reads this configuration (`auto-fix-all/scripts/config.sh`, `auto-fix-all/scripts/wait_ci.sh`, and any future reader going through `arcanum/_lib/repo_config.sh`) checks the new file first. If the key it needs isn't there, it falls back to the legacy file and prints the warning above — so nothing you had configured stops working after upgrading arcanum, you just won't see the warning go away until you migrate.
+Every script that reads this configuration (`auto-fix-all/scripts/config.sh`, `auto-fix-all/scripts/wait_ci.sh`, `monitor-issues/scripts/config.sh`, and any future reader going through `arcanum/_lib/repo_config.sh`) checks the new file first. If the key it needs isn't there, it falls back to the legacy file and prints the warning above — so nothing you had configured stops working after upgrading arcanum, you just won't see the warning go away until you migrate.
 
 ## How to migrate
 

@@ -19,8 +19,5 @@ if [[ "$VALUE" != "true" && "$VALUE" != "false" ]]; then
   echo "Error: value must be 'true' or 'false'" >&2
   exit 1
 fi
-TARGET_FILE="$(_config_file_for_key "$KEY")"
-_acquire_lock
-_read_config "$TARGET_FILE" | jq --arg k "$KEY" --arg v "$VALUE" '.[$k] = ($v == "true")' > "${TARGET_FILE}.tmp"
-mv "${TARGET_FILE}.tmp" "$TARGET_FILE"
-_release_lock
+# config-key: monitor-issues.clear_context
+repo_config_write "$(_new_file_for_key "$KEY")" "$(_legacy_file_for_key "$KEY")" "$NAMESPACE" "$KEY" "$VALUE"
