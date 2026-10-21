@@ -1,6 +1,9 @@
 .claude/state/
 core/node_modules/
 core/coverage/
+cli/node_modules/
+cli/coverage/
+cli/dist/
 
 synced/
 

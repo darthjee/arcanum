@@ -3,12 +3,19 @@
 # these targets run core/'s suite inside the darthjee/node-based test
 # image, with core/ bind-mounted rather than baked into the image.
 #
+# The cli-* targets do the same for the cli/ package (the `cli` compose
+# service: same test image, whole repo mounted, cli/ as working dir).
+# cli-test builds cli/dist/arcanum.mjs before running the specs, since
+# `yarn test` does not build; cli-check runs lint then test.
+#
 # mod-check gates the Claude Code mods shipped with arcanum (MOD_DIRS):
 # for each, `claude plugin validate`, `tsc -p` and `claude plugin test`,
 # run on the host (the Claude Code CLI must be on PATH), stopping at the
 # first failure.
 
 CORE_COMPOSE := docker compose -f core/docker-compose.yml
+CLI_SERVICE := cli
+YARN_INSTALL := yarn install --frozen-lockfile
 
 # The engine.mode=docker runtime image (the `runtime` target of
 # core/Dockerfile, built from the install root). See
@@ -43,7 +50,8 @@ MOD_TYPES_TSCONFIG := .claude-plugin/types/tsconfig.json
 
 .PHONY: core-test core-lint core-check core-shell core-report core-audit \
 	core-build-runtime core-smoke-runtime docker-parity docker-benchmark \
-	mod-check
+	mod-check cli-install cli-lint cli-build cli-test cli-check cli-shell \
+	cli-audit
 
 core-test:
 	$(CORE_COMPOSE) run --rm core sh -c "yarn install --frozen-lockfile && yarn test"
@@ -61,6 +69,26 @@ core-report:
 
 core-audit:
 	$(CORE_COMPOSE) run --rm core sh -c "yarn install --frozen-lockfile && yarn audit"
+
+cli-install:
+	$(CORE_COMPOSE) run --rm $(CLI_SERVICE) sh -c "$(YARN_INSTALL)"
+
+cli-lint:
+	$(CORE_COMPOSE) run --rm $(CLI_SERVICE) sh -c "$(YARN_INSTALL) && yarn lint"
+
+cli-build:
+	$(CORE_COMPOSE) run --rm $(CLI_SERVICE) sh -c "$(YARN_INSTALL) && yarn build"
+
+cli-test:
+	$(CORE_COMPOSE) run --rm $(CLI_SERVICE) sh -c "$(YARN_INSTALL) && yarn build && yarn test"
+
+cli-check: cli-lint cli-test
+
+cli-shell:
+	$(CORE_COMPOSE) run --rm $(CLI_SERVICE) sh
+
+cli-audit:
+	$(CORE_COMPOSE) run --rm $(CLI_SERVICE) sh -c "$(YARN_INSTALL) && yarn audit"
 
 core-build-runtime:
 	@test -n "$(RUNTIME_VERSION)" || { echo "RUNTIME_VERSION is empty (no arcanum.version?); pass RUNTIME_VERSION=<version>" >&2; exit 1; }

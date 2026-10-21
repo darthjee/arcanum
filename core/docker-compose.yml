@@ -1,7 +1,11 @@
 # Runs core/'s test suite (and lint) inside the darthjee/node-based test
 # image, with core/ bind-mounted rather than baked in — see Dockerfile
 # and docs/agents/architecture/script-engine.md. Invoked via the
-# `core-*` Makefile targets at the repo root, not directly.
+# `core-*` Makefile targets at the repo root, not directly. The `cli`
+# service reuses the same test image for cli/ (the `cli-*` targets); it
+# mounts the whole repo because cli/'s build reads ../core and
+# ../arcanum, and gives cli/node_modules its own volume since esbuild
+# ships a platform-specific binary.
 services:
   core:
     build:
@@ -16,5 +20,17 @@ services:
     working_dir: /home/node/app/core
     command: sh -c "yarn install --frozen-lockfile && yarn test"
 
+  cli:
+    build:
+      context: ..
+      dockerfile: core/Dockerfile
+      target: test
+    volumes:
+      - ../:/home/node/app
+      - cli_node_modules:/home/node/app/cli/node_modules
+    working_dir: /home/node/app/cli
+    command: sh -c "yarn install --frozen-lockfile && yarn build && yarn test"
+
 volumes:
   core_node_modules:
+  cli_node_modules:

@@ -1,0 +1,64 @@
+#!/usr/bin/env node
+
+// arcanum-cli's npm `bin` entry: the Node-floor gate (see
+// docs/agents/specs/arcanum-cli.md#runtime).
+//
+// This file is not bundled. It must parse on a Node.js older than the
+// floor, so it sticks to ES2020 syntax (no top-level await, no `?.` or
+// `??`). It checks `process.versions.node` against the floor and only
+// then imports the bundle shipped next to it, `../dist/arcanum.mjs`,
+// resolved relative to this file, never to the current directory.
+//
+// The floor literal below must equal `engines.node` in cli/package.json
+// and core/package.json; a spec enforces it.
+
+const NODE_FLOOR = '22.13.0';
+
+/**
+ * @param {string} version - a dotted version, e.g. `22.13.0`.
+ * @returns {number[]} its major, minor and patch numbers.
+ */
+function versionParts(version) {
+  const parts = String(version).split('.');
+  const numbers = [];
+
+  for (let index = 0; index < 3; index += 1) {
+    const number = parseInt(parts[index], 10);
+
+    numbers.push(isNaN(number) ? 0 : number);
+  }
+
+  return numbers;
+}
+
+/**
+ * @param {string} found - the running Node.js version.
+ * @param {string} floor - the minimum supported version.
+ * @returns {boolean} whether `found` is older than `floor`.
+ */
+function isBelowFloor(found, floor) {
+  const foundParts = versionParts(found);
+  const floorParts = versionParts(floor);
+
+  for (let index = 0; index < 3; index += 1) {
+    if (foundParts[index] !== floorParts[index]) {
+      return foundParts[index] < floorParts[index];
+    }
+  }
+
+  return false;
+}
+
+const foundVersion = process.versions.node;
+
+if (isBelowFloor(foundVersion, NODE_FLOOR)) {
+  process.stderr.write('Node.js >= ' + NODE_FLOOR + ' required, found ' + foundVersion + '\n');
+  process.exitCode = 1;
+} else {
+  import('../dist/arcanum.mjs')
+    .then((cli) => cli.main(process.argv.slice(2)))
+    .catch((error) => {
+      process.stderr.write('arcanum: ' + (error && error.message ? error.message : String(error)) + '\n');
+      process.exitCode = 1;
+    });
+}
