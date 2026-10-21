@@ -28,6 +28,16 @@
 # with no credential. `tsc -p` is left out: it extends the engine-generated
 # .claude-plugin/types/ folder, which only a live session writes, so
 # `make mod-check` (run locally) is the full gate for it.
+#
+# The `cli` and `cli-node-floor` jobs (test workflow) gate the cli/
+# package. Both check out the full repo and run from cli/, since its
+# esbuild build bundles ../core/lib and ../arcanum/migrations/repos (any
+# change there can break the CLI, so neither job has path filters).
+# `yarn test` does not build, so `yarn build` always runs first. `cli`
+# runs on the same image as `test`/`checks` (lint, build, test, then a
+# non-blocking audit); `cli-node-floor` re-runs build and test on
+# cimg/node:22.13.0, the CLI's minimum supported Node (the darthjee image
+# runs 22.14.0, so it is not the floor). No Codacy coverage upload yet.
 
 version: 2.1
 
@@ -115,6 +125,46 @@ jobs:
           name: Commit-message template sync check (non-blocking)
           command: ../scripts/check_commit_template_sync.sh || true
 
+  cli:
+    docker:
+      - image: darthjee/circleci_node:0.2.1
+    working_directory: ~/project/cli
+    steps:
+      - checkout:
+          path: ~/project
+      - run:
+          name: Install dependencies
+          command: yarn install --frozen-lockfile
+      - run:
+          name: Lint
+          command: yarn lint
+      - run:
+          name: Build
+          command: yarn build
+      - run:
+          name: Run tests
+          command: yarn test
+      - run:
+          name: Dependency audit (non-blocking)
+          command: yarn audit || true
+
+  cli-node-floor:
+    docker:
+      - image: cimg/node:22.13.0
+    working_directory: ~/project/cli
+    steps:
+      - checkout:
+          path: ~/project
+      - run:
+          name: Install dependencies
+          command: yarn install --frozen-lockfile
+      - run:
+          name: Build
+          command: yarn build
+      - run:
+          name: Run tests
+          command: yarn test
+
   mod-checks:
     docker:
       - image: darthjee/circleci_node:0.2.1
@@ -160,6 +210,14 @@ workflows:
             tags:
               ignore: /.*/
       - mod-checks:
+          filters:
+            tags:
+              ignore: /.*/
+      - cli:
+          filters:
+            tags:
+              ignore: /.*/
+      - cli-node-floor:
           filters:
             tags:
               ignore: /.*/
