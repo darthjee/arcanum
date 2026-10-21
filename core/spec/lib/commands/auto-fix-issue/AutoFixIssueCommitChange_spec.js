@@ -203,6 +203,18 @@ describe('AutoFixIssueCommitChange', () => {
           });
         });
 
+        it('falls back to the model email when the resolved config email is an explicit ""', async () => {
+          await expectCommitMessage({
+            CommandClass: AutoFixIssueCommitChange,
+            repoPath,
+            runArgs: [TYPE, SCOPE, ID, SUBJECT, AGENT, MODEL_NAME, MODEL_EMAIL],
+            execFileAsyncOpts: EXEC_FILE_ASYNC_OPTS,
+            configChainOpts: { agentEmail: '', omitModelCoauthor: false },
+            matcher: 'toContain',
+            expected: `Co-Authored-By: backend agent <${MODEL_EMAIL}>`
+          });
+        });
+
         it('substitutes a "{agent}" placeholder in the resolved config email with the agent name', async () => {
           await expectCommitMessage({
             CommandClass: AutoFixIssueCommitChange,
