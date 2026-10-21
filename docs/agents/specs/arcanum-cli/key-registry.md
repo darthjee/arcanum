@@ -156,6 +156,7 @@ This is the **final** list. #777 transcribes it into `keys.json`, adding descrip
 | `git.omit_model_coauthor` | boolean | all | `false` | |
 | `git.remove_coauthors` | array of strings | all | `[]` | emails removed from the coauthors list |
 | `next_step.auto.<skill>` | boolean | all | `false` | only JSON `true` enables it |
+| `next_step.clear.<skill>` | boolean | all | `false` | added by #796 after this audit; only read when the matching `next_step.auto.<skill>` fires; no `setup` entry |
 | `auto-fix-all.ignored_check_patterns` | array of strings, `format: regex` | **repo only** | `[]` | each entry is a case-insensitive regex |
 | `auto-fix-all.clear_context` | boolean | local only | `false` | |
 | `auto-fix-all.finish_on_empty_queue` | boolean | local only | `false` | |

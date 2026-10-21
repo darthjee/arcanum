@@ -106,4 +106,18 @@ describe('RepoConfig', () => {
       await expectAsync(repoConfig.getIgnoredCheckPatterns()).toBeResolvedTo([]);
     });
   });
+
+  describe('with the strict-keys guard', () => {
+    beforeEach(() => {
+      repoConfig = new RepoConfig(createRepoContextMock({ repoPath }), { env: { ARCANUM_STRICT_CONFIG_KEYS: '1' } });
+    });
+
+    it('reads git.safe_branch, a registered key', async () => {
+      await expectAsync(repoConfig.getSafeBranch()).toBeResolvedTo('origin/main');
+    });
+
+    it('reads auto-fix-all.ignored_check_patterns, a registered key', async () => {
+      await expectAsync(repoConfig.getIgnoredCheckPatterns()).toBeResolvedTo([]);
+    });
+  });
 });

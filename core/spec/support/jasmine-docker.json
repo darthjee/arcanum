@@ -3,7 +3,9 @@
   "spec_files": [
     "docker/**/*_spec.js"
   ],
-  "helpers": [],
+  "helpers": [
+    "support/strictConfigKeys.js"
+  ],
   "env": {
     "stopSpecOnExpectationFailure": false,
     "random": true

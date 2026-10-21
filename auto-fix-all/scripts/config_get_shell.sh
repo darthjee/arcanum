@@ -18,6 +18,9 @@ if [[ $# -lt 2 ]]; then
   exit 1
 fi
 KEY="$2"
+# config-key: auto-fix-all.clear_context
+# config-key: auto-fix-all.finish_on_empty_queue
+# config-key: auto-fix-all.ignored_check_patterns
 VALUE=$(repo_config_read "$(_new_file_for_key "$KEY")" "$(_legacy_file_for_key "$KEY")" "$NAMESPACE" "$KEY")
 VALUE="${VALUE:-false}"
 echo "$VALUE"

@@ -208,6 +208,59 @@ describe('ConfigChain', () => {
     });
   });
 
+  describe('#read with the strict-keys guard', () => {
+    function strictConfigChain() {
+      return newConfigChain({ ARCANUM_STRICT_CONFIG_KEYS: '1' });
+    }
+
+    it('throws on a key that matches no registry entry', async () => {
+      await expectAsync(strictConfigChain().read(repoPath, 'foo', 'bar')).toBeRejectedWithError(
+        /config key "foo\.bar" is not in core\/lib\/utils\/config\/keys\.json/
+      );
+    });
+
+    it('throws when any one of several keys is unregistered', async () => {
+      await expectAsync(strictConfigChain().read(repoPath, 'git', 'merge_body_mode', 'nope')).toBeRejectedWithError(
+        /"git\.nope"/
+      );
+    });
+
+    it('reads an exactly registered key', async () => {
+      await writeRepoConfig({ git: { merge_body_mode: 'full' } });
+
+      await expectAsync(strictConfigChain().read(repoPath, 'git', 'merge_body_mode')).toBeResolvedTo('full');
+    });
+
+    it('reads a key matching a wildcard entry', async () => {
+      await writeRepoConfig({ git: { agents: { architect: 'specific@repo' } } });
+
+      await expectAsync(strictConfigChain().read(repoPath, 'git', 'agents.architect', 'email')).toBeResolvedTo(
+        'specific@repo'
+      );
+    });
+
+    it('never throws when the variable is unset', async () => {
+      await expectAsync(newConfigChain().read(repoPath, 'foo', 'bar')).toBeResolvedTo(undefined);
+    });
+
+    it('never throws when the variable is set to anything but 1', async () => {
+      await expectAsync(newConfigChain({ ARCANUM_STRICT_CONFIG_KEYS: 'true' }).read(repoPath, 'foo', 'bar'))
+        .toBeResolvedTo(undefined);
+    });
+
+    it('does not guard #readTiers', async () => {
+      const tiers = await strictConfigChain().readTiers(repoPath, 'foo', 'bar');
+
+      expect(tiers.map(({ set }) => set)).toEqual([false, false, false]);
+    });
+
+    it('guards #readWithSource too', async () => {
+      await expectAsync(strictConfigChain().readWithSource(repoPath, 'foo', 'bar')).toBeRejectedWithError(
+        /"foo\.bar"/
+      );
+    });
+  });
+
   describe('#readWithSource', () => {
     const localFile = () => path.join(repoPath, '.claude', 'state', 'arcanum-config.json');
     const repoFile = () => path.join(repoPath, '.claude', 'configuration', 'arcanum-repo-config.json');

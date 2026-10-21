@@ -18,6 +18,8 @@ if [[ $# -lt 2 ]]; then
   exit 1
 fi
 KEY="$2"
+# config-key: auto-fix-all.clear_context
+# config-key: auto-fix-all.finish_on_empty_queue
 CURRENT=$(repo_config_read "$(_new_file_for_key "$KEY")" "$(_legacy_file_for_key "$KEY")" "$NAMESPACE" "$KEY")
 CURRENT="${CURRENT:-false}"
 if [[ "$CURRENT" == "true" ]]; then
@@ -25,5 +27,7 @@ if [[ "$CURRENT" == "true" ]]; then
 else
   NEW_VALUE="true"
 fi
+# config-key: auto-fix-all.clear_context
+# config-key: auto-fix-all.finish_on_empty_queue
 repo_config_write "$(_new_file_for_key "$KEY")" "$(_legacy_file_for_key "$KEY")" "$NAMESPACE" "$KEY" "$NEW_VALUE"
 echo "$NEW_VALUE"

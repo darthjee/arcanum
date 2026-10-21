@@ -27,6 +27,7 @@ You do not own `core/Dockerfile`, `core/docker-compose.yml`, or the root `Makefi
 - No string-interpolated shell execution from native code — any `child_process` call must use `execFile`/`spawn` with an argument array, never `exec()` with a concatenated string.
 - No real network calls in specs: mock/stub `fetch` using fixture data under `core/spec/support/fixtures/`.
 - Never print a GitHub token (from `gh auth token` or otherwise) to stdout or logs.
+- Adding a config key means adding a `core/lib/utils/config/keys.json` entry (and a `# config-key: <key>` annotation above any shell config call whose key can't be read statically) — see [Shared State & Configuration Files](../../docs/agents/architecture/shared-state-and-configuration.md#the-key-registry).
 - Never edit `cli/` — it is owned by `client`. A change to a shared-surface file in `core/lib/` (the config services the CLI bundles) keeps the CLI specs green in the same PR, with the `cli/` side planned for `client`.
 
 ## How to coordinate with the architect

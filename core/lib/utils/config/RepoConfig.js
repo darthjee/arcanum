@@ -1,7 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { assertRegisteredConfigKey } from './KeyRegistry.js';
 
-const DEFAULT_SAFE_BRANCH = 'origin/main';
+/** `git.safe_branch`'s default, checked against keys.json by the defaults drift spec. */
+export const DEFAULT_SAFE_BRANCH = 'origin/main';
 
 /**
  * Reads single-tier config keys (no legacy-file fallback, no
@@ -24,9 +26,13 @@ class RepoConfig {
    *   The `RepoContext` type reference is optional, core-only
    *   documentation — the CLI never passes a `RepoContext`, only an
    *   object carrying `repoPath` — and pulls nothing into the bundle.
+   * @param {object} [deps] - injectable collaborators, for testing.
+   * @param {object} [deps.env] - the environment the strict-keys guard
+   *   reads `ARCANUM_STRICT_CONFIG_KEYS` from (defaults to `process.env`).
    */
-  constructor(repoContext) {
+  constructor(repoContext, { env = process.env } = {}) {
     this._repoContext = repoContext;
+    this._env = env;
   }
 
   /**
@@ -34,6 +40,8 @@ class RepoConfig {
    *   to `"origin/main"` when absent/empty/unreadable.
    */
   async getSafeBranch() {
+    assertRegisteredConfigKey('git.safe_branch', this._env);
+
     const { repoPath } = this._repoContext;
 
     const configPath = path.join(repoPath, '.claude', 'state', 'arcanum-config.json');
@@ -73,6 +81,8 @@ class RepoConfig {
    *   absent, unreadable, malformed, or not itself an array.
    */
   async getIgnoredCheckPatterns() {
+    assertRegisteredConfigKey('auto-fix-all.ignored_check_patterns', this._env);
+
     const { repoPath } = this._repoContext;
 
     const configPath = path.join(repoPath, '.claude', 'configuration', 'arcanum-repo-config.json');

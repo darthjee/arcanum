@@ -27,6 +27,7 @@ cmd_config() {
 #   Writes next_step.auto.<skill> = <true|false> into this migration's tier.
 write_auto() {
   local skill="$1" value="$2"
+  # config-key: next_step.auto.<skill>
   repo_config_write ".claude/configuration/arcanum-repo-config.json" "" "$NAMESPACE" "auto.${skill}" "$value"
 }
 

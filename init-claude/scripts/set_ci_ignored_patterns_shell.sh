@@ -35,4 +35,5 @@ else
   PATTERNS_JSON="$(printf '%s\n' "$@" | jq -R . | jq -s -c .)"
 fi
 
+# config-key: auto-fix-all.ignored_check_patterns
 repo_config_write "$NEW_CONFIG_FILE" "$LEGACY_CONFIG_FILE" "$NAMESPACE" "ignored_check_patterns" "$PATTERNS_JSON"
