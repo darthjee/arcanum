@@ -23,9 +23,11 @@ class ConfigChain {
    *   `CLAUDE_CONFIG_DIR`/`HOME` from (defaults to `process.env`).
    * @param {import('../../context/RepoContext.js').default} [deps.repoContext] -
    *   the target repo's context, whose `repoPath` `#read` falls back to
-   *   when its own `repoPath` argument is omitted. Optional — `RepoContext.js`
-   *   still builds `ConfigChain` zero-arg internally and passes `repoPath`
-   *   explicitly on every `#read` call.
+   *   when its own `repoPath` argument is omitted. Optional, core-only —
+   *   the CLI never passes it (this JSDoc type reference pulls nothing
+   *   into the bundle); `RepoContext.js` itself still builds
+   *   `ConfigChain` zero-arg internally and passes `repoPath` explicitly
+   *   on every `#read` call.
    */
   constructor({ env = process.env, repoContext } = {}) {
     this._env = env;

@@ -21,6 +21,7 @@ The config logic stays in `core/` as the single source, owned by `node`. The **s
 | `core/lib/utils/config/AgentEmail.js` | Shared agent-email resolution (see [Shared agent-email helper](#shared-agent-email-helper)). |
 | `core/lib/utils/config/KeyRegistry.js` and `keys.json` | The [Key Registry](key-registry.md#location) and its loader, validator and matcher. |
 | `core/lib/utils/file/Lock.js` | The lock, compatible with the shell `lock.sh` (see [Lock](#lock)). |
+| `core/lib/utils/file/LockTimeoutError.js` | The error `Lock` throws when its optional `timeoutMs` bound runs out (`code: 'LOCK_TIMEOUT'`); imported by `Lock.js`, so it is bundled with it. |
 | `core/lib/utils/file/RepoPath.js` | Repo-path validation and root normalization (see [Repo-root normalizing helper](#repo-root-normalizing-helper)). |
 
 - **The authoritative declaration** of this list is the explicit `files` list of the shared-surface block in `core/eslint.config.mjs` (see [Guardrails](#guardrails)). This table explains it; when the two disagree, the ESLint block wins and this table is fixed.
@@ -145,18 +146,22 @@ The surface is enforced on **both sides**, following the precedent of `core/esli
   // The CLI's declared shared surface (docs/agents/specs/arcanum-cli/shared-config-logic.md):
   // these files are bundled into arcanum-cli, so they may import only node:
   // built-ins and each other. Replaces the commands-layering rule for these
-  // files (flat config: last matching block wins); `**` already rejects commands/.
+  // files (flat config: last matching block wins); the allowlist already rejects commands/.
   files: [
     'lib/utils/config/ConfigChain.js', 'lib/utils/config/RepoConfig.js',
     'lib/utils/config/RepoConfigWriter.js', 'lib/utils/config/ConfigError.js',
     'lib/utils/config/AgentEmail.js', 'lib/utils/config/KeyRegistry.js',
-    'lib/utils/file/Lock.js', 'lib/utils/file/RepoPath.js'
+    'lib/utils/file/Lock.js', 'lib/utils/file/LockTimeoutError.js', 'lib/utils/file/RepoPath.js'
   ],
   rules: {
     'no-restricted-imports': ['error', { patterns: [{
-      group: ['**', '!node:*', '!./ConfigChain.js', '!./RepoConfig.js', '!./RepoConfigWriter.js',
-              '!./ConfigError.js', '!./AgentEmail.js', '!./keys.json',
-              '!../file/Lock.js', '!../file/RepoPath.js', '!../config/ConfigError.js'],
+      // Allowlist: any specifier NOT matching one of these alternatives is restricted.
+      regex: '^(?!(?:node:.+' +
+        '|\\./(?:ConfigChain|RepoConfig|RepoConfigWriter|ConfigError|AgentEmail|KeyRegistry)\\.js' +
+        '|\\./keys\\.json' +
+        '|\\./(?:Lock|LockTimeoutError|RepoPath)\\.js' +
+        '|\\.\\./file/(?:Lock|LockTimeoutError|RepoPath)\\.js' +
+        '|\\.\\./config/(?:ConfigChain|ConfigError)\\.js)$)',
       message: 'Shared-surface files may import only node: built-ins and other shared-surface files.'
     }] }],
     'no-restricted-syntax': ['error',
@@ -165,6 +170,7 @@ The surface is enforced on **both sides**, following the precedent of `core/esli
 }
 ```
 
+- The allowlist is a negative-lookahead `regex`, not a gitignore-style `group` (`'**'` plus `'!…'` re-includes): under gitignore semantics `**` also excludes the parent segments (`.`, `..`, `node:fs`), which can never be re-included, so such a `group` rejects every import.
 - Bare built-ins (`'fs'` instead of `'node:fs'`) are rejected. Every current import already uses `node:`, so this keeps the allowlist simple at no cost.
 - `no-restricted-syntax` covers dynamic `import()`, which `no-restricted-imports` ignores. `export … from` is already covered.
 - Patterns match the import **specifier**, not the resolved path. For example, `'./ConfigChain.js'` written in `file/Lock.js` passes lint and fails at runtime; specs catch that, and the build's metafile check covers resolved paths.
