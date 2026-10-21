@@ -15,6 +15,7 @@ docs/
 ISSUE_TEMPLATE.md
 .gitignore
 scripts/
+cli/
 arcanum.version
 
 # Not in git, or never wanted in the image.

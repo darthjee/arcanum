@@ -44,6 +44,7 @@ EXCLUDES=(
   "ISSUE_TEMPLATE.md"
   ".gitignore"
   "scripts/"
+  "cli/"
   "arcanum.version"
 )
 
