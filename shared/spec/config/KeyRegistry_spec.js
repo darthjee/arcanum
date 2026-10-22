@@ -334,9 +334,34 @@ describe('KeyRegistry', () => {
       expect(() => assertRegisteredConfigKey('foo.bar', {})).not.toThrow();
     });
 
-    it('defaults to process.env, which the spec runner sets', () => {
-      expect(process.env.ARCANUM_STRICT_CONFIG_KEYS).toBe('1');
-      expect(() => assertRegisteredConfigKey('foo.bar')).toThrowError(/foo\.bar/);
+    describe('when defaulting to process.env', () => {
+      let original;
+
+      beforeEach(() => {
+        original = process.env.ARCANUM_STRICT_CONFIG_KEYS;
+      });
+
+      afterEach(() => {
+        if (original === undefined) {
+          delete process.env.ARCANUM_STRICT_CONFIG_KEYS;
+        } else {
+          process.env.ARCANUM_STRICT_CONFIG_KEYS = original;
+        }
+      });
+
+      it('is off, since the shared spec runner does not set the guard', () => {
+        expect(process.env.ARCANUM_STRICT_CONFIG_KEYS).toBeUndefined();
+        expect(() => assertRegisteredConfigKey('foo.bar')).not.toThrow();
+      });
+
+      it('throws on an unregistered key when process.env turns the guard on', () => {
+        process.env.ARCANUM_STRICT_CONFIG_KEYS = '1';
+
+        expect(() => assertRegisteredConfigKey('foo.bar')).toThrowError(
+          Error,
+          'arcanum: config key "foo.bar" is not in core/lib/shared/config/keys.json (ARCANUM_STRICT_CONFIG_KEYS=1)'
+        );
+      });
     });
   });
 });
