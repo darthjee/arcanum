@@ -2,22 +2,9 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  buildBundle, checkInputs, compareSemver, migrationVersions, nodeTarget, sharedSurface
+  ALLOWED_INPUT_DIRS, buildBundle, checkInputs, compareSemver, migrationVersions, nodeTarget
 } from '../../scripts/build.mjs';
 import { CLI_DIR, REPO_ROOT } from '../support/paths.js';
-
-const SURFACE = [
-  'core/lib/utils/config/ConfigChain.js',
-  'core/lib/utils/config/RepoConfig.js',
-  'core/lib/utils/config/RepoConfigWriter.js',
-  'core/lib/utils/config/ConfigError.js',
-  'core/lib/utils/config/AgentEmail.js',
-  'core/lib/utils/config/KeyRegistry.js',
-  'core/lib/utils/file/Lock.js',
-  'core/lib/utils/file/LockTimeoutError.js',
-  'core/lib/utils/file/RepoPath.js',
-  'core/lib/utils/config/keys.json'
-];
 
 describe('scripts/build.mjs', () => {
   let tmp;
@@ -160,56 +147,35 @@ describe('scripts/build.mjs', () => {
     });
   });
 
-  describe('sharedSurface', () => {
-    it('returns core\'s declared surface files plus keys.json', async () => {
-      expect([...(await sharedSurface())].sort()).toEqual([...SURFACE].sort());
-    });
-
-    it('fails unless exactly one block targets ImportExpression', async () => {
-      await mkdir(path.join(tmp, 'core'));
-      await writeFile(
-        path.join(tmp, 'core', 'eslint.config.mjs'),
-        'import js from \'@eslint/js\';\nexport default [js.configs.recommended, { rules: {} }];\n'
-      );
-
-      await expectAsync(sharedSurface(tmp)).toBeRejectedWithError(/exactly one shared-surface block.*found 0/);
-    });
-
-    it('fails when the surface block has no files list', async () => {
-      await mkdir(path.join(tmp, 'core'));
-      await writeFile(
-        path.join(tmp, 'core', 'eslint.config.mjs'),
-        'export default [{ rules: { \'no-restricted-syntax\': [\'error\', \'ImportExpression\'] } }];\n'
-      );
-
-      await expectAsync(sharedSurface(tmp)).toBeRejectedWithError(/no files list/);
-    });
-  });
-
   describe('checkInputs', () => {
-    const allowed = ['core/lib/utils/config/KeyRegistry.js', 'core/lib/utils/config/keys.json'];
     const dirs = { workingDir: CLI_DIR, repoRoot: REPO_ROOT };
 
-    it('accepts cli/lib inputs, allowed core inputs and define inputs', () => {
+    it('allows cli/lib/ and core/lib/shared/ by default', () => {
+      expect(ALLOWED_INPUT_DIRS).toEqual(['cli/lib/', 'core/lib/shared/']);
+    });
+
+    it('accepts cli/lib inputs, core/lib/shared inputs and define inputs', () => {
       const metafile = {
         inputs: {
           'lib/main.js': {},
           'lib/commands/config.js': {},
-          '../core/lib/utils/config/KeyRegistry.js': {},
-          '../core/lib/utils/config/keys.json': {},
+          '../core/lib/shared/config/KeyRegistry.js': {},
+          '../core/lib/shared/config/keys.json': {},
+          '../core/lib/shared/file/Lock.js': {},
           '<define:__ARCANUM_MIGRATION_VERSIONS__>': {}
         }
       };
 
-      expect(checkInputs(metafile, allowed, dirs)).toEqual([
+      expect(checkInputs(metafile, dirs)).toEqual([
         'cli/lib/commands/config.js',
         'cli/lib/main.js',
-        'core/lib/utils/config/KeyRegistry.js',
-        'core/lib/utils/config/keys.json'
+        'core/lib/shared/config/KeyRegistry.js',
+        'core/lib/shared/config/keys.json',
+        'core/lib/shared/file/Lock.js'
       ]);
     });
 
-    it('rejects an input outside cli/lib and the surface', () => {
+    it('rejects an input outside cli/lib and core/lib/shared', () => {
       const metafile = {
         inputs: {
           'lib/main.js': {},
@@ -218,12 +184,33 @@ describe('scripts/build.mjs', () => {
         }
       };
 
-      expect(() => checkInputs(metafile, allowed, dirs))
-        .toThrowError(/cli\/scripts\/build\.mjs, core\/lib\/context\/RepoContext\.js/);
+      expect(() => checkInputs(metafile, dirs)).toThrowError(
+        'bundled inputs outside cli/lib/** and core/lib/shared/**: ' +
+        'cli/scripts/build.mjs, core/lib/context/RepoContext.js'
+      );
+    });
+
+    it('rejects an input at an old core/lib/utils surface path', () => {
+      const metafile = { inputs: { '../core/lib/utils/config/ConfigChain.js': {} } };
+
+      expect(() => checkInputs(metafile, dirs)).toThrowError(/core\/lib\/utils\/config\/ConfigChain\.js/);
+    });
+
+    it('rejects an input that only shares the folder name prefix', () => {
+      const metafile = { inputs: { '../core/lib/shared-other/X.js': {} } };
+
+      expect(() => checkInputs(metafile, dirs)).toThrowError(/core\/lib\/shared-other\/X\.js/);
+    });
+
+    it('takes the allowed folders as an option', () => {
+      const metafile = { inputs: { 'lib/main.js': {}, '../core/lib/shared/config/ConfigChain.js': {} } };
+
+      expect(() => checkInputs(metafile, { ...dirs, allowedDirs: ['cli/lib/'] }))
+        .toThrowError(/outside cli\/lib\/\*\*: core\/lib\/shared\/config\/ConfigChain\.js/);
     });
 
     it('defaults to cli/ as the working directory', () => {
-      expect(checkInputs({ inputs: { 'lib/main.js': {} } }, allowed)).toEqual(['cli/lib/main.js']);
+      expect(checkInputs({ inputs: { 'lib/main.js': {} } })).toEqual(['cli/lib/main.js']);
     });
   });
 
@@ -237,7 +224,7 @@ describe('scripts/build.mjs', () => {
       expect(result.outfile).toBe(outfile);
       expect(result.version).toBe(manifest.version);
       expect(result.inputs).toContain('cli/lib/main.js');
-      expect(result.inputs).toContain('core/lib/utils/config/keys.json');
+      expect(result.inputs).toContain('core/lib/shared/config/keys.json');
       expect(bundle).toContain(`"${manifest.version}"`);
       expect(bundle).toContain('"engine.mode"');
       expect(bundle).toContain('"0.13.0"');

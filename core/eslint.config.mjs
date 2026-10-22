@@ -75,25 +75,14 @@ export default [
     }
   },
   {
-    // The CLI's declared shared surface (see
-    // docs/agents/specs/arcanum-cli/shared-config-logic.md): these files
-    // are bundled into arcanum-cli, so they may import only `node:`
-    // built-ins and each other (KeyRegistry.js also loads `./keys.json`).
-    // This `files` list is the authoritative declaration of the surface.
+    // The shared surface (see docs/agents/specs/shared-lib.md): everything
+    // under `lib/shared/` is bundled into arcanum-cli, so the folder itself
+    // is the declaration of the surface. Its files may import only `node:`
+    // built-ins and relative paths that stay inside `lib/shared/`.
     // Replaces the commands-layering rule above for these files (flat
     // config: last matching block wins); the allowlist already rejects
     // commands/.
-    files: [
-      'lib/utils/config/ConfigChain.js',
-      'lib/utils/config/RepoConfig.js',
-      'lib/utils/config/RepoConfigWriter.js',
-      'lib/utils/config/ConfigError.js',
-      'lib/utils/config/AgentEmail.js',
-      'lib/utils/config/KeyRegistry.js',
-      'lib/utils/file/Lock.js',
-      'lib/utils/file/LockTimeoutError.js',
-      'lib/utils/file/RepoPath.js'
-    ],
+    files: ['lib/shared/**/*.js'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -105,14 +94,15 @@ export default [
               // with `**` plus `!` re-includes cannot express this: `**`
               // also excludes the parent `.`/`..`/`node:fs` segments,
               // which gitignore semantics never re-include.)
+              // Relative specifiers may start with `./` or a single `../`
+              // (surface files sit in `lib/shared/<area>/`, so one `../`
+              // stays inside `lib/shared/`); no later segment may start
+              // with a dot, which rejects any further `..` (e.g.
+              // `../../context/RepoContext.js`).
               regex:
                 '^(?!(?:node:.+' +
-                '|\\./(?:ConfigChain|RepoConfig|RepoConfigWriter|ConfigError|AgentEmail|KeyRegistry)\\.js' +
-                '|\\./keys\\.json' +
-                '|\\./(?:Lock|LockTimeoutError|RepoPath)\\.js' +
-                '|\\.\\./file/(?:Lock|LockTimeoutError|RepoPath)\\.js' +
-                '|\\.\\./config/(?:ConfigChain|ConfigError)\\.js)$)',
-              message: 'Shared-surface files may import only node: built-ins and other shared-surface files.'
+                '|\\.\\.?/(?:[\\w-][\\w.-]*/)*[\\w-][\\w.-]*)$)',
+              message: 'Files under lib/shared/ may import only node: built-ins and other files under lib/shared/.'
             }
           ]
         }

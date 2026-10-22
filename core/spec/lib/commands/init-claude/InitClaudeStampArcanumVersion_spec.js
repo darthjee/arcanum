@@ -3,9 +3,9 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import InitClaudeStampArcanumVersion from '../../../../lib/commands/init-claude/InitClaudeStampArcanumVersion.js';
 import RepoContext from '../../../../lib/context/RepoContext.js';
-import RepoConfigWriter from '../../../../lib/utils/config/RepoConfigWriter.js';
+import RepoConfigWriter from '../../../../lib/shared/config/RepoConfigWriter.js';
 import InstallVersion from '../../../../lib/utils/file/InstallVersion.js';
-import Lock from '../../../../lib/utils/file/Lock.js';
+import Lock from '../../../../lib/shared/file/Lock.js';
 import { fakeExecFileAsync } from '../../../support/utils/fakeExecFileAsync.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 

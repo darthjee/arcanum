@@ -3,8 +3,8 @@ import { access, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import Lock from '../../../../lib/utils/file/Lock.js';
-import LockTimeoutError from '../../../../lib/utils/file/LockTimeoutError.js';
+import Lock from '../../../../lib/shared/file/Lock.js';
+import LockTimeoutError from '../../../../lib/shared/file/LockTimeoutError.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../..');

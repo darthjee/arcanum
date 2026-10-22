@@ -1,5 +1,5 @@
 import DispatchFailure from '../../utils/errors/DispatchFailure.js';
-import Lock from '../../utils/file/Lock.js';
+import Lock from '../../shared/file/Lock.js';
 import QueueStore from '../../utils/queue/QueueStore.js';
 
 /**

@@ -1,4 +1,4 @@
-import KeyRegistry, { assertRegisteredConfigKey } from '../../../../lib/utils/config/KeyRegistry.js';
+import KeyRegistry, { assertRegisteredConfigKey } from '../../../../lib/shared/config/KeyRegistry.js';
 
 describe('KeyRegistry', () => {
   const ALL = ['global', 'repo', 'local'];
@@ -318,7 +318,7 @@ describe('KeyRegistry', () => {
 
     it('throws on an unregistered key when the guard is on', () => {
       expect(() => assertRegisteredConfigKey('foo.bar', STRICT)).toThrowError(
-        'arcanum: config key "foo.bar" is not in core/lib/utils/config/keys.json (ARCANUM_STRICT_CONFIG_KEYS=1)'
+        'arcanum: config key "foo.bar" is not in core/lib/shared/config/keys.json (ARCANUM_STRICT_CONFIG_KEYS=1)'
       );
     });
 

@@ -1,6 +1,6 @@
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import IssueStatePaths from '../utils/file/IssueStatePaths.js';
-import Lock from '../utils/file/Lock.js';
+import Lock from '../shared/file/Lock.js';
 import JsonParser from '../utils/json/JsonParser.js';
 import JsonReader from '../utils/json/JsonReader.js';
 import JsonValueFormatter from '../utils/json/JsonValueFormatter.js';

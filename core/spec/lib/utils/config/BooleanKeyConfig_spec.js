@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import BooleanKeyConfig from '../../../../lib/utils/config/BooleanKeyConfig.js';
 import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
-import Lock from '../../../../lib/utils/file/Lock.js';
+import Lock from '../../../../lib/shared/file/Lock.js';
 import FlatBooleanKeyConfig from '../../../support/dummies/FlatBooleanKeyConfig.js';
 import { captureRejection } from '../../../support/utils/captureRejection.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';

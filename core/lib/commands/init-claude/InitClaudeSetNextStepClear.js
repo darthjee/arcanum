@@ -23,7 +23,7 @@ class InitClaudeSetNextStepClear extends InitClaudeSetNextStepKey {
    * @param {import('../../context/RepoContext.js').default} repoContext -
    *   the target repo's context, supplying `repoPath`.
    * @param {object} [deps] - injectable collaborators, for testing.
-   * @param {import('../../utils/config/RepoConfigWriter.js').default} [deps.writer] -
+   * @param {import('../../shared/config/RepoConfigWriter.js').default} [deps.writer] -
    *   the repo-config writer.
    */
   constructor(repoContext, deps = {}) {

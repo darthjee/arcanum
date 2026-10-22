@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import DispatchFailure from '../errors/DispatchFailure.js';
-import Lock from '../file/Lock.js';
+import Lock from '../../shared/file/Lock.js';
 
 /** The `// false` default every boolean key resolves to, checked against keys.json by the defaults drift spec. */
 export const DEFAULT_VALUE = 'false';

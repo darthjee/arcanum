@@ -1,5 +1,5 @@
-import AgentEmail from '../../../../lib/utils/config/AgentEmail.js';
-import ConfigChain from '../../../../lib/utils/config/ConfigChain.js';
+import AgentEmail from '../../../../lib/shared/config/AgentEmail.js';
+import ConfigChain from '../../../../lib/shared/config/ConfigChain.js';
 import {
   AGENT_EMAIL_FIXTURES,
   MODEL_EMAIL,

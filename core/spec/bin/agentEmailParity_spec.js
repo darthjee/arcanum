@@ -11,7 +11,7 @@ import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
 // Shell side of the agent-email parity table (issue #778): runs
 // arcanum/_lib/agent_email.sh's `agent_email_get` against every row of
-// the shared fixture table that core/spec/lib/utils/config/AgentEmail_spec.js
+// the shared fixture table that core/spec/lib/shared/config/AgentEmail_spec.js
 // runs natively, so shell and native agree on every row (`null`, `""`,
 // generic-beats-specific across tiers, `{agent}` substitution).
 

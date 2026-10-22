@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import ConfigChain from '../../../../lib/utils/config/ConfigChain.js';
+import ConfigChain from '../../../../lib/shared/config/ConfigChain.js';
 import { createRepoContextMock } from '../../../support/factories/repoContextFactory.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
@@ -215,7 +215,7 @@ describe('ConfigChain', () => {
 
     it('throws on a key that matches no registry entry', async () => {
       await expectAsync(strictConfigChain().read(repoPath, 'foo', 'bar')).toBeRejectedWithError(
-        /config key "foo\.bar" is not in core\/lib\/utils\/config\/keys\.json/
+        /config key "foo\.bar" is not in core\/lib\/shared\/config\/keys\.json/
       );
     });
 

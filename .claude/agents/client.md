@@ -27,7 +27,7 @@ These specs are explicitly yours:
 
 You do not own:
 
-- `core/lib/`, `core/spec/` and the key registry (`core/lib/utils/config/keys.json`, `KeyRegistry.js` — both move to `shared/lib/` in #824) — those are `node`'s, and `shared`'s once they move.
+- `core/lib/`, `core/spec/` and the key registry (`core/lib/shared/config/keys.json`, `KeyRegistry.js` — both move to `shared/lib/` in #824) — those are `node`'s, and `shared`'s once they move.
 - `shared/` — the root lib consumed by both `core/` and `cli/`, owned by `shared`.
 - Docker, docker-compose, the Makefile's `cli-*` targets, `.circleci/`, `scripts/publish_cli_package.sh` and `scripts/bump-version.sh` — those are `infra`'s.
 - `AGENTS.md`, the root `README.md` and the agent roster — those stay with `architect`.

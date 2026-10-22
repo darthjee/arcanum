@@ -107,9 +107,9 @@ Node's `package.json` `imports` field cannot point outside its own package, so r
 
 The move goes **step by step**: consolidate inside core, then copy, then switch. It is not one big move.
 
-1. **Consolidate inside core (#820).** Move the 10 files into `core/lib/shared/{config,file}/`, and their moved specs into `core/spec/lib/shared/{config,file}/`. Rewrite the imports in `core/` and `cli/`. Replace the 9-file allowlist in `core/eslint.config.mjs` with a folder rule (`core/lib/shared/**` may import only `node:` built-ins and itself). Repoint the CLI lint restriction and the build metafile check. Behaviour stays the same.
+1. **Consolidate inside core (#820).** Move the 10 files into `core/lib/shared/{config,file}/`, and their moved specs into `core/spec/lib/shared/{config,file}/`. Rewrite the imports in `core/` and `cli/`. Replace the 9-file allowlist in `core/eslint.config.mjs` with a folder rule (`core/lib/shared/**` may import only `node:` built-ins and itself). The CLI side becomes folder-based too: `cli/eslint.config.mjs` lets `cli/` import anything under `core/lib/shared/` and nothing else under `core/`, and `cli/scripts/build.mjs`'s metafile check accepts bundled inputs under `cli/lib/**` and `core/lib/shared/**` only, no longer reading core's ESLint config. Code comments that name the moved paths (`arcanum/_lib/lock.sh`, comments in `core/` and `cli/`) are repointed to `core/lib/shared/`, so none points at a deleted path. Behaviour stays the same.
 2. **Copy (#822).** Scaffold `shared/` and **copy** (not move) `core/lib/shared/{config,file}/` into `shared/lib/{config,file}/`, and the moved and duplicated specs into `shared/spec/`. `core/` and `cli/` are not touched.
-3. **Switch (#824).** `core/` and `cli/` import `shared/` by relative path. Thanks to step 1, this is a prefix change (`core/lib/shared/` → `shared/lib/`). Delete `core/lib/shared/` and `core/spec/lib/shared/`, with no re-export shims. Move core's folder lint rule to `shared/`, and repoint `cli/eslint.config.mjs`'s restriction and `cli/scripts/build.mjs`'s metafile check at `shared/`. Repoint code comments that name the old paths (`arcanum/_lib/lock.sh`, `cli/scripts/build.mjs`).
+3. **Switch (#824).** `core/` and `cli/` import `shared/` by relative path. Thanks to step 1, this is a prefix change (`core/lib/shared/` → `shared/lib/`). Delete `core/lib/shared/` and `core/spec/lib/shared/`, with no re-export shims. Move core's folder lint rule to `shared/`. Since step 1 made the CLI side folder-based, `cli/eslint.config.mjs`'s restriction and `cli/scripts/build.mjs`'s metafile check are a prefix swap to `shared/lib/`. Code comments that name `core/lib/shared/` paths (`arcanum/_lib/lock.sh`, `core/`, `cli/`) are repointed a second time, to `shared/lib/`.
 
 **Drift rule for the copy window.** Between steps 2 and 3, the surface exists in both `core/lib/shared/` and `shared/lib/`. No change to those files is planned in that window. If one is unavoidable, it is made in **both** copies.
 
@@ -141,7 +141,7 @@ Every file under `core/spec` and `cli/spec` that the move affects, derived from 
 
 | File | Notes |
 | --- | --- |
-| `core/spec/lib/utils/file/Lock_spec.js` | Split by what each side can run. `shared/spec/file/Lock_spec.js` gets the unit `describe`s (`#acquire`, mutual exclusion, `#release`, stale locks, bound). Core keeps the "cross-implementation race with `arcanum/_lib/lock.sh`" block, which needs bash and `arcanum/_lib/`. |
+| `core/spec/lib/utils/file/Lock_spec.js` | #820 moves it whole, unchanged, to `core/spec/lib/shared/file/Lock_spec.js`, so specs keep mirroring `lib/` 1:1. #822 splits it by what each side can run. `shared/spec/file/Lock_spec.js` gets the unit `describe`s (`#acquire`, mutual exclusion, `#release`, stale locks, bound). Core keeps the "cross-implementation race with `arcanum/_lib/lock.sh`" block, which needs bash and `arcanum/_lib/`. |
 | `core/spec/support/utils/tempDir.js` | Copied to `shared/spec/support/utils/`. Used by most moved specs. |
 | `core/spec/support/utils/gitFixtureRepo.js` | Copied to `shared/spec/support/utils/`. Used by `RepoPath_spec.js`. |
 | `core/spec/support/fixtures/agentEmailFixtures.js` | Copied to `shared/spec/support/fixtures/`. Used by `AgentEmail_spec.js` (shared) and `core/spec/bin/agentEmailParity_spec.js` (core), so the shell/native parity table stays one table per side. |
@@ -290,7 +290,7 @@ One sub-issue per item of #816's split. Each refers to its dependencies as "item
 | 9 | #826 | Promote this spec into architecture docs; rewrite the suspended `arcanum-cli` spec sections and every doc that points at `core/lib/utils/config`; update the `architecture.md` index. | `architect` | 7, 8 |
 | 10 | #827 | Remove this spec (and `shared-lib/`, if it was split). | `architect` | 9 |
 
-Path references are repointed as they move: code comments in #824; agent files (`node.md`, `scripter.md`, `client.md`) keep the current paths in #819, each with a "moves to `shared/lib/` in #824" note, and are repointed in #820 and #824 as those move the files; architecture docs (`lock-system.md`, `docker-engine.md`, `shared-state-and-configuration.md`) in #826. Plain `core/lib/...` mentions in the `arcanum-cli` specs (e.g. `command-surface.md`) carry no banner and are repointed in #826.
+Path references are repointed as they move: code comments in #820 (to `core/lib/shared/`) and again in #824 (to `shared/lib/`); agent files (`node.md`, `scripter.md`, `client.md`) keep the current paths in #819, each with a "moves to `shared/lib/` in #824" note, and are repointed in #820 and #824 as those move the files; architecture docs (`lock-system.md`, `docker-engine.md`, `shared-state-and-configuration.md`) in #826. Plain `core/lib/...` mentions in the `arcanum-cli` specs (e.g. `command-surface.md`) carry no banner and are repointed in #826.
 
 ## Open points
 

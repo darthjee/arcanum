@@ -2,8 +2,8 @@ import { access } from 'node:fs/promises';
 import { execFile, spawn } from 'node:child_process';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import AgentEmail from '../../utils/config/AgentEmail.js';
-import ConfigChain from '../../utils/config/ConfigChain.js';
+import AgentEmail from '../../shared/config/AgentEmail.js';
+import ConfigChain from '../../shared/config/ConfigChain.js';
 
 const promisifiedExecFile = promisify(execFile);
 const USAGE = 'Usage: commit_change.sh <repo_path> <type> <scope> <id> <subject> <agent> <model_name> ' +
