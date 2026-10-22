@@ -45,6 +45,14 @@
 # under c8 (coverage thresholds enforced, blocking), then a non-blocking
 # audit; `shared-node-floor` re-runs the specs on cimg/node:22.13.0,
 # since the CLI bundles shared/ and ships it to users on Node 22.13.
+#
+# Codacy coverage: `test` (core/) and `shared` (shared/) each upload a
+# partial lcov report (`report --partial`), after rewriting its `SF:`
+# paths from package-relative (`lib/...`) to repo-root (`core/lib/...`,
+# `shared/lib/...`). The `coverage-final` job, which requires both, then
+# sends Codacy's `final` call to merge them for the commit. All uploads
+# are non-blocking. If `test` or `shared` fails, `coverage-final` is
+# skipped and that commit's coverage is never finalized (accepted).
 
 version: 2.1
 
@@ -106,8 +114,11 @@ jobs:
           name: Run tests with coverage
           command: yarn test
       - run:
-          name: Upload coverage to Codacy (non-blocking)
-          command: bash <(curl -Ls https://coverage.codacy.com/get.sh) report -r coverage/lcov.info || true
+          name: Make coverage paths relative to the repository root
+          command: sed -i -E 's#^SF:(.*/core/)?lib/#SF:core/lib/#' coverage/lcov.info
+      - run:
+          name: Upload partial coverage to Codacy (non-blocking)
+          command: bash <(curl -Ls https://coverage.codacy.com/get.sh) report --partial -r coverage/lcov.info || true
 
   checks:
     docker:
@@ -189,6 +200,12 @@ jobs:
           name: Run tests with coverage
           command: yarn test
       - run:
+          name: Make coverage paths relative to the repository root
+          command: sed -i -E 's#^SF:(.*/shared/)?lib/#SF:shared/lib/#' coverage/lcov.info
+      - run:
+          name: Upload partial coverage to Codacy (non-blocking)
+          command: bash <(curl -Ls https://coverage.codacy.com/get.sh) report --partial -r coverage/lcov.info || true
+      - run:
           name: Dependency audit (non-blocking)
           command: yarn audit || true
 
@@ -205,6 +222,14 @@ jobs:
       - run:
           name: Run tests
           command: yarn test
+
+  coverage-final:
+    docker:
+      - image: darthjee/circleci_node:0.2.1
+    steps:
+      - run:
+          name: Finalize Codacy coverage (non-blocking)
+          command: bash <(curl -Ls https://coverage.codacy.com/get.sh) final || true
 
   mod-checks:
     docker:
@@ -267,6 +292,11 @@ workflows:
             tags:
               ignore: /.*/
       - shared-node-floor:
+          filters:
+            tags:
+              ignore: /.*/
+      - coverage-final:
+          requires: [test, shared]
           filters:
             tags:
               ignore: /.*/
