@@ -6,7 +6,7 @@ import BooleanKeyConfig from './BooleanKeyConfig.js';
  * `true`/`false` keys under a namespace of the shared, three-tier
  * config files, re-deriving `arcanum/_lib/repo_config.sh`'s new/legacy
  * file split and `repo_config_read`/`repo_config_write` logic natively
- * (`core/lib/utils/config/RepoConfig.js` covers an unrelated,
+ * (`core/lib/shared/config/RepoConfig.js` covers an unrelated,
  * single-tier read). Currently backs `AutoFixAllConfig` and
  * `MonitorIssuesConfig`.
  *
@@ -29,7 +29,7 @@ class NamespacedBooleanKeyConfig extends BooleanKeyConfig {
    *   personal state file, with no legacy fallback.
    * @param {string} options.legacyFileName - the legacy file's name
    *   under `.claude/configuration/` (e.g. `auto-fix-all.json`).
-   * @param {import('../file/Lock.js').default} [options.lock] - the
+   * @param {import('../../shared/file/Lock.js').default} [options.lock] - the
    *   lock/mutate/release helper used to guard writes.
    */
   constructor({ namespace, stateKeys, legacyFileName, lock }) {

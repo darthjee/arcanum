@@ -1,5 +1,5 @@
 import path from 'node:path';
-import RepoConfigWriter from '../../utils/config/RepoConfigWriter.js';
+import RepoConfigWriter from '../../shared/config/RepoConfigWriter.js';
 
 const CONFIG_FILE = path.join('.claude', 'configuration', 'arcanum-repo-config.json');
 const NAMESPACE = 'next_step';

@@ -1,5 +1,5 @@
 import path from 'node:path';
-import RepoConfigWriter from '../../utils/config/RepoConfigWriter.js';
+import RepoConfigWriter from '../../shared/config/RepoConfigWriter.js';
 import { INSTALL_ROOT } from '../../utils/file/InstallRoot.js';
 import InstallVersion from '../../utils/file/InstallVersion.js';
 

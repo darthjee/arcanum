@@ -16,7 +16,7 @@ import NamespacedBooleanKeyConfig from '../../utils/config/NamespacedBooleanKeyC
 class MonitorIssuesConfig extends NamespacedBooleanKeyConfig {
   /**
    * @param {object} [deps] - injectable collaborators, for testing.
-   * @param {import('../../utils/file/Lock.js').default} [deps.lock] -
+   * @param {import('../../shared/file/Lock.js').default} [deps.lock] -
    *   the lock/mutate/release helper used to guard writes.
    */
   constructor({ lock } = {}) {

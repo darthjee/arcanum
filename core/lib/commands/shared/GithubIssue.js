@@ -5,7 +5,7 @@ import GithubIssueService from '../../services/GithubIssueService.js';
 import IssueStateService from '../../services/IssueStateService.js';
 import GithubToken from '../../utils/github/GithubToken.js';
 import IssueStatePaths from '../../utils/file/IssueStatePaths.js';
-import Lock from '../../utils/file/Lock.js';
+import Lock from '../../shared/file/Lock.js';
 import Origin from '../../utils/git/Origin.js';
 import JsonParser from '../../utils/json/JsonParser.js';
 import JsonReader from '../../utils/json/JsonReader.js';

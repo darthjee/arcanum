@@ -1,9 +1,9 @@
-import ConfigChain from '../utils/config/ConfigChain.js';
+import ConfigChain from '../shared/config/ConfigChain.js';
 import GithubIssueService from '../services/GithubIssueService.js';
 import GithubToken from '../utils/github/GithubToken.js';
 import IssueStateService from '../services/IssueStateService.js';
 import Origin from '../utils/git/Origin.js';
-import RepoPath from '../utils/file/RepoPath.js';
+import RepoPath from '../shared/file/RepoPath.js';
 
 /**
  * Bundles a single repo's `repoPath` with the 5 collaborators
