@@ -1,4 +1,4 @@
-import KeyRegistry from '../../../../core/lib/utils/config/KeyRegistry.js';
+import KeyRegistry from '../../../../core/lib/shared/config/KeyRegistry.js';
 import { run } from '../../../lib/commands/config.js';
 import { UsageError } from '../../../lib/exitCodes.js';
 import { fakeIo } from '../../support/fakeIo.js';
