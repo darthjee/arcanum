@@ -16,7 +16,7 @@ You own all of `shared/`:
 
 Your scope rule is "code consumed by both `core/` and `cli/`". New code that both consumers need goes into `shared/`, not into `core/lib`.
 
-`shared/` is created by #822. Until #824 deletes it, a copy of the surface also lives in `core/` (in `core/lib/utils/` until #820, then in `core/lib/shared/`), and that copy is `node`'s.
+`shared/` is created by #822. Until #824 deletes it, a copy of the surface also lives in `core/` (in `core/lib/shared/`, moved there from `core/lib/utils/` by #820), and that copy is `node`'s.
 
 You do not own:
 
