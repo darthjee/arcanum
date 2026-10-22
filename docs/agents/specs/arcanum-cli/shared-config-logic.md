@@ -10,6 +10,8 @@ Define how the CLI reuses arcanum's existing config read/write code, so that it 
 
 ### Source stays in `core/`
 
+> **Suspended:** under revision by epic #816; see [Shared Lib](../shared-lib.md). Until #826 rewrites it, `shared-lib.md` wins where the two disagree.
+
 The config logic stays in `core/` as the single source, owned by `node`. The **shared surface** is the set of `core/lib` files the CLI bundles:
 
 | File | Role |
@@ -125,6 +127,8 @@ Precondition, checked: no shared-surface file uses `import.meta.url` or `__dirna
 | `define` | `__ARCANUM_CLI_VERSION__` from `package.json` | `--version` needs no runtime file read or second JSON import. |
 | `metafile` | `true` | Feeds the surface check below. |
 
+> **Suspended:** the build-time surface check below is under revision by epic #816; see [Shared Lib](../shared-lib.md). Until #826 rewrites it, `shared-lib.md` wins where the two disagree.
+
 **Build-time surface check.** After building, `build.mjs` reads the metafile and **fails** if any bundled input lies outside `cli/lib/**` plus the shared-surface files. It reads that list from core's ESLint shared-surface block, the authoritative declaration, so there is no third copy. This complements the specifier-based lint rule (see [Guardrails](#guardrails)) with a check on resolved paths, at no new dependency.
 
 **`cli/package.json` wiring.** `"build": "node scripts/build.mjs"`; `"prepack": "yarn build"`, so `npm publish`/`npm pack` always ship a fresh bundle; `files: ["bin/", "dist/", "README.md"]`. The CI `cli` job and the release publish job both run `yarn build` (see [CI coupling](#ci-coupling) and [Packaging and Release](packaging-and-release.md#release)).
@@ -136,6 +140,8 @@ Precondition, checked: no shared-surface file uses `import.meta.url` or `__dirna
 ### Guardrails
 
 #### Shared-surface lint rule
+
+> **Suspended:** under revision by epic #816; see [Shared Lib](../shared-lib.md). Until #826 rewrites it, `shared-lib.md` wins where the two disagree.
 
 The surface is enforced on **both sides**, following the precedent of `core/eslint.config.mjs`'s existing `no-restricted-imports` block for the `commands → context/services → utils` layering.
 
@@ -201,11 +207,16 @@ Shape:
 
 ### Future work
 
+> **Suspended:** under revision by epic #816; see [Shared Lib](../shared-lib.md). Until #826 rewrites it, `shared-lib.md` wins where the two disagree.
+
 Extracting the shared config logic into its own npm package is a separate follow-up issue, outside epic #767. That issue must deal with `core` shipping with zero runtime npm dependencies inside the release zip and the Docker image, so `core` cannot simply depend on a published package. A likely shape: an in-repo workspace package that `core` imports locally and that is published to npm for the CLI.
 
 ## Alternatives considered
 
 - **Extracting a shared workspace package now.** Rejected: it needs a new root folder, import churn in `core`, and Docker/Makefile changes. That is too much for about 900 lines. It is kept as future work.
+
+  > **Suspended:** this bullet is under revision by epic #816; see [Shared Lib](../shared-lib.md). Until #826 rewrites it, `shared-lib.md` wins where the two disagree.
+
 - **A plain copy script instead of `esbuild`.** Rejected: copied files keep their relative imports and need their own module layout in the package, whereas a bundle is one self-contained file.
 - **Reimplementing the config logic in the CLI.** Rejected: it would drift from arcanum, especially the locking.
 - **Importing `core/lib` at runtime.** Impossible: `core/` is not shipped in the npm package.

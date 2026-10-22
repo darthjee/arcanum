@@ -54,6 +54,8 @@ A new root-level folder needs a new specialist agent. A `client` agent owns `cli
 | `infra` | Docker, docker-compose and Makefile `cli-*` targets; `.circleci/`, including the npm publish job and npm token setup. `.circleci/` is formally added to `infra`'s scope. |
 | `architect` | `AGENTS.md`, the root `README.md`, the agent roster, and this spec. |
 
+> **Suspended:** the `node` row is under revision by epic #816; see [Shared Lib](shared-lib.md). Until #826 rewrites it, `shared-lib.md` wins where the two disagree.
+
 Pieces introduced by this spec's decisions:
 
 | Piece | Owner |
