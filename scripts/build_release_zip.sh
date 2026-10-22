@@ -14,7 +14,12 @@
 # "docs/guides/" (packaged user-facing guides, e.g. linked from
 # arcanum/_lib/repo_config.sh's fallback warning) — every other doc
 # under docs/ stays dev-only and unshipped. The spec folders
-# ("core/spec/", "shared/spec/") are dev-only too and never shipped.
+# ("core/spec/", "shared/spec/") are dev-only too and never shipped,
+# as are CI, lint and test tooling config (".circleci/", the lint
+# configs, the root Makefile, core/docker-compose.yml, the
+# arcanum-next-step mod's tests and tsconfig.json) and arcanum.png.
+# EXCLUDES entries ending in "/" match a path prefix, entries containing
+# "*" are bash globs, and every other entry matches one exact path.
 # Also embeds a MANIFEST file at the zip root, listing every packaged
 # path one per line, so installer.sh/updater.sh can reconcile an
 # install without needing git.
@@ -49,6 +54,19 @@ EXCLUDES=(
   "cli/"
   "core/spec/"
   "shared/spec/"
+  ".circleci/"
+  ".codacy.yml"
+  ".markdownlint.json"
+  ".markdownlintignore"
+  "Makefile"
+  "arcanum.png"
+  "core/eslint.config.mjs"
+  "core/.jscpd.json"
+  "core/docker-compose.yml"
+  "shared/eslint.config.mjs"
+  "arcanum-next-step/tsconfig.json"
+  "arcanum-next-step/hooks/test-support.ts"
+  "arcanum-next-step/hooks/*.test.ts"
   "arcanum.version"
 )
 
@@ -60,6 +78,11 @@ is_excluded() {
       # Carve-out: docs/ is excluded wholesale except docs/guides/,
       # which is packaged (see header comment above).
       [[ "$path" == docs/* && "$path" != docs/guides/* ]] && return 0
+    elif [[ "$exclude" == *"*"* ]]; then
+      # Glob entry: the right side is deliberately unquoted so bash
+      # pattern-matches it (e.g. "arcanum-next-step/hooks/*.test.ts").
+      # shellcheck disable=SC2053
+      [[ "$path" == $exclude ]] && return 0
     elif [[ "$exclude" == */ ]]; then
       [[ "$path" == "$exclude"* ]] && return 0
     else

@@ -18,6 +18,19 @@ scripts/
 cli/
 core/spec/
 shared/spec/
+.circleci/
+.codacy.yml
+.markdownlint.json
+.markdownlintignore
+Makefile
+arcanum.png
+core/eslint.config.mjs
+core/.jscpd.json
+core/docker-compose.yml
+shared/eslint.config.mjs
+arcanum-next-step/tsconfig.json
+arcanum-next-step/hooks/test-support.ts
+arcanum-next-step/hooks/*.test.ts
 arcanum.version
 
 # Not in git, or never wanted in the image.

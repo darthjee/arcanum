@@ -52,7 +52,7 @@ So the `runtime` target copies the **install layout**, not just `core/`: the sam
 - The build context is the install root, with `-f core/Dockerfile --target runtime`.
 - Production dependencies are installed with `yarn install --production --frozen-lockfile`. `core/package.json` has no runtime `dependencies` today, so this installs nothing, but it stays so that adding one doesn't silently break the image.
 - An `arcanum.json` with the install's version is written into the image root (`--build-arg ARCANUM_VERSION`), so `InstallVersion` resolves the same version inside the container as on the host, even for a git-clone install, whose `.git` is not copied.
-- `.dockerignore` keeps `core/node_modules`, `coverage/`, `.git` and `docs/` out of the context. Its "Mirrors scripts/build_release_zip.sh EXCLUDES." block mirrors the release zip's `EXCLUDES`, so the dev-only spec folders (`core/spec/`, `shared/spec/`) never reach the runtime image either. The `test` stage bind-mounts the repo instead of copying it, so specs still run there.
+- `.dockerignore` keeps `core/node_modules`, `coverage/`, `.git` and `docs/` out of the context. Its "Mirrors scripts/build_release_zip.sh EXCLUDES." block mirrors the release zip's `EXCLUDES`, so the dev-only spec folders (`core/spec/`, `shared/spec/`) never reach the runtime image either, and neither do the CI, lint and test tooling files (see [Install & Release Pipeline](install-and-release.md) for the list). The `test` stage bind-mounts the repo instead of copying it, so specs still run there.
 
 ### Runtime user and entrypoint
 
