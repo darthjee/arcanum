@@ -5,7 +5,9 @@
 # service reuses the same test image for cli/ (the `cli-*` targets); it
 # mounts the whole repo because cli/'s build reads ../core and
 # ../arcanum, and gives cli/node_modules its own volume since esbuild
-# ships a platform-specific binary.
+# ships a platform-specific binary. The `shared` service does the same
+# for shared/ (the `shared-*` targets): whole repo mounted, shared/ as
+# working dir, shared/node_modules in its own volume.
 services:
   core:
     build:
@@ -31,6 +33,18 @@ services:
     working_dir: /home/node/app/cli
     command: sh -c "yarn install --frozen-lockfile && yarn build && yarn test"
 
+  shared:
+    build:
+      context: ..
+      dockerfile: core/Dockerfile
+      target: test
+    volumes:
+      - ../:/home/node/app
+      - shared_node_modules:/home/node/app/shared/node_modules
+    working_dir: /home/node/app/shared
+    command: sh -c "yarn install --frozen-lockfile && yarn test"
+
 volumes:
   core_node_modules:
   cli_node_modules:
+  shared_node_modules:
