@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import KeyRegistry from '../../../../lib/shared/config/KeyRegistry.js';
+import KeyRegistry from '../../../../../shared/lib/config/KeyRegistry.js';
 import { checkShellSource, findConfigCalls } from '../../../support/utils/shellConfigKeys.js';
 
 // Shell static scan (issue #777, layer 2 of

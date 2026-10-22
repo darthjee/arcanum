@@ -1,5 +1,5 @@
 import path from 'node:path';
-import RepoConfigWriter from '../../shared/config/RepoConfigWriter.js';
+import RepoConfigWriter from '../../../../shared/lib/config/RepoConfigWriter.js';
 
 const NEW_CONFIG_FILE = path.join('.claude', 'configuration', 'arcanum-repo-config.json');
 const LEGACY_CONFIG_FILE = path.join('.claude', 'configuration', 'auto-fix-all.json');

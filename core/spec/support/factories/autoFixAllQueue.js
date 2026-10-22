@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import AutoFixAllQueue from '../../../lib/commands/auto-fix-all/AutoFixAllQueue.js';
-import Lock from '../../../lib/shared/file/Lock.js';
+import Lock from '../../../../shared/lib/file/Lock.js';
 import RepoContext from '../../../lib/context/RepoContext.js';
 import RepoContextFactory from '../../../lib/context/RepoContextFactory.js';
 import { fakeFetch } from '../utils/fakeFetch.js';

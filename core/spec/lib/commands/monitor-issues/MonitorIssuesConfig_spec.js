@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import MonitorIssuesConfig from '../../../../lib/commands/monitor-issues/MonitorIssuesConfig.js';
 import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
-import Lock from '../../../../lib/shared/file/Lock.js';
+import Lock from '../../../../../shared/lib/file/Lock.js';
 import { captureRejection } from '../../../support/utils/captureRejection.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 

@@ -1,6 +1,6 @@
 import DispatchFailure from '../../utils/errors/DispatchFailure.js';
 import IssueTagger from '../../utils/issue/IssueTagger.js';
-import Lock from '../../shared/file/Lock.js';
+import Lock from '../../../../shared/lib/file/Lock.js';
 import QueueStore from '../../utils/queue/QueueStore.js';
 import RepoContextFactory from '../../context/RepoContextFactory.js';
 

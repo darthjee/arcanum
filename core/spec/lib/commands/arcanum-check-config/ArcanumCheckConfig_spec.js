@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import ArcanumCheckConfig from '../../../../lib/commands/arcanum-check-config/ArcanumCheckConfig.js';
-import ConfigChain from '../../../../lib/shared/config/ConfigChain.js';
+import ConfigChain from '../../../../../shared/lib/config/ConfigChain.js';
 import { createRepoContextMock } from '../../../support/factories/repoContextFactory.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 

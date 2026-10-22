@@ -29,7 +29,7 @@ class NamespacedBooleanKeyConfig extends BooleanKeyConfig {
    *   personal state file, with no legacy fallback.
    * @param {string} options.legacyFileName - the legacy file's name
    *   under `.claude/configuration/` (e.g. `auto-fix-all.json`).
-   * @param {import('../../shared/file/Lock.js').default} [options.lock] - the
+   * @param {import('../../../../shared/lib/file/Lock.js').default} [options.lock] - the
    *   lock/mutate/release helper used to guard writes.
    */
   constructor({ namespace, stateKeys, legacyFileName, lock }) {

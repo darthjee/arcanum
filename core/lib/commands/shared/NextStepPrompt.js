@@ -1,6 +1,6 @@
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
-import ConfigChain from '../../shared/config/ConfigChain.js';
+import ConfigChain from '../../../../shared/lib/config/ConfigChain.js';
 import DispatchFailure from '../../utils/errors/DispatchFailure.js';
 import TtyPrompt from '../../utils/io/TtyPrompt.js';
 
