@@ -215,7 +215,7 @@ describe('ConfigChain', () => {
 
     it('throws on a key that matches no registry entry', async () => {
       await expectAsync(strictConfigChain().read(repoPath, 'foo', 'bar')).toBeRejectedWithError(
-        /config key "foo\.bar" is not in core\/lib\/shared\/config\/keys\.json/
+        /config key "foo\.bar" is not in shared\/lib\/config\/keys\.json/
       );
     });
 

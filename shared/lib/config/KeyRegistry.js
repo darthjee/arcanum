@@ -674,7 +674,7 @@ export function assertRegisteredConfigKey(key, env = process.env) {
 
   if (!defaultRegistry.lookup(key)) {
     throw new Error(
-      `arcanum: config key "${key}" is not in core/lib/shared/config/keys.json (ARCANUM_STRICT_CONFIG_KEYS=1)`
+      `arcanum: config key "${key}" is not in shared/lib/config/keys.json (ARCANUM_STRICT_CONFIG_KEYS=1)`
     );
   }
 }

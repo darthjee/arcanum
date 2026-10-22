@@ -318,7 +318,7 @@ describe('KeyRegistry', () => {
 
     it('throws on an unregistered key when the guard is on', () => {
       expect(() => assertRegisteredConfigKey('foo.bar', STRICT)).toThrowError(
-        'arcanum: config key "foo.bar" is not in core/lib/shared/config/keys.json (ARCANUM_STRICT_CONFIG_KEYS=1)'
+        'arcanum: config key "foo.bar" is not in shared/lib/config/keys.json (ARCANUM_STRICT_CONFIG_KEYS=1)'
       );
     });
 
@@ -359,7 +359,7 @@ describe('KeyRegistry', () => {
 
         expect(() => assertRegisteredConfigKey('foo.bar')).toThrowError(
           Error,
-          'arcanum: config key "foo.bar" is not in core/lib/shared/config/keys.json (ARCANUM_STRICT_CONFIG_KEYS=1)'
+          'arcanum: config key "foo.bar" is not in shared/lib/config/keys.json (ARCANUM_STRICT_CONFIG_KEYS=1)'
         );
       });
     });
