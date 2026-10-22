@@ -69,8 +69,8 @@ shared/
 | Agent | Owns for this change |
 | --- | --- |
 | `shared` (new, created by #819) | All of `shared/`: `shared/lib/`, `shared/spec/`, `shared/package.json`, `shared/yarn.lock`, `shared/eslint.config.mjs`, `shared/README.md`. Its scope is "code consumed by both `core/` and `cli/`". |
-| `node` | `core/`'s Node.js source and config, **minus** the surface. It requests changes to `shared/` through `architect`. |
-| `client` | All of `cli/`, **minus** the surface it bundles. It requests changes to `shared/` through `architect`. |
+| `node` | `core/`'s Node.js source and config, including the surface while it lives in `core/` (`core/lib/utils/`, then `core/lib/shared/`), and **minus** the surface once #824 removes that copy. It requests changes to `shared/` through `architect`. |
+| `client` | All of `cli/`, **minus** the surface it bundles, which is owned by whoever owns the folder it lives in (`node` until #824, then `shared`). It requests changes to the surface through `architect`. |
 | `infra` | The `shared` compose service, the `shared-*` Makefile targets, the CircleCI `shared` jobs, and the packaging specs (see [Tooling and CI](#tooling-and-ci)). |
 | `architect` | This spec, `AGENTS.md`, the agent roster and `docs/agents/folder-structure.md`. |
 
@@ -290,7 +290,7 @@ One sub-issue per item of #816's split. Each refers to its dependencies as "item
 | 9 | #826 | Promote this spec into architecture docs; rewrite the suspended `arcanum-cli` spec sections and every doc that points at `core/lib/utils/config`; update the `architecture.md` index. | `architect` | 7, 8 |
 | 10 | #827 | Remove this spec (and `shared-lib/`, if it was split). | `architect` | 9 |
 
-Path references are repointed as they move: code comments in #824; agent files (`node.md`, `scripter.md`, `client.md`) in #819; architecture docs (`lock-system.md`, `docker-engine.md`, `shared-state-and-configuration.md`) in #826. Plain `core/lib/...` mentions in the `arcanum-cli` specs (e.g. `command-surface.md`) carry no banner and are repointed in #826.
+Path references are repointed as they move: code comments in #824; agent files (`node.md`, `scripter.md`, `client.md`) keep the current paths in #819, each with a "moves to `shared/lib/` in #824" note, and are repointed in #820 and #824 as those move the files; architecture docs (`lock-system.md`, `docker-engine.md`, `shared-state-and-configuration.md`) in #826. Plain `core/lib/...` mentions in the `arcanum-cli` specs (e.g. `command-surface.md`) carry no banner and are repointed in #826.
 
 ## Open points
 
