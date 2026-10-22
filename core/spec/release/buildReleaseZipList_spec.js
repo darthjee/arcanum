@@ -5,7 +5,9 @@ import { REPO_ROOT, runCommand } from '../support/utils/runCommand.js';
 // real `scripts/build_release_zip.sh --list` against this checkout and
 // asserts the mod's committed files make it into the release MANIFEST,
 // while its engine-generated `.claude-plugin/types/` folder never does.
-// It also asserts the `cli/` source tree (issue #779) is never shipped.
+// It also asserts the `cli/` source tree (issue #779) is never shipped,
+// and that no spec/ folder (e.g. `core/spec/`, `shared/spec/` — issue
+// #821) is ever shipped.
 // `--list` only prints the would-be MANIFEST — no zip, no output dir.
 
 const BUILD_SCRIPT = path.join(REPO_ROOT, 'scripts', 'build_release_zip.sh');
@@ -18,6 +20,7 @@ const MOD_FILES = [
 ];
 const GENERATED_TYPES_PREFIX = 'arcanum-next-step/.claude-plugin/types/';
 const CLI_PREFIX = 'cli/';
+const SPEC_FOLDER_PATTERN = /(^|\/)spec\//;
 
 /**
  * The environment `build_release_zip.sh --list` runs with: the caller's
@@ -65,5 +68,9 @@ describe('scripts/build_release_zip.sh --list', () => {
 
   it('lists nothing under cli/', () => {
     expect(paths.filter((line) => line.startsWith(CLI_PREFIX))).toEqual([]);
+  });
+
+  it('lists nothing under any spec/ folder', () => {
+    expect(paths.filter((line) => SPEC_FOLDER_PATTERN.test(line))).toEqual([]);
   });
 });

@@ -13,9 +13,11 @@
 # see arcanum/install/installer.sh). "docs/" is excluded except for
 # "docs/guides/" (packaged user-facing guides, e.g. linked from
 # arcanum/_lib/repo_config.sh's fallback warning) — every other doc
-# under docs/ stays dev-only and unshipped. Also embeds a MANIFEST file
-# at the zip root, listing every packaged path one per line, so
-# installer.sh/updater.sh can reconcile an install without needing git.
+# under docs/ stays dev-only and unshipped. The spec folders
+# ("core/spec/", "shared/spec/") are dev-only too and never shipped.
+# Also embeds a MANIFEST file at the zip root, listing every packaged
+# path one per line, so installer.sh/updater.sh can reconcile an
+# install without needing git.
 # Prints the absolute path of the produced zip as the last line of
 # stdout.
 #
@@ -45,6 +47,8 @@ EXCLUDES=(
   ".gitignore"
   "scripts/"
   "cli/"
+  "core/spec/"
+  "shared/spec/"
   "arcanum.version"
 )
 

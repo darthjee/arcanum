@@ -16,6 +16,8 @@ ISSUE_TEMPLATE.md
 .gitignore
 scripts/
 cli/
+core/spec/
+shared/spec/
 arcanum.version
 
 # Not in git, or never wanted in the image.
