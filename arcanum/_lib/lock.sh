@@ -5,7 +5,7 @@
 # the mutation. The caller must set LOCK_FILE before sourcing (or before
 # calling _acquire_lock).
 #
-# Protocol (shared byte-for-byte with core/lib/shared/file/Lock.js, so
+# Protocol (shared byte-for-byte with shared/lib/file/Lock.js, so
 # shell and native writers exclude each other on the same lock file):
 #   - Instance id: <hostname>:<pid>:<nonce>, generated fresh per
 #     _acquire_lock call. The lock file holds the id followed by "\n".
