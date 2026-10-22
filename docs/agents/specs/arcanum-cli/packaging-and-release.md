@@ -53,10 +53,7 @@ No other lifecycle scripts. In particular `preinstall`, `install` and `postinsta
 `yarn build` (`cli/scripts/build.mjs`) produces one file, `cli/dist/arcanum.mjs`, containing:
 
 - the CLI (`cli/lib/**`);
-- the shared config surface from `core/lib` (see [Shared Config Logic](shared-config-logic.md#source-stays-in-core));
-
-  > **Suspended:** this bullet is under revision by epic #816; see [Shared Lib](../shared-lib.md). Until #826 rewrites it, `shared-lib.md` wins where the two disagree.
-
+- the shared config surface from `shared/lib` (see [Shared Config Logic](shared-config-logic.md#source-lives-in-shared));
 - the [Key Registry](key-registry.md) (`keys.json`, inlined by the JSON import);
 - the CLI version, injected through `define` as `__ARCANUM_CLI_VERSION__`;
 - the embedded migration-version list (below).
@@ -102,7 +99,7 @@ The package is published from the existing CircleCI `release` workflow (see [Ins
 
 - In the `release` workflow, with the same tag filters as its siblings (`branches: ignore: /.*/`, `tags: only: /^\d+\.\d+\.\d+$/`).
 - `requires: [build-and-release]`, and runs in parallel with `publish-image`. The GitHub release is arcanum's canonical artefact, so the CLI is only published once it exists. A failing `publish-image` does not hold back the CLI, and vice versa.
-- Image: the same `darthjee/circleci_node` image as the `cli` test job, `working_directory: ~/project/cli`, with the full-repo checkout (the build needs `core/lib` and `arcanum/migrations/`).
+- Image: the same `darthjee/circleci_node` image as the `cli` test job, `working_directory: ~/project/cli`, with the full-repo checkout (the build needs `shared/lib` and `arcanum/migrations/`).
 - Steps, each failing the job on error:
   1. **Version check:** `cli/package.json`'s `version` must equal `$CIRCLE_TAG` (see [Version lockstep](#version-lockstep)).
   2. **Already published?** If `npm view arcanum-cli@$CIRCLE_TAG version` returns the version, stop with success (see [Failure handling](#failure-handling)).
@@ -170,7 +167,7 @@ What a user installs, and what can reach it:
 - **Zero runtime dependencies.** `npm i -g arcanum-cli` installs exactly one package; nothing else is resolved from the registry.
 - **No install-time code.** No `preinstall`/`install`/`postinstall` scripts (enforced by a packaging spec).
 - **Readable bundle.** `dist/arcanum.mjs` is unminified, so what runs is what can be read in the package.
-- **Bounded build inputs.** The metafile check fails the build if anything outside `cli/lib/**` and the declared shared surface gets bundled (see [Shared Config Logic](shared-config-logic.md#bundle-at-build-time-with-esbuild)). The devDependencies, including `esbuild`, run only at build time and are pinned by `cli/yarn.lock` with exact versions; the release job installs with `--frozen-lockfile`.
+- **Bounded build inputs.** The metafile check fails the build if anything outside `cli/lib/**` and `shared/lib/**` gets bundled (see [Shared Config Logic](shared-config-logic.md#bundle-at-build-time-with-esbuild)). The devDependencies, including `esbuild`, run only at build time and are pinned by `cli/yarn.lock` with exact versions; the release job installs with `--frozen-lockfile`.
 - **Whitelisted contents.** `files` plus the `npm pack --dry-run` check (step 5) mean no source, spec, lockfile or stray local file is published.
 - **Narrow credentials.** The npm token is scoped to one package, expires, lives only in the `release` workflow, and is never printed (see [Token storage](#token-storage)).
 - **Audit.** The `cli` CI job runs `yarn audit` as a non-blocking step, like the `checks` job does for `core/`. It only covers devDependencies, since there are no runtime ones.

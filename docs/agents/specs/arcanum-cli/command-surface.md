@@ -105,7 +105,7 @@ Edge cases:
 | Inside a worktree | The worktree's own root, since each worktree has its own `.claude/state/`. |
 | Bare repo, or not inside a repo | "No repo". |
 | `git` not on PATH | "No repo", with a stderr warning. |
-| Non-existent path, or a file | Usage error (exit `2`), with `RepoPath`'s messages (`core/lib/utils/file/RepoPath.js`). |
+| Non-existent path, or a file | Usage error (exit `2`), with `RepoPath`'s messages (`shared/lib/file/RepoPath.js`). |
 
 What each repo state means for reads and writes is in the index's [Targeting](../arcanum-cli.md#targeting) section and is not repeated here.
 
@@ -141,7 +141,7 @@ A tier file is **malformed** when it is not valid JSON, or is valid JSON whose t
 | Unreadable (permissions, a directory) | Stderr warning; tier treated as empty. | **Refused, exit `7`.** |
 | Not writable | Normal. | Exit `7` with the OS error. |
 
-- **Why writes refuse.** `RepoConfigWriter._readBase` (`core/lib/utils/config/RepoConfigWriter.js`) reads a malformed file as `{}`, so writing through it would silently overwrite a corrupted user file. The CLI must never destroy user data it cannot parse, so it diverges here on purpose.
+- **Why writes refuse.** `RepoConfigWriter._readBase` (`shared/lib/config/RepoConfigWriter.js`) reads a malformed file as `{}`, so writing through it would silently overwrite a corrupted user file. The CLI must never destroy user data it cannot parse, so it diverges here on purpose.
 - **How.** Before calling the shared writer, the CLI reads and parses the target file itself and refuses on any malformed state. The check and the write are not atomic, but the window is the same one a hand edit already has, and the shared writer still takes the lock.
 - `--force` does not bypass this. The fix is to repair or remove the file by hand.
 - `get` with an explicit tier flag on a malformed file prints the warning and behaves as if the key is unset (exit `1`), so scripts see a stable code; the warning tells the human why.
@@ -150,7 +150,7 @@ A tier file is **malformed** when it is not valid JSON, or is valid JSON whose t
 
 ### Lock contention
 
-- Writes go through the shared `Lock` (`core/lib/utils/file/Lock.js`) on `<file>.lock`, the same protocol as `arcanum/_lib/lock.sh` (see [Lock System](../../architecture/lock-system.md)). The CLI and running skills exclude each other with the protocol fixed in #807 (atomic create-if-absent acquire, owner-checked release). #807 is a hard blocker for the CLI's write commands, so this holds from the CLI's first release.
+- Writes go through the shared `Lock` (`shared/lib/file/Lock.js`) on `<file>.lock`, the same protocol as `arcanum/_lib/lock.sh` (see [Lock System](../../architecture/lock-system.md)). The CLI and running skills exclude each other with the protocol fixed in #807 (atomic create-if-absent acquire, owner-checked release). #807 is a hard blocker for the CLI's write commands, so this holds from the CLI's first release.
 - Unlike skills, the CLI **bounds the wait**. The default is `10` seconds; `--lock-timeout <seconds>` changes it. `0` means try once and fail if the lock is held. Negative or non-numeric values are usage errors.
 - On timeout the CLI exits `6`, names the lock file, and hints at removing it by hand if no process holds it. A timeout means the lock file existed for the whole wait: the CLI wrote nothing, so there is nothing to clean up, on timeout or on a signal.
 - Reads take **no lock**. A read racing a write sees either the old or the new file, since writes replace the file whole.

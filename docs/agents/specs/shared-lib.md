@@ -62,7 +62,7 @@ shared/
 - Every import in `core/` and `cli/` is rewritten to point at the new path. **No re-export shims** are left at the old `core/lib` paths.
 - Behaviour stays the same: no API, message or output changes. Dispatcher output, exit codes and parity tests stay byte-identical.
 
-**What stays in core:** `BooleanKeyConfig`, `NamespacedBooleanKeyConfig` and `DispatchFailure`. They are the native `config.sh` dispatch layer, not the surface (see [Shared Config Logic](arcanum-cli/shared-config-logic.md#source-stays-in-core)). The other files in `core/lib/utils/file/` (`InstallRoot`, `InstallVersion`, `IssueFileLocator`, `IssueStatePaths`) are core-only and stay too.
+**What stays in core:** `BooleanKeyConfig`, `NamespacedBooleanKeyConfig` and `DispatchFailure`. They are the native `config.sh` dispatch layer, not the surface (see [Shared Config Logic](arcanum-cli/shared-config-logic.md#source-lives-in-shared)). The other files in `core/lib/utils/file/` (`InstallRoot`, `InstallVersion`, `IssueFileLocator`, `IssueStatePaths`) are core-only and stay too.
 
 ## Ownership
 
@@ -271,7 +271,7 @@ Two risks would be silent in CI today. Each gets a guard:
 - **A published npm package, or a workspace package.** Rejected: `core/` ships with zero runtime npm dependencies inside the release zip and the Docker image, and installs run it straight from disk, so it cannot depend on a published package. A workspace needs a root `package.json` and install step that no install flow has.
 - **A mount, copy or symlink of `shared/` at a core path.** Rejected; see [Import boundary](#import-boundary).
 - **One big move instead of steps.** Rejected: a single PR touching `core/`, `cli/`, a new package, Docker, Makefile and CI at once is hard to review and to revert. Consolidating first makes the switch a prefix change, and the copy step lets `shared/`'s tooling land and go green before anything depends on it.
-- **Keeping the surface in core** (the previous decision in [Shared Config Logic](arcanum-cli/shared-config-logic.md#source-stays-in-core)). Reversed: it keeps the hand-kept file list and regex, keeps CLI-only writer changes in `node`'s scope, and lets a `core/` edit change the CLI bundle silently.
+- **Keeping the surface in core** (the previous decision in [Shared Config Logic](arcanum-cli/shared-config-logic.md#source-lives-in-shared)). Reversed: it keeps the hand-kept file list and regex, keeps CLI-only writer changes in `node`'s scope, and lets a `core/` edit change the CLI bundle silently.
 
 ## Implementation order
 

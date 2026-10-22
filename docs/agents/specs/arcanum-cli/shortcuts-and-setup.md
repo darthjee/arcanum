@@ -196,7 +196,7 @@ global  git.agents.node  -
 
 ### `ignore-checks`
 
-At runtime, `auto-fix-all.ignored_check_patterns` is read **only from the repo tier**: `RepoConfig.getIgnoredCheckPatterns` (`core/lib/utils/config/RepoConfig.js`) reads `.claude/configuration/arcanum-repo-config.json`, with no chain. Its entries are **case-insensitive regex strings** (`core/lib/services/PrChecker.js`), not globs. The shortcut follows both facts.
+At runtime, `auto-fix-all.ignored_check_patterns` is read **only from the repo tier**: `RepoConfig.getIgnoredCheckPatterns` (`shared/lib/config/RepoConfig.js`) reads `.claude/configuration/arcanum-repo-config.json`, with no chain. Its entries are **case-insensitive regex strings** (`core/lib/services/PrChecker.js`), not globs. The shortcut follows both facts.
 
 - **Repo tier only.** The registry marks the key repo-only. `--local` and `--global` on `ignore-checks`, and on generic `config set`/`unset` of this key, are a validation error (exit `3`, `arcanum: auto-fix-all.ignored_check_patterns is repo-only`). No cross-tier merge or shadowing question arises.
 - **Syntax.**
