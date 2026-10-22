@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import RepoContext from '../../../lib/context/RepoContext.js';
 import IssueStateService from '../../../lib/services/IssueStateService.js';
-import Lock from '../../../lib/utils/file/Lock.js';
+import Lock from '../../../lib/shared/file/Lock.js';
 import { createTempDir } from '../utils/tempDir.js';
 
 /**

@@ -1,9 +1,9 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import RepoConfigWriter from '../../../../lib/utils/config/RepoConfigWriter.js';
-import Lock from '../../../../lib/utils/file/Lock.js';
-import ConfigError from '../../../../lib/utils/config/ConfigError.js';
+import RepoConfigWriter from '../../../../lib/shared/config/RepoConfigWriter.js';
+import Lock from '../../../../lib/shared/file/Lock.js';
+import ConfigError from '../../../../lib/shared/config/ConfigError.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 describe('RepoConfigWriter', () => {

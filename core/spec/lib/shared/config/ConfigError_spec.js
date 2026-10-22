@@ -1,4 +1,4 @@
-import ConfigError from '../../../../lib/utils/config/ConfigError.js';
+import ConfigError from '../../../../lib/shared/config/ConfigError.js';
 
 describe('ConfigError', () => {
   it('sets code, message and file', () => {

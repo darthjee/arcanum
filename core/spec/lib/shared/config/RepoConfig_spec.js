@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import RepoConfig from '../../../../lib/utils/config/RepoConfig.js';
+import RepoConfig from '../../../../lib/shared/config/RepoConfig.js';
 import { createRepoContextMock } from '../../../support/factories/repoContextFactory.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 

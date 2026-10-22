@@ -1,10 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import keys from '../../../../lib/utils/config/keys.json' with { type: 'json' };
-import { SETUP_SECTIONS, validateRegistry } from '../../../../lib/utils/config/KeyRegistry.js';
+import keys from '../../../../lib/shared/config/keys.json' with { type: 'json' };
+import { SETUP_SECTIONS, validateRegistry } from '../../../../lib/shared/config/KeyRegistry.js';
 
-const KEYS_FILE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../lib/utils/config/keys.json');
+const KEYS_FILE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../lib/shared/config/keys.json');
 const ALL = ['global', 'repo', 'local'];
 
 describe('keys.json', () => {

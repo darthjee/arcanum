@@ -1,6 +1,6 @@
 import { mkdir, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import RepoPath from '../../../../lib/utils/file/RepoPath.js';
+import RepoPath from '../../../../lib/shared/file/RepoPath.js';
 import { createGitFixtureRepo } from '../../../support/utils/gitFixtureRepo.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 

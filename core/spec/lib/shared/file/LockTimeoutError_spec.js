@@ -1,4 +1,4 @@
-import LockTimeoutError from '../../../../lib/utils/file/LockTimeoutError.js';
+import LockTimeoutError from '../../../../lib/shared/file/LockTimeoutError.js';
 
 describe('LockTimeoutError', () => {
   const error = new LockTimeoutError('/tmp/state/issue-1.lock');

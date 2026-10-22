@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import RepoConfig from '../../../../lib/utils/config/RepoConfig.js';
+import RepoConfig from '../../../../lib/shared/config/RepoConfig.js';
 import RepoContext from '../../../../lib/context/RepoContext.js';
 import SafeBranch from '../../../../lib/commands/shared/SafeBranch.js';
 import { createGitFixtureRepo } from '../../../support/utils/gitFixtureRepo.js';

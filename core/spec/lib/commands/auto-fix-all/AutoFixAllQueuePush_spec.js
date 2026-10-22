@@ -1,6 +1,6 @@
 import path from 'node:path';
 import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
-import Lock from '../../../../lib/utils/file/Lock.js';
+import Lock from '../../../../lib/shared/file/Lock.js';
 import { captureRejection } from '../../../support/utils/captureRejection.js';
 import { captureStdout } from '../../../support/utils/captureStdout.js';
 import { fakeFetch } from '../../../support/utils/fakeFetch.js';

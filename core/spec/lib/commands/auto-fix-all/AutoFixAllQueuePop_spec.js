@@ -1,6 +1,6 @@
 import path from 'node:path';
 import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
-import Lock from '../../../../lib/utils/file/Lock.js';
+import Lock from '../../../../lib/shared/file/Lock.js';
 import { captureRejection } from '../../../support/utils/captureRejection.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 import { createAutoFixAllQueue, writeQueueFile, readQueueFile } from '../../../support/factories/autoFixAllQueue.js';

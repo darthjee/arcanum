@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import IssueStateService from '../../../lib/services/IssueStateService.js';
-import Lock from '../../../lib/utils/file/Lock.js';
+import Lock from '../../../lib/shared/file/Lock.js';
 import {
   itAcquiresAndReleasesTheLock,
   itDoesNotCorruptStateUnderConcurrentMutations,
