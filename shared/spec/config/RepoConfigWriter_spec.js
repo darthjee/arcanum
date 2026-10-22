@@ -488,6 +488,217 @@ describe('RepoConfigWriter', () => {
     });
   });
 
+  describe('#unset', () => {
+    /**
+     * @param {object} [overrides] - `unset` argument overrides.
+     * @returns {Promise<void>} resolves once done.
+     */
+    function unsetKey(overrides = {}) {
+      return writer.unset({ newFile, legacyFile, namespace: 'next_step', key: 'auto.enhance-issue', ...overrides });
+    }
+
+    it('removes a flat key, keeping siblings and their order', async () => {
+      await seedFile(newFile, '{"version":"1.0.0","next_step":{"a":1,"flat":"v","b":2},"z":true}');
+
+      await unsetKey({ key: 'flat' });
+
+      expect(await readFile(newFile, 'utf8')).toEqual(`${JSON.stringify({
+        version: '1.0.0',
+        next_step: { a: 1, b: 2 },
+        z: true
+      }, null, 2)}\n`);
+    });
+
+    it('removes a dotted leaf, keeping siblings', async () => {
+      await seedFile(newFile, '{"next_step":{"auto":{"discuss-issue":false,"enhance-issue":true},"other":1}}');
+
+      await unsetKey();
+
+      expect(await readFile(newFile, 'utf8')).toEqual(`${JSON.stringify({
+        next_step: { auto: { 'discuss-issue': false }, other: 1 }
+      }, null, 2)}\n`);
+    });
+
+    it('keeps the now-empty parent objects', async () => {
+      await seedFile(newFile, '{"next_step":{"auto":{"enhance-issue":true}}}');
+
+      await unsetKey();
+
+      expect(await readFile(newFile, 'utf8')).toEqual(
+        '{\n  "next_step": {\n    "auto": {}\n  }\n}\n'
+      );
+    });
+
+    it('removes a key holding null', async () => {
+      await seedFile(newFile, '{"next_step":{"auto":{"enhance-issue":null,"x":1}}}');
+
+      await unsetKey();
+
+      expect(JSON.parse(await readFile(newFile, 'utf8'))).toEqual({ next_step: { auto: { x: 1 } } });
+    });
+
+    [
+      ['a missing leaf', '{"next_step":{"auto":{"other":1}}}'],
+      ['a missing intermediate', '{"next_step":{"other":1}}'],
+      ['a null intermediate', '{"next_step":{"auto":null}}'],
+      ['a missing namespace', '{"version":"1.0.0"}'],
+      ['a null namespace', '{"next_step":null}']
+    ].forEach(([label, contents]) => {
+      it(`is a no-op on ${label}, leaving the bytes untouched`, async () => {
+        await seedFile(newFile, contents);
+        const writeSpy = spyOn(writer._fs, 'writeFile').and.callThrough();
+
+        await unsetKey();
+
+        expect(await readFile(newFile, 'utf8')).toEqual(contents);
+        expect(writeSpy).not.toHaveBeenCalled();
+        expect(existsSync(`${newFile}.lock`)).toBeFalse();
+      });
+    });
+
+    it('does not create a missing file', async () => {
+      await unsetKey();
+
+      expect(existsSync(newFile)).toBeFalse();
+      expect(existsSync(`${newFile}.tmp`)).toBeFalse();
+      expect(existsSync(`${newFile}.lock`)).toBeFalse();
+    });
+
+    it('seeds the namespace from the legacy file, then deletes', async () => {
+      await seedFile(newFile, '{"version":"1.0.0"}');
+      await seedFile(legacyFile, '{"legacy_key":1,"ignored_check_patterns":["z"]}');
+
+      await unsetKey({ namespace: 'auto-fix-all', key: 'ignored_check_patterns' });
+
+      expect(await readFile(newFile, 'utf8')).toEqual(`${JSON.stringify({
+        version: '1.0.0',
+        'auto-fix-all': { legacy_key: 1 }
+      }, null, 2)}\n`);
+    });
+
+    it('does not write the legacy seed alone when the key is missing', async () => {
+      await seedFile(newFile, '{"version":"1.0.0"}');
+      await seedFile(legacyFile, '{"legacy_key":1}');
+
+      await unsetKey({ namespace: 'auto-fix-all', key: 'ignored_check_patterns' });
+
+      expect(await readFile(newFile, 'utf8')).toEqual('{"version":"1.0.0"}');
+    });
+
+    it('does not reseed when the namespace already exists', async () => {
+      await seedFile(newFile, '{"auto-fix-all":{"kept":true,"gone":1}}');
+      await seedFile(legacyFile, '{"legacy_key":1}');
+
+      await unsetKey({ namespace: 'auto-fix-all', key: 'gone' });
+
+      expect(JSON.parse(await readFile(newFile, 'utf8'))).toEqual({ 'auto-fix-all': { kept: true } });
+    });
+
+    describe('without a namespace (top-level unset)', () => {
+      it('removes a flat top-level key, ignoring legacyFile', async () => {
+        await seedFile(newFile, '{"a":1,"b":2,"c":3}');
+        await seedFile(legacyFile, '{"b":"legacy"}');
+
+        await writer.unset({ newFile, legacyFile, key: 'b' });
+
+        expect(await readFile(newFile, 'utf8')).toEqual('{\n  "a": 1,\n  "c": 3\n}\n');
+      });
+
+      it('removes a dotted top-level path, keeping empty parents', async () => {
+        await seedFile(newFile, '{"a":{"b":{"c":1}},"z":0}');
+
+        await writer.unset({ newFile, key: 'a.b.c' });
+
+        expect(JSON.parse(await readFile(newFile, 'utf8'))).toEqual({ a: { b: {} }, z: 0 });
+      });
+
+      it('is a no-op on a missing top-level key', async () => {
+        await seedFile(newFile, '{"a":1}');
+
+        await writer.unset({ newFile, key: 'missing.deep' });
+
+        expect(await readFile(newFile, 'utf8')).toEqual('{"a":1}');
+      });
+
+      it('rejects a non-object intermediate with NOT_AN_OBJECT', async () => {
+        await seedFile(newFile, '{"a":{"b":3}}');
+
+        const error = await writer.unset({ newFile, key: 'a.b.c' }).catch((e) => e);
+
+        expect(error).toBeInstanceOf(ConfigError);
+        expect(error.code).toEqual('NOT_AN_OBJECT');
+        expect(error.message).toEqual('Cannot index .a.b: not a JSON object');
+        expect(existsSync(`${newFile}.lock`)).toBeFalse();
+      });
+    });
+
+    ['"x"', '[1]', '3', 'false'].forEach((raw) => {
+      it(`rejects when an intermediate holds ${raw}, releasing the lock`, async () => {
+        await seedFile(newFile, `{"next_step":{"auto":${raw}}}`);
+
+        const error = await unsetKey().catch((e) => e);
+
+        expect(error).toBeInstanceOf(ConfigError);
+        expect(error.code).toEqual('NOT_AN_OBJECT');
+        expect(error.message).toEqual('Cannot index .next_step.auto: not a JSON object');
+        expect(error.file).toEqual(newFile);
+        expect(existsSync(`${newFile}.lock`)).toBeFalse();
+      });
+    });
+
+    it('rejects a non-object namespace with NOT_AN_OBJECT, releasing the lock', async () => {
+      await seedFile(newFile, '{"next_step":"x"}');
+
+      const error = await unsetKey().catch((e) => e);
+
+      expect(error).toBeInstanceOf(ConfigError);
+      expect(error.code).toEqual('NOT_AN_OBJECT');
+      expect(error.message).toEqual('Cannot index .next_step: not a JSON object');
+      expect(existsSync(`${newFile}.lock`)).toBeFalse();
+    });
+
+    it('rejects a non-object file with NOT_AN_OBJECT', async () => {
+      await seedFile(newFile, '[1]');
+
+      const error = await unsetKey().catch((e) => e);
+
+      expect(error).toBeInstanceOf(ConfigError);
+      expect(error.code).toEqual('NOT_AN_OBJECT');
+      expect(existsSync(`${newFile}.lock`)).toBeFalse();
+    });
+
+    it('acquires and releases <newFile>.lock', async () => {
+      await seedFile(newFile, '{"next_step":{"auto":{"enhance-issue":true}}}');
+      spyOn(lock, 'acquire').and.callThrough();
+      spyOn(lock, 'release').and.callThrough();
+
+      await unsetKey();
+
+      expect(lock.acquire).toHaveBeenCalledWith(`${newFile}.lock`);
+      expect(lock.release).toHaveBeenCalledWith(`${newFile}.lock`);
+      expect(existsSync(`${newFile}.lock`)).toBeFalse();
+    });
+
+    it('releases the lock on a no-op', async () => {
+      spyOn(lock, 'release').and.callThrough();
+
+      await unsetKey();
+
+      expect(lock.release).toHaveBeenCalledWith(`${newFile}.lock`);
+    });
+
+    it('writes via <file>.tmp and renames it into place', async () => {
+      await seedFile(newFile, '{"next_step":{"auto":{"enhance-issue":true}}}');
+      const renameSpy = jasmine.createSpy('rename').and.callFake(rename);
+      const spied = new RepoConfigWriter({ lock, fs: { rename: renameSpy } });
+
+      await spied.unset({ newFile, legacyFile, namespace: 'next_step', key: 'auto.enhance-issue' });
+
+      expect(renameSpy).toHaveBeenCalledWith(`${newFile}.tmp`, newFile);
+      expect(existsSync(`${newFile}.tmp`)).toBeFalse();
+    });
+  });
+
   describe('timeoutMs', () => {
     const calls = {
       write: () => ({
@@ -497,6 +708,10 @@ describe('RepoConfigWriter', () => {
       setVersion: () => ({
         file: newFile,
         run: (opts) => writer.setVersion({ file: newFile, version: '1.2.3', ...opts })
+      }),
+      unset: () => ({
+        file: newFile,
+        run: (opts) => writer.unset({ newFile, legacyFile, namespace: 'n', key: 'k', ...opts })
       })
     };
 

@@ -5,7 +5,9 @@ import ConfigError from './ConfigError.js';
 
 /**
  * Native equivalent of `arcanum/_lib/repo_config.sh`'s writers
- * (`repo_config_write` and `repo_config_set_version`). Every write is
+ * (`repo_config_write` and `repo_config_set_version`), plus a
+ * native-only `unset` that deletes a key (no shell counterpart yet).
+ * Every write is
  * guarded by `<file>.lock` through `Lock.js` (the same protocol as
  * `arcanum/_lib/lock.sh`, so shell and native writers exclude each
  * other), serialized byte-identically to jq's default output
@@ -79,6 +81,58 @@ class RepoConfigWriter {
   }
 
   /**
+   * Deletes a key, the counterpart of `write`: under `<newFile>.lock`,
+   * seeds `.<namespace>` from `legacyFile` when `newFile` lacks it
+   * (exactly as `write` does, so the reader's legacy fallback can't
+   * resurrect the value), then deletes `.<namespace>.<key>` (or `.<key>`
+   * from the root when `namespace` is omitted). A dotted `key` is a
+   * nested path.
+   *
+   * A missing leaf, or a missing or `null` intermediate, is a no-op: the
+   * file is neither rewritten nor created (a legacy seed alone is not
+   * written either). Empty parent objects left behind are kept.
+   * @param {object} args - the unset's arguments.
+   * @param {string} args.newFile - the namespaced config file's path.
+   * @param {string} [args.legacyFile] - the legacy config file's path
+   *   (only read, as a seed); ignored without a `namespace`.
+   * @param {string} [args.namespace] - the top-level namespace key;
+   *   omitted to delete from the root of the file.
+   * @param {string} args.key - the key (or dot-separated path) to delete.
+   * @param {number} [args.timeoutMs] - bound on waiting for the lock;
+   *   omitted waits forever.
+   * @returns {Promise<void>} resolves once written (if needed) and
+   *   unlocked.
+   * @throws {ConfigError} `NOT_AN_OBJECT` when the file, the namespace
+   *   or an intermediate holds a non-object value.
+   * @throws {Error} a `LockTimeoutError` when `timeoutMs` runs out
+   *   (nothing is written).
+   */
+  async unset({ newFile, legacyFile, namespace, key, timeoutMs }) {
+    await this._locked(newFile, async () => {
+      const config = await this._readBase(newFile);
+      const keyPath = key.split('.');
+
+      if (namespace === undefined) {
+        return RepoConfigWriter._deletePath(config, keyPath, '', newFile) ? config : null;
+      }
+
+      await this._seedNamespace(config, namespace, legacyFile);
+
+      const section = config[namespace];
+
+      if (section === undefined || section === null) {
+        return null;
+      }
+
+      if (!RepoConfigWriter._isObject(section)) {
+        throw new ConfigError('NOT_AN_OBJECT', `Cannot index .${namespace}: not a JSON object`, { file: newFile });
+      }
+
+      return RepoConfigWriter._deletePath(section, keyPath, namespace, newFile) ? config : null;
+    }, { timeoutMs });
+  }
+
+  /**
    * Mirrors `repo_config_set_version <file> <version> [<namespace>]`:
    * under `<file>.lock`, sets `.version` (or `.<namespace>.version` when
    * `namespace` is given).
@@ -108,12 +162,14 @@ class RepoConfigWriter {
 
   /**
    * Holds `<file>.lock` while `mutate` builds the new contents, then
-   * writes them atomically. Releases the lock whenever it was acquired;
+   * writes them atomically. When `mutate` resolves to `null` (nothing
+   * changed), the file is left untouched. Releases the lock whenever it
+   * was acquired;
    * a failed `acquire` (e.g. `LockTimeoutError`) propagates unchanged,
    * with nothing written and no release.
    * @param {string} file - the config file's path.
-   * @param {function(): Promise<object>} mutate - builds the object to
-   *   write.
+   * @param {function(): Promise<object|null>} mutate - builds the
+   *   object to write, or `null` to skip writing.
    * @param {object} [opts] - locking options.
    * @param {number} [opts.timeoutMs] - forwarded to `Lock.acquire`
    *   (validated there); when omitted, `acquire` gets no options and
@@ -133,10 +189,13 @@ class RepoConfigWriter {
 
     try {
       const config = await mutate();
-      const tmp = `${file}.tmp`;
 
-      await this._fs.writeFile(tmp, `${JSON.stringify(config, null, 2)}\n`);
-      await this._fs.rename(tmp, file);
+      if (config !== null) {
+        const tmp = `${file}.tmp`;
+
+        await this._fs.writeFile(tmp, `${JSON.stringify(config, null, 2)}\n`);
+        await this._fs.rename(tmp, file);
+      }
     } finally {
       await this._lock.release(lockFile);
     }
@@ -286,6 +345,45 @@ class RepoConfigWriter {
 
     RepoConfigWriter._setPath(child, rest, value, current, file);
     target[head] = child;
+  }
+
+  /**
+   * Walks `keyPath` from `target` and deletes the leaf, keeping any
+   * (possibly now empty) parents.
+   * @param {object} target - the object to delete the path from, mutated.
+   * @param {string[]} keyPath - the (non-empty) path to delete.
+   * @param {string} prefix - the path walked so far, for error messages
+   *   (`''` at the root of the file).
+   * @param {string} file - the config file's path, for the error.
+   * @returns {boolean} whether a key was deleted (`false` when the leaf
+   *   or a `null`/missing intermediate is absent).
+   * @throws {ConfigError} `NOT_AN_OBJECT` when an intermediate holds a
+   *   non-object value.
+   */
+  static _deletePath(target, keyPath, prefix, file) {
+    const [head, ...rest] = keyPath;
+
+    if (rest.length === 0) {
+      if (!Object.hasOwn(target, head)) {
+        return false;
+      }
+
+      delete target[head];
+      return true;
+    }
+
+    const current = RepoConfigWriter._joinPath(prefix, head);
+    const child = target[head];
+
+    if (child === undefined || child === null) {
+      return false;
+    }
+
+    if (!RepoConfigWriter._isObject(child)) {
+      throw new ConfigError('NOT_AN_OBJECT', `Cannot index .${current}: not a JSON object`, { file });
+    }
+
+    return RepoConfigWriter._deletePath(child, rest, current, file);
   }
 
   /**
