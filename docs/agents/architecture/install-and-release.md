@@ -7,6 +7,8 @@ Besides `git clone`, arcanum can be installed via a `curl | bash` one-liner, in 
 
 The release zip is assembled by `scripts/build_release_zip.sh` (a development tool, not included in the zip itself) and published by the CircleCI pipeline (`.circleci/config.yml`) as a GitHub Release asset, triggered on a semver tag push (the same `X.Y.Z` pattern already used by the repository's existing tags). The zip includes a `MANIFEST` file (a list of every packaged path, one per line, generated from the same `FILES` array used to assemble the zip) at the root of the tree, used by both the installer and the updater to reconcile installations without depending on `git`. Running `scripts/build_release_zip.sh --list` prints that same path list, one per line, without building anything (no zip, no output directory, no `MANIFEST` file). `core/spec` uses it to check what gets packaged, e.g. that the `arcanum-next-step/` mod ships while its engine-generated `.claude-plugin/types/` does not.
 
+Spec folders (`core/spec/`, `shared/spec/`) are dev-only and never packaged: both are listed in `build_release_zip.sh`'s `EXCLUDES`, and the `--list` packaging spec (`core/spec/release/buildReleaseZipList_spec.js`) asserts that no listed path matches `(^|/)spec/`. Existing zip installs drop `core/spec/` on their next update, through the updater's `MANIFEST` diff; git-clone installs keep the full tree by design.
+
 After the zip is uploaded, the same `release` workflow also publishes the multi-arch runtime Docker image `darthjee/arcanum:<version>` (job `publish-image`), used by `engine.mode=docker`. See [Docker Engine → Distribution and versioning](docker-engine.md#distribution-and-versioning).
 
 ## Update
