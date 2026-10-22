@@ -210,7 +210,7 @@ Every file under `core/spec` and `cli/spec` that the move affects, derived from 
 
 ## Writer additions
 
-#780 needs three capabilities that `RepoConfigWriter` lacks. #825 adds them in `shared/lib/config/RepoConfigWriter.js`, with specs, **after** the switch, so each change is made once and the move's PRs stay purely mechanical.
+Issue #780 needs three capabilities that `RepoConfigWriter` lacks. #825 adds them in `shared/lib/config/RepoConfigWriter.js`, with specs, **after** the switch, so each change is made once and the move's PRs stay purely mechanical.
 
 This spec fixes the **behaviour contract** only. Method names and signatures are left to #825.
 
