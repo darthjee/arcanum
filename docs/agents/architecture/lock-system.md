@@ -3,7 +3,7 @@
 The lock system prevents concurrent mutations of shared JSON state files. It has two implementations that share one protocol, byte for byte, so shell and native writers exclude each other on the same lock file:
 
 - `arcanum/_lib/lock.sh`: set `LOCK_FILE`, then call `_acquire_lock` / `_release_lock`.
-- `core/lib/utils/file/Lock.js`: `Lock#acquire(lockFile, { timeoutMs, warn })` / `Lock#release(lockFile)`.
+- `shared/lib/file/Lock.js`: `Lock#acquire(lockFile, { timeoutMs, warn })` / `Lock#release(lockFile)`. It lives in the [Shared Lib](shared-lib.md), so `core/` and the CLI use the same code.
 
 **Lock file:** `<file>.lock` next to the state file it protects, or a named lock file (see [Users](#users)).
 
@@ -26,7 +26,7 @@ Held ids are kept per lock path, so one process can hold several different lock 
 - **Skills never give up.** `lock.sh` and `Lock#acquire` without `timeoutMs` retry forever.
 - **Warning.** After 10 consecutive failed attempts, a single warning per acquisition (`Warning: lock (<file>) seems stuck after 10 attempts — …`) suggests checking for a holder and removing the lock file by hand. Stale-lock breaks don't count as failed attempts.
 - **Crashed holders.** A lock left by a dead process on the same host is broken automatically. A cross-host lock (for example one left by a container, which has its own hostname) or an unparseable lock is never broken automatically: it still needs manual removal after the warning.
-- **Optional bound (Node only).** `acquire(lockFile, { timeoutMs })` gives up once `timeoutMs` milliseconds have passed (`0` makes a single create attempt, plus a stale break if needed). It throws `LockTimeoutError` (`code: 'LOCK_TIMEOUT'`, with a `lockFile` property and a message naming the lock file) and has written nothing. `warn: false` suppresses the "seems stuck" warning. `lock.sh` has no bound.
+- **Optional bound (Node only).** `acquire(lockFile, { timeoutMs })` gives up once `timeoutMs` milliseconds have passed (`0` makes a single create attempt, plus a stale break if needed). It throws `LockTimeoutError` (`shared/lib/file/LockTimeoutError.js`; `code: 'LOCK_TIMEOUT'`, with a `lockFile` property and a message naming the lock file) and has written nothing. `RepoConfigWriter` passes its own optional `timeoutMs` through (see [Shared Lib → Writer API](shared-lib.md#writer-api)). `warn: false` suppresses the "seems stuck" warning. `lock.sh` has no bound.
 - **Test overrides.** The retry interval can be shortened: Node `new Lock({ sleepMs })`, bash `ARCANUM_LOCK_RETRY_SLEEP` (seconds, default `1`).
 
 ## Mixed versions
@@ -35,10 +35,10 @@ An old-protocol writer (write → sleep 1s → re-read) still overwrites a held 
 
 ## Users
 
-The shell callers are listed below. Their native twins in `core/lib` use `Lock.js` on the same lock files.
+The shell callers are listed below. Their native twins in `core/lib` and `shared/lib` use `Lock.js` on the same lock files.
 
 - `auto-fix-all` queue push/pop (`auto-fix-all/scripts/queue_common.sh`, `.claude/state/auto-fix-all-queue.lock`).
-- Config tiers: repo config (`arcanum/_lib/repo_config.sh`), global config (`arcanum/_lib/global_config.sh`), and `core/`'s `RepoConfigWriter`.
+- Config tiers: repo config (`arcanum/_lib/repo_config.sh`), global config (`arcanum/_lib/global_config.sh`), and `shared/`'s `RepoConfigWriter`.
 - `monitor-issues`: its config, the rewrite queue, and `.claude/state/issue-monitor.lock`.
 - Issue state (`arcanum/_lib/issue_state_shell.sh`, `.claude/state/issue-<id>.lock`).
 - Permission grants (`arcanum/_lib/permission_grant_shell.sh`).

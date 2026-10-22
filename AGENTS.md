@@ -58,7 +58,7 @@ All project documentation lives under [`docs/agents/`](docs/agents/):
 | File | Contents |
 | --- | --- |
 | [Folder Structure](docs/agents/folder-structure.md) | Top-level directory layout and the role of each folder. |
-| [Architecture](docs/agents/architecture.md) | Hub linking to `docs/agents/architecture/` — arcanum's internals by topic: source layout and overview, agent roster and delegation, repo path threading, shared state and configuration, per-repo migrations, the script engine, script preference guidelines, dispatch permissions, the lock system, issue tags, branch bootstrap and merge conflicts, install and release, cross-skill references, and entrypoint migration status. |
+| [Architecture](docs/agents/architecture.md) | Hub linking to `docs/agents/architecture/` — arcanum's internals by topic: source layout and overview, agent roster and delegation, repo path threading, shared state and configuration, per-repo migrations, the script engine, the shared lib, script preference guidelines, dispatch permissions, the lock system, issue tags, branch bootstrap and merge conflicts, install and release, cross-skill references, and entrypoint migration status. |
 | [Flow](docs/agents/flow.md) | Main runtime flow of the application. |
 | [Plans](docs/agents/plans/) | Implementation plans for ongoing or upcoming features. |
 | [Issues](docs/agents/issues/) | Detailed specs for open issues. |

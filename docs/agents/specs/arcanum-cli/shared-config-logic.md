@@ -8,32 +8,30 @@ Define how the CLI reuses arcanum's existing config read/write code, so that it 
 
 ## Decisions
 
-### Source stays in `core/`
+### Source lives in `shared/`
 
-> **Suspended:** under revision by epic #816; see [Shared Lib](../shared-lib.md). Until #826 rewrites it, `shared-lib.md` wins where the two disagree.
-
-The config logic stays in `core/` as the single source, owned by `node`. The **shared surface** is the set of `core/lib` files the CLI bundles:
+The config logic lives in the root `shared/` lib as the single source, owned by `shared`, and both `core/` and `cli/` import it by relative path (see [Shared Lib](../../architecture/shared-lib.md)). Epic #816 moved it there out of `core/lib`. The **shared surface** is the set of `shared/lib` files the CLI bundles:
 
 | File | Role |
 | --- | --- |
-| `core/lib/utils/config/ConfigChain.js` | Local → repo → global resolution, including `readWithSource` (see [Shared agent-email helper](#shared-agent-email-helper)). |
-| `core/lib/utils/config/RepoConfig.js` | Repo-tier reads. |
-| `core/lib/utils/config/RepoConfigWriter.js` | Every config write, with the lock. |
-| `core/lib/utils/config/ConfigError.js` | The shared error contract (see [`ConfigError`](#configerror)). |
-| `core/lib/utils/config/AgentEmail.js` | Shared agent-email resolution (see [Shared agent-email helper](#shared-agent-email-helper)). |
-| `core/lib/utils/config/KeyRegistry.js` and `keys.json` | The [Key Registry](key-registry.md#location) and its loader, validator and matcher. |
-| `core/lib/utils/file/Lock.js` | The lock, compatible with the shell `lock.sh` (see [Lock](#lock)). |
-| `core/lib/utils/file/LockTimeoutError.js` | The error `Lock` throws when its optional `timeoutMs` bound runs out (`code: 'LOCK_TIMEOUT'`); imported by `Lock.js`, so it is bundled with it. |
-| `core/lib/utils/file/RepoPath.js` | Repo-path validation and root normalization (see [Repo-root normalizing helper](#repo-root-normalizing-helper)). |
+| `shared/lib/config/ConfigChain.js` | Local → repo → global resolution, including `readWithSource` (see [Shared agent-email helper](#shared-agent-email-helper)). |
+| `shared/lib/config/RepoConfig.js` | Repo-tier reads. |
+| `shared/lib/config/RepoConfigWriter.js` | Every config write, with the lock. |
+| `shared/lib/config/ConfigError.js` | The shared error contract (see [`ConfigError`](#configerror)). |
+| `shared/lib/config/AgentEmail.js` | Shared agent-email resolution (see [Shared agent-email helper](#shared-agent-email-helper)). |
+| `shared/lib/config/KeyRegistry.js` and `keys.json` | The [Key Registry](key-registry.md#location) and its loader, validator and matcher. |
+| `shared/lib/file/Lock.js` | The lock, compatible with the shell `lock.sh` (see [Lock](#lock)). |
+| `shared/lib/file/LockTimeoutError.js` | The error `Lock` throws when its optional `timeoutMs` bound runs out (`code: 'LOCK_TIMEOUT'`); imported by `Lock.js`, so it is bundled with it. |
+| `shared/lib/file/RepoPath.js` | Repo-path validation and root normalization (see [Repo-root normalizing helper](#repo-root-normalizing-helper)). |
 
-- **The authoritative declaration** of this list is the explicit `files` list of the shared-surface block in `core/eslint.config.mjs` (see [Guardrails](#guardrails)). This table explains it; when the two disagree, the ESLint block wins and this table is fixed.
-- **`BooleanKeyConfig` is not on the surface.** It is the native `config.sh` dispatch layer: subcommand-named methods, `"\n"`-terminated stdout strings, `toggle`, and `throw new DispatchFailure('', 1)` as `is-enabled`'s "false" exit signal. It stays core-only and keeps `DispatchFailure`, which is a dispatch protocol there, not an error. Its subclasses (`AutoFixAllConfig`, `MonitorIssuesConfig`) target the same namespaced repo file with legacy fallback that `ConfigChain` and `RepoConfigWriter` already handle, so the CLI reads every key through `ConfigChain` and writes every key through `RepoConfigWriter`.
-- **JSDoc `RepoContext` references stay.** `ConfigChain` and `RepoConfig` reference `core/lib/context/RepoContext.js` only inside JSDoc `import('…')` types. Neither ESLint nor `esbuild` reads them, so they pull nothing into the bundle. They document an optional dependency that only core injects; the CLI never passes `repoContext`. The JSDoc is reworded to "optional, core-only", so readers do not mistake it for a surface dependency.
+- **The folder is the declaration.** Everything under `shared/lib` is public, so there is no separate file list (see [Guardrails](#guardrails)). This table explains what is there today.
+- **`BooleanKeyConfig` is not on the surface.** It stays in `core/lib/utils/config/`, with `NamespacedBooleanKeyConfig`. It is the native `config.sh` dispatch layer: subcommand-named methods, `"\n"`-terminated stdout strings, `toggle`, and `throw new DispatchFailure('', 1)` as `is-enabled`'s "false" exit signal. It stays core-only and keeps `DispatchFailure`, which is a dispatch protocol there, not an error. Its subclasses (`AutoFixAllConfig`, `MonitorIssuesConfig`) target the same namespaced repo file with legacy fallback that `ConfigChain` and `RepoConfigWriter` already handle, so the CLI reads every key through `ConfigChain` and writes every key through `RepoConfigWriter`.
+- **JSDoc `RepoContext` references stay.** `ConfigChain` and `RepoConfig` reference core's `RepoContext` only inside JSDoc `import('…')` types, marked "optional, core-only". Neither ESLint nor `esbuild` reads them, so they pull nothing into the bundle. They document an optional dependency that only core injects; the CLI never passes `repoContext`.
 - **Strict-keys guard.** `ConfigChain#read` and `RepoConfig`'s read gain the registry's test-only guard: under `ARCANUM_STRICT_CONFIG_KEYS=1`, set by core's spec runner, they throw `ConfigError('UNREGISTERED_KEY')` on a key that matches no registry entry. Production behaviour is unchanged (see [Key Registry](key-registry.md#enforcing-a-new-key-means-a-registry-entry)).
 
 ### `ConfigError`
 
-A small class on the shared surface, `core/lib/utils/config/ConfigError.js`:
+A small class on the shared surface, `shared/lib/config/ConfigError.js`:
 
 ```js
 class ConfigError extends Error {
@@ -59,7 +57,7 @@ class ConfigError extends Error {
 
 ### Lock
 
-**The flaw.** The shared lock protocol (`arcanum/_lib/lock.sh` and its mirror `core/lib/utils/file/Lock.js`, see [Lock System](../../architecture/lock-system.md)) does not exclude a writer that already holds the lock. Acquire writes its id unconditionally, sleeps 1s and re-reads, and never checks whether the lock file already exists. A late writer therefore "steals" a held lock, both mutate the file concurrently (a silent lost update), and the first to finish `rm -f`s the other's lock. The protocol only arbitrates writers arriving within the same ~1s window. The [Command Surface](command-surface.md#lock-contention) guarantees assume real exclusion.
+**The flaw.** The shared lock protocol (`arcanum/_lib/lock.sh` and its mirror `shared/lib/file/Lock.js`, see [Lock System](../../architecture/lock-system.md)) does not exclude a writer that already holds the lock. Acquire writes its id unconditionally, sleeps 1s and re-reads, and never checks whether the lock file already exists. A late writer therefore "steals" a held lock, both mutate the file concurrently (a silent lost update), and the first to finish `rm -f`s the other's lock. The protocol only arbitrates writers arriving within the same ~1s window. The [Command Surface](command-surface.md#lock-contention) guarantees assume real exclusion.
 
 **Decision: fix the shared protocol** rather than weakening the CLI's guarantees or giving the CLI a private lock, which would still not exclude skills. The fix is code in both shell and `core/`, so it is its own issue, **#807** (owners `node` + `scripter`):
 
@@ -77,7 +75,7 @@ Consequences:
 
 ### Repo-root normalizing helper
 
-`core/lib/utils/file/RepoPath.js` joins the shared surface. It imports only `node:` built-ins, and the CLI already reuses its messages for `--repo` usage errors (see the index's [Targeting](../arcanum-cli.md#targeting)). It gains a `toplevel(repoPath)` method that runs `git -C <path> rev-parse --show-toplevel` through `execFile` with an argument array. The normalization rule itself is in [Command Surface](command-surface.md#--repo-normalization). Owner: `node`.
+`shared/lib/file/RepoPath.js` joins the shared surface. It imports only `node:` built-ins, and the CLI already reuses its messages for `--repo` usage errors (see the index's [Targeting](../arcanum-cli.md#targeting)). It gains a `toplevel(repoPath)` method that runs `git -C <path> rev-parse --show-toplevel` through `execFile` with an argument array. The normalization rule itself is in [Command Surface](command-surface.md#--repo-normalization). Owner: `node`.
 
 This was decided while planning #773, not in the issue discussion; reviewers may revisit it.
 
@@ -92,7 +90,7 @@ This was decided while planning #773, not in the issue discussion; reviewers may
 **Decisions.**
 
 1. **`ConfigChain#readWithSource(repoPath, namespace, ...keys)`** returns `{ value, tier, file, key }` or `undefined`. `read` becomes a thin wrapper over it. There is one resolution loop, so value and provenance cannot drift, and `arcanum config get` can show provenance generically.
-2. **`core/lib/utils/config/AgentEmail.js`**, on the shared surface, importing only `ConfigChain`:
+2. **`shared/lib/config/AgentEmail.js`**, on the shared surface, importing only `ConfigChain`:
    - `resolve(repoPath, agent)` → `{ email, raw, tier, key } | undefined`, where `raw` is the value before `{agent}` substitution. This is the CLI's entry point.
    - `get(repoPath, agent, modelEmail)` → `string`: `resolve` plus the `modelEmail` fallback, with the same verbatim `() => agent` replacer. It replaces the three `_agentEmailGet` copies.
 3. **Native aligns to the shell on `""`.** An empty string is *not* an opt-out of the agent co-author line. A resolved empty string means "no email": `get` returns `modelEmail`, and `resolve` still reports the tier and key with `email: undefined`, so the CLI can show e.g. `(model default)  (empty at repo: git.agents.node)`. This is a deliberate native behaviour fix (today a native commit would get an empty co-author email), covered by a spec and called out in the release notes.
@@ -104,7 +102,7 @@ The CLI view built on `AgentEmail#resolve` is in [Shortcuts and Setup](shortcuts
 
 ### Bundle at build time with `esbuild`
 
-The CLI build uses **`esbuild`** to bundle the CLI itself, the shared surface above and the [Key Registry](key-registry.md) into a single self-contained file in the `arcanum-cli` package. `esbuild` is a devDependency only, so the runtime stays zero-dependency. `core/` is not part of the npm package, so the CLI cannot import `core/lib` at runtime.
+The CLI build uses **`esbuild`** to bundle the CLI itself, the shared surface above and the [Key Registry](key-registry.md) into a single self-contained file in the `arcanum-cli` package. `esbuild` is a devDependency only, so the runtime stays zero-dependency. Neither `core/` nor `shared/` is part of the npm package, so the CLI cannot import `shared/lib` at runtime.
 
 Precondition, checked: no shared-surface file uses `import.meta.url` or `__dirname`, so moving them into a bundle breaks no module-relative path resolution.
 
@@ -127,13 +125,11 @@ Precondition, checked: no shared-surface file uses `import.meta.url` or `__dirna
 | `define` | `__ARCANUM_CLI_VERSION__` from `package.json` | `--version` needs no runtime file read or second JSON import. |
 | `metafile` | `true` | Feeds the surface check below. |
 
-> **Suspended:** the build-time surface check below is under revision by epic #816; see [Shared Lib](../shared-lib.md). Until #826 rewrites it, `shared-lib.md` wins where the two disagree.
-
-**Build-time surface check.** After building, `build.mjs` reads the metafile and **fails** if any bundled input lies outside `cli/lib/**` plus the shared-surface files. It reads that list from core's ESLint shared-surface block, the authoritative declaration, so there is no third copy. This complements the specifier-based lint rule (see [Guardrails](#guardrails)) with a check on resolved paths, at no new dependency.
+**Build-time surface check.** After building, `build.mjs` reads the metafile and **fails** if any bundled input lies outside `cli/lib/**` and `shared/lib/**` (`ALLOWED_INPUT_DIRS`). Both are folders, so there is no file list to keep in sync. This complements the specifier-based lint rule (see [Guardrails](#guardrails)) with a check on resolved paths, at no new dependency.
 
 **`cli/package.json` wiring.** `"build": "node scripts/build.mjs"`; `"prepack": "yarn build"`, so `npm publish`/`npm pack` always ship a fresh bundle; `files: ["bin/", "dist/", "README.md"]`. The CI `cli` job and the release publish job both run `yarn build` (see [CI coupling](#ci-coupling) and [Packaging and Release](packaging-and-release.md#release)).
 
-**Specs.** Regular Jasmine specs and c8 coverage run against the **source** (`cli/spec` → `cli/lib` → `core/lib` through relative imports). A few **smoke specs** run the built `dist/arcanum.mjs` through `cli/bin/arcanum`: `--version`, a `set`/`get` round-trip in a temp repo, and an unknown-key exit `3`, which proves the registry was inlined. They require `yarn build` first.
+**Specs.** Regular Jasmine specs and c8 coverage run against the **source** (`cli/spec` → `cli/lib` → `shared/lib` through relative imports). A few **smoke specs** run the built `dist/arcanum.mjs` through `cli/bin/arcanum`: `--version`, a `set`/`get` round-trip in a temp repo, and an unknown-key exit `3`, which proves the registry was inlined. They require `yarn build` first.
 
 **JSON import, to verify during implementation (`node`).** `KeyRegistry.js` loads `keys.json` with a static JSON import (`with { type: 'json' }`), which `esbuild` inlines, so the bundle carries the registry with no runtime file read. Inside **core**, though, it runs unbundled on Node 22.13. If that Node still prints an `ExperimentalWarning` for JSON modules (they were marked stable around 22.12/23.1), the stderr line would break the dispatcher's output contract. The floor CI job would also catch it. **Fallback:** rename `keys.json` → `keys.js` with `export default [...]`. That is transparent to `esbuild`, and the array-of-entries decision in [Key Registry](key-registry.md) is unaffected.
 
@@ -141,48 +137,17 @@ Precondition, checked: no shared-surface file uses `import.meta.url` or `__dirna
 
 #### Shared-surface lint rule
 
-> **Suspended:** under revision by epic #816; see [Shared Lib](../shared-lib.md). Until #826 rewrites it, `shared-lib.md` wins where the two disagree.
+The surface is enforced on **both sides**, as described in [Shared Lib → Import boundary](../../architecture/shared-lib.md#import-boundary).
 
-The surface is enforced on **both sides**, following the precedent of `core/eslint.config.mjs`'s existing `no-restricted-imports` block for the `commands → context/services → utils` layering.
-
-**Core side: an allowlist on the surface files.** A new block in `core/eslint.config.mjs` names the surface **explicitly**, not by glob (`BooleanKeyConfig.js` lives in the same folder but is not on the surface). This `files` list is the authoritative declaration of the shared surface.
-
-```js
-{
-  // The CLI's declared shared surface (docs/agents/specs/arcanum-cli/shared-config-logic.md):
-  // these files are bundled into arcanum-cli, so they may import only node:
-  // built-ins and each other. Replaces the commands-layering rule for these
-  // files (flat config: last matching block wins); the allowlist already rejects commands/.
-  files: [
-    'lib/utils/config/ConfigChain.js', 'lib/utils/config/RepoConfig.js',
-    'lib/utils/config/RepoConfigWriter.js', 'lib/utils/config/ConfigError.js',
-    'lib/utils/config/AgentEmail.js', 'lib/utils/config/KeyRegistry.js',
-    'lib/utils/file/Lock.js', 'lib/utils/file/LockTimeoutError.js', 'lib/utils/file/RepoPath.js'
-  ],
-  rules: {
-    'no-restricted-imports': ['error', { patterns: [{
-      // Allowlist: any specifier NOT matching one of these alternatives is restricted.
-      regex: '^(?!(?:node:.+' +
-        '|\\./(?:ConfigChain|RepoConfig|RepoConfigWriter|ConfigError|AgentEmail|KeyRegistry)\\.js' +
-        '|\\./keys\\.json' +
-        '|\\./(?:Lock|LockTimeoutError|RepoPath)\\.js' +
-        '|\\.\\./file/(?:Lock|LockTimeoutError|RepoPath)\\.js' +
-        '|\\.\\./config/(?:ConfigChain|ConfigError)\\.js)$)',
-      message: 'Shared-surface files may import only node: built-ins and other shared-surface files.'
-    }] }],
-    'no-restricted-syntax': ['error',
-      { selector: 'ImportExpression', message: 'No dynamic import() on the shared surface.' }]
-  }
-}
-```
+**Surface side: a folder rule.** `shared/eslint.config.mjs` lets every file under `shared/lib/` import only `node:` built-ins and other files under `shared/lib/`. The folder itself is the surface, so the rule needs no file list.
 
 - The allowlist is a negative-lookahead `regex`, not a gitignore-style `group` (`'**'` plus `'!…'` re-includes): under gitignore semantics `**` also excludes the parent segments (`.`, `..`, `node:fs`), which can never be re-included, so such a `group` rejects every import.
-- Bare built-ins (`'fs'` instead of `'node:fs'`) are rejected. Every current import already uses `node:`, so this keeps the allowlist simple at no cost.
-- `no-restricted-syntax` covers dynamic `import()`, which `no-restricted-imports` ignores. `export … from` is already covered.
-- Patterns match the import **specifier**, not the resolved path. For example, `'./ConfigChain.js'` written in `file/Lock.js` passes lint and fails at runtime; specs catch that, and the build's metafile check covers resolved paths.
-- The existing `checks` CI job enforces this side on every `core` edit.
+- Bare built-ins (`'fs'` instead of `'node:fs'`) are rejected.
+- `no-restricted-syntax` covers dynamic `import()`, which `no-restricted-imports` ignores.
+- Patterns match the import **specifier**, not the resolved path. Specs catch a wrong path at runtime, and the build's metafile check covers resolved paths.
+- The `shared` CI job enforces this side, and `shared/spec/packaging/eslintBoundary_spec.js` covers the rule itself.
 
-**CLI side: `core/lib` only through the surface.** `cli/eslint.config.mjs` restricts `**/core/lib/**` imports to the surface entry files the CLI actually uses (`ConfigChain`, `RepoConfigWriter`, `ConfigError`, `AgentEmail`, `KeyRegistry`, `Lock`, `RepoPath`). Without it, the CLI could import e.g. `core/lib/context/RepoContext.js`, `esbuild` would bundle it silently, and the surface would be bypassed. The new `cli` CI job enforces this side.
+**Consumer side.** `cli/eslint.config.mjs` forbids any import from `core/` and any import from `shared/spec/`, so the CLI reaches only `shared/lib/**`. Without it, the CLI could import e.g. `core/lib/context/RepoContext.js`, `esbuild` would bundle it silently, and the surface would be bypassed. The `cli` CI job enforces this side. `core/eslint.config.mjs` likewise forbids `shared/spec/` imports in `core/`.
 
 #### Malformed files stay the CLI's concern
 
@@ -199,27 +164,18 @@ The surface is enforced on **both sides**, following the precedent of `core/esli
 
 Shape:
 
-- A new **`cli` job in the `test` workflow**, owned by `infra` (whose scope gains `.circleci/`, see [Packaging and Release](packaging-and-release.md)). Same image as `test`/`checks` (`darthjee/circleci_node:0.2.1`), `working_directory: ~/project/cli` (the full-repo checkout provides `core/lib` and the `arcanum/migrations/` files the build reads), tag pushes ignored like its siblings. Steps: `yarn install --frozen-lockfile` → lint → **build the bundle** → CLI specs, including the smoke specs against the built bundle → `yarn audit` (non-blocking, as in `checks`).
+- A new **`cli` job in the `test` workflow**, owned by `infra` (whose scope gains `.circleci/`, see [Packaging and Release](packaging-and-release.md)). Same image as `test`/`checks` (`darthjee/circleci_node:0.2.1`), `working_directory: ~/project/cli` (the full-repo checkout provides `shared/lib` and the `arcanum/migrations/` files the build reads), tag pushes ignored like its siblings. Steps: `yarn install --frozen-lockfile` → lint → **build the bundle** → CLI specs, including the smoke specs against the built bundle → `yarn audit` (non-blocking, as in `checks`).
 - It complements the index's Node 22.13 floor job (see [Runtime](../arcanum-cli.md#runtime)), which runs the same specs at the floor.
 - **The bundle is never committed.** It is built in CI and again at publish, so no freshness check is needed. The release pipeline's npm publish job, `publish-cli`, uses **the same build script** as the `cli` job, so the tested artefact is the shipped artefact (see [Packaging and Release](packaging-and-release.md#release)).
-- **The reverse direction is already covered.** The core-side lint rule lives in `core`'s ESLint config, so the existing `checks` job enforces it on every `core` edit.
+- **The reverse direction is already covered.** The surface-side lint rule lives in `shared/eslint.config.mjs`, so the `shared` job enforces it on every push.
 - **Revisit** path filtering only if the `cli` job's runtime grows noticeably, as a separate `infra` issue outside epic #767.
-
-### Future work
-
-> **Suspended:** under revision by epic #816; see [Shared Lib](../shared-lib.md). Until #826 rewrites it, `shared-lib.md` wins where the two disagree.
-
-Extracting the shared config logic into its own npm package is a separate follow-up issue, outside epic #767. That issue must deal with `core` shipping with zero runtime npm dependencies inside the release zip and the Docker image, so `core` cannot simply depend on a published package. A likely shape: an in-repo workspace package that `core` imports locally and that is published to npm for the CLI.
 
 ## Alternatives considered
 
-- **Extracting a shared workspace package now.** Rejected: it needs a new root folder, import churn in `core`, and Docker/Makefile changes. That is too much for about 900 lines. It is kept as future work.
-
-  > **Suspended:** this bullet is under revision by epic #816; see [Shared Lib](../shared-lib.md). Until #826 rewrites it, `shared-lib.md` wins where the two disagree.
-
+- **Keeping the surface in `core/`.** First chosen here, then reversed: epic #816 extracted it into the root `shared/` lib, a plain folder imported by relative path, not an npm or workspace package (see [Shared Lib → Alternatives considered](../../architecture/shared-lib.md#alternatives-considered)).
 - **A plain copy script instead of `esbuild`.** Rejected: copied files keep their relative imports and need their own module layout in the package, whereas a bundle is one self-contained file.
 - **Reimplementing the config logic in the CLI.** Rejected: it would drift from arcanum, especially the locking.
-- **Importing `core/lib` at runtime.** Impossible: `core/` is not shipped in the npm package.
+- **Importing `shared/lib` at runtime.** Impossible: `shared/` is not shipped in the npm package.
 - **Path-filtered CI for the CLI job.** Rejected: it needs CircleCI dynamic config, and a hand-maintained filter can silently stop covering a new surface file.
 - **A CLI-only, stricter lock.** Rejected: it would not exclude running skills, which use the shared protocol. The shared protocol is fixed instead (#807).
 - **Keeping `BooleanKeyConfig` on the surface.** Rejected: it is the `config.sh` dispatch layer, and it drags `DispatchFailure` in.
@@ -245,11 +201,11 @@ Extracting the shared config logic into its own npm package is a separate follow
 
 - With #807, an uncontended lock is immediate instead of a fixed 1s.
 - The bundle is unminified, with zero runtime dependencies; the supply-chain surface is limited to the `esbuild` devDependency.
-- The CLI-side lint and the metafile check stop the bundle from silently pulling in more of `core/lib`.
+- The CLI-side lint and the metafile check stop the bundle from silently pulling in anything outside `cli/lib` and `shared/lib`.
 
 ## Open points
 
-None left. The npm-package extraction is recorded as [Future work](#future-work).
+None left. The extraction into `shared/` was done in epic #816.
 
 ## Dependencies
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This repository has no application architecture in the traditional sense — there's no running process, no runtime layers. Each skill is a set of markdown instructions that Claude Code loads and interprets when the user invokes `/skill-name`. That's still true for the skills themselves; deterministic logic within a skill, however, is migrating per-entrypoint from bash scripts to a native Node.js runtime layer under `core/` — see [Script Engine](script-engine.md) for the design (not yet implemented as of this writing).
+This repository has no application architecture in the traditional sense — there's no running process, no runtime layers. Each skill is a set of markdown instructions that Claude Code loads and interprets when the user invokes `/skill-name`. That's still true for the skills themselves; deterministic logic within a skill, however, is migrating per-entrypoint from bash scripts to a native Node.js runtime layer under `core/` — see [Script Engine](script-engine.md) for the design (not yet implemented as of this writing). Code that both `core/` and the `arcanum` CLI (`cli/`) need, such as the config surface, lives in the root `shared/` lib (see [Shared Lib](shared-lib.md)).
 
 ## Source Code Layout
 

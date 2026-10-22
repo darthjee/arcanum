@@ -20,11 +20,11 @@ Never write to these files directly — always use the dedicated scripts (e.g. `
 
 ## The key registry
 
-`core/lib/utils/config/keys.json` is the source of truth for every arcanum config key: its type, the tiers it may live in, its default, and its `setup` wizard entry. `core/lib/utils/config/KeyRegistry.js` loads it, matches dotted keys against it (`<name>` segments are wildcards, a literal entry beats a wildcard) and validates values. Nothing reads it at runtime yet, so skills behave as before. Three specs keep it in sync with what arcanum actually reads: a defaults drift spec, the `ARCANUM_STRICT_CONFIG_KEYS` read guard and a static scan of shell config calls. See [Key Registry](../specs/arcanum-cli/key-registry.md) for the full format.
+`shared/lib/config/keys.json` is the source of truth for every arcanum config key: its type, the tiers it may live in, its default, and its `setup` wizard entry. `shared/lib/config/KeyRegistry.js` loads it, matches dotted keys against it (`<name>` segments are wildcards, a literal entry beats a wildcard) and validates values. Both live in the [Shared Lib](shared-lib.md), owned by `shared`, but any agent may add, edit or remove an entry for a key its own change introduces (see [Shared Lib → Ownership](shared-lib.md#ownership)). Skills never read it at runtime, so they behave as before; the CLI's `config` command uses it for its usage text. Three specs keep it in sync with what arcanum actually reads: a defaults drift spec, the `ARCANUM_STRICT_CONFIG_KEYS` read guard and a static scan of shell config calls. See [Key Registry](../specs/arcanum-cli/key-registry.md) for the full format.
 
 **Checklist — adding a config key:**
 
-- [ ] Add a `core/lib/utils/config/keys.json` entry for it (type, tiers, default, and `setup` if the wizard asks for it).
+- [ ] Add a `shared/lib/config/keys.json` entry for it (type, tiers, default, and `setup` if the wizard asks for it).
 - [ ] If a shell call reads or writes it through a key the static scan can't build (a variable used as the whole namespace or the whole key argument), put a `# config-key: <dotted.key>` annotation on the line directly above the call.
 
 ## The global config tier
