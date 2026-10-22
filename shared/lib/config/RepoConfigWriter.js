@@ -40,14 +40,20 @@ class RepoConfigWriter {
    * the shell's `setpath(($k | split(".")); $v)`: missing intermediate
    * objects are created and sibling keys are kept. A flat key behaves
    * as a plain `.<namespace>[key] = value`.
+   *
+   * Without a `namespace`, `key` is a path from the root of the file
+   * (a top-level write): missing intermediates are created, siblings
+   * and their order are kept, and `legacyFile` is ignored (a legacy
+   * file only ever seeds one namespace).
    * @param {object} args - the write's arguments.
    * @param {string} args.newFile - the namespaced config file's path.
    * @param {string} [args.legacyFile] - the legacy, feature-specific
    *   config file's path (only read, as a seed); empty/absent when the
    *   namespace has no legacy file (the shell's `""`).
-   * @param {string} args.namespace - the top-level namespace key.
+   * @param {string} [args.namespace] - the top-level namespace key;
+   *   omitted for a top-level write.
    * @param {string} args.key - the key (or dot-separated path) to set
-   *   under `namespace`.
+   *   under `namespace`, or from the root when it is omitted.
    * @param {*} args.value - the JSON-serializable value to set.
    * @param {number} [args.timeoutMs] - bound on waiting for the lock;
    *   omitted waits forever.
@@ -59,14 +65,13 @@ class RepoConfigWriter {
     await this._locked(newFile, async () => {
       const config = await this._readBase(newFile);
 
-      if (!Object.hasOwn(config, namespace)) {
-        const legacy = await this._readLegacy(legacyFile);
+      if (namespace === undefined) {
+        RepoConfigWriter._setPath(config, key.split('.'), value, '', newFile);
 
-        if (legacy.exists) {
-          config[namespace] = legacy.value;
-        }
+        return config;
       }
 
+      await this._seedNamespace(config, namespace, legacyFile);
       this._setNamespaced(config, namespace, key.split('.'), value, newFile);
 
       return config;
@@ -205,6 +210,27 @@ class RepoConfigWriter {
   }
 
   /**
+   * Mirrors the shell writers' legacy seed: when `config` lacks
+   * `.<namespace>` and `legacyFile` exists, copies the legacy file's
+   * full contents in as `.<namespace>`.
+   * @param {object} config - the config object, mutated in place.
+   * @param {string} namespace - the namespace key.
+   * @param {string} [legacyFile] - the legacy config file's path.
+   * @returns {Promise<void>} resolves once seeded (or skipped).
+   */
+  async _seedNamespace(config, namespace, legacyFile) {
+    if (Object.hasOwn(config, namespace)) {
+      return;
+    }
+
+    const legacy = await this._readLegacy(legacyFile);
+
+    if (legacy.exists) {
+      config[namespace] = legacy.value;
+    }
+  }
+
+  /**
    * Mirrors jq's `.[$ns] = ((.[$ns] // {}) | setpath($path; $v))`.
    * @param {object} config - the config object, mutated in place.
    * @param {string} namespace - the namespace key.
@@ -234,7 +260,8 @@ class RepoConfigWriter {
    * @param {object} target - the object to set the path in, mutated.
    * @param {string[]} keyPath - the (non-empty) path to set.
    * @param {unknown} value - the leaf value.
-   * @param {string} prefix - the path walked so far, for error messages.
+   * @param {string} prefix - the path walked so far, for error messages
+   *   (`''` at the root of the file).
    * @param {string} file - the config file's path, for the error.
    * @returns {void}
    * @throws {ConfigError} `NOT_AN_OBJECT` when an intermediate holds a
@@ -248,7 +275,7 @@ class RepoConfigWriter {
       return;
     }
 
-    const current = `${prefix}.${head}`;
+    const current = RepoConfigWriter._joinPath(prefix, head);
     let child = target[head];
 
     if (child === undefined || child === null) {
@@ -259,6 +286,15 @@ class RepoConfigWriter {
 
     RepoConfigWriter._setPath(child, rest, value, current, file);
     target[head] = child;
+  }
+
+  /**
+   * @param {string} prefix - the path walked so far (`''` at the root).
+   * @param {string} head - the next path segment.
+   * @returns {string} the joined path, without a leading dot.
+   */
+  static _joinPath(prefix, head) {
+    return prefix === '' ? head : `${prefix}.${head}`;
   }
 
   /**

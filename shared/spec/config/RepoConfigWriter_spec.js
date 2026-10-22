@@ -348,6 +348,95 @@ describe('RepoConfigWriter', () => {
         });
       });
     });
+
+    describe('without a namespace (top-level write)', () => {
+      /**
+       * @param {string} key - the top-level key or dotted path.
+       * @param {unknown} value - the value to write.
+       * @returns {Promise<void>} resolves once written.
+       */
+      function writeTopLevel(key, value) {
+        return writer.write({ newFile, legacyFile, key, value });
+      }
+
+      it('writes a flat key on a new file', async () => {
+        await writeTopLevel('flat', 'v');
+
+        expect(await readFile(newFile, 'utf8')).toEqual('{\n  "flat": "v"\n}\n');
+      });
+
+      it('creates the intermediates of a dotted path', async () => {
+        await writeTopLevel('a.b.c', 1);
+
+        expect(await readFile(newFile, 'utf8')).toEqual(
+          '{\n  "a": {\n    "b": {\n      "c": 1\n    }\n  }\n}\n'
+        );
+      });
+
+      it('keeps siblings and their order, appending new keys', async () => {
+        await seedFile(newFile, '{"version":"1.0.0","a":{"x":1},"z":true}');
+
+        await writeTopLevel('a.y', 2);
+        await writeTopLevel('new', 'n');
+
+        expect(await readFile(newFile, 'utf8')).toEqual(`${JSON.stringify({
+          version: '1.0.0',
+          a: { x: 1, y: 2 },
+          z: true,
+          new: 'n'
+        }, null, 2)}\n`);
+      });
+
+      it('replaces an existing leaf in place', async () => {
+        await seedFile(newFile, '{"a":1,"b":2,"c":3}');
+
+        await writeTopLevel('b', 'two');
+
+        expect(await readFile(newFile, 'utf8')).toEqual(
+          '{\n  "a": 1,\n  "b": "two",\n  "c": 3\n}\n'
+        );
+      });
+
+      it('treats a null intermediate as {}', async () => {
+        await seedFile(newFile, '{"a":null}');
+
+        await writeTopLevel('a.b', 1);
+
+        expect(JSON.parse(await readFile(newFile, 'utf8'))).toEqual({ a: { b: 1 } });
+      });
+
+      it('ignores legacyFile', async () => {
+        await seedFile(legacyFile, '{"legacy_key":1}');
+        spyOn(writer._fs, 'readFile').and.callThrough();
+
+        await writeTopLevel('flat', 'v');
+
+        expect(writer._fs.readFile).not.toHaveBeenCalledWith(legacyFile, 'utf8');
+        expect(JSON.parse(await readFile(newFile, 'utf8'))).toEqual({ flat: 'v' });
+      });
+
+      it('rejects a non-object intermediate with NOT_AN_OBJECT, releasing the lock', async () => {
+        await seedFile(newFile, '{"a":{"b":"x"}}');
+
+        const error = await writeTopLevel('a.b.c', 1).catch((e) => e);
+
+        expect(error).toBeInstanceOf(ConfigError);
+        expect(error.code).toEqual('NOT_AN_OBJECT');
+        expect(error.message).toEqual('Cannot index .a.b: not a JSON object');
+        expect(error.file).toEqual(newFile);
+        expect(existsSync(`${newFile}.lock`)).toBeFalse();
+      });
+
+      it('acquires and releases <newFile>.lock', async () => {
+        spyOn(lock, 'acquire').and.callThrough();
+        spyOn(lock, 'release').and.callThrough();
+
+        await writeTopLevel('flat', 'v');
+
+        expect(lock.acquire).toHaveBeenCalledWith(`${newFile}.lock`);
+        expect(lock.release).toHaveBeenCalledWith(`${newFile}.lock`);
+      });
+    });
   });
 
   describe('#setVersion', () => {
