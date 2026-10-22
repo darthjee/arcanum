@@ -1,4 +1,4 @@
-import KeyRegistry from '../../../core/lib/shared/config/KeyRegistry.js';
+import KeyRegistry from '../../../shared/lib/config/KeyRegistry.js';
 import { EXIT_ERROR, EXIT_OK, EXIT_USAGE, UsageError } from '../exitCodes.js';
 import { configUsage } from '../help.js';
 
