@@ -73,6 +73,8 @@ The `setup` field:
 
 ### Location
 
+> **Suspended:** under revision by epic #816; see [Shared Lib](../shared-lib.md). Until #826 rewrites it, `shared-lib.md` wins where the two disagree.
+
 - The registry is **`core/lib/utils/config/keys.json`**, owned by **`node`**, next to the existing config logic. A loader, validator and matcher, **`core/lib/utils/config/KeyRegistry.js`**, sits beside it; its specs live under `core/spec/`.
 - Both files join the **declared shared surface** of [Shared Config Logic](shared-config-logic.md#guardrails), so the existing guardrails cover them as they are: `esbuild` bundling into `arcanum-cli`, the shared-surface lint rule, and the always-on CLI CI job. No second path is added to any filter or list.
 - `KeyRegistry.js` loads the file with a **static JSON import**, `import keys from './keys.json' with { type: 'json' }`, which core's `node >=22.13` ESM setup supports. It never uses `fs.readFileSync`: `esbuild` inlines static JSON imports, so the bundled CLI carries the registry, whereas a runtime file read would look for a file that is absent from the npm package.

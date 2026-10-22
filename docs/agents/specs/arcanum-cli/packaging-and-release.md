@@ -54,6 +54,9 @@ No other lifecycle scripts. In particular `preinstall`, `install` and `postinsta
 
 - the CLI (`cli/lib/**`);
 - the shared config surface from `core/lib` (see [Shared Config Logic](shared-config-logic.md#source-stays-in-core));
+
+  > **Suspended:** this bullet is under revision by epic #816; see [Shared Lib](../shared-lib.md). Until #826 rewrites it, `shared-lib.md` wins where the two disagree.
+
 - the [Key Registry](key-registry.md) (`keys.json`, inlined by the JSON import);
 - the CLI version, injected through `define` as `__ARCANUM_CLI_VERSION__`;
 - the embedded migration-version list (below).
