@@ -23,6 +23,7 @@ You are the architect and coordinator of Arcanum — a collection of Claude Code
 | `node` | `core/`'s Node.js source/config (`core/lib/`, `core/spec/`, `core/bin/`, `core/package.json`, `core/eslint.config.mjs`) — the native counterpart of scripts migrating from bash |
 | `infra` | Docker, docker-compose, and Makefile files repo-wide — e.g. `core/Dockerfile`, `core/docker-compose.yml`, the root `Makefile`'s `core-*` and `cli-*` targets — plus `.circleci/` (the `test` and `release` workflows) |
 | `client` | All of `cli/` — the user-facing `arcanum` CLI npm package (`cli/bin/arcanum`, `cli/lib/`, `cli/spec/`, `cli/scripts/build.mjs`, `cli/package.json`, `cli/eslint.config.mjs`, `cli/README.md`), plus its architecture doc and end-user guide |
+| `shared` | All of `shared/` (`shared/lib/`, `shared/spec/`, `shared/package.json`, `shared/yarn.lock`, `shared/eslint.config.mjs`, `shared/README.md`): code consumed by both `core/` and `cli/` |
 | `mod` | Top-level Claude Code mod folders — e.g. `arcanum-next-step/` (`.claude-plugin/plugin.json`, `hooks/`, `types/`, `*.test.ts`, its `README.md`) |
 
 ## How to coordinate

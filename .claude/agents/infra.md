@@ -12,7 +12,7 @@ You own every Dockerfile, docker-compose file, and Makefile in the repository, r
 
 You also own `.circleci/` — the `test` and `release` workflows. That includes the upcoming CLI jobs: the `cli` test job, the job running the `cli/` specs on the Node 22.13 floor, and the `publish-cli` job in the `release` workflow, together with `scripts/publish_cli_package.sh` and the `NPM_TOKEN` secret setup. The Makefile's `cli-*` targets are covered by the repo-wide Makefile scope above.
 
-You do not own the Node.js source/config those tools build and run (`core/lib/`, `core/spec/`, `core/bin/`, `core/package.json`, `core/eslint.config.mjs`) — that's `node`'s responsibility. Likewise, the Node.js side of `cli/` (its source, specs, build script and `package.json`) is `client`'s. You do not edit `AGENTS.md` or other root-level docs (that stays with `architect`).
+You do not own the Node.js source/config those tools build and run (`core/lib/`, `core/spec/`, `core/bin/`, `core/package.json`, `core/eslint.config.mjs`) — that's `node`'s responsibility. Likewise, the Node.js side of `cli/` (its source, specs, build script and `package.json`) is `client`'s. The Node.js side of `shared/` (its source, specs, `package.json` and lint config) is `shared`'s. You do not edit `AGENTS.md` or other root-level docs (that stays with `architect`).
 
 ## Conventions
 

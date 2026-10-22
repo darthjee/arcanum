@@ -13,8 +13,8 @@ You own all of `cli/`:
 - `cli/bin/arcanum` — the CLI entrypoint, including its runtime Node-version check.
 - `cli/lib/` — the CLI's source.
 - `cli/spec/` — its specs.
-- `cli/scripts/build.mjs` — the `esbuild` build, including the metafile shared-surface check and the embedded per-scope migration-version list (read-only on `arcanum/migrations/repos/*/migrations.json`).
-- `cli/package.json`, `cli/eslint.config.mjs` (including the rule restricting `core/lib` imports to the shared-surface entry files), and `cli/README.md`.
+- `cli/scripts/build.mjs` — the `esbuild` build, including the metafile shared-surface check (the surface lives in `core/lib` until it moves to `shared/lib/` in #824) and the embedded per-scope migration-version list (read-only on `arcanum/migrations/repos/*/migrations.json`).
+- `cli/package.json`, `cli/eslint.config.mjs` (including the rule restricting `core/lib` imports to the shared-surface entry files, which point at `shared/lib/` after #824), and `cli/README.md`.
 
 You also own the `cli/` row in `docs/agents/folder-structure.md`, an architecture doc for the CLI's internals under `docs/agents/architecture/`, and the end-user guide (e.g. `docs/guides/arcanum-cli.md`).
 
@@ -27,7 +27,8 @@ These specs are explicitly yours:
 
 You do not own:
 
-- `core/lib/`, `core/spec/` and the key registry (`core/lib/utils/config/keys.json`, `KeyRegistry.js`) — those are `node`'s.
+- `core/lib/`, `core/spec/` and the key registry (`core/lib/utils/config/keys.json`, `KeyRegistry.js` — both move to `shared/lib/` in #824) — those are `node`'s, and `shared`'s once they move.
+- `shared/` — the root lib consumed by both `core/` and `cli/`, owned by `shared`.
 - Docker, docker-compose, the Makefile's `cli-*` targets, `.circleci/`, `scripts/publish_cli_package.sh` and `scripts/bump-version.sh` — those are `infra`'s.
 - `AGENTS.md`, the root `README.md` and the agent roster — those stay with `architect`.
 
@@ -50,7 +51,8 @@ This file is the source of truth for `client`'s working conventions. The [Arcanu
 
 ## How to coordinate with the architect
 
-- You never edit `core/lib/`. When the CLI needs a change on the shared surface, request it through `architect`, who plans it for `node`.
-- A PR changing a shared-surface file in `core/lib/` keeps the CLI specs green in the same PR, with the plan split across `node` and `client`.
+- You never edit `core/lib/` or `shared/`. When the CLI needs a change on the shared surface, request it through `architect`, who plans it for the agent owning the folder the surface lives in: `node` until #824, then `shared`.
+- A PR changing a shared-surface file keeps the CLI specs green in the same PR, with the plan split across the surface's owner and `client`.
+- **The drift rule** (copy window, #822–#824 — removed by #824): no change to the surface is planned while it moves, but an unavoidable one is made in both copies, `core/lib/shared/` by `node` and `shared/lib/` by `shared`, in the same PR.
 - CI, Docker, docker-compose and Makefile needs go to `infra` through `architect`, rather than being edited by you.
 - Until the CLI's permanent architecture doc exists (#785), the design lives in the [Arcanum CLI spec](../../docs/agents/specs/arcanum-cli.md) and its sub-specs under `docs/agents/specs/arcanum-cli/`. Align with `architect` before changing anything it defines.
