@@ -38,6 +38,13 @@
 # non-blocking audit); `cli-node-floor` re-runs build and test on
 # cimg/node:22.13.0, the CLI's minimum supported Node (the darthjee image
 # runs 22.14.0, so it is not the floor). No Codacy coverage upload yet.
+#
+# The `shared` and `shared-node-floor` jobs (test workflow) gate the
+# shared/ package the same way, from shared/ in a full checkout (no path
+# filters). shared/ has no build step. `shared` lints, runs the specs
+# under c8 (coverage thresholds enforced, blocking), then a non-blocking
+# audit; `shared-node-floor` re-runs the specs on cimg/node:22.13.0,
+# since the CLI bundles shared/ and ships it to users on Node 22.13.
 
 version: 2.1
 
@@ -165,6 +172,40 @@ jobs:
           name: Run tests
           command: yarn test
 
+  shared:
+    docker:
+      - image: darthjee/circleci_node:0.2.1
+    working_directory: ~/project/shared
+    steps:
+      - checkout:
+          path: ~/project
+      - run:
+          name: Install dependencies
+          command: yarn install --frozen-lockfile
+      - run:
+          name: Lint
+          command: yarn lint
+      - run:
+          name: Run tests with coverage
+          command: yarn test
+      - run:
+          name: Dependency audit (non-blocking)
+          command: yarn audit || true
+
+  shared-node-floor:
+    docker:
+      - image: cimg/node:22.13.0
+    working_directory: ~/project/shared
+    steps:
+      - checkout:
+          path: ~/project
+      - run:
+          name: Install dependencies
+          command: yarn install --frozen-lockfile
+      - run:
+          name: Run tests
+          command: yarn test
+
   mod-checks:
     docker:
       - image: darthjee/circleci_node:0.2.1
@@ -218,6 +259,14 @@ workflows:
             tags:
               ignore: /.*/
       - cli-node-floor:
+          filters:
+            tags:
+              ignore: /.*/
+      - shared:
+          filters:
+            tags:
+              ignore: /.*/
+      - shared-node-floor:
           filters:
             tags:
               ignore: /.*/
