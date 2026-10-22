@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import RepoConfigWriter from '../../lib/config/RepoConfigWriter.js';
 import Lock from '../../lib/file/Lock.js';
+import LockTimeoutError from '../../lib/file/LockTimeoutError.js';
 import ConfigError from '../../lib/config/ConfigError.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
@@ -395,6 +396,81 @@ describe('RepoConfigWriter', () => {
 
       expect(lock.acquire).toHaveBeenCalledWith(`${newFile}.lock`);
       expect(lock.release).toHaveBeenCalledWith(`${newFile}.lock`);
+    });
+  });
+
+  describe('timeoutMs', () => {
+    const calls = {
+      write: () => ({
+        file: newFile,
+        run: (opts) => writer.write({ newFile, legacyFile, namespace: 'n', key: 'k', value: 1, ...opts })
+      }),
+      setVersion: () => ({
+        file: newFile,
+        run: (opts) => writer.setVersion({ file: newFile, version: '1.2.3', ...opts })
+      })
+    };
+
+    Object.entries(calls).forEach(([name, build]) => {
+      describe(`on #${name}`, () => {
+        it('forwards timeoutMs to acquire', async () => {
+          spyOn(lock, 'acquire').and.callThrough();
+          const { file, run } = build();
+
+          await run({ timeoutMs: 250 });
+
+          expect(lock.acquire).toHaveBeenCalledWith(`${file}.lock`, { timeoutMs: 250 });
+        });
+
+        it('passes no lock options when timeoutMs is omitted', async () => {
+          spyOn(lock, 'acquire').and.callThrough();
+          const { file, run } = build();
+
+          await run({});
+
+          expect(lock.acquire).toHaveBeenCalledOnceWith(`${file}.lock`);
+        });
+
+        it('propagates a LockTimeoutError with no write and no release', async () => {
+          const timeout = new LockTimeoutError(`${newFile}.lock`);
+          const fakeLock = {
+            acquire: jasmine.createSpy('acquire').and.rejectWith(timeout),
+            release: jasmine.createSpy('release')
+          };
+          const fsSpies = {
+            writeFile: jasmine.createSpy('writeFile'),
+            rename: jasmine.createSpy('rename')
+          };
+
+          writer = new RepoConfigWriter({ lock: fakeLock, fs: fsSpies });
+          const { run } = build();
+          const error = await run({ timeoutMs: 0 }).catch((e) => e);
+
+          expect(error).toBe(timeout);
+          expect(error.code).toEqual('LOCK_TIMEOUT');
+          expect(fsSpies.writeFile).not.toHaveBeenCalled();
+          expect(fsSpies.rename).not.toHaveBeenCalled();
+          expect(fakeLock.release).not.toHaveBeenCalled();
+        });
+      });
+    });
+
+    it('times out on a pre-held real lock with timeoutMs: 0, leaving the file untouched', async () => {
+      await seedFile(newFile, '{"a":1}');
+      await lock.acquire(`${newFile}.lock`);
+
+      try {
+        const error = await writer.write({
+          newFile, legacyFile, namespace: 'n', key: 'k', value: 1, timeoutMs: 0
+        }).catch((e) => e);
+
+        expect(error).toBeInstanceOf(LockTimeoutError);
+        expect(error.code).toEqual('LOCK_TIMEOUT');
+        expect(await readFile(newFile, 'utf8')).toEqual('{"a":1}');
+        expect(existsSync(`${newFile}.tmp`)).toBeFalse();
+      } finally {
+        await lock.release(`${newFile}.lock`);
+      }
     });
   });
 });

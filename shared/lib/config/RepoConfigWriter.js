@@ -12,6 +12,10 @@ import ConfigError from './ConfigError.js';
  * (`JSON.stringify(obj, null, 2) + '\n'`, existing key order preserved,
  * new keys appended) and written atomically via `<file>.tmp` + rename.
  *
+ * Every method also takes an optional, native-only `timeoutMs` that
+ * bounds the wait for the lock (`Lock.acquire`); omitted waits forever,
+ * as the shell writers do.
+ *
  * Paths are absolute — callers resolve them against their
  * `repoContext.repoPath`.
  */
@@ -45,9 +49,13 @@ class RepoConfigWriter {
    * @param {string} args.key - the key (or dot-separated path) to set
    *   under `namespace`.
    * @param {*} args.value - the JSON-serializable value to set.
+   * @param {number} [args.timeoutMs] - bound on waiting for the lock;
+   *   omitted waits forever.
    * @returns {Promise<void>} resolves once written and unlocked.
+   * @throws {Error} a `LockTimeoutError` when `timeoutMs` runs out
+   *   (nothing is written).
    */
-  async write({ newFile, legacyFile, namespace, key, value }) {
+  async write({ newFile, legacyFile, namespace, key, value, timeoutMs }) {
     await this._locked(newFile, async () => {
       const config = await this._readBase(newFile);
 
@@ -62,7 +70,7 @@ class RepoConfigWriter {
       this._setNamespaced(config, namespace, key.split('.'), value, newFile);
 
       return config;
-    });
+    }, { timeoutMs });
   }
 
   /**
@@ -73,9 +81,13 @@ class RepoConfigWriter {
    * @param {string} args.file - the config file's path.
    * @param {string} args.version - the version string to set.
    * @param {string} [args.namespace] - the optional namespace key.
+   * @param {number} [args.timeoutMs] - bound on waiting for the lock;
+   *   omitted waits forever.
    * @returns {Promise<void>} resolves once written and unlocked.
+   * @throws {Error} a `LockTimeoutError` when `timeoutMs` runs out
+   *   (nothing is written).
    */
-  async setVersion({ file, version, namespace }) {
+  async setVersion({ file, version, namespace, timeoutMs }) {
     await this._locked(file, async () => {
       const config = await this._readBase(file);
 
@@ -86,22 +98,33 @@ class RepoConfigWriter {
       }
 
       return config;
-    });
+    }, { timeoutMs });
   }
 
   /**
    * Holds `<file>.lock` while `mutate` builds the new contents, then
-   * writes them atomically. Always releases the lock.
+   * writes them atomically. Releases the lock whenever it was acquired;
+   * a failed `acquire` (e.g. `LockTimeoutError`) propagates unchanged,
+   * with nothing written and no release.
    * @param {string} file - the config file's path.
    * @param {function(): Promise<object>} mutate - builds the object to
    *   write.
+   * @param {object} [opts] - locking options.
+   * @param {number} [opts.timeoutMs] - forwarded to `Lock.acquire`
+   *   (validated there); when omitted, `acquire` gets no options and
+   *   waits forever.
    * @returns {Promise<void>} resolves once written and unlocked.
    */
-  async _locked(file, mutate) {
+  async _locked(file, mutate, { timeoutMs } = {}) {
     const lockFile = `${file}.lock`;
 
     await this._fs.mkdir(path.dirname(file), { recursive: true });
-    await this._lock.acquire(lockFile);
+
+    if (timeoutMs === undefined) {
+      await this._lock.acquire(lockFile);
+    } else {
+      await this._lock.acquire(lockFile, { timeoutMs });
+    }
 
     try {
       const config = await mutate();
