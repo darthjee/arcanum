@@ -75,7 +75,7 @@ A native implementation of a given dual entrypoint must be byte-identical to its
 
 ## The `core/` package layout
 
-A single, central Node package at `core/` — not one Node package per skill. `core/package.json` declares Yarn as the package manager and zero runtime npm dependencies (built-in Node APIs only, including the global `fetch` for GitHub REST/GraphQL calls instead of a GitHub SDK — mirroring how today's shell scripts already avoid the `gh issue`/`gh api` subcommands in favor of `curl` plus `gh auth token`). Source lives under `core/lib/`; `core/bin/arcanum` is the one executable entrypoint described above.
+A single, central Node package at `core/` — not one Node package per skill. `core/package.json` declares Yarn as the package manager and zero runtime npm dependencies (built-in Node APIs only, including the global `fetch` for GitHub REST/GraphQL calls instead of a GitHub SDK — mirroring how today's shell scripts already avoid the `gh issue`/`gh api` subcommands in favor of `curl` plus `gh auth token`). Source lives under `core/lib/`; `core/bin/arcanum` is the one executable entrypoint described above. Code that `core/` shares with the `arcanum` CLI, such as the config surface (`ConfigChain`, `RepoConfig`, `RepoConfigWriter`, `KeyRegistry`, `Lock`, `RepoPath`), lives outside it, in the root `shared/` lib, which `core/` imports by relative path (see [Shared Lib](shared-lib.md)).
 
 `core/lib/` is split into 4 folders, with a one-way dependency direction — `commands` → `context`/`services` → `utils` — enforced by `core/eslint.config.mjs`'s `no-restricted-imports` override (scoped to `lib/context/**`, `lib/services/**`, `lib/utils/**`, failing any import specifier matching `**/commands/**`), not merely by convention:
 

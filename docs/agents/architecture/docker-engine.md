@@ -47,7 +47,9 @@ Why this layout:
 
 The native code is not self-contained under `core/`. `core/lib/utils/file/InstallRoot.js` resolves `INSTALL_ROOT` four levels above its own file, and native commands use it for `arcanum/_lib/config_chain.sh` (sourced by `core/lib/core/dispatcher.js` for every command, for `InvocationLog`), skill templates, and sibling shims that native commands shell out to (those go through `engine_dispatch.sh` again, see [Nested-call guard](#nested-call-guard)).
 
-So the `runtime` target copies the **install layout**, not just `core/`: the same file set as the release zip (`scripts/build_release_zip.sh`), under `/opt/arcanum`, with the CLI at `/opt/arcanum/core/bin/arcanum`.
+Native code also imports the config surface from the root `shared/lib/` by relative path (see [Shared Lib](shared-lib.md)).
+
+So the `runtime` target copies the **install layout**, not just `core/` (`shared/` lands at `/opt/arcanum/shared/`, next to `core/`): the same file set as the release zip (`scripts/build_release_zip.sh`), under `/opt/arcanum`, with the CLI at `/opt/arcanum/core/bin/arcanum`.
 
 - The build context is the install root, with `-f core/Dockerfile --target runtime`.
 - Production dependencies are installed with `yarn install --production --frozen-lockfile`. `core/package.json` has no runtime `dependencies` today, so this installs nothing, but it stays so that adding one doesn't silently break the image.
@@ -147,7 +149,7 @@ Dispatch resolves the config dir on the host (`CLAUDE_CONFIG_DIR`, or else `$HOM
 
 ### Shared state and locks
 
-All shared JSON state that commands mutate lives under the repo's `.claude/state/`. `arcanum/_lib/lock.sh` and `core/lib/utils/file/Lock.js` put the lock file next to the state file. The repo mount is `rw` at the same path, so a host process and a container process see the same lock file and exclude each other.
+All shared JSON state that commands mutate lives under the repo's `.claude/state/`. `arcanum/_lib/lock.sh` and `shared/lib/file/Lock.js` put the lock file next to the state file. The repo mount is `rw` at the same path, so a host process and a container process see the same lock file and exclude each other.
 
 The lock protocol creates the lock file atomically, only if absent, holding a `<hostname>:<pid>:<nonce>` instance id. Each container gets its own hostname (its container id), and the nonce is per acquire call, so ids stay unique across the host and any number of concurrent containers even though container pids restart at 1. Stale-lock detection only breaks a lock whose hostname matches the reader's and whose pid is dead. A lock left behind by a container carries the container's hostname, so the host sees it as cross-host and never breaks it automatically: it needs manual removal after the "seems stuck" warning. See [Lock System](lock-system.md).
 
