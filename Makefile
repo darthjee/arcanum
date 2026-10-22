@@ -8,6 +8,10 @@
 # cli-test builds cli/dist/arcanum.mjs before running the specs, since
 # `yarn test` does not build; cli-check runs lint then test.
 #
+# The shared-* targets do the same for the shared/ package (the `shared`
+# compose service). shared/ has no build step, so shared-test only runs
+# the specs (under c8); shared-check runs lint then test.
+#
 # mod-check gates the Claude Code mods shipped with arcanum (MOD_DIRS):
 # for each, `claude plugin validate`, `tsc -p` and `claude plugin test`,
 # run on the host (the Claude Code CLI must be on PATH), stopping at the
@@ -15,6 +19,7 @@
 
 CORE_COMPOSE := docker compose -f core/docker-compose.yml
 CLI_SERVICE := cli
+SHARED_SERVICE := shared
 YARN_INSTALL := yarn install --frozen-lockfile
 
 # The engine.mode=docker runtime image (the `runtime` target of
@@ -51,7 +56,8 @@ MOD_TYPES_TSCONFIG := .claude-plugin/types/tsconfig.json
 .PHONY: core-test core-lint core-check core-shell core-report core-audit \
 	core-build-runtime core-smoke-runtime docker-parity docker-benchmark \
 	mod-check cli-install cli-lint cli-build cli-test cli-check cli-shell \
-	cli-audit
+	cli-audit shared-install shared-lint shared-test shared-check \
+	shared-shell shared-audit
 
 core-test:
 	$(CORE_COMPOSE) run --rm core sh -c "yarn install --frozen-lockfile && yarn test"
@@ -89,6 +95,23 @@ cli-shell:
 
 cli-audit:
 	$(CORE_COMPOSE) run --rm $(CLI_SERVICE) sh -c "$(YARN_INSTALL) && yarn audit"
+
+shared-install:
+	$(CORE_COMPOSE) run --rm $(SHARED_SERVICE) sh -c "$(YARN_INSTALL)"
+
+shared-lint:
+	$(CORE_COMPOSE) run --rm $(SHARED_SERVICE) sh -c "$(YARN_INSTALL) && yarn lint"
+
+shared-test:
+	$(CORE_COMPOSE) run --rm $(SHARED_SERVICE) sh -c "$(YARN_INSTALL) && yarn test"
+
+shared-check: shared-lint shared-test
+
+shared-shell:
+	$(CORE_COMPOSE) run --rm $(SHARED_SERVICE) sh
+
+shared-audit:
+	$(CORE_COMPOSE) run --rm $(SHARED_SERVICE) sh -c "$(YARN_INSTALL) && yarn audit"
 
 core-build-runtime:
 	@test -n "$(RUNTIME_VERSION)" || { echo "RUNTIME_VERSION is empty (no arcanum.version?); pass RUNTIME_VERSION=<version>" >&2; exit 1; }

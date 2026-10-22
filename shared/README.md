@@ -41,7 +41,15 @@ enforces this.
 
 ## Running lint and specs
 
-Inside `shared/`, with Node 22.13+ and Yarn:
+From the repo root, inside the test container (Docker required):
+
+```bash
+make shared-test    # Jasmine under c8, coverage thresholds enforced
+make shared-lint
+make shared-check   # lint, then test
+```
+
+Alternatively, inside `shared/` on the host, with Node 22.13+ and Yarn:
 
 ```bash
 yarn install
