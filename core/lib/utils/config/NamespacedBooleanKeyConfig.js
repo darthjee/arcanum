@@ -6,7 +6,7 @@ import BooleanKeyConfig from './BooleanKeyConfig.js';
  * `true`/`false` keys under a namespace of the shared, three-tier
  * config files, re-deriving `arcanum/_lib/repo_config.sh`'s new/legacy
  * file split and `repo_config_read`/`repo_config_write` logic natively
- * (`core/lib/shared/config/RepoConfig.js` covers an unrelated,
+ * (`shared/lib/config/RepoConfig.js` covers an unrelated,
  * single-tier read). Currently backs `AutoFixAllConfig` and
  * `MonitorIssuesConfig`.
  *

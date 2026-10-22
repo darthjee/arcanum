@@ -2,6 +2,15 @@ import js from '@eslint/js';
 import jsdoc from 'eslint-plugin-jsdoc';
 import globals from 'globals';
 
+// `shared/spec/**` is `shared`'s own test tree, never a library: core may
+// import `shared/lib/**` but nothing under `shared/spec/` (see
+// docs/agents/specs/shared-lib.md). Repeated in every block below that sets
+// `no-restricted-imports` (flat config: the last matching block wins).
+const SHARED_SPEC_BAN = {
+  regex: '(?:^|/)shared/spec/',
+  message: 'core/ may import shared/lib/** but never shared/spec/** — see docs/agents/specs/shared-lib.md.'
+};
+
 export default [
   js.configs.recommended,
   jsdoc.configs['flat/recommended'],
@@ -51,6 +60,12 @@ export default [
     }
   },
   {
+    files: ['lib/**/*.js', 'bin/**/*.js', 'bin/arcanum', 'spec/**/*.js'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [SHARED_SPEC_BAN] }]
+    }
+  },
+  {
     // Enforces `lib/`'s one-way `commands` → `context`/`services` →
     // `utils` layering (see docs/agents/architecture/script-engine.md):
     // nothing under `context/`, `services/`, or `utils/` may import from
@@ -62,6 +77,7 @@ export default [
         'error',
         {
           patterns: [
+            SHARED_SPEC_BAN,
             {
               group: ['**/commands/**'],
               message:
@@ -71,45 +87,6 @@ export default [
             }
           ]
         }
-      ]
-    }
-  },
-  {
-    // The shared surface (see docs/agents/specs/shared-lib.md): everything
-    // under `lib/shared/` is bundled into arcanum-cli, so the folder itself
-    // is the declaration of the surface. Its files may import only `node:`
-    // built-ins and relative paths that stay inside `lib/shared/`.
-    // Replaces the commands-layering rule above for these files (flat
-    // config: last matching block wins); the allowlist already rejects
-    // commands/.
-    files: ['lib/shared/**/*.js'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              // An allowlist: any specifier NOT matching one of these
-              // alternatives is restricted. (A gitignore-style `group`
-              // with `**` plus `!` re-includes cannot express this: `**`
-              // also excludes the parent `.`/`..`/`node:fs` segments,
-              // which gitignore semantics never re-include.)
-              // Relative specifiers may start with `./` or a single `../`
-              // (surface files sit in `lib/shared/<area>/`, so one `../`
-              // stays inside `lib/shared/`); no later segment may start
-              // with a dot, which rejects any further `..` (e.g.
-              // `../../context/RepoContext.js`).
-              regex:
-                '^(?!(?:node:.+' +
-                '|\\.\\.?/(?:[\\w-][\\w.-]*/)*[\\w-][\\w.-]*)$)',
-              message: 'Files under lib/shared/ may import only node: built-ins and other files under lib/shared/.'
-            }
-          ]
-        }
-      ],
-      'no-restricted-syntax': [
-        'error',
-        { selector: 'ImportExpression', message: 'No dynamic import() on the shared surface.' }
       ]
     }
   }

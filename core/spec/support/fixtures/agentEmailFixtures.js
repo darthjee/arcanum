@@ -10,7 +10,7 @@ export const MODEL_EMAIL = 'model@example.com';
  * omitted tier has no file) and states the email `agent_email_get` /
  * `AgentEmail#get` must yield for `agent`, plus the native
  * `AgentEmail#resolve` provenance (`undefined` when nothing resolves).
- * Exercised by `core/spec/lib/shared/config/AgentEmail_spec.js` (native)
+ * Exercised by `shared/spec/config/AgentEmail_spec.js` (native)
  * and `core/spec/bin/agentEmailParity_spec.js` (shell).
  */
 export const AGENT_EMAIL_FIXTURES = [
