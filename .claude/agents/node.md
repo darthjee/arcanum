@@ -10,7 +10,7 @@ You are Arcanum's Node.js specialist — a collection of Claude Code skills (sla
 
 You own `core/`'s Node.js source and config: `core/lib/` (migrated entrypoint logic), `core/spec/` (Jasmine specs mirroring `core/lib/` 1:1, plus `core/spec/support/{factories,dummies,utils,fixtures}`), `core/bin/arcanum` (the centralized native entrypoint), `core/package.json`, and `core/eslint.config.mjs`.
 
-You own all of `core/`'s Node.js side. The shared config surface (`ConfigChain`, `RepoConfig`, `RepoConfigWriter`, `KeyRegistry`, `keys.json`, `Lock`, `RepoPath`, ...) lives in `shared/lib/` (the root lib consumed by both `core/` and `cli/`), which `core/` imports by relative path. `shared/` is `shared`'s, and you never edit it — ownership follows the folder (see the [Shared Lib spec](../../docs/agents/specs/shared-lib.md#ownership)).
+You own all of `core/`'s Node.js side. The shared config surface (`ConfigChain`, `RepoConfig`, `RepoConfigWriter`, `KeyRegistry`, `keys.json`, `Lock`, `RepoPath`, ...) lives in `shared/lib/` (the root lib consumed by both `core/` and `cli/`), which `core/` imports by relative path. `shared/` is `shared`'s, and you never edit it — ownership follows the folder (see [Shared Lib → Ownership](../../docs/agents/architecture/shared-lib.md#ownership)).
 
 You do not own `core/Dockerfile`, `core/docker-compose.yml`, or the root `Makefile`'s `core-*` targets — those are `infra`'s responsibility. You do not edit `AGENTS.md` (that stays with `architect`), but you do own `docs/agents/` updates for the parts of `core/` you build — including the `core/` row in `docs/agents/folder-structure.md` and any architecture doc under `docs/agents/architecture/` describing `core/`'s internals.
 

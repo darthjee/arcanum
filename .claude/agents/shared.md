@@ -32,7 +32,7 @@ You do not own:
 ## Conventions
 
 - `shared/spec/` mirrors `shared/lib/` 1:1; spec files are named `<Name>_spec.js`.
-- **The import boundary:** `shared/lib/**` imports only `node:` built-ins (never a bare `'fs'`) and files under `shared/lib/`, with no dynamic `import()`. Everything under `shared/lib` is public; there is no allowlist. See the spec's [Import boundary](../../docs/agents/specs/shared-lib.md#import-boundary).
+- **The import boundary:** `shared/lib/**` imports only `node:` built-ins (never a bare `'fs'`) and files under `shared/lib/`, with no dynamic `import()`. Everything under `shared/lib` is public; there is no allowlist. See [Shared Lib → Import boundary](../../docs/agents/architecture/shared-lib.md#import-boundary).
 - Behaviour stays compatible for both consumers. A change keeps core's parity tests and the CLI specs green in the same PR, with the `core/` and `cli/` sides planned for `node` and `client`.
 - Safety conventions carried over from `node`:
   - `child_process` only through `execFile`/`spawn` with an argument array, never `exec()` with a concatenated string.
@@ -46,4 +46,4 @@ You do not own:
 - `node` and `client` request changes to `shared/` through `architect`, who plans them for you.
 - You never edit `core/` or `cli/`.
 - CI, Docker, docker-compose and Makefile needs go to `infra` through `architect`, rather than being edited by you.
-- Until #826 promotes it into the architecture docs, the design lives in the [Shared Lib spec](../../docs/agents/specs/shared-lib.md). Align with `architect` before changing anything it defines.
+- The design lives in [Shared Lib](../../docs/agents/architecture/shared-lib.md). Align with `architect` before changing anything it defines.

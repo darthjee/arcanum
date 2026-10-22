@@ -2,13 +2,11 @@
 
 ## Status
 
-Proposed. Nothing in this spec is implemented yet.
+Implemented (#818–#826) and promoted to [Shared Lib](../architecture/shared-lib.md), which is now the source of truth. This spec is kept until #827 removes it.
 
 Origin: epic #816 (design discussion), which came out of the refinement of #780 (generic `arcanum config` commands). #780 is on hold until this spec is implemented.
 
 From this spec's merge on, it is the source of truth for the `shared/` lib design, and it supersedes the epic body, as [Arcanum CLI](arcanum-cli.md) did for #767. Later changes, from the implementation items (#819–#827) or review, are made here and are not back-ported to #816. The epic body is a historical snapshot; only its split list may still change.
-
-Where this spec disagrees with the [Arcanum CLI](arcanum-cli.md) specs, this spec wins. The reversed sections there carry a "Suspended" banner until #826 rewrites them.
 
 ## Goal and Non-goals
 
