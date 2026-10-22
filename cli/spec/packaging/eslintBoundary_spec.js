@@ -24,17 +24,23 @@ describe('cli/eslint.config.mjs shared-surface boundary', () => {
     return result.messages.filter((message) => message.ruleId === RULE);
   }
 
-  it('rejects a core/lib import outside the surface entry files', async () => {
-    expect((await boundaryMessages('../../../core/lib/context/RepoContext.js')).length).toBe(1);
-    expect((await boundaryMessages('../../../core/lib/utils/config/BooleanKeyConfig.js')).length).toBe(1);
+  it('rejects a core/ import outside core/lib/shared/', async () => {
+    for (const specifier of [
+      '../../../core/lib/context/RepoContext.js',
+      '../../../core/lib/utils/config/BooleanKeyConfig.js',
+      '../../../core/lib/utils/config/ConfigChain.js',
+      '../../../core/package.json'
+    ]) {
+      expect((await boundaryMessages(specifier)).length).withContext(specifier).toBe(1);
+    }
   });
 
-  it('accepts the surface entry files', async () => {
+  it('accepts any file under core/lib/shared/', async () => {
     for (const file of [
       'config/ConfigChain', 'config/RepoConfigWriter', 'config/ConfigError', 'config/AgentEmail',
-      'config/KeyRegistry', 'file/Lock', 'file/RepoPath'
+      'config/KeyRegistry', 'config/RepoConfig', 'file/Lock', 'file/LockTimeoutError', 'file/RepoPath'
     ]) {
-      expect(await boundaryMessages(`../../../core/lib/utils/${file}.js`)).withContext(file).toEqual([]);
+      expect(await boundaryMessages(`../../../core/lib/shared/${file}.js`)).withContext(file).toEqual([]);
     }
   });
 
