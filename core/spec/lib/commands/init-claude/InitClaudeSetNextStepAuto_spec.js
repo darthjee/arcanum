@@ -3,8 +3,8 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import InitClaudeSetNextStepAuto from '../../../../lib/commands/init-claude/InitClaudeSetNextStepAuto.js';
 import RepoContext from '../../../../lib/context/RepoContext.js';
-import RepoConfigWriter from '../../../../lib/shared/config/RepoConfigWriter.js';
-import Lock from '../../../../lib/shared/file/Lock.js';
+import RepoConfigWriter from '../../../../../shared/lib/config/RepoConfigWriter.js';
+import Lock from '../../../../../shared/lib/file/Lock.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 describe('InitClaudeSetNextStepAuto', () => {

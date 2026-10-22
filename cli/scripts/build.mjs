@@ -6,7 +6,7 @@
 // - injects the CLI version and the per-scope migration-version list
 //   through `define`;
 // - fails when any bundled input lies outside cli/lib/** and the shared
-//   surface folder, core/lib/shared/**.
+//   surface folder, shared/lib/**.
 //
 // The helpers are exported for the specs; the build only runs when this
 // file is invoked directly (`node scripts/build.mjs`).
@@ -26,7 +26,7 @@ export const REPO_ROOT = path.resolve(CLI_DIR, '..');
  * The repo-relative folders a bundled input may live in: the CLI's own
  * source and the shared surface folder.
  */
-export const ALLOWED_INPUT_DIRS = ['cli/lib/', 'core/lib/shared/'];
+export const ALLOWED_INPUT_DIRS = ['cli/lib/', 'shared/lib/'];
 
 /** The migration scopes an entry's `applies_to` may name. */
 export const SCOPES = ['repo', 'local', 'global'];
@@ -82,7 +82,7 @@ export function nodeTarget(enginesNode) {
 
 /**
  * Fails when any bundled input lies outside the allowed folders
- * (`cli/lib/**` and `core/lib/shared/**` by default).
+ * (`cli/lib/**` and `shared/lib/**` by default).
  * esbuild's virtual `<define:…>` inputs are not files and are ignored.
  * Only asserts "bundled inputs ⊆ allowed folders"; an allowed file the
  * CLI does not use yet is fine.

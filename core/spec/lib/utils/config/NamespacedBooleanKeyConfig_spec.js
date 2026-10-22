@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import BooleanKeyConfig from '../../../../lib/utils/config/BooleanKeyConfig.js';
 import NamespacedBooleanKeyConfig from '../../../../lib/utils/config/NamespacedBooleanKeyConfig.js';
-import Lock from '../../../../lib/shared/file/Lock.js';
+import Lock from '../../../../../shared/lib/file/Lock.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
 describe('NamespacedBooleanKeyConfig', () => {

@@ -87,11 +87,10 @@ export default [
     }
   },
   {
-    // CLI side of the shared-surface guardrail: cli/ may import core/ only
-    // through core/lib/shared/ (any file in that folder); every other core/
-    // path is rejected. Without this, esbuild would silently bundle any
-    // other core file. The build's metafile check covers resolved paths on
-    // top of this.
+    // CLI side of the shared-surface guardrail: cli/ imports nothing from
+    // core/ and reaches the shared surface only through shared/lib/** (never
+    // shared/spec/**). Without this, esbuild would silently bundle any other
+    // file. The build's metafile check covers resolved paths on top of this.
     files: ['**/*.js', '**/*.mjs'],
     rules: {
       'no-restricted-imports': [
@@ -99,10 +98,16 @@ export default [
         {
           patterns: [
             {
-              regex: '(?:^|/)core/(?!lib/shared/)',
+              regex: '(?:^|/)core/',
               message:
-                'cli/ may import core/ only through core/lib/shared/ — see ' +
-                'docs/agents/specs/arcanum-cli/shared-config-logic.md.'
+                'cli/ may not import core/ — use the shared surface in ' +
+                'shared/lib/ instead; see docs/agents/specs/shared-lib.md.'
+            },
+            {
+              regex: '(?:^|/)shared/spec/',
+              message:
+                'cli/ may import shared/lib/** only, never shared/spec/** — see ' +
+                'docs/agents/specs/shared-lib.md.'
             }
           ]
         }

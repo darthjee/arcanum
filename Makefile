@@ -34,6 +34,9 @@ RUNTIME_ENV_SCRIPT := /usr/local/lib/arcanum-runtime-env.sh
 # Dispatch-like flags: the host uid, read-only root, /tmp a tmpfs.
 RUNTIME_RUN := docker run --rm --user "$$(id -u):$$(id -g)" --read-only --tmpfs /tmp
 RUNTIME_SMOKE_COMMAND := arcanum-smoke-check
+RUNTIME_CONFIG_SMOKE_COMMAND := arcanum-check-config
+RUNTIME_CONFIG_SMOKE_REPO := /tmp
+RUNTIME_CONFIG_SMOKE_KEY := git.authors
 
 # Docker-engine parity specs and benchmark (#741), run on the host. See
 # docs/agents/architecture/docker-engine.md#testing.
@@ -121,8 +124,10 @@ core-build-runtime:
 # checks: (1) the arcanum CLI starts through the real entrypoint (an
 # unknown command is the side-effect-free probe: it must fail with the
 # CLI's own error); (2) the entrypoint's nss_wrapper setup gives that uid
-# a passwd entry that getent and ssh accept, and git/gh run; (3) the baked
-# arcanum.json reports RUNTIME_VERSION.
+# a passwd entry that getent and ssh accept, and git/gh run; (3) a native
+# config command (which loads the config surface from shared/lib/) runs
+# and reports the requested key; (4) the baked arcanum.json reports
+# RUNTIME_VERSION.
 core-smoke-runtime: core-build-runtime
 	@echo "smoke: arcanum CLI starts as uid $$(id -u)"
 	@out="$$($(RUNTIME_RUN) $(RUNTIME_IMAGE) $(RUNTIME_SMOKE_COMMAND) 2>&1)" && { echo "expected a non-zero exit, got: $$out" >&2; exit 1; }; \
@@ -130,6 +135,12 @@ core-smoke-runtime: core-build-runtime
 		|| { echo "unexpected CLI output: $$out" >&2; exit 1; }
 	@echo "smoke: passwd entry, ssh, git and gh"
 	$(RUNTIME_RUN) --entrypoint sh $(RUNTIME_IMAGE) -euc '. $(RUNTIME_ENV_SCRIPT); getent passwd "$$(id -u)"; getent group "$$(id -g)"; ssh -T -G localhost >/dev/null; ssh -V; git --version; gh --version'
+	@echo "smoke: native config command resolves shared/"
+	@out="$$($(RUNTIME_RUN) $(RUNTIME_IMAGE) $(RUNTIME_CONFIG_SMOKE_COMMAND) $(RUNTIME_CONFIG_SMOKE_REPO) $(RUNTIME_CONFIG_SMOKE_KEY))" \
+		|| { echo "$(RUNTIME_CONFIG_SMOKE_COMMAND) failed: $$out" >&2; exit 1; }; \
+		key="$$(echo "$$out" | $(RUNTIME_RUN) -i --entrypoint jq $(RUNTIME_IMAGE) -r .key)" \
+		&& test "$$key" = "$(RUNTIME_CONFIG_SMOKE_KEY)" \
+		|| { echo "unexpected $(RUNTIME_CONFIG_SMOKE_COMMAND) output: $$out" >&2; exit 1; }
 	@echo "smoke: arcanum.json version"
 	@version="$$($(RUNTIME_RUN) --entrypoint jq $(RUNTIME_IMAGE) -r .version $(RUNTIME_ROOT)/arcanum.json)" \
 		&& test "$$version" = "$(RUNTIME_VERSION)" \

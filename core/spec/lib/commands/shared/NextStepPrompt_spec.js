@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import NextStepPrompt from '../../../../lib/commands/shared/NextStepPrompt.js';
-import ConfigChain from '../../../../lib/shared/config/ConfigChain.js';
+import ConfigChain from '../../../../../shared/lib/config/ConfigChain.js';
 import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
 import FakeTty from '../../../support/dummies/FakeTty.js';
 import { captureRejection } from '../../../support/utils/captureRejection.js';

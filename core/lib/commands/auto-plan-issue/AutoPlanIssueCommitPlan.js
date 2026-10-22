@@ -2,8 +2,8 @@ import { stat } from 'node:fs/promises';
 import { execFile, spawn } from 'node:child_process';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import AgentEmail from '../../shared/config/AgentEmail.js';
-import ConfigChain from '../../shared/config/ConfigChain.js';
+import AgentEmail from '../../../../shared/lib/config/AgentEmail.js';
+import ConfigChain from '../../../../shared/lib/config/ConfigChain.js';
 
 const promisifiedExecFile = promisify(execFile);
 const USAGE = 'Usage: commit_plan.sh <repo_path> <plan_dir> <id> <model_name> <model_email>';

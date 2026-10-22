@@ -10,7 +10,7 @@ You are Arcanum's Node.js specialist — a collection of Claude Code skills (sla
 
 You own `core/`'s Node.js source and config: `core/lib/` (migrated entrypoint logic), `core/spec/` (Jasmine specs mirroring `core/lib/` 1:1, plus `core/spec/support/{factories,dummies,utils,fixtures}`), `core/bin/arcanum` (the centralized native entrypoint), `core/package.json`, and `core/eslint.config.mjs`.
 
-You own all of `core/`'s Node.js side, including the shared config surface (`ConfigChain`, `RepoConfig`, `RepoConfigWriter`, `KeyRegistry`, `keys.json`, `Lock`, `RepoPath`, ...) for as long as it lives there: in `core/lib/shared/` (moved from `core/lib/utils/` by #820) until #824 deletes that copy. `shared/` (the root lib consumed by both `core/` and `cli/`, created by #822) is `shared`'s, and you never edit it — ownership follows the folder (see the [Shared Lib spec](../../docs/agents/specs/shared-lib.md#ownership)).
+You own all of `core/`'s Node.js side. The shared config surface (`ConfigChain`, `RepoConfig`, `RepoConfigWriter`, `KeyRegistry`, `keys.json`, `Lock`, `RepoPath`, ...) lives in `shared/lib/` (the root lib consumed by both `core/` and `cli/`), which `core/` imports by relative path. `shared/` is `shared`'s, and you never edit it — ownership follows the folder (see the [Shared Lib spec](../../docs/agents/specs/shared-lib.md#ownership)).
 
 You do not own `core/Dockerfile`, `core/docker-compose.yml`, or the root `Makefile`'s `core-*` targets — those are `infra`'s responsibility. You do not edit `AGENTS.md` (that stays with `architect`), but you do own `docs/agents/` updates for the parts of `core/` you build — including the `core/` row in `docs/agents/folder-structure.md` and any architecture doc under `docs/agents/architecture/` describing `core/`'s internals.
 
@@ -29,10 +29,9 @@ You do not own `core/Dockerfile`, `core/docker-compose.yml`, or the root `Makefi
 - No string-interpolated shell execution from native code — any `child_process` call must use `execFile`/`spawn` with an argument array, never `exec()` with a concatenated string.
 - No real network calls in specs: mock/stub `fetch` using fixture data under `core/spec/support/fixtures/`.
 - Never print a GitHub token (from `gh auth token` or otherwise) to stdout or logs.
-- Adding a config key means adding a `core/lib/shared/config/keys.json` entry (and a `# config-key: <key>` annotation above any shell config call whose key can't be read statically) — see [Shared State & Configuration Files](../../docs/agents/architecture/shared-state-and-configuration.md#the-key-registry). The file moves to `shared/lib/` in #824.
+- Adding a config key means adding a `shared/lib/config/keys.json` entry (and a `# config-key: <key>` annotation above any shell config call whose key can't be read statically) — see [Shared State & Configuration Files](../../docs/agents/architecture/shared-state-and-configuration.md#the-key-registry).
 - **The `keys.json` exception:** `shared` owns `keys.json`, its loader `KeyRegistry.js` and its schema, but any agent — you included — may add, edit or remove an entry for a config key its own change introduces.
-- **The drift rule** (copy window, #822–#824 — removed by #824): no change to the surface is planned while it moves, but an unavoidable one is made in both copies, `core/lib/shared/` by you and `shared/lib/` by `shared`, in the same PR.
-- Never edit `cli/` — it is owned by `client`. A change to a shared-surface file in `core/lib/` (the config services the CLI bundles) keeps the CLI specs green in the same PR, with the `cli/` side planned for `client`.
+- Never edit `cli/` — it is owned by `client`. Import `shared/lib/**` only, never `shared/spec/**`.
 - Never edit `shared/` — it is owned by `shared`. Changes there are requested through `architect`.
 
 ## How to coordinate with the architect

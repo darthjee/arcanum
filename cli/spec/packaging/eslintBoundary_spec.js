@@ -24,27 +24,38 @@ describe('cli/eslint.config.mjs shared-surface boundary', () => {
     return result.messages.filter((message) => message.ruleId === RULE);
   }
 
-  it('rejects a core/ import outside core/lib/shared/', async () => {
+  it('rejects any core/ import', async () => {
     for (const specifier of [
       '../../../core/lib/context/RepoContext.js',
       '../../../core/lib/utils/config/BooleanKeyConfig.js',
       '../../../core/lib/utils/config/ConfigChain.js',
+      '../../../core/lib/shared/config/KeyRegistry.js',
       '../../../core/package.json'
     ]) {
       expect((await boundaryMessages(specifier)).length).withContext(specifier).toBe(1);
     }
   });
 
-  it('accepts any file under core/lib/shared/', async () => {
+  it('accepts any file under shared/lib/', async () => {
     for (const file of [
-      'config/ConfigChain', 'config/RepoConfigWriter', 'config/ConfigError', 'config/AgentEmail',
-      'config/KeyRegistry', 'config/RepoConfig', 'file/Lock', 'file/LockTimeoutError', 'file/RepoPath'
+      'config/ConfigChain.js', 'config/RepoConfigWriter.js', 'config/ConfigError.js', 'config/AgentEmail.js',
+      'config/KeyRegistry.js', 'config/RepoConfig.js', 'config/keys.json',
+      'file/Lock.js', 'file/LockTimeoutError.js', 'file/RepoPath.js'
     ]) {
-      expect(await boundaryMessages(`../../../core/lib/shared/${file}.js`)).withContext(file).toEqual([]);
+      expect(await boundaryMessages(`../../../shared/lib/${file}`)).withContext(file).toEqual([]);
     }
   });
 
-  it('accepts imports outside core/lib', async () => {
+  it('rejects a shared/spec/ import', async () => {
+    for (const specifier of [
+      '../../../shared/spec/support/helpers.js',
+      '../../../shared/spec/lib/config/KeyRegistry_spec.js'
+    ]) {
+      expect((await boundaryMessages(specifier)).length).withContext(specifier).toBe(1);
+    }
+  });
+
+  it('accepts imports outside core/ and shared/spec/', async () => {
     expect(await boundaryMessages('../exitCodes.js')).toEqual([]);
     expect(await boundaryMessages('node:path')).toEqual([]);
   });

@@ -1,6 +1,6 @@
 import DispatchFailure from '../../utils/errors/DispatchFailure.js';
 import IssueTagger from '../../utils/issue/IssueTagger.js';
-import Lock from '../../shared/file/Lock.js';
+import Lock from '../../../../shared/lib/file/Lock.js';
 import QueueStore from '../../utils/queue/QueueStore.js';
 import RepoContextFactory from '../../context/RepoContextFactory.js';
 
@@ -26,7 +26,7 @@ function defaultSleep(ms) {
  * `waitNext`, `push`, `pop`, `empty`, `list`). State is a JSON array in
  * `.claude/state/auto-fix-all-queue.json`; `push`/`pop` are
  * lock-guarded (`.claude/state/auto-fix-all-queue.lock`, via
- * `core/lib/shared/file/Lock.js`) against concurrent mutation. `save`/`push` also
+ * `shared/lib/file/Lock.js`) against concurrent mutation. `save`/`push` also
  * best-effort tag-mutate the affected GitHub issues (`enqueued` added,
  * `ready_for_work`/`created` removed) — see
  * docs/agents/plans/264-migrate-auto-fix-all-queue-entrypoint-save-next-wait-next-push-pop-empty-list-to-native-node-js/node.md.

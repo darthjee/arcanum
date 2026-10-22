@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import Lock from '../../../../lib/shared/file/Lock.js';
+import Lock from '../../../../../shared/lib/file/Lock.js';
 import PermissionGrant from '../../../../lib/commands/shared/PermissionGrant.js';
 import ClaudeContext from '../../../../lib/context/ClaudeContext.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';

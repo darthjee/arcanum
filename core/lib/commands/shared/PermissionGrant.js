@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import Lock from '../../shared/file/Lock.js';
+import Lock from '../../../../shared/lib/file/Lock.js';
 
 /**
  * Native equivalent of `arcanum/_lib/permission_grant_shell.sh`'s CLI
@@ -36,7 +36,7 @@ class PermissionGrant {
    * needed, deduping against whatever is already there, without
    * disturbing any other content already in `file` (e.g.
    * `.permissions.deny`, hooks, or any other top-level key).
-   * Lock-protected (`core/lib/shared/file/Lock.js`), atomic write (`.tmp` file +
+   * Lock-protected (`shared/lib/file/Lock.js`), atomic write (`.tmp` file +
    * rename).
    *
    * Degrades silently (stderr warning, no-op, still resolves/exits 0)

@@ -74,7 +74,7 @@ describe('smoke: dist/arcanum.mjs', () => {
   });
 
   it('lists keys from the inlined key registry in config --help', async () => {
-    const keys = JSON.parse(await readFile(path.join(REPO_ROOT, 'core', 'lib', 'shared', 'config', 'keys.json'), 'utf8'));
+    const keys = JSON.parse(await readFile(path.join(REPO_ROOT, 'shared', 'lib', 'config', 'keys.json'), 'utf8'));
     const result = await runCli(gate, ['config', '--help'], tmp);
 
     expect(result.code).toBe(0);

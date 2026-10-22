@@ -1,4 +1,4 @@
-import ConfigChain from '../../shared/config/ConfigChain.js';
+import ConfigChain from '../../../../shared/lib/config/ConfigChain.js';
 
 const USAGE = 'Usage: /arcanum-check-config <namespace.key[.sub...]>';
 

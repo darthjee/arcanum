@@ -150,18 +150,18 @@ describe('scripts/build.mjs', () => {
   describe('checkInputs', () => {
     const dirs = { workingDir: CLI_DIR, repoRoot: REPO_ROOT };
 
-    it('allows cli/lib/ and core/lib/shared/ by default', () => {
-      expect(ALLOWED_INPUT_DIRS).toEqual(['cli/lib/', 'core/lib/shared/']);
+    it('allows cli/lib/ and shared/lib/ by default', () => {
+      expect(ALLOWED_INPUT_DIRS).toEqual(['cli/lib/', 'shared/lib/']);
     });
 
-    it('accepts cli/lib inputs, core/lib/shared inputs and define inputs', () => {
+    it('accepts cli/lib inputs, shared/lib inputs and define inputs', () => {
       const metafile = {
         inputs: {
           'lib/main.js': {},
           'lib/commands/config.js': {},
-          '../core/lib/shared/config/KeyRegistry.js': {},
-          '../core/lib/shared/config/keys.json': {},
-          '../core/lib/shared/file/Lock.js': {},
+          '../shared/lib/config/KeyRegistry.js': {},
+          '../shared/lib/config/keys.json': {},
+          '../shared/lib/file/Lock.js': {},
           '<define:__ARCANUM_MIGRATION_VERSIONS__>': {}
         }
       };
@@ -169,13 +169,13 @@ describe('scripts/build.mjs', () => {
       expect(checkInputs(metafile, dirs)).toEqual([
         'cli/lib/commands/config.js',
         'cli/lib/main.js',
-        'core/lib/shared/config/KeyRegistry.js',
-        'core/lib/shared/config/keys.json',
-        'core/lib/shared/file/Lock.js'
+        'shared/lib/config/KeyRegistry.js',
+        'shared/lib/config/keys.json',
+        'shared/lib/file/Lock.js'
       ]);
     });
 
-    it('rejects an input outside cli/lib and core/lib/shared', () => {
+    it('rejects an input outside cli/lib and shared/lib', () => {
       const metafile = {
         inputs: {
           'lib/main.js': {},
@@ -185,7 +185,7 @@ describe('scripts/build.mjs', () => {
       };
 
       expect(() => checkInputs(metafile, dirs)).toThrowError(
-        'bundled inputs outside cli/lib/** and core/lib/shared/**: ' +
+        'bundled inputs outside cli/lib/** and shared/lib/**: ' +
         'cli/scripts/build.mjs, core/lib/context/RepoContext.js'
       );
     });
@@ -196,17 +196,31 @@ describe('scripts/build.mjs', () => {
       expect(() => checkInputs(metafile, dirs)).toThrowError(/core\/lib\/utils\/config\/ConfigChain\.js/);
     });
 
-    it('rejects an input that only shares the folder name prefix', () => {
-      const metafile = { inputs: { '../core/lib/shared-other/X.js': {} } };
+    it('rejects an input at the removed core/lib/shared surface path', () => {
+      const metafile = { inputs: { 'lib/main.js': {}, '../core/lib/shared/config/KeyRegistry.js': {} } };
 
-      expect(() => checkInputs(metafile, dirs)).toThrowError(/core\/lib\/shared-other\/X\.js/);
+      expect(() => checkInputs(metafile, dirs)).toThrowError(
+        'bundled inputs outside cli/lib/** and shared/lib/**: core/lib/shared/config/KeyRegistry.js'
+      );
+    });
+
+    it('rejects a shared/spec input', () => {
+      const metafile = { inputs: { '../shared/spec/config/KeyRegistry_spec.js': {} } };
+
+      expect(() => checkInputs(metafile, dirs)).toThrowError(/shared\/spec\/config\/KeyRegistry_spec\.js/);
+    });
+
+    it('rejects an input that only shares the folder name prefix', () => {
+      const metafile = { inputs: { '../shared/lib-other/X.js': {} } };
+
+      expect(() => checkInputs(metafile, dirs)).toThrowError(/shared\/lib-other\/X\.js/);
     });
 
     it('takes the allowed folders as an option', () => {
-      const metafile = { inputs: { 'lib/main.js': {}, '../core/lib/shared/config/ConfigChain.js': {} } };
+      const metafile = { inputs: { 'lib/main.js': {}, '../shared/lib/config/ConfigChain.js': {} } };
 
       expect(() => checkInputs(metafile, { ...dirs, allowedDirs: ['cli/lib/'] }))
-        .toThrowError(/outside cli\/lib\/\*\*: core\/lib\/shared\/config\/ConfigChain\.js/);
+        .toThrowError(/outside cli\/lib\/\*\*: shared\/lib\/config\/ConfigChain\.js/);
     });
 
     it('defaults to cli/ as the working directory', () => {
@@ -224,7 +238,7 @@ describe('scripts/build.mjs', () => {
       expect(result.outfile).toBe(outfile);
       expect(result.version).toBe(manifest.version);
       expect(result.inputs).toContain('cli/lib/main.js');
-      expect(result.inputs).toContain('core/lib/shared/config/keys.json');
+      expect(result.inputs).toContain('shared/lib/config/keys.json');
       expect(bundle).toContain(`"${manifest.version}"`);
       expect(bundle).toContain('"engine.mode"');
       expect(bundle).toContain('"0.13.0"');

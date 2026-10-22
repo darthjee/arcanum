@@ -17,7 +17,7 @@ This package is not the internal `core/bin/arcanum` dispatcher that Arcanum's sk
 
 ## Development
 
-Run from `cli/`, with the whole repository checked out (the build reads `../core/` and `../arcanum/migrations/`):
+Run from `cli/`, with the whole repository checked out (the build reads `../shared/lib/` and `../arcanum/migrations/`):
 
 ```bash
 yarn install

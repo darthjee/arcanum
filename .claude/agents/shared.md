@@ -16,11 +16,9 @@ You own all of `shared/`:
 
 Your scope rule is "code consumed by both `core/` and `cli/`". New code that both consumers need goes into `shared/`, not into `core/lib`.
 
-`shared/` is created by #822. Until #824 deletes it, a copy of the surface also lives in `core/` (in `core/lib/shared/`, moved there from `core/lib/utils/` by #820), and that copy is `node`'s.
-
 You do not own:
 
-- `core/`, including the copy of the surface in `core/lib/shared/` — that is `node`'s.
+- `core/` — that is `node`'s.
 - `cli/` — that is `client`'s.
 - The `shared` compose service, the `shared-*` Makefile targets, the CircleCI `shared` jobs and the packaging specs — those are `infra`'s.
 - `AGENTS.md`, the agent roster and `docs/agents/folder-structure.md` — those are `architect`'s.
@@ -42,11 +40,10 @@ You do not own:
   - Never print a GitHub token (from `gh auth token` or otherwise) to stdout or logs.
   - Zero runtime npm dependencies.
 - **The `keys.json` exception:** you own `keys.json`, its loader `KeyRegistry.js` and its schema, but any agent may add, edit or remove an entry for a config key its own change introduces. Adding a key never needs a separate `shared` dispatch.
-- **The drift rule** (copy window, #822–#824 — removed by #824): no change to the surface is planned while it moves, but an unavoidable one is made in both copies, `core/lib/shared/` by `node` and `shared/lib/` by `shared`, in the same PR.
 
 ## How to coordinate with the architect
 
 - `node` and `client` request changes to `shared/` through `architect`, who plans them for you.
-- You never edit `core/` or `cli/`, not even the copy of the surface in `core/lib/shared/`.
+- You never edit `core/` or `cli/`.
 - CI, Docker, docker-compose and Makefile needs go to `infra` through `architect`, rather than being edited by you.
 - Until #826 promotes it into the architecture docs, the design lives in the [Shared Lib spec](../../docs/agents/specs/shared-lib.md). Align with `architect` before changing anything it defines.

@@ -59,11 +59,3 @@ yarn test   # Jasmine under c8, coverage thresholds enforced
 
 The spec runner does not set `ARCANUM_STRICT_CONFIG_KEYS`; the strict-keys
 guard is covered by explicit specs instead.
-
-## Copy window and drift rule
-
-Until #824 switches `core/` and `cli/` to import from here, the same surface
-also lives in `core/lib/shared/` (owned by `node`). While both copies exist,
-no change to the surface is planned; an unavoidable one is made in **both**
-copies, in the same PR. #824 diffs the two copies, removes the core copy and
-this note.
