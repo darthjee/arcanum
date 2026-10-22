@@ -8,6 +8,10 @@ import { REPO_ROOT, runCommand } from '../support/utils/runCommand.js';
 // It also asserts the `cli/` source tree (issue #779) is never shipped,
 // and that no spec/ folder (e.g. `core/spec/`, `shared/spec/` — issue
 // #821) is ever shipped.
+// Issue #817: dev-only files (CI and lint config, the root `Makefile`,
+// `core/` dev tooling, the mod's tests and type-check config,
+// `arcanum.png`) are never shipped, while the files the runtime image and
+// the installed tree need keep shipping.
 // `--list` only prints the would-be MANIFEST — no zip, no output dir.
 
 const BUILD_SCRIPT = path.join(REPO_ROOT, 'scripts', 'build_release_zip.sh');
@@ -21,6 +25,31 @@ const MOD_FILES = [
 const GENERATED_TYPES_PREFIX = 'arcanum-next-step/.claude-plugin/types/';
 const CLI_PREFIX = 'cli/';
 const SPEC_FOLDER_PATTERN = /(^|\/)spec\//;
+const CIRCLECI_PREFIX = '.circleci/';
+const MOD_TEST_PATTERN = /^arcanum-next-step\/hooks\/.*\.test\.ts$/;
+const DEV_ONLY_FILES = [
+  '.codacy.yml',
+  '.markdownlint.json',
+  '.markdownlintignore',
+  'Makefile',
+  'arcanum.png',
+  'core/eslint.config.mjs',
+  'core/.jscpd.json',
+  'core/docker-compose.yml',
+  'arcanum-next-step/tsconfig.json',
+  'arcanum-next-step/hooks/test-support.ts'
+];
+const RUNTIME_FILES = [
+  'core/Dockerfile',
+  '.dockerignore',
+  'core/docker-entrypoint.sh',
+  'core/docker-runtime-entrypoint.sh',
+  'core/docker-runtime-env.sh',
+  'core/package.json',
+  'core/yarn.lock',
+  'core/bin/arcanum',
+  'README.md'
+];
 
 /**
  * The environment `build_release_zip.sh --list` runs with: the caller's
@@ -72,5 +101,25 @@ describe('scripts/build_release_zip.sh --list', () => {
 
   it('lists nothing under any spec/ folder', () => {
     expect(paths.filter((line) => SPEC_FOLDER_PATTERN.test(line))).toEqual([]);
+  });
+
+  DEV_ONLY_FILES.forEach((file) => {
+    it(`does not list ${file}`, () => {
+      expect(paths).not.toContain(file);
+    });
+  });
+
+  it('lists nothing under .circleci/', () => {
+    expect(paths.filter((line) => line.startsWith(CIRCLECI_PREFIX))).toEqual([]);
+  });
+
+  it('lists no mod *.test.ts file', () => {
+    expect(paths.filter((line) => MOD_TEST_PATTERN.test(line))).toEqual([]);
+  });
+
+  RUNTIME_FILES.forEach((file) => {
+    it(`lists ${file}`, () => {
+      expect(paths).toContain(file);
+    });
   });
 });
