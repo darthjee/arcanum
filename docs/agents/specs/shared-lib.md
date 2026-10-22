@@ -69,8 +69,8 @@ shared/
 | Agent | Owns for this change |
 | --- | --- |
 | `shared` (new, created by #819) | All of `shared/`: `shared/lib/`, `shared/spec/`, `shared/package.json`, `shared/yarn.lock`, `shared/eslint.config.mjs`, `shared/README.md`. Its scope is "code consumed by both `core/` and `cli/`". |
-| `node` | `core/`'s Node.js source and config, including the surface while it lives in `core/` (`core/lib/utils/`, then `core/lib/shared/`), and **minus** the surface once #824 removes that copy. It requests changes to `shared/` through `architect`. |
-| `client` | All of `cli/`, **minus** the surface it bundles, which is owned by whoever owns the folder it lives in (`node` until #824, then `shared`). It requests changes to the surface through `architect`. |
+| `node` | `core/`'s Node.js source and config. The surface no longer lives in `core/` (#824 removed the `core/lib/shared/` copy). It requests changes to `shared/` through `architect`. |
+| `client` | All of `cli/`, **minus** the surface it bundles, which is owned by whoever owns the folder it lives in (`shared`, since #824). It requests changes to the surface through `architect`. |
 | `infra` | The `shared` compose service, the `shared-*` Makefile targets, the CircleCI `shared` jobs, and the packaging specs (see [Tooling and CI](#tooling-and-ci)). |
 | `architect` | This spec, `AGENTS.md`, the agent roster and `docs/agents/folder-structure.md`. |
 
