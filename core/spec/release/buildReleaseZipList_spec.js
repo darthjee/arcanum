@@ -12,6 +12,9 @@ import { REPO_ROOT, runCommand } from '../support/utils/runCommand.js';
 // `core/` dev tooling, the mod's tests and type-check config,
 // `arcanum.png`) are never shipped, while the files the runtime image and
 // the installed tree need keep shipping.
+// Issue #823: `shared/lib/` and `shared/package.json` (its `"type":
+// "module"` makes the ESM imports resolve) keep shipping, while
+// `shared/eslint.config.mjs` never does.
 // `--list` only prints the would-be MANIFEST — no zip, no output dir.
 
 const BUILD_SCRIPT = path.join(REPO_ROOT, 'scripts', 'build_release_zip.sh');
@@ -24,6 +27,7 @@ const MOD_FILES = [
 ];
 const GENERATED_TYPES_PREFIX = 'arcanum-next-step/.claude-plugin/types/';
 const CLI_PREFIX = 'cli/';
+const SHARED_LIB_PREFIX = 'shared/lib/';
 const SPEC_FOLDER_PATTERN = /(^|\/)spec\//;
 const CIRCLECI_PREFIX = '.circleci/';
 const MOD_TEST_PATTERN = /^arcanum-next-step\/hooks\/.*\.test\.ts$/;
@@ -36,6 +40,7 @@ const DEV_ONLY_FILES = [
   'core/eslint.config.mjs',
   'core/.jscpd.json',
   'core/docker-compose.yml',
+  'shared/eslint.config.mjs',
   'arcanum-next-step/tsconfig.json',
   'arcanum-next-step/hooks/test-support.ts'
 ];
@@ -48,6 +53,8 @@ const RUNTIME_FILES = [
   'core/package.json',
   'core/yarn.lock',
   'core/bin/arcanum',
+  'shared/package.json',
+  'shared/lib/config/keys.json',
   'README.md'
 ];
 
@@ -115,6 +122,10 @@ describe('scripts/build_release_zip.sh --list', () => {
 
   it('lists no mod *.test.ts file', () => {
     expect(paths.filter((line) => MOD_TEST_PATTERN.test(line))).toEqual([]);
+  });
+
+  it('lists files under shared/lib/', () => {
+    expect(paths.some((line) => line.startsWith(SHARED_LIB_PREFIX))).toBeTrue();
   });
 
   RUNTIME_FILES.forEach((file) => {
