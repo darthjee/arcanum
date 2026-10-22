@@ -4,6 +4,8 @@ core/coverage/
 cli/node_modules/
 cli/coverage/
 cli/dist/
+shared/node_modules/
+shared/coverage/
 
 synced/
 
