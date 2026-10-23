@@ -387,6 +387,78 @@ class RepoConfigWriter {
   }
 
   /**
+   * Walks `keyPath` from `target` and returns the leaf value, without
+   * mutating anything.
+   * @param {object} target - the object to read the path from.
+   * @param {string[]} keyPath - the (non-empty) path to read.
+   * @param {string} prefix - the path walked so far, for error messages
+   *   (`''` at the root of the file).
+   * @param {string} file - the config file's path, for the error.
+   * @returns {unknown} the leaf value, or `undefined` when the leaf or a
+   *   `null`/missing intermediate is absent (inherited keys never count).
+   * @throws {ConfigError} `NOT_AN_OBJECT` when an intermediate holds a
+   *   non-object value.
+   */
+  static _getPath(target, keyPath, prefix, file) {
+    const [head, ...rest] = keyPath;
+
+    if (!Object.hasOwn(target, head)) {
+      return undefined;
+    }
+
+    const child = target[head];
+
+    if (rest.length === 0) {
+      return child;
+    }
+
+    if (child === null) {
+      return undefined;
+    }
+
+    const current = RepoConfigWriter._joinPath(prefix, head);
+
+    if (!RepoConfigWriter._isObject(child)) {
+      throw new ConfigError('NOT_AN_OBJECT', `Cannot index .${current}: not a JSON object`, { file });
+    }
+
+    return RepoConfigWriter._getPath(child, rest, current, file);
+  }
+
+  /**
+   * Structural equality of plain JSON values: primitives compare through
+   * `Object.is`, arrays by length and then element by element, objects
+   * by the same set of own keys (key order is ignored) and recursively
+   * equal values. A reordered object therefore counts as unchanged.
+   *
+   * Only meant for parsed JSON (and values built like it): there are no
+   * cycles, Dates, Maps or other non-JSON types to handle.
+   * @param {unknown} a - the first value.
+   * @param {unknown} b - the second value.
+   * @returns {boolean} whether `a` and `b` are structurally equal.
+   */
+  static _deepEqual(a, b) {
+    if (Object.is(a, b)) {
+      return true;
+    }
+
+    if (Array.isArray(a) || Array.isArray(b)) {
+      return Array.isArray(a) && Array.isArray(b)
+        && a.length === b.length
+        && a.every((item, index) => RepoConfigWriter._deepEqual(item, b[index]));
+    }
+
+    if (!RepoConfigWriter._isObject(a) || !RepoConfigWriter._isObject(b)) {
+      return false;
+    }
+
+    const keys = Object.keys(a);
+
+    return keys.length === Object.keys(b).length
+      && keys.every((key) => Object.hasOwn(b, key) && RepoConfigWriter._deepEqual(a[key], b[key]));
+  }
+
+  /**
    * @param {string} prefix - the path walked so far (`''` at the root).
    * @param {string} head - the next path segment.
    * @returns {string} the joined path, without a leading dot.
