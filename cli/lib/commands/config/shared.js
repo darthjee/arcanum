@@ -3,6 +3,7 @@
 
 import path from 'node:path';
 import { EXIT_ERROR, TargetUnavailableError } from '../../exitCodes.js';
+import { readWarning, tierSkew } from '../../skew.js';
 import { TIERS, readTierTolerant, tierFile } from '../../tierFiles.js';
 
 /**
@@ -49,11 +50,14 @@ export function checkAccountForRead(account, warn) {
  * Resolves the targets for a read and reads the tiers it covers: the
  * given tier, or every tier that has a target (local → repo → global).
  * With no tier and no repo, only the global tier is read, with a note.
- * Malformed files warn and read as empty.
+ * Malformed files warn and read as empty; a tier ahead of the CLI, or
+ * behind it with migrations pending, warns too.
  * @param {object} context - the subcommand context.
  * @param {(string|undefined)} context.tier - the tier flag, if any.
  * @param {() => Promise<object>} context.resolveTargets - resolves the account and repo.
  * @param {(message: string) => void} context.warn - prints a stderr warning.
+ * @param {string} context.version - the CLI's version.
+ * @param {object} context.migrationVersions - the per-scope migration versions.
  * @param {object} [options] - read options.
  * @param {boolean} [options.allTiers] - report every tier, a tier with
  *   no target included (with `file: null`).
@@ -62,7 +66,8 @@ export function checkAccountForRead(account, warn) {
  * @throws {TargetUnavailableError} for an explicit `--repo`/`--local`
  *   with no repo, or a Claude config dir that is not a directory.
  */
-export async function readTiers({ tier, resolveTargets, warn }, { allTiers = false } = {}) {
+export async function readTiers(context, { allTiers = false } = {}) {
+  const { tier, resolveTargets, warn, version, migrationVersions } = context;
   const targets = await resolveTargets();
   const { repo, account } = targets;
 
@@ -89,7 +94,17 @@ export async function readTiers({ tier, resolveTargets, warn }, { allTiers = fal
       continue;
     }
 
-    tiers.push({ tier: name, file, read: await readTierTolerant(file, warn) });
+    const read = await readTierTolerant(file, warn);
+
+    if (read.state === 'ok') {
+      const warning = readWarning(name, tierSkew(name, read, { cliVersion: version, migrationVersions }), version);
+
+      if (warning !== null) {
+        warn(warning);
+      }
+    }
+
+    tiers.push({ tier: name, file, read });
   }
 
   return { targets, tiers };

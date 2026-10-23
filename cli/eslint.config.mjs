@@ -70,6 +70,7 @@ export default [
     languageOptions: {
       globals: {
         __ARCANUM_CLI_VERSION__: 'readonly',
+        __ARCANUM_NODE_FLOOR__: 'readonly',
         __ARCANUM_MIGRATION_VERSIONS__: 'readonly'
       }
     }

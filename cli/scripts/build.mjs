@@ -3,8 +3,8 @@
 // and docs/agents/specs/arcanum-cli/packaging-and-release.md#build-output).
 //
 // Besides bundling, it:
-// - injects the CLI version and the per-scope migration-version list
-//   through `define`;
+// - injects the CLI version, the Node floor (`engines.node`) and the
+//   per-scope migration-version list through `define`;
 // - fails when any bundled input lies outside cli/lib/** and the shared
 //   surface folder, shared/lib/**.
 //
@@ -228,6 +228,7 @@ export async function buildBundle({
     logLevel: 'silent',
     define: {
       __ARCANUM_CLI_VERSION__: JSON.stringify(version),
+      __ARCANUM_NODE_FLOOR__: JSON.stringify(manifest.engines.node),
       __ARCANUM_MIGRATION_VERSIONS__: JSON.stringify(versions)
     }
   });

@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { NODE_FLOOR } from '../../lib/main.js';
 import { CLI_DIR, REPO_ROOT } from '../support/paths.js';
 
 /**
@@ -35,5 +36,9 @@ describe('lockstep', () => {
 
     expect(match).withContext('NODE_FLOOR literal in bin/arcanum').not.toBeNull();
     expect(`>=${match[1]}`).toBe(cliManifest.engines.node);
+  });
+
+  it('keeps the source-run NODE_FLOOR fallback equal to engines.node', () => {
+    expect(NODE_FLOOR).toBe(cliManifest.engines.node);
   });
 });

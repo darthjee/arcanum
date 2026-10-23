@@ -242,6 +242,32 @@ describe('config get', () => {
     });
   });
 
+  describe('version skew', () => {
+    const migrationVersions = { repo: ['2.0.0'], local: [], global: [] };
+    const skewGet = (...args) => runCli(['config', 'get', ...args], { cwd: root, env, version: '2.4.0', migrationVersions });
+
+    it('warns on a read of a tier ahead of the CLI', async () => {
+      await writeTier(path.join(root, REPO_FILE), { version: '2.5.0', engine: { mode: 'native' } });
+
+      const result = await skewGet('engine.mode');
+
+      expect(result.code).toBe(0);
+      expect(result.err).toContain('repo config is at 2.5.0, newer than this CLI (2.4.0)');
+    });
+
+    it('warns on a tier behind with pending migrations', async () => {
+      await writeTier(path.join(root, REPO_FILE), { version: '1.0.0', engine: { mode: 'native' } });
+
+      expect((await skewGet('engine.mode')).err).toContain('1 pending migration; run /arcanum-migrate');
+    });
+
+    it('is silent on a tier behind with nothing pending', async () => {
+      await writeTier(path.join(root, REPO_FILE), { version: '2.1.0', engine: { mode: 'native' } });
+
+      expect((await skewGet('engine.mode')).err).toBe('');
+    });
+  });
+
   it('accepts flags before the command', async () => {
     expect((await runCli(['--json', 'config', 'get', 'engine.mode'], { cwd: root, env })).json().value).toBe('native');
   });

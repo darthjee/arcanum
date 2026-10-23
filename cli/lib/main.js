@@ -35,6 +35,15 @@ export const CLI_VERSION = typeof __ARCANUM_CLI_VERSION__ === 'undefined'
   : __ARCANUM_CLI_VERSION__;
 
 /**
+ * The Node.js floor (`engines.node`), injected by the build through
+ * `define`; a source run falls back to the literal below, which a spec
+ * keeps equal to `cli/package.json`'s `engines.node`.
+ */
+export const NODE_FLOOR = typeof __ARCANUM_NODE_FLOOR__ === 'undefined'
+  ? '>=22.13.0'
+  : __ARCANUM_NODE_FLOOR__;
+
+/**
  * The per-scope list of arcanum versions that shipped migrations,
  * injected by the build through `define` (see
  * docs/agents/specs/arcanum-cli/packaging-and-release.md#embedded-migration-version-list).
@@ -58,7 +67,8 @@ const DEFAULT_IO = { stdout: process.stdout, stderr: process.stderr };
  * @param {object} [options.migrationVersions] - the per-scope migration
  *   versions the version-skew checks use.
  * @param {object} [options.deps] - further injectable collaborators,
- *   forwarded to the command (e.g. `execFileAsync`, `lock`).
+ *   forwarded to the command (e.g. `execFileAsync`, `lock`,
+ *   `nodeVersion`).
  * @returns {Promise<number>} the exit code.
  */
 export async function run(argv, {
@@ -139,6 +149,8 @@ async function dispatch(argv, invocation) {
     env,
     cwd,
     version,
+    nodeVersion: deps.nodeVersion || process.versions.node,
+    nodeFloor: NODE_FLOOR,
     migrationVersions,
     deps,
     output,
