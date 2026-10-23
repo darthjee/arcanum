@@ -59,4 +59,32 @@ describe('prompter', () => {
     await expectAsync(answer).toBeRejectedWith(jasmine.objectContaining({ reason: 'sigint' }));
     terminal.close();
   });
+
+  it('owns the process SIGINT only while a question is open', async () => {
+    const handlers = new Set();
+    const signals = { on: (signal, handler) => handlers.add(handler), off: (signal, handler) => handlers.delete(handler) };
+    const owned = createPrompter({ input: new PassThrough(), output: new PassThrough(), signals });
+    const answer = owned.ask('name? ');
+
+    expect(handlers.size).toBe(1);
+    [...handlers][0]();
+
+    await expectAsync(answer).toBeRejectedWith(jasmine.objectContaining({ reason: 'sigint' }));
+    expect(handlers.size).toBe(0);
+    owned.close();
+  });
+
+  it('releases the process SIGINT once answered', async () => {
+    const input = new PassThrough();
+    const handlers = new Set();
+    const signals = { on: (signal, handler) => handlers.add(handler), off: (signal, handler) => handlers.delete(handler) };
+    const owned = createPrompter({ input, output: new PassThrough(), signals });
+    const answer = owned.ask('name? ');
+
+    input.write('x\n');
+
+    expect(await answer).toBe('x');
+    expect(handlers.size).toBe(0);
+    owned.close();
+  });
 });

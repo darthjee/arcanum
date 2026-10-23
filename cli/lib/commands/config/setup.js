@@ -14,6 +14,7 @@ import { REPO_CONFIG_FILE } from '../../tierFiles.js';
 import { askPatterns } from './setup/ci.js';
 import { askAgents } from './setup/identity.js';
 import { askSetting } from './setup/setting.js';
+import { printSummary } from './setup/summary.js';
 import { AGENTS_PATTERN } from './shortcuts/agentsEmail.js';
 import { memoizeTargets } from './shortcuts/common.js';
 import { defaultTier } from './shortcuts/defaultTier.js';
@@ -71,15 +72,15 @@ export async function run(context) {
   const targets = await resolveTargets();
   const items = availableItems(setupItems(registry, sections), targets, output);
 
-  const prompter = deps.prompter || createPrompter({ input: io.stdin, output: io.stderr });
-  const session = {
-    context: { ...context, resolveTargets, warn: onceOnly(context.warn) },
-    io,
-    output,
-    registry,
-    prompter,
-    targets,
-    results: []
+  const baseSignals = deps.signals || processSignals();
+  const prompter = deps.prompter || createPrompter({ input: io.stdin, output: io.stderr, signals: baseSignals });
+  const session = { io, output, registry, prompter, targets, items, results: [], summarized: false };
+
+  session.context = {
+    ...context,
+    resolveTargets,
+    warn: onceOnly(context.warn),
+    deps: { ...deps, signals: summarizingSignals(session, baseSignals) }
   };
 
   try {
@@ -89,6 +90,37 @@ export async function run(context) {
       prompter.close();
     }
   }
+}
+
+/**
+ * @returns {{on: (signal: string, handler: () => void) => void, off: (signal: string, handler: () => void) => void, exit: (code: number) => void}}
+ *   the real process's signal hooks.
+ */
+function processSignals() {
+  return {
+    on: (signal, handler) => process.on(signal, handler),
+    off: (signal, handler) => process.off(signal, handler),
+    exit: (code) => process.exit(code)
+  };
+}
+
+/**
+ * The signal hooks the wizard's writes run with: a Ctrl-C during a
+ * write still releases the lock and exits `130` (`writeKey`), but
+ * prints the summary first.
+ * @param {object} session - the wizard's state.
+ * @param {object} signals - the underlying hooks.
+ * @returns {object} the hooks.
+ */
+export function summarizingSignals(session, signals) {
+  return {
+    on: (signal, handler) => signals.on(signal, handler),
+    off: (signal, handler) => signals.off(signal, handler),
+    exit: (code) => {
+      printSummary(session, true);
+      signals.exit(code);
+    }
+  };
 }
 
 /**
@@ -245,16 +277,22 @@ const ASKERS = { value: askSetting, agents: askAgents, array: askPatterns };
  *   `130` when interrupted, else `0`.
  */
 export async function runItems(session, items) {
+  let finished = false;
+
   try {
     for (const item of items) {
       await ASKERS[item.kind](session, item);
     }
+
+    finished = true;
   } catch (error) {
     if (!(error instanceof Interrupted)) {
       throw error;
     }
 
     return EXIT_SIGINT;
+  } finally {
+    printSummary(session, !finished);
   }
 
   const failed = session.results.find((result) => result.status === 'failed');

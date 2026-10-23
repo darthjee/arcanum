@@ -27,15 +27,30 @@ export class Interrupted extends Error {
  * @param {boolean} [streams.terminal] - whether to treat the streams as
  *   a terminal (line editing, Ctrl-C as `SIGINT`); defaults to whether
  *   both are TTYs, so injected streams use `terminal: false`.
- * @returns {{ask: (question: string) => Promise<string>, close: () => void}}
+ * @param {{on: (signal: string, handler: () => void) => void, off: (signal: string, handler: () => void) => void}} [streams.signals]
+ *   the process signal hooks: while a question is open, the prompter
+ *   owns `SIGINT` (removed again between questions).
+ * @returns {{ask: (question: string) => Promise<string>, interrupt: (reason?: string) => void, close: () => void}}
  *   `ask` writes the question and resolves the next line, or rejects
- *   with `Interrupted`; `close` releases the input.
+ *   with `Interrupted`; `interrupt` stops it; `close` releases the input.
  */
-export function createPrompter({ input, output, terminal = Boolean(input.isTTY && output.isTTY) }) {
+export function createPrompter({ input, output, terminal = Boolean(input.isTTY && output.isTTY), signals = processSignals() }) {
   const rl = readline.createInterface({ input, output, terminal });
   const lines = [];
   let pending = null;
   let stopped = null;
+  const onSigint = () => {
+    stop('sigint');
+    rl.close();
+  };
+  const settle = () => {
+    const current = pending;
+
+    pending = null;
+    signals.off('SIGINT', onSigint);
+
+    return current;
+  };
 
   const stop = (reason) => {
     if (stopped !== null) {
@@ -45,10 +60,7 @@ export function createPrompter({ input, output, terminal = Boolean(input.isTTY &
     stopped = reason;
 
     if (pending !== null) {
-      const { reject } = pending;
-
-      pending = null;
-      reject(new Interrupted(reason));
+      settle().reject(new Interrupted(reason));
     }
   };
 
@@ -59,15 +71,9 @@ export function createPrompter({ input, output, terminal = Boolean(input.isTTY &
       return;
     }
 
-    const { resolve } = pending;
-
-    pending = null;
-    resolve(line);
+    settle().resolve(line);
   });
-  rl.on('SIGINT', () => {
-    stop('sigint');
-    rl.close();
-  });
+  rl.on('SIGINT', onSigint);
   rl.on('close', () => stop('eof'));
 
   return {
@@ -87,6 +93,7 @@ export function createPrompter({ input, output, terminal = Boolean(input.isTTY &
 
       return new Promise((resolve, reject) => {
         pending = { resolve, reject };
+        signals.on('SIGINT', onSigint);
       });
     },
     interrupt(reason = 'sigint') {
@@ -95,5 +102,16 @@ export function createPrompter({ input, output, terminal = Boolean(input.isTTY &
     close() {
       rl.close();
     }
+  };
+}
+
+/**
+ * @returns {{on: (signal: string, handler: () => void) => void, off: (signal: string, handler: () => void) => void}}
+ *   the real process's signal hooks.
+ */
+function processSignals() {
+  return {
+    on: (signal, handler) => process.on(signal, handler),
+    off: (signal, handler) => process.off(signal, handler)
   };
 }

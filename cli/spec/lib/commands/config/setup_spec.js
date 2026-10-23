@@ -5,8 +5,10 @@ import Lock from '../../../../../shared/lib/file/Lock.js';
 import { needsRepo, selectSections, setupItems } from '../../../../lib/commands/config/setup.js';
 import { defaultTier } from '../../../../lib/commands/config/shortcuts/defaultTier.js';
 import { UsageError } from '../../../../lib/exitCodes.js';
+import { run } from '../../../../lib/main.js';
+import { fakeIo } from '../../../support/fakeIo.js';
 import { makeRepo, writeTier } from '../../../support/fixtures.js';
-import { scriptedPrompter } from '../../../support/prompter.js';
+import { EOF, SIGINT, scriptedPrompter } from '../../../support/prompter.js';
 import { shortcutHarness } from '../../../support/shortcuts.js';
 
 describe('config setup', () => {
@@ -453,6 +455,137 @@ describe('config setup', () => {
       expect(err).toContain(`arcanum: ${KEY} is not an array (got "oops")\n`);
       expect(err).toContain(`hint: fix it with: arcanum config set ${KEY} '[...]' --repo\n`);
       expect(prompter.questions).toEqual([]);
+    });
+  });
+
+  describe('interrupts, write errors and the summary', () => {
+    it('prints the summary after a full run', async () => {
+      await harness.seed({ repo: { git: { merge_body_mode: 'full' } } });
+      const { code, err } = await wizard(['engine', 'git'], ['shell', '', '', '', '']);
+
+      expect(code).toBe(0);
+      expect(err.endsWith([
+        '',
+        'summary',
+        '  written      engine.mode            local   (unset) -> shell',
+        '  kept         git.safe_branch        -       (unset)',
+        '  kept         git.merge_body_mode    repo    full',
+        ''
+      ].join('\n'))).toBeTrue();
+    });
+
+    it('stops on Ctrl-C at a prompt (exit 130), collapsing the wildcard items not reached', async () => {
+      await harness.seed();
+      const { code, err } = await wizard(['engine', 'flow', 'ci'], ['shell', '', '', SIGINT]);
+
+      expect(code).toBe(130);
+      expect(err.endsWith([
+        '',
+        'summary',
+        '  written      engine.mode    local   (unset) -> shell',
+        '  not reached  next_step.auto.*, auto-fix-all.ignored_check_patterns',
+        ''
+      ].join('\n'))).toBeTrue();
+    });
+
+    it('treats EOF like Ctrl-C, listing the instances not reached', async () => {
+      await harness.seed();
+      const { code, err } = await wizard(['flow'], ['on', '', '', EOF]);
+
+      expect(code).toBe(130);
+      expect(err.endsWith([
+        '',
+        'summary',
+        '  written      next_step.auto.enhance-issue    local   (unset) -> true',
+        '  not reached  next_step.auto.discuss-issue, next_step.auto.auto-plan-issue',
+        ''
+      ].join('\n'))).toBeTrue();
+    });
+
+    it('marks the per-agent item not reached as git.agents.*', async () => {
+      await harness.seed();
+      await writeTier(path.join(harness.root, '.claude', 'agents', 'node.md'), '# node\n');
+      const { code, err } = await wizard(['identity'], ['', EOF]);
+
+      expect(code).toBe(130);
+      expect(err).toContain('  not reached  git.agents.*\n');
+    });
+
+    it('prints an empty summary when interrupted at the first question', async () => {
+      await harness.seed();
+      const { err } = await wizard(['engine'], [SIGINT]);
+
+      expect(err.endsWith('\nsummary\n  not reached  engine.mode\n')).toBeTrue();
+    });
+
+    it('prints the summary once, before the exit, on Ctrl-C during a write', async () => {
+      await harness.seed();
+      const handlers = [];
+      const order = [];
+      const io = fakeIo({ stdin: [], tty: true });
+      const stderrWrite = io.stderr.write;
+
+      io.stderr.write = (text) => {
+        order.push(text);
+        stderrWrite(text);
+      };
+
+      const signals = {
+        on: (signal, handler) => handlers.push(handler),
+        off: (signal, handler) => handlers.splice(handlers.indexOf(handler), 1),
+        exit: (code) => order.push(`exit ${code}`)
+      };
+      const lock = {
+        async acquire() {
+          handlers[handlers.length - 1]();
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          throw Object.assign(new Error('stuck'), { code: 'LOCK_TIMEOUT' });
+        },
+        async release() {}
+      };
+      const code = await run(['config', 'setup', 'engine'], {
+        io,
+        cwd: harness.root,
+        env: harness.env,
+        version: '2.4.0',
+        migrationVersions: { repo: [], local: [], global: [] },
+        deps: { ...harness.deps, prompter: scriptedPrompter(['shell', '', '']), signals, lock }
+      });
+      const exitAt = order.indexOf('exit 130');
+
+      expect(code).toBe(6);
+      expect(exitAt).toBeGreaterThan(0);
+      expect(order[exitAt - 1]).toBe('\nsummary\n  not reached  engine.mode\n');
+      expect(io.err().split('summary').length).toBe(2);
+    });
+
+    it('marks a lock timeout failed, continues, and exits 6', async () => {
+      await harness.seed();
+      await new Lock().acquire(`${harness.localFile}.lock`);
+      const { code, err } = await wizard(['engine', 'git', '--lock-timeout', '0'], ['shell', '', '', '', 'full', 'global', '']);
+
+      expect(code).toBe(6);
+      expect(err).toContain('hint: if no arcanum process is running, remove that file\n');
+      expect(err.endsWith([
+        '',
+        'summary',
+        `  failed       engine.mode            local   timed out after 0s waiting for ${harness.localFile}.lock`,
+        '  kept         git.safe_branch        -       (unset)',
+        '  written      git.merge_body_mode    global  (unset) -> full',
+        ''
+      ].join('\n'))).toBeTrue();
+      expect(JSON.parse(await readFile(harness.globalFile, 'utf8'))).toEqual({ git: { merge_body_mode: 'full' } });
+    });
+
+    it('exits with the first error\'s code when several writes fail', async () => {
+      await harness.seed();
+      await writeTier(harness.globalFile, '{ not json');
+      await new Lock().acquire(`${harness.localFile}.lock`);
+      const { code, err } = await wizard(['identity', 'engine', '--lock-timeout', '0'], ['a@b.c', '', '', 'shell', '', '']);
+
+      expect(code).toBe(7);
+      expect(err).toMatch(/\n {2}failed {7}git\.email {6}global {2}\S/);
+      expect(err).toMatch(/\n {2}failed {7}engine\.mode {4}local {3}timed out/);
     });
   });
 });

@@ -57,6 +57,16 @@ describe('smoke: dist/arcanum.mjs', () => {
     expect(JSON.parse(result.stdout)).toEqual({ version: manifest.version });
   });
 
+  it('refuses config setup without a terminal (exit 2)', async () => {
+    const result = await runCli(gate, ['config', 'setup'], tmp);
+
+    expect(result).toEqual({
+      code: 2,
+      stdout: '',
+      stderr: 'arcanum: config setup needs an interactive terminal\nhint: use arcanum config set / the shortcuts instead\n'
+    });
+  });
+
   it('exits 0 for --help', async () => {
     const result = await runCli(gate, ['--help'], tmp);
 
