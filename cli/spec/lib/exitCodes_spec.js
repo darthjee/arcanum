@@ -1,6 +1,7 @@
 import {
-  EXIT_ERROR, EXIT_FILE, EXIT_LOCK_TIMEOUT, EXIT_OK, EXIT_TARGET_UNAVAILABLE, EXIT_USAGE,
-  EXIT_VALIDATION, EXIT_VERSION_SKEW, UsageError, exitCodeForError
+  CliError, EXIT_ERROR, EXIT_FILE, EXIT_IDENTIFIERS, EXIT_LOCK_TIMEOUT, EXIT_OK, EXIT_TARGET_UNAVAILABLE,
+  EXIT_USAGE, EXIT_VALIDATION, EXIT_VERSION_SKEW, FileError, LockTimeoutRefusal, TargetUnavailableError,
+  UsageError, ValidationError, VersionSkewError, exitCodeForError
 } from '../../lib/exitCodes.js';
 
 describe('exitCodes', () => {
@@ -19,6 +20,41 @@ describe('exitCodes', () => {
       expect(error.message).toBe('bad');
       expect(error.code).toBe('USAGE');
       expect(error.name).toBe('UsageError');
+    });
+  });
+
+  describe('the CLI refusals', () => {
+    [
+      [ValidationError, EXIT_VALIDATION, 'VALIDATION'],
+      [TargetUnavailableError, EXIT_TARGET_UNAVAILABLE, 'TARGET_UNAVAILABLE'],
+      [VersionSkewError, EXIT_VERSION_SKEW, 'VERSION_SKEW'],
+      [LockTimeoutRefusal, EXIT_LOCK_TIMEOUT, 'LOCK_TIMEOUT'],
+      [FileError, EXIT_FILE, 'FILE'],
+      [UsageError, EXIT_USAGE, 'USAGE']
+    ].forEach(([ErrorClass, exit, code]) => {
+      it(`maps ${ErrorClass.name} to ${exit}, with its hint`, () => {
+        const error = new ErrorClass('no', { hint: 'try this' });
+
+        expect(error).toBeInstanceOf(CliError);
+        expect(error.code).toBe(code);
+        expect(error.hint).toBe('try this');
+        expect(error.name).toBe(ErrorClass.name);
+        expect(exitCodeForError(error)).toBe(exit);
+      });
+    });
+
+    it('defaults a CliError to 1 with no hint', () => {
+      const error = new CliError('x');
+
+      expect(exitCodeForError(error)).toBe(EXIT_ERROR);
+      expect(error.hint).toBeNull();
+    });
+
+    it('names every non-zero exit code in snake case', () => {
+      expect(EXIT_IDENTIFIERS).toEqual({
+        1: 'error', 2: 'usage', 3: 'validation', 4: 'target_unavailable',
+        5: 'version_skew', 6: 'lock_timeout', 7: 'file'
+      });
     });
   });
 

@@ -98,6 +98,13 @@ describe('main', () => {
       expect(spy.calls.mostRecent().args[0].positionals).toEqual(['set', 'k', '-1']);
     });
 
+    it('prints the JSON error object under --json', async () => {
+      expect(await run(['nope', '--json'], { io })).toBe(2);
+      expect(JSON.parse(io.err())).toEqual({
+        error: { code: 'usage', exit: 2, message: 'arcanum: unknown command \'nope\'', hint: null }
+      });
+    });
+
     it('reports a non-Error throw', async () => {
       spyOn(COMMANDS.config, 'run').and.callFake(() => {
         throw 'boom';

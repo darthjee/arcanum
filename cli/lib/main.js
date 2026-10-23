@@ -1,8 +1,9 @@
 import { parseArgs } from 'node:util';
 import { extractRepoTarget, firstPositional, valueOptionNames } from './args.js';
 import configCommand from './commands/config.js';
-import { EXIT_OK, EXIT_USAGE, UsageError, exitCodeForError } from './exitCodes.js';
+import { EXIT_OK, EXIT_USAGE, UsageError } from './exitCodes.js';
 import { topLevelUsage } from './help.js';
+import { createOutput, reportError, wantsJson } from './output.js';
 import { resolveTargets } from './target.js';
 
 /** The CLI's command registry: top-level command name → module. */
@@ -47,7 +48,7 @@ const DEFAULT_IO = { stdout: process.stdout, stderr: process.stderr };
 
 /**
  * Runs the CLI for one argv and returns its exit code. Never throws:
- * every error goes through `exitCodeForError`.
+ * every error goes through `reportError` (and so `exitCodeForError`).
  * @param {string[]} argv - the arguments after the program name.
  * @param {object} [options] - injectable dependencies.
  * @param {{stdout: {write: (text: string) => void}, stderr: {write: (text: string) => void}}} [options.io] - output streams.
@@ -71,15 +72,7 @@ export async function run(argv, {
   try {
     return await dispatch(argv, { io, version, env, cwd, migrationVersions, deps });
   } catch (error) {
-    io.stderr.write(`arcanum: ${error && error.message ? error.message : String(error)}\n`);
-
-    const code = exitCodeForError(error);
-
-    if (code === EXIT_USAGE) {
-      io.stderr.write('Run \'arcanum --help\' for usage.\n');
-    }
-
-    return code;
+    return reportError(io, error, { json: wantsJson(argv), env });
   }
 }
 
@@ -135,7 +128,8 @@ async function dispatch(argv, invocation) {
     return EXIT_USAGE;
   }
 
-  const warn = (message) => io.stderr.write(`arcanum: warning: ${message}\n`);
+  const output = createOutput(io, { json: Boolean(values.json) });
+  const { warn } = output;
   const targeting = { repo: repoPath, claudeConfigDir: values['claude-config-dir'] };
 
   return command.run({
@@ -147,6 +141,7 @@ async function dispatch(argv, invocation) {
     version,
     migrationVersions,
     deps,
+    output,
     warn,
     targeting,
     resolveTargets: () => resolveTargets({ ...targeting, env, cwd, warn, execFileAsync: deps.execFileAsync })
