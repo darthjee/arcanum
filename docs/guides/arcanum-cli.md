@@ -13,6 +13,8 @@ arcanum --version
 
 You need Node.js 22.13.0 or newer. One install serves every Arcanum install and every Claude account on the machine.
 
+Releases are published from CI with npm provenance, which links each version to the commit and pipeline that built it. `npm audit signatures` checks it after install.
+
 ## The three tiers
 
 | Tier | Flag | File | Use it for |
@@ -75,6 +77,7 @@ arcanum config git merge-body full                  # git.merge_body_mode, local
 arcanum config git safe-branch origin/develop       # git.safe_branch, local
 arcanum config next-step auto enhance-issue on      # next_step.auto.enhance-issue, local
 arcanum config auto-fix-all clear-context on        # auto-fix-all.clear_context, local
+arcanum config auto-fix-all finish-on-empty-queue on   # auto-fix-all.finish_on_empty_queue, local
 arcanum config monitor-issues clear-context off
 ```
 
