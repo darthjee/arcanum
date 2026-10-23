@@ -465,25 +465,195 @@ Errors, on stderr in `--json` mode:
 
 ## Shortcuts
 
-The contract is [Shortcuts and Setup](../specs/arcanum-cli/shortcuts-and-setup.md). The design point is that shortcuts add no output contract of their own:
+Curated front-ends over common keys, all under `arcanum config` (`cli/lib/commands/config/shortcuts/`):
 
-- **Delegation.** A single-value shortcut (`engine`, `git safe-branch`, `git merge-body`, the `clear-context`/`finish-on-empty-queue` toggles, `next-step auto <skill>`) maps to a key, a default write tier and a value kind, then calls the generic subcommand's `run` with `args` and `tier` filled in: no value → `get`, a value → `set` (at the default tier unless a tier flag is given), `--unset` → `unset`. Validation, refusal order, output and JSON are therefore the generic ones, byte for byte. The `--unset` flag is a shortcut-only option, which `config.js` refuses on the generic subcommands.
+```text
+arcanum config agents email                       # default + every agent's effective email
+arcanum config agents email <agent>               # per-tier breakdown for one agent
+arcanum config agents email set <pattern>         # git.email, e.g. you+{agent}@example.com
+arcanum config agents email set <agent> <email>   # git.agents.<agent>
+arcanum config agents email unset [<agent>]       # git.email, or git.agents.<agent>
+arcanum config engine [shell|native|docker | --unset]                 # engine.mode
+arcanum config next-step auto [<skill> [on|off | --unset]]            # next_step.auto.<skill>
+arcanum config git safe-branch [<ref> | --unset]                      # git.safe_branch
+arcanum config git merge-body [full|empty|coauthors | --unset]        # git.merge_body_mode
+arcanum config auto-fix-all clear-context [on|off | --unset]          # auto-fix-all.clear_context
+arcanum config auto-fix-all finish-on-empty-queue [on|off | --unset]  # auto-fix-all.finish_on_empty_queue
+arcanum config auto-fix-all ignore-checks [list] | add <pattern>... | remove <pattern>...
+arcanum config monitor-issues clear-context [on|off | --unset]        # monitor-issues.clear_context
+```
+
+| Shortcut | Key(s) | Value kind | Default write tier |
+| --- | --- | --- | --- |
+| `agents email` | `git.email`, `git.agents.<agent>` | string, as typed | global |
+| `engine` | `engine.mode` | enum | local |
+| `next-step auto <skill>` | `next_step.auto.<skill>` | boolean token | local |
+| `git safe-branch` | `git.safe_branch` | string, as typed | local (the only tier) |
+| `git merge-body` | `git.merge_body_mode` | enum | local |
+| `auto-fix-all clear-context` | `auto-fix-all.clear_context` | boolean token | local (the only tier) |
+| `auto-fix-all finish-on-empty-queue` | `auto-fix-all.finish_on_empty_queue` | boolean token | local (the only tier) |
+| `auto-fix-all ignore-checks` | `auto-fix-all.ignored_check_patterns` | array of regexes | repo (the only tier) |
+| `monitor-issues clear-context` | `monitor-issues.clear_context` | boolean token | local (the only tier) |
+
+`defaultTier.js` holds these defaults in one place for the shortcuts and the [setup wizard](#setup-wizard): a key's only tier, else its shortcut's default, else `local` when allowed, else its first tier. Tuning knobs (`plan-issues.*`, `git.omit_model_coauthor`, …) get no shortcut; they stay reachable through `config set`.
+
+### Design rules
+
+- **Thin front-ends.** Each shortcut covers registry keys and adds nothing the generic `get`/`set`/`unset` lack, except the `agents email` resolution view and `ignore-checks`' array add/remove. Namespaces mirror the config namespaces; `agents email` stays under `agents` to leave room for more per-agent settings.
+- **Single-value shortcuts** take the value positionally: no value reads, a value writes, and `--unset` removes (like `git config --unset`), so the positional slot is only ever a value and a ref named `unset` cannot collide. `--unset` with a value is a usage error. Verb shortcuts exist only where needed: `agents email [set|unset]` (two keys, `set <pattern>` and `set <agent> <email>` told apart by arity) and `ignore-checks [list|add|remove]`.
+- **Writes** go to the default tier; `--global`, `--repo` or `--local` overrides it within the tiers the registry allows (`git safe-branch --repo x` is `git.safe_branch is local-only`, exit `3`).
+- **Reads ignore the default tier.** Without a tier flag a read resolves like `config get`; with one it reads only that tier; `--all-tiers` works on reads.
+- **Boolean tokens** are `on`/`off`/`true`/`false`, lowercase only, always stored as JSON booleans. Anything else is exit `3`, `<key> must be on or off, got "ON"`, `hint: accepted: on, off, true, false (lowercase)`. `off` stores `false` rather than removing the key, so it can shadow a lower tier's `on`; removing is `--unset`.
+- **Flags.** Shortcuts accept the tier flags, the global flags, `--all-tiers` on reads only and `--lock-timeout` on writes only. They refuse `--force` and `--string` (`--force is not accepted by shortcuts (engine)`, `hint: use arcanum config set/unset <key> --force instead`): they only target known keys with known types.
+- **`next-step auto <skill>`** accepts any well-formed skill name, per the registry's wildcard rule.
+
+### Shortcut output
+
+Single-value shortcuts have no output contract of their own: a shortcut prints exactly what its generic equivalent prints, in human and `--json` modes, with the same exit codes. Booleans print as `true`/`false`.
+
+| Shortcut | Same as |
+| --- | --- |
+| `engine` | `config get engine.mode` |
+| `engine native` | `config set engine.mode native --local` |
+| `engine --unset` | `config unset engine.mode --local` |
+| `next-step auto enhance-issue on` | `config set next_step.auto.enhance-issue true --local` |
+
+- An unset read exits `1` and shows `(unset; default: <value>)` / the `"default"` field, as `get` does.
+- A write to a tier that a higher-precedence tier still overrides adds a stderr note: `arcanum: note: local still overrides next_step.auto.enhance-issue (value: true)`.
+- **`next-step auto` with no skill** lists every resolved `next_step.auto.*` key that is set, sorted by skill, as `<skill>  <value>  (<tier>)`; with a tier flag, only that tier's. It always exits `0`, prints nothing when empty, and refuses `--unset` and `--all-tiers`. JSON: `{"entries":[{"key":"next_step.auto.enhance-issue","value":false,"source":"local"}]}`.
+
+How delegation is built:
+
+- **Delegation.** A single-value shortcut (`singleValue.js`, and `next-step auto <skill>`) maps to a key, a default write tier and a value kind, then calls the generic subcommand's `run` with `args` and `tier` filled in. Validation, refusal order, output and JSON are therefore the generic ones, byte for byte. The `--unset` flag is a shortcut-only option, which `config.js` refuses on the generic subcommands.
 - **Value parsing.** `set` accepts an optional `parseValue` in its context. Shortcuts pass one for booleans (`booleanToken.js`) and for refs and emails (stored as typed); enums keep the generic parser so enum refusals match `config set`'s. A parser that throws has its error deferred to the registry step of `prepareWrite`, so a missing target (`4`) or a malformed file (`7`) still wins over a bad token (`3`).
-- **Shadowed-tier note.** `writeValue` shares one memoized `resolveTargets` with the delegated `set`, then reads the higher-precedence tiers (strict `readTier`, silent on malformed files) and prints `arcanum: note: <tier> still overrides <key> (value: …)` through `output.note`.
-- **`next-step auto`** without a skill reads the tiers with `readTiers` and resolves every `next_step.auto.*` child (first non-`null` value wins), sorted by skill.
-- **`agents email`** resolves through `AgentEmail#resolve` (`ConfigChain#readWithSource`), never through its own loop. `ConfigChain` gets `CLAUDE_CONFIG_DIR` from the resolved account. Outside a repo, a small `ConfigChain` subclass drops the repo and local files, so nothing is read from a non-repo cwd. The per-tier detail and the agent discovery read the tiers with `readTiers` (`allTiers: true`, so `file: null` marks a tier with no target). Agents come from `git.agents.*` in any tier plus the repo's `.claude/agents/*.md`.
-- **`ignore-checks`** goes through `prepareWrite` (target, file, registry — tier and, for `add`, `format: regex` over the given patterns — then skew) and then `writeKey`'s `update` op, which calls `RepoConfigWriter#update`: the `mutate` callback re-reads the array inside the lock, refuses a non-array, appends or removes, and returns the new array. A remove on an absent key throws an internal no-change marker, so the file isn't created.
+- **Shadowed-tier note.** `writeValue` shares one memoized `resolveTargets` with the delegated `set`, then reads the higher-precedence tiers (strict `readTier`, silent on malformed files) and prints the note through `output.note`.
+- **`next-step auto`** without a skill reads the tiers with `readTiers` and resolves every `next_step.auto.*` child (first non-`null` value wins).
+
+### `agents email`
+
+**Resolution** matches `arcanum/_lib/agent_email.sh`, so the CLI shows what commits will actually use: tiers local → repo → global; within a tier `git.agents.<agent>` before `git.email`; a tier is fully resolved before the next, so a higher-tier `git.email` beats a lower-tier `git.agents.<agent>`; `null` counts as absent; `{agent}` is replaced by the agent name; an explicit `""` at the winning tier and key stops the chain and means the model's email. With no value anywhere, the commit also uses the model's email, which the CLI cannot know, so it shows `(model default)`.
+
+**Agents listed:** every agent with a non-`null` `git.agents.<agent>` in any tier, plus every `.claude/agents/*.md` basename in the target repo (other files are ignored). Configured agents not in the repo are marked `(not in this repo)`; outside a repo only configured agents are listed. Rows are sorted by name. An agent name must match `[A-Za-z0-9_-]+`.
+
+**Listing** (`agents email`, always exit `0`):
+
+```text
+default  you+{agent}@example.com   (global: git.email)
+
+agent      effective email            from
+architect  you+architect@example.com  global git.email
+node       node-bot@example.com       repo   git.agents.node
+reviewer   rev@example.com            global git.agents.reviewer   (not in this repo)
+```
+
+```json
+{"default":{"set":true,"value":"you+{agent}@example.com","source":"global"},
+ "agents":[{"agent":"node","email":"node-bot@example.com","source":"repo","key":"git.agents.node","in_repo":true}]}
+```
+
+- With no `git.email`, the first line is `default  (unset)`. When the model default applies, `email`, `source` and `key` are `null` and the row shows `(model default)`; when it applies because of an explicit `""`, `source` and `key` name where the empty value sits and the row shows `(empty at repo: git.agents.node)`. Outside a repo, `in_repo` is `null`.
+
+**Detail** (`agents email <agent>`): both keys in every tier, the resolved one marked `<- resolved` (or `<- resolved (empty: model default)`), set but losing ones `(shadowed)`, and a tier with no target `(no target)`. It exits `1` when the model default would apply, like `get`.
+
+```text
+local   git.agents.node  -
+        git.email        -
+repo    git.agents.node  node-bot@example.com      <- resolved
+        git.email        -
+global  git.agents.node  -
+        git.email        you+{agent}@example.com   (shadowed)
+```
+
+JSON: `{"agent":"node","resolved":{"email":…,"source":…,"key":…},"tiers":{"local":{"agents":{"set":…,"value":…},"email":{…},"file":…},…}}`, with `"file": null` for a tier with no target and every `resolved` field `null` when nothing resolves.
+
+The listing and the detail always show every tier, so they refuse tier flags, `--all-tiers` and `--unset`.
+
+**Writes.** `set` and `unset` default to the global tier; a tier flag overrides it. Their output is `config set`/`config unset`'s, with the shadowed-tier note on `set`. Because `set` and `unset` are verbs in that position, an agent literally named `set` or `unset` can only be read and written through the generic `config get/set git.agents.<agent>`.
+
+How it is built: resolution goes through `AgentEmail#resolve` (`ConfigChain#readWithSource`), never through its own loop. `ConfigChain` gets `CLAUDE_CONFIG_DIR` from the resolved account. Outside a repo, a small `ConfigChain` subclass drops the repo and local files, so nothing is read from a non-repo cwd. The per-tier detail and the agent discovery read the tiers with `readTiers` (`allTiers: true`, so `file: null` marks a tier with no target).
+
+### `ignore-checks`
+
+At runtime `auto-fix-all.ignored_check_patterns` is read only from the repo tier (`RepoConfig.getIgnoredCheckPatterns`), and its entries are case-insensitive regexes (`PrChecker`), not globs. The shortcut follows both:
+
+- **Repo tier only.** `--local` and `--global` are exit `3` (`auto-fix-all.ignored_check_patterns is repo-only`), as for the generic `config set`/`unset` of this key. `--repo` is accepted.
+- **Syntax.** `ignore-checks` or `ignore-checks list` lists; `add <pattern>...` and `remove <pattern>...` edit. `add`/`remove` with no pattern is a usage error; use `--` before patterns starting with `-`. `--unset` is refused (use `config unset auto-fix-all.ignored_check_patterns --repo`), and so is `--force`, so a repo ahead of the CLI can only be edited through the generic `config set --force`.
+- **Semantics.** Patterns match by exact string. `add` appends in the order given and skips patterns already present; `remove` skips missing ones. A call that changes nothing exits `0` with `"changed": false`. An absent key counts as `[]`, and removing the last pattern leaves `[]`; `remove` on an absent key writes nothing.
+- **Validation.** Each pattern given to `add` must compile with `new RegExp(p, 'i')`; one invalid pattern is exit `3` (`auto-fix-all.ignored_check_patterns[1] is not a valid regex: Unterminated group`) and nothing is written, not even the valid ones. `remove` does not validate, so a stale invalid pattern can still be removed.
+- **Not an array.** A stored value that is not an array makes `list`, `add` and `remove` exit `3` with `hint: fix it with: arcanum config set auto-fix-all.ignored_check_patterns '[...]' --repo`.
+- **Output.** `list` prints one pattern per line (nothing for none); JSON `{"key":…,"tier":"repo","file":…,"patterns":[…]}`. `add`/`remove` print one line per distinct pattern given: `added '^codacy' to auto-fix-all.ignored_check_patterns (repo: <file>)`, `removed '…' from …`, `'…' already present` or `'…' not present`. Their JSON is the `config set` shape, with the whole arrays as `value` and `previous.value`, plus `"added"` and `"removed"` listing the patterns actually changed.
+- `/init-claude` (`InitClaudeSetCiIgnoredPatterns`) replaces the whole list; the shortcut edits it incrementally. Both write the same file under the same lock.
+
+How it is built: `add`/`remove` go through `prepareWrite` (target, file, registry — tier and, for `add`, `format: regex` over the given patterns — then skew) and then `writeKey`'s `update` op, which calls `RepoConfigWriter#update`: the `mutate` callback re-reads the array inside the lock, refuses a non-array, appends or removes, and returns the new array, so concurrent `add`s never lose updates. A remove on an absent key throws an internal no-change marker, so the file isn't created.
 
 ## Setup wizard
 
-The contract is [Shortcuts and Setup → `arcanum config setup` wizard](../specs/arcanum-cli/shortcuts-and-setup.md#arcanum-config-setup-wizard).
+`arcanum config setup [<section>...] [--lock-timeout <seconds>]` walks a new user through the core onboarding settings. Operational toggles stay shortcut-only.
+
+### Coverage and order
+
+Sections always run in this order (`SETUP_SECTIONS` in `KeyRegistry.js`), whatever order they are given in; duplicates are ignored and an unknown section is a usage error with `hint: sections: identity, engine, git, flow, ci`. No argument runs them all.
+
+| Section | Keys |
+| --- | --- |
+| `identity` | `git.email`, then, behind `customise per-agent emails? [y/N]`, one `git.agents.<agent>` per agent in the repo's `.claude/agents/`, each showing what it currently resolves to |
+| `engine` | `engine.mode` |
+| `git` | `git.safe_branch`, then `git.merge_body_mode` |
+| `flow` | `next_step.auto.<skill>` for `enhance-issue`, `discuss-issue` and `auto-plan-issue` |
+| `ci` | `auto-fix-all.ignored_check_patterns` |
+
+The list is registry-driven: the wizard asks exactly the entries of `shared/lib/config/keys.json` that carry a `setup` field (`{section, order, prompt, instances?}`, see [the key registry](shared-state-and-configuration.md#the-key-registry)), ordered by section, then `order`. A wildcard entry's `setup.instances` lists the concrete keys to ask; `git.agents.<agent>` instead takes its instances from the repo's agents. Adding a key to the wizard is a registry edit. The wizard shows each key's `description`; `setup.prompt` is not displayed today.
+
+### Targets
+
+- Without a configured repo, the per-agent overrides, the `ci` section and every item whose default tier is not `global` are dropped, with one `arcanum: note:` per affected section (`skipping the ci section: no repo at <path>`). In practice only `git.email` is left. An unconfigured repo adds the note `run /init-claude in <root>`.
+- If nothing is left, the wizard exits `4`: `nothing to set up: every requested setting needs a configured repo (…)`.
+
+### Terminal
+
+- The wizard needs stdin and stderr to be TTYs; otherwise it exits `2` with `config setup needs an interactive terminal` and `hint: use arcanum config set / the shortcuts instead`. `--json` is a usage error (`--json is not accepted by setup: it is interactive`), checked first. Tier flags are not accepted.
+- Every prompt, note and the summary go to stderr, so stdout stays results-only (and stays empty).
+
+### Per-setting flow
+
+```text
+engine.mode — Script engine used to run migrated skill entrypoints
+  current: native (repo)
+  new value [shell/native/docker, Enter keeps, - unsets]: shell
+  tier [local/repo/global] (local):
+  set engine.mode = "shell" at local (/x/foo/.claude/state/arcanum-config.json)? [Y/n]
+```
+
+1. Show the key, its description and its current resolved value and source (or `(unset; default: …)`).
+2. Ask the value: Enter keeps it (nothing else is asked or written), `-` unsets it. Enums show their choices inline; booleans accept `y`/`n` plus the shortcut tokens; strings are stored as typed; anything else parses like `config set`. A value failing validation prints the error and asks again, instead of exiting `3`.
+3. Ask the tier among the ones the registry allows, defaulting to `defaultTier(key)`. Single-tier keys skip the question. An invalid tier asks again.
+4. If a higher-precedence tier holds a value, print `arcanum: note: <tier> still overrides this (value: …)`. Then show the exact write and ask `[Y/n]` (`y`, `yes`, `n`, `no`, Enter for yes). Declining records the setting as kept.
+5. Write at once, through the generic `set`/`unset` body.
+
+The `ci` section shows the current list and loops over `[a]dd / [r]emove / [d]one` (Enter is done). Each pattern is validated as a case-insensitive regex, checked for presence, confirmed and written like `ignore-checks add`/`remove`, then the new list is shown.
+
+### Errors, interrupts and summary
+
+- A write error (lock timeout, skew, malformed file, I/O) is printed, the setting is recorded as failed, and the wizard goes on. The exit code is the first failure's, or `0`.
+- Ctrl-C or EOF (Ctrl-D, stdin closed) stops the wizard with exit `130`. Settings already written stay written: each write is atomic, and a Ctrl-C during a write releases the lock first.
+- A summary goes to stderr on every exit path once the questions have started: written (key, tier, old -> new), kept, failed (with the reason), and, when interrupted, not reached.
+
+```text
+summary
+  written      engine.mode            local   native -> shell
+  kept         git.safe_branch        local   origin/main
+  failed       git.merge_body_mode    local   timed out after 10s waiting for …
+  not reached  next_step.auto.*, auto-fix-all.ignored_check_patterns
+```
+
+### How it is built
 
 - **Items.** `setupItems` takes every registry entry with `setup`, sorted by `SETUP_SECTIONS` index then `setup.order`, and expands `setup.instances` into concrete keys. `git.agents.<agent>` stays one `agents` item, expanded from `repoAgents(root)` once the user opts in. Each item's default tier comes from `defaultTier(key)`.
-- **Targeting.** Targets are resolved once (`memoizeTargets`). Without a configured repo, the `agents` item, the `ci` section and every item whose default tier is not `global` are dropped, with one `note:` per section; nothing left is exit `4`.
+- **Targeting.** Targets are resolved once (`memoizeTargets`); `availableItems` drops the repo-dependent items and prints the notes.
 - **Writes.** `set.js` and `unset.js` expose their bodies as `applySet`/`applyUnset`, and `ignoreChecks.js` exposes `updatePatterns`; the wizard calls them with the chosen tier and a fixed `parseValue`, so the target, file, registry, skew and lock checks are the generic code. Each write takes and releases its own lock; no lock is held while prompting.
-- **Errors.** A `ValidationError` while typing a value re-asks. A write failure is printed with `reportError`, recorded as failed, and the wizard goes on; the exit code is the first failure's.
-- **Interrupts.** The prompter rejects with `Interrupted` on EOF or SIGINT; the wizard prints the summary and returns `130`. During a write, `writeKey`'s own SIGINT handler runs with signal hooks whose `exit` prints the summary first.
-- **Summary.** Every exit path after the first question prints it once, on stderr. Items with no recorded result are "not reached"; a wildcard entry none of whose instances was reached collapses to `next_step.auto.*` / `git.agents.*`.
+- **Errors.** A `ValidationError` while typing a value re-asks. A write failure is printed with `reportError`, recorded as failed, and the wizard goes on.
+- **Interrupts.** The prompter (`cli/lib/prompter.js`) rejects with `Interrupted` on EOF or SIGINT, owning `SIGINT` only while a question is open; the wizard prints the summary and returns `130`. During a write, `writeKey`'s own SIGINT handler runs with signal hooks whose `exit` prints the summary first.
+- **Summary.** Printed once (`summary.js`). Items with no recorded result are "not reached"; a wildcard entry none of whose instances was reached collapses to `next_step.auto.*` / `git.agents.*`. Read warnings are printed once per run, not once per setting.
 
 ## Specs
 
@@ -491,3 +661,29 @@ The contract is [Shortcuts and Setup → `arcanum config setup` wizard](../specs
 - Every exit code and precedence pair, each malformed-file kind (with byte-unchanged checks on refused writes), each value-parsing row with and without `--string`, the JSON shapes, the lock cases (held by a live fake owner, `--lock-timeout 0`, acquired after release, no "seems stuck" warning) and SIGINT each have a spec.
 - `setup_spec` drives the wizard with a scripted prompter (`cli/spec/support/prompter.js`, with `EOF`/`SIGINT` answers) and `deps.isInteractive`; `fakeIo` can also fake a TTY stdin. One bundle smoke spec checks the real no-TTY refusal.
 - The shortcut specs (`cli/spec/lib/commands/config/shortcuts/`) use `cli/spec/support/shortcuts.js`, which re-seeds the tiers before each run, so a shortcut and its generic equivalent run against the same files and their stdout, stderr and exit code are compared directly. `agentsEmail_spec` runs the `AgentEmail` shell/native parity table (`cli/spec/support/agentEmailFixtures.js`, a copy of `shared/spec`'s, since `cli/` never imports `shared/spec/**`).
+
+## Alternatives considered
+
+- **Renaming `core/bin/arcanum` to free the name.** Rejected: it touches `engine_dispatch.sh`, the Docker image and older installs for no user benefit, since the dispatcher is never on `PATH`.
+- **One binary for internal and user commands.** Rejected: it mixes two argv conventions and exposes internal commands to users.
+- **Shipping the CLI inside each Arcanum install**, with a `PATH` migration. Rejected: users with several installs would get competing clients.
+- **Skew against the Arcanum install's own version.** Rejected: the CLI cannot reliably locate the install serving a repo, and the tier pointers are what describe the files' shape.
+- **A CLI framework (`commander`, `yargs`).** Rejected: supply-chain surface on a tool that writes into `~/.claude`, and it breaks the zero-runtime-dependency rule. `commander` is the upgrade path if the surface grows a lot.
+- **Defaulting `set` to `--local`, like git.** Rejected: with a committed tier and a shared one, an implicit tier makes accidental writes too easy.
+- **Only exit codes `1`/`2`, like git.** Rejected: scripts need to tell "nowhere to write" and "corrupted file" apart from a typo.
+- **Overwriting malformed files, like `RepoConfigWriter`.** Rejected: it destroys user data the CLI cannot read.
+- **Waiting forever for the lock, like the skills.** Rejected: a silent hang is worse than a clear timeout.
+- **Letting `--force` bypass read-only keys.** Rejected: the version pointers drive migrations.
+- **Verbs (`show`/`set`/`unset`) on every shortcut.** Rejected: positional values read better, and verbs collide with values.
+- **Unsetting via `off`.** Rejected: `off` must be able to shadow a lower tier's `on`.
+- **A shortcut-specific output contract.** Rejected: two contracts to test and keep in sync.
+- **`git email` instead of `agents email`, or listing only configured agents.** Rejected: the question is what each repo agent commits as, including agents with no override.
+- **Every tier, or merged arrays, for `ignore-checks`.** Rejected: the runtime reads only the repo tier.
+- **Collecting every wizard answer and writing at the end.** Rejected: Ctrl-C would lose everything, and a late error would hide what applied.
+- **A hardcoded wizard key list.** Rejected: it drifts from the registry.
+
+## Future work
+
+- **`list --json` and registry defaults.** Whether `list` should also report defaults of keys unset in every tier; `get` already reports them in `default`.
+- **Splitting the `--repo` overload** into separate flags (e.g. `--repo-path` for targeting), if the syntactic path/tier rule proves confusing.
+- **Per-key skew granularity.** Refusing a write to a key touched by a pending migration, rather than only warning per tier; see [the key registry](shared-state-and-configuration.md#the-key-registry).
