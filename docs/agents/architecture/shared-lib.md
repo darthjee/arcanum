@@ -115,6 +115,14 @@ See [Install & Release Pipeline](install-and-release.md) and [Docker Engine](doc
   - A missing leaf, or a missing or `null` intermediate, is a no-op: the file is neither rewritten nor created.
   - It throws `ConfigError` `NOT_AN_OBJECT` when the file, the namespace or an intermediate holds a non-object value.
   - Empty parent objects left behind are kept.
+- **`update({ newFile, legacyFile, namespace, key, mutate, timeoutMs })`** is an atomic read-modify-write of one key. The first consumer is #781's `arcanum config auto-fix-all ignore-checks add/remove`.
+  - Under `<newFile>.lock`, it seeds from `legacyFile` exactly as `write` does, reads the current value at the key (`undefined` when the leaf, or a missing or `null` intermediate, is absent), and writes `mutate`'s result with `write`'s semantics. Without a `namespace`, `key` is a path from the root and `legacyFile` is ignored.
+  - `mutate` receives a `structuredClone` of the current value, so changing it in place cannot corrupt `previous`. It may be async.
+  - When the result deep-equals the current value (a structural comparison of plain JSON values that ignores key order), nothing is written: the file is neither rewritten nor created, and a legacy seed alone is not persisted.
+  - It resolves to `{ changed, previous, value }`: whether the file was written, the value before the call and the value after it.
+  - A `mutate` that returns `undefined` is a usage error (`TypeError`) and writes nothing; deleting a key stays `unset`'s job.
+  - A `mutate` that throws writes nothing, releases the lock and propagates the error unchanged.
+  - It throws `ConfigError` `NOT_AN_OBJECT` when the file, the namespace or an intermediate holds a non-object value.
 - **`timeoutMs`** is optional on every method. Omitted, the writer waits for the lock forever, as the shell writers do. When it runs out, the method throws `LockTimeoutError` (`code: 'LOCK_TIMEOUT'`) and writes nothing.
 
 Every write holds `<file>.lock` through `Lock.js`, the same protocol as `arcanum/_lib/lock.sh`, so shell and native writers exclude each other. The output matches jq's default formatting (`JSON.stringify(obj, null, 2) + '\n'`, existing key order kept, new keys appended). The file is written atomically through `<file>.tmp` and a rename. See [Lock System](lock-system.md).

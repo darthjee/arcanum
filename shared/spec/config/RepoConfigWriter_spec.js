@@ -699,6 +699,394 @@ describe('RepoConfigWriter', () => {
     });
   });
 
+  describe('#update', () => {
+    /**
+     * @param {object} [overrides] - `update` argument overrides.
+     * @returns {Promise<{changed: boolean, previous: unknown, value: unknown}>}
+     *   the update's result.
+     */
+    function updatePatterns(overrides = {}) {
+      return writer.update({
+        newFile,
+        legacyFile,
+        namespace: 'auto-fix-all',
+        key: 'ignored_check_patterns',
+        mutate: (current) => [...(current || []), 'c'],
+        ...overrides
+      });
+    }
+
+    it('creates an absent key, with previous undefined', async () => {
+      const mutate = jasmine.createSpy('mutate').and.returnValue(['c']);
+
+      const result = await updatePatterns({ mutate });
+
+      expect(mutate).toHaveBeenCalledOnceWith(undefined);
+      expect(result).toEqual({ changed: true, previous: undefined, value: ['c'] });
+      expect(JSON.parse(await readFile(newFile, 'utf8'))).toEqual({
+        'auto-fix-all': { ignored_check_patterns: ['c'] }
+      });
+      expect(existsSync(`${newFile}.lock`)).toBeFalse();
+    });
+
+    it('updates an existing value byte-identically to the equivalent write', async () => {
+      const contents = '{"version":"1.0.0","auto-fix-all":{"a":1,"ignored_check_patterns":["a","b"],"z":2},"y":true}';
+
+      await seedFile(newFile, contents);
+      await writer.write({
+        newFile, legacyFile, namespace: 'auto-fix-all', key: 'ignored_check_patterns', value: ['a', 'b', 'c']
+      });
+      const expected = await readFile(newFile, 'utf8');
+
+      await seedFile(newFile, contents);
+      const result = await updatePatterns();
+
+      expect(result).toEqual({ changed: true, previous: ['a', 'b'], value: ['a', 'b', 'c'] });
+      expect(await readFile(newFile, 'utf8')).toEqual(expected);
+      expect(Object.keys(JSON.parse(expected)['auto-fix-all'])).toEqual(['a', 'ignored_check_patterns', 'z']);
+    });
+
+    it('reads and creates a dotted nested key, creating intermediates', async () => {
+      await seedFile(newFile, '{"next_step":{"other":1}}');
+      const mutate = jasmine.createSpy('mutate').and.returnValue(true);
+
+      const result = await writer.update({ newFile, namespace: 'next_step', key: 'auto.enhance-issue', mutate });
+
+      expect(mutate).toHaveBeenCalledOnceWith(undefined);
+      expect(result.changed).toBeTrue();
+      expect(JSON.parse(await readFile(newFile, 'utf8'))).toEqual({
+        next_step: { other: 1, auto: { 'enhance-issue': true } }
+      });
+    });
+
+    it('reads an existing dotted nested value', async () => {
+      await seedFile(newFile, '{"next_step":{"auto":{"count":2}}}');
+
+      const result = await writer.update({
+        newFile, namespace: 'next_step', key: 'auto.count', mutate: (n) => n + 1
+      });
+
+      expect(result).toEqual({ changed: true, previous: 2, value: 3 });
+      expect(JSON.parse(await readFile(newFile, 'utf8'))).toEqual({ next_step: { auto: { count: 3 } } });
+    });
+
+    [
+      ['a null intermediate', '{"next_step":{"auto":null}}'],
+      ['a null namespace', '{"next_step":null}'],
+      ['a missing namespace', '{"version":"1.0.0"}']
+    ].forEach(([label, contents]) => {
+      it(`passes undefined through ${label}`, async () => {
+        await seedFile(newFile, contents);
+        const mutate = jasmine.createSpy('mutate').and.returnValue(1);
+
+        const result = await writer.update({ newFile, namespace: 'next_step', key: 'auto.x', mutate });
+
+        expect(mutate).toHaveBeenCalledOnceWith(undefined);
+        expect(result).toEqual({ changed: true, previous: undefined, value: 1 });
+        expect(JSON.parse(await readFile(newFile, 'utf8')).next_step).toEqual({ auto: { x: 1 } });
+      });
+    });
+
+    it('does not see inherited keys as present', async () => {
+      await seedFile(newFile, '{"n":{}}');
+      const mutate = jasmine.createSpy('mutate').and.returnValue('v');
+
+      await writer.update({ newFile, namespace: 'n', key: 'toString', mutate });
+
+      expect(mutate).toHaveBeenCalledOnceWith(undefined);
+    });
+
+    describe('when the result is unchanged', () => {
+      [
+        ['an identical copy', '{"n":{"k":{"a":[1,"x",null,true],"b":{"c":2}}}}', (v) => structuredClone(v)],
+        ['a reordered object', '{"n":{"k":{"a":1,"b":2}}}', () => ({ b: 2, a: 1 })],
+        ['the same primitive', '{"n":{"k":"v"}}', () => 'v']
+      ].forEach(([label, contents, mutate]) => {
+        it(`does not rewrite the file for ${label}`, async () => {
+          await seedFile(newFile, contents);
+          const writeSpy = spyOn(writer._fs, 'writeFile').and.callThrough();
+          const renameSpy = spyOn(writer._fs, 'rename').and.callThrough();
+
+          const result = await writer.update({ newFile, namespace: 'n', key: 'k', mutate });
+
+          expect(result.changed).toBeFalse();
+          expect(result.value).toBe(result.previous);
+          expect(await readFile(newFile, 'utf8')).toEqual(contents);
+          expect(writeSpy).not.toHaveBeenCalled();
+          expect(renameSpy).not.toHaveBeenCalled();
+          expect(existsSync(`${newFile}.lock`)).toBeFalse();
+        });
+      });
+
+      it('does not create a missing file', async () => {
+        await seedFile(legacyFile, '{"ignored_check_patterns":["z"]}');
+        const writeSpy = spyOn(writer._fs, 'writeFile').and.callThrough();
+
+        const result = await updatePatterns({ mutate: () => ['z'] });
+
+        expect(result).toEqual({ changed: false, previous: ['z'], value: ['z'] });
+        expect(existsSync(newFile)).toBeFalse();
+        expect(existsSync(`${newFile}.tmp`)).toBeFalse();
+        expect(existsSync(`${newFile}.lock`)).toBeFalse();
+        expect(writeSpy).not.toHaveBeenCalled();
+      });
+
+      it('does not persist a legacy seed alone', async () => {
+        await seedFile(newFile, '{"version":"1.0.0"}');
+        await seedFile(legacyFile, '{"ignored_check_patterns":["z"]}');
+
+        const result = await updatePatterns({ mutate: (v) => v });
+
+        expect(result).toEqual({ changed: false, previous: ['z'], value: ['z'] });
+        expect(await readFile(newFile, 'utf8')).toEqual('{"version":"1.0.0"}');
+      });
+    });
+
+    it('keeps previous intact when mutate changes its argument in place', async () => {
+      await seedFile(newFile, '{"auto-fix-all":{"ignored_check_patterns":["a"]}}');
+
+      const result = await updatePatterns({
+        mutate: (list) => {
+          list.push('b');
+          return list;
+        }
+      });
+
+      expect(result).toEqual({ changed: true, previous: ['a'], value: ['a', 'b'] });
+    });
+
+    it('propagates an error from mutate, leaving the bytes untouched and releasing the lock', async () => {
+      const contents = '{"auto-fix-all":{"ignored_check_patterns":"not-an-array"}}';
+      const failure = new Error('not an array');
+
+      await seedFile(newFile, contents);
+
+      const error = await updatePatterns({ mutate: () => { throw failure; } }).catch((e) => e);
+
+      expect(error).toBe(failure);
+      expect(await readFile(newFile, 'utf8')).toEqual(contents);
+      expect(existsSync(`${newFile}.lock`)).toBeFalse();
+      expect(existsSync(`${newFile}.tmp`)).toBeFalse();
+
+      await writePatterns();
+
+      expect(JSON.parse(await readFile(newFile, 'utf8'))['auto-fix-all'].ignored_check_patterns).toEqual(['a', 'b']);
+    });
+
+    it('propagates a rejection from an async mutate', async () => {
+      const failure = new Error('async failure');
+
+      const error = await updatePatterns({ mutate: async () => { throw failure; } }).catch((e) => e);
+
+      expect(error).toBe(failure);
+      expect(existsSync(newFile)).toBeFalse();
+      expect(existsSync(`${newFile}.lock`)).toBeFalse();
+    });
+
+    it('rejects a mutate that returns undefined with a TypeError, writing nothing', async () => {
+      const contents = '{"auto-fix-all":{"ignored_check_patterns":["a"]}}';
+
+      await seedFile(newFile, contents);
+      const writeSpy = spyOn(writer._fs, 'writeFile').and.callThrough();
+
+      const error = await updatePatterns({ mutate: () => undefined }).catch((e) => e);
+
+      expect(error).toBeInstanceOf(TypeError);
+      expect(error.message).toEqual('update\'s mutate must return a value; use unset to delete');
+      expect(await readFile(newFile, 'utf8')).toEqual(contents);
+      expect(writeSpy).not.toHaveBeenCalled();
+      expect(existsSync(`${newFile}.lock`)).toBeFalse();
+    });
+
+    it('accepts an async mutate', async () => {
+      await seedFile(newFile, '{"auto-fix-all":{"ignored_check_patterns":["a"]}}');
+
+      const result = await updatePatterns({
+        mutate: async (list) => {
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          return [...list, 'b'];
+        }
+      });
+
+      expect(result).toEqual({ changed: true, previous: ['a'], value: ['a', 'b'] });
+      expect(JSON.parse(await readFile(newFile, 'utf8'))['auto-fix-all'].ignored_check_patterns).toEqual(['a', 'b']);
+    });
+
+    it('seeds the namespace from the legacy file and persists it on a change', async () => {
+      await seedFile(newFile, '{"version":"1.0.0"}');
+      await seedFile(legacyFile, '{"legacy_key":1,"ignored_check_patterns":["z"]}');
+      const mutate = jasmine.createSpy('mutate').and.callFake((list) => [...list, 'c']);
+
+      const result = await updatePatterns({ mutate });
+
+      expect(mutate).toHaveBeenCalledOnceWith(['z']);
+      expect(result).toEqual({ changed: true, previous: ['z'], value: ['z', 'c'] });
+      expect(await readFile(newFile, 'utf8')).toEqual(`${JSON.stringify({
+        version: '1.0.0',
+        'auto-fix-all': { legacy_key: 1, ignored_check_patterns: ['z', 'c'] }
+      }, null, 2)}\n`);
+    });
+
+    it('does not reseed when the namespace already exists', async () => {
+      await seedFile(newFile, '{"auto-fix-all":{"kept":true}}');
+      await seedFile(legacyFile, '{"ignored_check_patterns":["z"]}');
+
+      const result = await updatePatterns();
+
+      expect(result.previous).toBeUndefined();
+      expect(JSON.parse(await readFile(newFile, 'utf8'))).toEqual({
+        'auto-fix-all': { kept: true, ignored_check_patterns: ['c'] }
+      });
+    });
+
+    describe('without a namespace (top-level update)', () => {
+      it('updates a dotted top-level path, ignoring legacyFile', async () => {
+        await seedFile(newFile, '{"a":{"b":[1]},"z":0}');
+        await seedFile(legacyFile, '{"a":{"b":["legacy"]}}');
+
+        const result = await writer.update({ newFile, legacyFile, key: 'a.b', mutate: (list) => [...list, 2] });
+
+        expect(result).toEqual({ changed: true, previous: [1], value: [1, 2] });
+        expect(await readFile(newFile, 'utf8')).toEqual(`${JSON.stringify({ a: { b: [1, 2] }, z: 0 }, null, 2)}\n`);
+      });
+
+      it('creates a missing top-level key', async () => {
+        const result = await writer.update({ newFile, key: 'x.y', mutate: () => 'v' });
+
+        expect(result).toEqual({ changed: true, previous: undefined, value: 'v' });
+        expect(JSON.parse(await readFile(newFile, 'utf8'))).toEqual({ x: { y: 'v' } });
+      });
+
+      it('rejects a non-object intermediate with NOT_AN_OBJECT', async () => {
+        await seedFile(newFile, '{"a":{"b":3}}');
+        const mutate = jasmine.createSpy('mutate');
+
+        const error = await writer.update({ newFile, key: 'a.b.c', mutate }).catch((e) => e);
+
+        expect(error).toBeInstanceOf(ConfigError);
+        expect(error.code).toEqual('NOT_AN_OBJECT');
+        expect(error.message).toEqual('Cannot index .a.b: not a JSON object');
+        expect(mutate).not.toHaveBeenCalled();
+        expect(existsSync(`${newFile}.lock`)).toBeFalse();
+      });
+    });
+
+    ['"x"', '[1]', '3', 'false'].forEach((raw) => {
+      it(`rejects when an intermediate holds ${raw}, releasing the lock`, async () => {
+        const contents = `{"next_step":{"auto":${raw}}}`;
+
+        await seedFile(newFile, contents);
+        const mutate = jasmine.createSpy('mutate');
+
+        const error = await writer.update({ newFile, namespace: 'next_step', key: 'auto.x', mutate })
+          .catch((e) => e);
+
+        expect(error).toBeInstanceOf(ConfigError);
+        expect(error.code).toEqual('NOT_AN_OBJECT');
+        expect(error.message).toEqual('Cannot index .next_step.auto: not a JSON object');
+        expect(error.file).toEqual(newFile);
+        expect(mutate).not.toHaveBeenCalled();
+        expect(await readFile(newFile, 'utf8')).toEqual(contents);
+        expect(existsSync(`${newFile}.lock`)).toBeFalse();
+      });
+    });
+
+    it('rejects a non-object namespace with NOT_AN_OBJECT', async () => {
+      await seedFile(newFile, '{"auto-fix-all":"x"}');
+
+      const error = await updatePatterns().catch((e) => e);
+
+      expect(error).toBeInstanceOf(ConfigError);
+      expect(error.code).toEqual('NOT_AN_OBJECT');
+      expect(error.message).toEqual('Cannot index .auto-fix-all: not a JSON object');
+      expect(existsSync(`${newFile}.lock`)).toBeFalse();
+    });
+
+    ['null', 'false'].forEach((raw) => {
+      it(`treats a file holding ${raw} as {}`, async () => {
+        await seedFile(newFile, raw);
+
+        const result = await updatePatterns();
+
+        expect(result).toEqual({ changed: true, previous: undefined, value: ['c'] });
+        expect(JSON.parse(await readFile(newFile, 'utf8'))).toEqual({
+          'auto-fix-all': { ignored_check_patterns: ['c'] }
+        });
+      });
+    });
+
+    it('rejects a non-object file with NOT_AN_OBJECT', async () => {
+      await seedFile(newFile, '[1]');
+
+      const error = await updatePatterns().catch((e) => e);
+
+      expect(error).toBeInstanceOf(ConfigError);
+      expect(error.code).toEqual('NOT_AN_OBJECT');
+      expect(existsSync(`${newFile}.lock`)).toBeFalse();
+    });
+
+    it('acquires and releases <newFile>.lock, writing via <file>.tmp', async () => {
+      const renameSpy = jasmine.createSpy('rename').and.callFake(rename);
+      const spied = new RepoConfigWriter({ lock, fs: { rename: renameSpy } });
+
+      spyOn(lock, 'acquire').and.callThrough();
+      spyOn(lock, 'release').and.callThrough();
+
+      await spied.update({ newFile, namespace: 'n', key: 'k', mutate: () => 1 });
+
+      expect(lock.acquire).toHaveBeenCalledWith(`${newFile}.lock`);
+      expect(lock.release).toHaveBeenCalledWith(`${newFile}.lock`);
+      expect(renameSpy).toHaveBeenCalledWith(`${newFile}.tmp`, newFile);
+      expect(existsSync(`${newFile}.tmp`)).toBeFalse();
+    });
+
+    it('keeps both changes from two concurrent updates of the same array', async () => {
+      await seedFile(newFile, '{"auto-fix-all":{"ignored_check_patterns":["a"]}}');
+      const other = new RepoConfigWriter({ lock: new Lock({ sleepMs: 5 }) });
+      const append = (item) => async (list) => {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return [...list, item];
+      };
+
+      await Promise.all([
+        updatePatterns({ mutate: append('b') }),
+        other.update({
+          newFile, legacyFile, namespace: 'auto-fix-all', key: 'ignored_check_patterns', mutate: append('c')
+        })
+      ]);
+
+      const patterns = JSON.parse(await readFile(newFile, 'utf8'))['auto-fix-all'].ignored_check_patterns;
+
+      expect(patterns.length).toEqual(3);
+      expect(patterns).toEqual(jasmine.arrayWithExactContents(['a', 'b', 'c']));
+    });
+  });
+
+  describe('._deepEqual', () => {
+    [
+      [1, 1, true],
+      ['a', 'b', false],
+      [null, null, true],
+      [null, {}, false],
+      [{}, null, false],
+      [1, '1', false],
+      [[1, 2], [1, 2], true],
+      [[1, 2], [1, 2, 3], false],
+      [[1, 2], [2, 1], false],
+      [[1], { 0: 1 }, false],
+      [{ 0: 1 }, [1], false],
+      [{ a: 1, b: [2] }, { b: [2], a: 1 }, true],
+      [{ a: 1 }, { a: 1, b: 2 }, false],
+      [{ a: 1, b: 2 }, { a: 1, c: 2 }, false],
+      [{ a: { b: 1 } }, { a: { b: 2 } }, false],
+      [{ a: undefined }, {}, false]
+    ].forEach(([a, b, expected]) => {
+      it(`returns ${expected} for ${JSON.stringify(a)} vs ${JSON.stringify(b)}`, () => {
+        expect(RepoConfigWriter._deepEqual(a, b)).toEqual(expected);
+      });
+    });
+  });
+
   describe('timeoutMs', () => {
     const calls = {
       write: () => ({
@@ -712,6 +1100,10 @@ describe('RepoConfigWriter', () => {
       unset: () => ({
         file: newFile,
         run: (opts) => writer.unset({ newFile, legacyFile, namespace: 'n', key: 'k', ...opts })
+      }),
+      update: () => ({
+        file: newFile,
+        run: (opts) => writer.update({ newFile, legacyFile, namespace: 'n', key: 'k', mutate: () => 1, ...opts })
       })
     };
 
