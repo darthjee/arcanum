@@ -1,14 +1,156 @@
-# Arcanum CLI internals
+# Arcanum CLI
 
-How the user-facing `arcanum` CLI (`cli/`, the npm package `arcanum-cli`) is put together. The contract it implements — syntax, value parsing, exit codes, output and JSON shapes — is the [Arcanum CLI spec](../specs/arcanum-cli.md) and its [Command Surface](../specs/arcanum-cli/command-surface.md) part; this doc does not repeat it. End-user docs: [the guide](../../guides/arcanum-cli.md) and [`cli/README.md`](../../../cli/README.md).
+The user-facing `arcanum` command (`cli/`, published as the optional npm package `arcanum-cli`) manages Arcanum's configuration from outside Claude Code, through `arcanum config ...`. It reads and writes the three tier files described in [Shared State & Configuration Files](shared-state-and-configuration.md) — global (`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/arcanum-config.json`), repo (`.claude/configuration/arcanum-repo-config.json`) and local (`.claude/state/arcanum-config.json`), resolved local → repo → global — with the same dotted-path rules, the same writer and the same lock as the skills, through the [shared lib](shared-lib.md). This doc covers both the contract the CLI implements (targeting, commands, value parsing, output, exit codes, shortcuts, the setup wizard) and how it is built.
 
-`cli/` is owned by the `client` agent. It is not `core/bin/arcanum`, the internal dispatcher the skills call.
+`cli/` is owned by the `client` agent (see [Agent Roster and Delegation](agent-roster-and-delegation.md)). End-user docs: [the guide](../../guides/arcanum-cli.md) and [`cli/README.md`](../../../cli/README.md).
+
+## Goal and distribution
+
+- **Configuration only.** Every command lives under `arcanum config ...`, so the top-level `arcanum <command>` namespace stays free for later features. The CLI does not install, update or remove Arcanum itself.
+- **Optional, installed separately.** `npm i -g arcanum-cli` installs the `arcanum` command. No per-repo migration installs it or nudges the user towards it; the README and the guide explain how to install it.
+- **One install per machine.** A single global install serves every Arcanum install and every Claude account on the machine (see [Targeting](#targeting)), so users with several `CLAUDE_CONFIG_DIR`s never end up with competing clients.
+- **Host Node.js, no Docker fallback.** Node is already a prerequisite of Arcanum's native engine. The floor is in [Runtime path](#runtime-path).
+- **Lockstep with Arcanum.** `arcanum-cli` is published on every Arcanum release with the same version. How it is built, packaged and published is in [Install & Release → npm package](install-and-release.md#npm-package-arcanum-cli).
+
+## Relationship to `core/bin/arcanum`
+
+Separate entrypoint, shared logic:
+
+- `core/bin/arcanum` is the internal native dispatcher that `arcanum/_lib/engine_dispatch.sh` calls (see [Script Engine](script-engine.md)). It is never on the user's `PATH`, so it does not collide with the user-facing `arcanum`.
+- `cli/bin/arcanum` is the user-facing entrypoint, with its own command registry, its own `--help`, repo resolution that defaults to the current directory, and human-readable output.
+- `cli/` imports nothing from `core/`. What both sides need lives in `shared/lib/` and is bundled into the CLI at build time; `cli/eslint.config.mjs` forbids imports from `core/` and from `shared/spec/` (see [Shared Lib → Import boundary](shared-lib.md#import-boundary)).
 
 ## Runtime path
 
-1. `cli/bin/arcanum` (unbundled, ES2020) checks the Node floor, then imports `cli/dist/arcanum.mjs`.
+1. `cli/bin/arcanum` (unbundled, ES2020, so it still parses on an old Node) compares `process.versions.node` with the floor, `22.13.0`. Below it, it prints `Node.js >= 22.13.0 required, found X` and exits `1`; otherwise it dynamically imports `../dist/arcanum.mjs`, resolved next to itself. The floor is in lockstep with `core/`: a spec checks that `cli/package.json`'s `engines.node` equals `core/package.json`'s (`>=22.13.0`) and that the literal in `cli/bin/arcanum` equals both, and the `esbuild` `target` (`node22.13`) derives from the same value. npm only warns on `engines`, hence the runtime check.
 2. The bundle's entry is `cli/lib/main.js`, which `cli/scripts/build.mjs` bundles with `esbuild` together with the `shared/lib/` files it imports. The build injects `__ARCANUM_CLI_VERSION__`, `__ARCANUM_NODE_FLOOR__` and `__ARCANUM_MIGRATION_VERSIONS__` through `define`. A source run, as in the specs, sees `0.0.0-dev`, a `>=22.13.0` fallback (kept equal to `engines.node` by a spec) and empty migration lists.
-3. `main.run(argv, { io, env, cwd, version, migrationVersions, deps })` never throws: every error goes through `output.reportError`, which uses `exitCodes.exitCodeForError` and returns the exit code. Everything a command touches (streams, env, cwd, versions, `execFileAsync`, `Lock`, signal hooks, Node version) can be injected, so specs never touch the real `~/.claude`, the real cwd or the real process.
+3. `main.run(argv, { io, env, cwd, version, migrationVersions, deps })` never throws: every error goes through `output.reportError`, which uses `exitCodes.exitCodeForError` and returns the exit code. Everything a command touches (streams, env, cwd, versions, `execFileAsync`, `Lock`, signal hooks, Node version) can be injected, so specs never touch the real `~/.claude`, the real cwd or the real process. An error escaping the bundle (it shouldn't) is printed by `cli/bin/arcanum` as `arcanum: <message>` with exit `1`.
+
+## Targeting
+
+Every invocation resolves two targets once, in `cli/lib/target.js`: the account (the Claude config directory, for the global tier) and the repo (for the repo and local tiers).
+
+### Account
+
+| Source | Rule |
+| --- | --- |
+| `--claude-config-dir <dir>` (`flag`) | Wins. A leading `~` or `~/` is expanded by the CLI itself, since the shell does not expand it in every position (`--claude-config-dir=~/...`). `~user` is a usage error, as is `~` with `$HOME` unset or an empty value. A relative path resolves against the cwd. A path that is missing or not a directory is a usage error (`2`). |
+| `CLAUDE_CONFIG_DIR` (`env`) | Used verbatim, with no `~` expansion, matching `ConfigChain`, the shell helpers and Claude Code, so the CLI never writes somewhere the skills don't read. A value starting with `~` raises a warning that it was not expanded. An empty value counts as unset. |
+| `$HOME/.claude` (`default`) | When neither is set. |
+| none (`unresolved`) | No flag, no `CLAUDE_CONFIG_DIR`, no `$HOME`. |
+
+How each account state behaves:
+
+| State | Reads of the global tier | Writes to the global tier |
+| --- | --- | --- |
+| Unresolved | Empty tier, stderr warning. | Refused, exit `4`, with a hint to set `CLAUDE_CONFIG_DIR` or pass `--claude-config-dir`. |
+| Directory missing (from `env` or `default`) | Empty tier, warning naming the path. | Refused, exit `4`. The CLI never creates the directory, so a typo cannot create a phantom account. |
+| Path is not a directory | Exit `4`. | Exit `4`. |
+| Directory exists, no `arcanum-config.json` | Empty tier. | Normal; the file is created on first write. |
+
+Whether an Arcanum install lives in that directory is not checked.
+
+### Repo
+
+- The repo is the cwd, or the `--repo <path>` targeting flag (see [Global flags](#global-flags) for how `--repo` doubles as a tier flag). Either is normalized with `RepoPath#toplevel` (`git -C <path> rev-parse --show-toplevel`), so a subdirectory targets the repo root, and inside a worktree the root is that worktree's own directory, since each worktree has its own `.claude/state/`.
+- A `--repo` path that does not exist or is not a directory is a usage error (`2`) with `RepoPath`'s `not a directory: <path>` message.
+- A path that is not in a git repo, a bare repo, or a cwd with no `git` on `PATH` (with a warning) resolves to "no repo". That is a result, not an error; whether it matters depends on the command.
+
+| State | Detection | Reads | Writes to repo / local |
+| --- | --- | --- | --- |
+| No repo | `rev-parse --show-toplevel` fails | Without a tier flag, only the global tier is read, with a stderr warning. An explicit `--repo`/`--local` is exit `4`. | Exit `4`. |
+| Not arcanum-configured | `.claude/configuration/arcanum-repo-config.json` is missing | Missing tiers read as empty. | Refused, exit `4`, with the hint `run /init-claude in that repo`. |
+| Configured | That file exists | Normal. | Normal; the local file is created on first write. |
+
+Writing into an unconfigured repo is refused because creating the file by hand would half-initialize the repo outside `/init-claude`: with no version pointer it reads as `0.0.0`, so every migration would look pending. `--force` never bypasses a target refusal.
+
+## `config info`
+
+`arcanum config info` (`cli/lib/commands/config/info.js`) describes the CLI's environment: where it would read and write, and whether writing there is safe. It never shows config values, never creates files, never takes locks, and always exits `0` except on usage errors: no repo, an unresolved account and missing or malformed files are reported, not errors. It deliberately leaves out the Arcanum install's location and version (see [Version skew](#version-skew)).
+
+```text
+arcanum-cli 2.4.0 (node 22.14.0, requires >=22.13.0)
+
+Account
+  claude config dir  /Users/x/.claude-favini   (from: env CLAUDE_CONFIG_DIR)
+  global config      /Users/x/.claude-favini/arcanum-config.json   [exists]
+  global version     2.3.0   behind — 1 pending migration, run /arcanum-migrate
+
+Repo
+  root               /Users/x/projects/foo   (from: cwd)
+  repo config        .claude/configuration/arcanum-repo-config.json   [exists]
+  repo version       2.4.0   up to date
+  local config       .claude/state/arcanum-config.json   [missing]
+  local version      0.0.0 (no pointer)   behind — 3 pending migrations, run /arcanum-migrate
+```
+
+- The account source reads `(from: --claude-config-dir)`, `(from: env CLAUDE_CONFIG_DIR)` or `(from: default $HOME/.claude)`; an unresolved account prints a single `(unresolved: CLAUDE_CONFIG_DIR and HOME are unset)` row. The repo source reads `(from: --repo)` or `(from: cwd)`; with no repo, a single `root  (no repo at <path>)` row.
+- Each file is `[exists]`, `[missing]` or `[malformed]`. A version line is `up to date`, `behind — N pending migration(s), run /arcanum-migrate`, `ahead — writes refused without --force`, or `unknown (malformed file)`. A missing pointer shows as `0.0.0 (no pointer)`.
+
+With `--json`, one object:
+
+```json
+{
+  "cli": { "version": "2.4.0", "node": "22.14.0", "node_floor": ">=22.13.0" },
+  "account": {
+    "claude_config_dir": "/Users/x/.claude-favini", "source": "env",
+    "file": "/Users/x/.claude-favini/arcanum-config.json", "exists": true,
+    "version": "2.3.0", "skew": { "status": "behind", "pending": 1 }
+  },
+  "repo": {
+    "root": "/Users/x/projects/foo", "source": "cwd",
+    "repo_config": { "file": "/Users/x/projects/foo/.claude/configuration/arcanum-repo-config.json", "exists": true, "version": "2.4.0", "skew": { "status": "up_to_date", "pending": 0 } },
+    "local_config": { "file": "/Users/x/projects/foo/.claude/state/arcanum-config.json", "exists": false, "version": "0.0.0", "skew": { "status": "behind", "pending": 3 } }
+  }
+}
+```
+
+- `account.source` is `flag`, `env`, `default` or `unresolved`. An unresolved account is `{ "claude_config_dir": null, "source": "unresolved", "file": null, "exists": false, "version": null, "skew": null }`.
+- `repo` is `null` when there is no repo; `repo.source` is `flag` or `cwd`.
+- `skew.status` is `up_to_date`, `behind` or `ahead`; `pending` counts that scope's pending migrations (`0` unless `behind`).
+- A malformed file block is `{ "file": …, "exists": true, "malformed": true, "version": null, "skew": null }`. File paths are absolute in JSON, repo-relative in the human output.
+
+## Version skew
+
+One CLI may face repos and accounts on different Arcanum versions. `cli/lib/skew.js` compares each tier's version pointer with the CLI's own version, which, since the CLI ships in lockstep with Arcanum, is the newest config shape it can know.
+
+| Tier | Pointer |
+| --- | --- |
+| Global | `.migrations.version` in `arcanum-config.json` |
+| Repo | `.version` in `.claude/configuration/arcanum-repo-config.json` (see [the repo version guide](../../guides/arcanum-repo-version.md)) |
+| Local | `.migrations.version` in `.claude/state/arcanum-config.json` |
+
+A pointer holds an Arcanum version, not a migration number. A missing (or non-string) pointer counts as `0.0.0`, as in `arcanum/migrations/run.sh`. Versions compare numerically (`0.9.3` < `0.13.0`). Migrations are scoped per tier (`applies_to: repo|local|global`), so the three files can sit at different versions.
+
+To know which migrations are pending, the build embeds, per scope, the list of released Arcanum versions that shipped a migration for it, read from `arcanum/migrations/repos/<X.Y.Z>/migrations.json` (`next/` excluded, versions above the CLI's dropped; see [Install & Release → npm package](install-and-release.md#npm-package-arcanum-cli)).
+
+| Status | Condition | Reads | Writes |
+| --- | --- | --- | --- |
+| `ahead` | pointer > CLI version | Allowed, with a warning ending `keys may have moved, run npm i -g arcanum-cli@latest`. | Refused with exit `5` and the hint `npm i -g arcanum-cli@latest, or pass --force`. `--force` bypasses it, reported as `"forced": true`. |
+| `behind` | pointer < CLI version, and the tier's scope has migrations after the pointer, up to the CLI version | Allowed, with a warning `<tier> config is at <v> with N pending migration(s); run /arcanum-migrate`. | Allowed. |
+| `up_to_date` | equal, or behind with nothing pending (a patch bump with no shape change) | Silent. | Silent. |
+
+- A write checks only the target tier's pointer: `set --global` ignores the repo pointer.
+- A malformed file has no skew status; it is handled as a file error instead (see [Missing and malformed tier files](#missing-and-malformed-tier-files)).
+- Skew is measured against the tier pointers, never against the Arcanum install's own version, which the CLI cannot reliably locate.
+
+## Exit codes
+
+`cli/lib/exitCodes.js` is the single mapping point. The `code` field of a JSON error is the identifier in the second column.
+
+| Exit | JSON `code` | Error class | When |
+| --- | --- | --- | --- |
+| `0` | — | — | Success, including `unset` of an absent key and `info` in any environment. |
+| `1` | `error` | `CliError` | Generic error: an unexpected failure, a shared `ConfigError` with no dedicated mapping (`UNREGISTERED_KEY` included), or a Node.js below the floor (printed by `cli/bin/arcanum`, before any JSON mode exists). |
+| `2` | `usage` | `UsageError` | Unknown command, subcommand or flag; bad arity; conflicting or missing tier flags; bad key syntax; bad `--lock-timeout`; a bad `--repo` or `--claude-config-dir` path. `parseArgs` errors (`ERR_PARSE_ARGS_*`) map here too. |
+| `3` | `validation` | `ValidationError` | Key registry refusal: unknown key, wrong type, enum, format, tier not allowed, read-only key. |
+| `4` | `target_unavailable` | `TargetUnavailableError` | Nowhere to read or write the requested tier: no repo, an unconfigured repo, or an unresolved, missing or non-directory Claude config dir. One code for every tier. Never bypassed by `--force`. |
+| `5` | `version_skew` | `VersionSkewError` | A write to a tier whose pointer is ahead of the CLI, without `--force`. |
+| `6` | `lock_timeout` | `LockTimeoutRefusal` | The write lock was not acquired within `--lock-timeout`. A shared `LOCK_TIMEOUT` maps here too. |
+| `7` | `file` | `FileError` | A malformed tier file the CLI refuses to write over, or an I/O error. The shared `NOT_AN_OBJECT` and `INVALID_JSON` codes and any Node errno error (`EACCES`, `ENOSPC`, `EISDIR`, …) map here too. |
+| `130` | — | — | Interrupted by Ctrl-C (`SIGINT`) during a write or the setup wizard. |
+
+Each `CliError` carries an optional `hint`, printed as a `hint:` line (see [Output](#output)).
 
 ## Module layout
 
