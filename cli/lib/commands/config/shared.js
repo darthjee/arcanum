@@ -2,22 +2,9 @@
 // the targets a read needs and reading its tier files.
 
 import path from 'node:path';
-import { EXIT_ERROR, TargetUnavailableError } from '../../exitCodes.js';
+import { TargetUnavailableError } from '../../exitCodes.js';
 import { readWarning, tierSkew } from '../../skew.js';
 import { TIERS, readTierTolerant, tierFile } from '../../tierFiles.js';
-
-/**
- * Placeholder for a subcommand whose behaviour is not implemented yet.
- * @param {string} name - the subcommand name.
- * @param {object} context - the parsed invocation.
- * @param {{stderr: {write: (text: string) => void}}} context.io - output streams.
- * @returns {number} `EXIT_ERROR`.
- */
-export function notImplemented(name, { io }) {
-  io.stderr.write(`arcanum: config ${name} is not implemented yet\n`);
-
-  return EXIT_ERROR;
-}
 
 /**
  * @param {{path: string}} repo - the resolved repo target.
