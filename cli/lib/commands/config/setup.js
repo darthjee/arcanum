@@ -11,6 +11,8 @@ import { EXIT_OK, TargetUnavailableError, UsageError } from '../../exitCodes.js'
 import { EXIT_SIGINT } from '../../writeTier.js';
 import { Interrupted, createPrompter } from '../../prompter.js';
 import { REPO_CONFIG_FILE } from '../../tierFiles.js';
+import { askPatterns } from './setup/ci.js';
+import { askAgents } from './setup/identity.js';
 import { askSetting } from './setup/setting.js';
 import { AGENTS_PATTERN } from './shortcuts/agentsEmail.js';
 import { memoizeTargets } from './shortcuts/common.js';
@@ -232,6 +234,9 @@ export function onceOnly(warn) {
   };
 }
 
+/** Item kind → its dialogue. */
+const ASKERS = { value: askSetting, agents: askAgents, array: askPatterns };
+
 /**
  * Asks each item in turn.
  * @param {object} session - the wizard's state.
@@ -242,9 +247,7 @@ export function onceOnly(warn) {
 export async function runItems(session, items) {
   try {
     for (const item of items) {
-      if (item.kind === 'value') {
-        await askSetting(session, item);
-      }
+      await ASKERS[item.kind](session, item);
     }
   } catch (error) {
     if (!(error instanceof Interrupted)) {

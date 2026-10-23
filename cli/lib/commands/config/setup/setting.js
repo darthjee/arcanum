@@ -22,8 +22,8 @@ export const UNSET_ANSWER = '-';
 /** The wizard's boolean answers: the shortcuts' tokens plus `y`/`n`. */
 export const WIZARD_BOOLEANS = { y: true, n: false, ...BOOLEAN_TOKENS };
 
-/** The answers to a `[Y/n]` question (Enter is yes). */
-const CONFIRM_ANSWERS = { '': true, y: true, yes: true, n: false, no: false };
+/** The answers to a yes/no question (Enter gives the question's default). */
+const CONFIRM_ANSWERS = { y: true, yes: true, n: false, no: false };
 
 /**
  * @param {string} key - the key the answer is for.
@@ -183,14 +183,19 @@ export async function askTier(session, { entry, defaultTier }) {
 }
 
 /**
- * Asks a `[Y/n]` question until answered.
+ * Asks a yes/no question until answered.
  * @param {object} session - the wizard's state.
- * @param {string} question - the question, ending with `[Y/n] `.
- * @returns {Promise<boolean>} whether the user confirmed.
+ * @param {string} question - the question, ending with `[Y/n] ` or `[y/N] `.
+ * @param {boolean} [fallback] - the answer Enter gives (default yes).
+ * @returns {Promise<boolean>} whether the user said yes.
  */
-export async function confirm(session, question) {
+export async function confirm(session, question, fallback = true) {
   for (;;) {
     const answer = (await session.prompter.ask(question)).trim().toLowerCase();
+
+    if (answer === '') {
+      return fallback;
+    }
 
     if (Object.hasOwn(CONFIRM_ANSWERS, answer)) {
       return CONFIRM_ANSWERS[answer];
@@ -299,13 +304,20 @@ export async function write(session, { key, tier, op, raw, parsed }) {
  * Runs the whole dialogue for one scalar setting.
  * @param {object} session - the wizard's state.
  * @param {object} item - the setting (`key`, `entry`, `defaultTier`).
+ * @param {string[]} [extra] - further lines shown after `current:`.
  * @returns {Promise<void>} resolves once kept, written or failed.
  */
-export async function askSetting(session, item) {
+export async function askSetting(session, item, extra = []) {
   const { key, entry } = item;
   const current = await currentValue(session, key, entry);
 
-  session.io.stderr.write(`\n${key} — ${entry.description}\n  current: ${currentText(current)}\n`);
+  session.io.stderr.write([
+    '',
+    `${key} — ${entry.description}`,
+    `  current: ${currentText(current)}`,
+    ...extra.map((line) => `  ${line}`),
+    ''
+  ].join('\n'));
 
   const answer = await askValue(session, item);
   const kept = { tier: current.source, value: current.set ? current.value : null };

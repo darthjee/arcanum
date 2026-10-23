@@ -5,7 +5,7 @@ import Lock from '../../../../../shared/lib/file/Lock.js';
 import { needsRepo, selectSections, setupItems } from '../../../../lib/commands/config/setup.js';
 import { defaultTier } from '../../../../lib/commands/config/shortcuts/defaultTier.js';
 import { UsageError } from '../../../../lib/exitCodes.js';
-import { makeRepo } from '../../../support/fixtures.js';
+import { makeRepo, writeTier } from '../../../support/fixtures.js';
 import { scriptedPrompter } from '../../../support/prompter.js';
 import { shortcutHarness } from '../../../support/shortcuts.js';
 
@@ -350,6 +350,109 @@ describe('config setup', () => {
 
       expect(code).toBe(6);
       expect(err).toContain(`arcanum: timed out after 0s waiting for ${harness.localFile}.lock\n`);
+    });
+  });
+
+  describe('the identity section', () => {
+    beforeEach(async () => {
+      await harness.seed({ global: { git: { email: 'bot+{agent}@example.com' } } });
+    });
+
+    /**
+     * @param {string[]} agents - the agent names to create.
+     * @returns {Promise<void>} resolves once written.
+     */
+    async function addAgents(agents) {
+      for (const agent of agents) {
+        await writeTier(path.join(harness.root, '.claude', 'agents', `${agent}.md`), `# ${agent}\n`);
+      }
+    }
+
+    it('asks git.email, then skips the per-agent emails by default', async () => {
+      await addAgents(['node']);
+      const { code, prompter } = await wizard(['identity'], ['', '']);
+
+      expect(code).toBe(0);
+      expect(prompter.questions).toEqual(['  new value [Enter keeps, - unsets]: ', 'customise per-agent emails? [y/N] ']);
+    });
+
+    it('on yes, asks once per repo agent, sorted, showing what each resolves to', async () => {
+      await addAgents(['node', 'client']);
+      await writeTier(path.join(harness.root, '.claude', 'agents', 'notes.txt'), 'ignored');
+      const { code, err, prompter } = await wizard(['identity'], ['', 'y', 'client@x.io', '', '', '']);
+
+      expect(code).toBe(0);
+      expect(err).toContain('git.agents.client — Commit email for one specific agent\n  current: (unset)\n' +
+        '  currently resolves to: bot+client@example.com (git.email, global)\n');
+      expect(err).toContain('git.agents.node — ');
+      expect(prompter.questions[4]).toBe(`  set git.agents.client = "client@x.io" at global (${harness.globalFile})? [Y/n] `);
+      expect(prompter.questions.length).toBe(6);
+      expect(JSON.parse(await readFile(harness.globalFile, 'utf8'))).toEqual({
+        git: { email: 'bot+{agent}@example.com', agents: { client: 'client@x.io' } }
+      });
+    });
+
+    it('shows the model default when nothing resolves', async () => {
+      await harness.seed();
+      await addAgents(['node']);
+      const { err } = await wizard(['identity'], ['', 'y', '']);
+
+      expect(err).toContain('  currently resolves to: the model default\n');
+    });
+
+    it('skips the per-agent emails with a note when the repo has no agents', async () => {
+      const { code, err, prompter } = await wizard(['identity'], ['']);
+
+      expect(code).toBe(0);
+      expect(err).toContain(`arcanum: note: no agents in ${harness.root}/.claude/agents; skipping the per-agent emails\n`);
+      expect(prompter.questions.length).toBe(1);
+    });
+  });
+
+  describe('the ci section', () => {
+    const KEY = 'auto-fix-all.ignored_check_patterns';
+    const stored = async () => JSON.parse(await readFile(harness.repoFile, 'utf8'))['auto-fix-all'];
+
+    it('adds and removes patterns, one confirmed write each', async () => {
+      await harness.seed({ repo: { 'auto-fix-all': { ignored_check_patterns: ['^sonar'] } } });
+      const { code, err, prompter } = await wizard(['ci'], [
+        'a', '[bad', '^codacy', '',
+        'a', '^sonar',
+        'r', '^nope',
+        'r', '^sonar', '',
+        'x', 'd'
+      ]);
+
+      expect(code).toBe(0);
+      expect(err).toContain(`${KEY} — Case-insensitive regexes of CI checks to ignore\n  current: ^sonar\n`);
+      expect(err).toMatch(/arcanum: auto-fix-all\.ignored_check_patterns\[0\] is not a valid regex: /);
+      expect(err).toContain('  \'^sonar\' already present\n');
+      expect(err).toContain('  \'^nope\' not present\n');
+      expect(err).toContain('arcanum: answer a, r or d\n');
+      expect(err).toContain('  now: ^sonar, ^codacy\n');
+      expect(err).toContain('  now: ^codacy\n');
+      expect(prompter.questions).toContain(`  add '^codacy' to ${KEY} at repo (${harness.repoFile})? [Y/n] `);
+      expect(prompter.questions).toContain(`  remove '^sonar' from ${KEY} at repo (${harness.repoFile})? [Y/n] `);
+      expect(await stored()).toEqual({ ignored_check_patterns: ['^codacy'] });
+    });
+
+    it('writes nothing when a change is declined, or when done straight away', async () => {
+      await harness.seed();
+      const { code, err } = await wizard(['ci'], ['a', '^codacy', 'n', '']);
+
+      expect(code).toBe(0);
+      expect(err).toContain('  current: (none)\n');
+      expect(await stored()).toBeUndefined();
+    });
+
+    it('marks a stored non-array value failed and moves on', async () => {
+      await harness.seed({ repo: { 'auto-fix-all': { ignored_check_patterns: 'oops' } } });
+      const { code, err, prompter } = await wizard(['ci'], []);
+
+      expect(code).toBe(3);
+      expect(err).toContain(`arcanum: ${KEY} is not an array (got "oops")\n`);
+      expect(err).toContain(`hint: fix it with: arcanum config set ${KEY} '[...]' --repo\n`);
+      expect(prompter.questions).toEqual([]);
     });
   });
 });
