@@ -53,7 +53,7 @@ describe('commands/config', () => {
 
   it('merges every subcommand\'s flags with the tier flags', () => {
     expect(Object.keys(options).sort()).toEqual(
-      ['all-tiers', 'force', 'global', 'local', 'lock-timeout', 'repo', 'string']
+      ['all-tiers', 'force', 'global', 'local', 'lock-timeout', 'repo', 'string', 'unset']
     );
     expect(SUBCOMMAND_OPTIONS.force.only).toEqual(['set', 'unset']);
   });

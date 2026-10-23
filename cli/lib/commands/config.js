@@ -7,6 +7,7 @@ import info from './config/info.js';
 import list from './config/list.js';
 import set from './config/set.js';
 import unset from './config/unset.js';
+import { isShortcut, runShortcut } from './config/shortcuts/index.js';
 
 /** The `arcanum config` subcommands: name → module. */
 export const SUBCOMMANDS = { get, set, unset, list, info };
@@ -26,19 +27,27 @@ export const SUBCOMMAND_OPTIONS = Object.values(SUBCOMMANDS).reduce((all, subcom
 }, {});
 
 /**
+ * The options only the shortcuts accept (not the generic subcommands),
+ * with the same `only` shape as `SUBCOMMAND_OPTIONS`.
+ */
+export const SHORTCUT_OPTIONS = { unset: { type: 'boolean', only: ['the shortcuts'] } };
+
+/**
  * The namespace's `parseArgs` options: the tier flags plus the union of
- * every subcommand's own flags. Which subcommand accepts which flag is
- * enforced after parsing, so the error can name the flag.
+ * every subcommand's and shortcut's own flags. Which subcommand accepts
+ * which flag is enforced after parsing, so the error can name the flag.
  */
 export const options = {
   ...TIER_OPTIONS,
-  ...Object.fromEntries(Object.entries(SUBCOMMAND_OPTIONS).map(([name, { type }]) => [name, { type }]))
+  ...Object.fromEntries(Object.entries({ ...SUBCOMMAND_OPTIONS, ...SHORTCUT_OPTIONS })
+    .map(([name, { type }]) => [name, { type }]))
 };
 
 /**
- * The `arcanum config` namespace: prints its help, or runs the
- * subcommand after the checks every subcommand shares (flags it
- * accepts, tier-flag exclusivity, arity and key syntax).
+ * The `arcanum config` namespace: prints its help, runs a shortcut
+ * (see `./config/shortcuts/`), or runs the subcommand after the checks
+ * every subcommand shares (flags it accepts, tier-flag exclusivity,
+ * arity and key syntax).
  * @param {object} context - the parsed invocation.
  * @param {string[]} context.positionals - the arguments after `config`.
  * @param {object} context.values - the parsed flags.
@@ -64,13 +73,17 @@ export async function run(context) {
     return EXIT_USAGE;
   }
 
+  if (isShortcut(name)) {
+    return runShortcut({ ...context, registry });
+  }
+
   if (!Object.hasOwn(SUBCOMMANDS, name)) {
     throw new UsageError(`unknown config subcommand '${name}'`);
   }
 
   const subcommand = SUBCOMMANDS[name];
 
-  checkFlags(name, values, subcommand.options, SUBCOMMAND_OPTIONS);
+  checkFlags(name, values, subcommand.options, { ...SUBCOMMAND_OPTIONS, ...SHORTCUT_OPTIONS });
 
   const tier = selectedTier(values);
 

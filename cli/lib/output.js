@@ -59,10 +59,10 @@ export function reportError(io, error, { json = false, env = {} } = {}) {
  * @param {{stdout: {write: (text: string) => void}, stderr: {write: (text: string) => void}}} io - output streams.
  * @param {object} [options] - output options.
  * @param {boolean} [options.json] - `--json` mode.
- * @returns {{json: boolean, result: (human: string, data: object) => void, warn: (message: string) => void}}
+ * @returns {{json: boolean, result: (human: string, data: object) => void, warn: (message: string) => void, note: (message: string) => void}}
  *   `result` prints the human text, or the data as exactly one JSON
  *   object line under `--json`; `warn` prints a plain-text stderr
- *   warning in both modes.
+ *   warning in both modes; `note` prints a plain-text stderr note.
  */
 export function createOutput(io, { json = false } = {}) {
   return {
@@ -76,6 +76,9 @@ export function createOutput(io, { json = false } = {}) {
     },
     warn(message) {
       io.stderr.write(`arcanum: warning: ${message}\n`);
+    },
+    note(message) {
+      io.stderr.write(`arcanum: note: ${message}\n`);
     }
   };
 }
