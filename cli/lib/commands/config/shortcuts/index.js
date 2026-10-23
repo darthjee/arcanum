@@ -4,6 +4,7 @@
 // name → runner (`git safe-branch`, `auto-fix-all clear-context`, …).
 
 import { UsageError } from '../../../exitCodes.js';
+import { runNextStepAuto } from './nextStep.js';
 import { singleValue } from './singleValue.js';
 
 /** Namespace → its runner, or its shortcuts (name → runner). */
@@ -19,6 +20,9 @@ export const SHORTCUTS = {
   },
   'monitor-issues': {
     'clear-context': singleValue('monitor-issues clear-context')
+  },
+  'next-step': {
+    auto: runNextStepAuto
   }
 };
 
