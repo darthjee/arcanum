@@ -70,6 +70,41 @@ describe('main', () => {
       expect(io.err()).toBe('arcanum: timed out\n');
     });
 
+    it('finds the command after a --repo <path> and a --claude-config-dir value', async () => {
+      const spy = spyOn(COMMANDS.config, 'run').and.resolveTo(0);
+
+      expect(await run(['--repo', './x', '--claude-config-dir', '/d', 'config', 'get', 'k', '--repo'], { io })).toBe(0);
+
+      const context = spy.calls.mostRecent().args[0];
+
+      expect(context.positionals).toEqual(['get', 'k']);
+      expect(context.values.repo).toBeTrue();
+      expect(context.targeting).toEqual({ repo: './x', claudeConfigDir: '/d' });
+      expect(context.resolveTargets).toEqual(jasmine.any(Function));
+    });
+
+    it('treats --repo <key> as the tier flag', async () => {
+      const spy = spyOn(COMMANDS.config, 'run').and.resolveTo(0);
+
+      expect(await run(['config', 'get', '--repo', 'engine.mode'], { io })).toBe(0);
+      expect(spy.calls.mostRecent().args[0].positionals).toEqual(['get', 'engine.mode']);
+      expect(spy.calls.mostRecent().args[0].targeting.repo).toBeUndefined();
+    });
+
+    it('passes the tokens after -- as positionals', async () => {
+      const spy = spyOn(COMMANDS.config, 'run').and.resolveTo(0);
+
+      expect(await run(['config', 'set', 'k', '--global', '--', '-1'], { io })).toBe(0);
+      expect(spy.calls.mostRecent().args[0].positionals).toEqual(['set', 'k', '-1']);
+    });
+
+    it('prints the JSON error object under --json', async () => {
+      expect(await run(['nope', '--json'], { io })).toBe(2);
+      expect(JSON.parse(io.err())).toEqual({
+        error: { code: 'usage', exit: 2, message: 'arcanum: unknown command \'nope\'', hint: null }
+      });
+    });
+
     it('reports a non-Error throw', async () => {
       spyOn(COMMANDS.config, 'run').and.callFake(() => {
         throw 'boom';

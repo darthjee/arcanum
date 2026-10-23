@@ -1,4 +1,4 @@
-import { configUsage, formatRows, topLevelUsage } from '../../lib/help.js';
+import { SUBCOMMAND_HELP, configUsage, formatRows, subcommandUsage, topLevelUsage } from '../../lib/help.js';
 
 describe('help', () => {
   describe('formatRows', () => {
@@ -39,6 +39,27 @@ describe('help', () => {
       expect(usage).toContain('info');
       expect(usage).toContain('  engine.mode  Script engine\n');
       expect(usage).toContain('  git.email    Commit email\n');
+      expect(usage).toContain('--claude-config-dir <dir>');
+      expect(usage).not.toContain('not implemented');
+    });
+  });
+
+  describe('subcommandUsage', () => {
+    Object.keys(SUBCOMMAND_HELP).forEach((name) => {
+      it(`prints the ${name} synopsis and the targeting flags`, () => {
+        const usage = subcommandUsage(name);
+
+        expect(usage).toMatch(new RegExp(`^Usage: arcanum config ${name}`));
+        expect(usage).toContain('--json');
+        expect(usage.endsWith('\n')).toBeTrue();
+      });
+    });
+
+    it('lists each subcommand\'s own flags', () => {
+      expect(subcommandUsage('get')).toContain('--all-tiers');
+      expect(subcommandUsage('set')).toContain('--string');
+      expect(subcommandUsage('unset')).toContain('--lock-timeout <seconds>');
+      expect(subcommandUsage('unset')).not.toContain('--string');
     });
   });
 });
