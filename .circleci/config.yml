@@ -23,6 +23,18 @@
 # `latest`), and published tags are immutable: the job fails if
 # darthjee/arcanum:<tag> already exists, including on workflow re-runs.
 #
+# The `publish-cli` job (also release-only, run after build-and-release, in
+# parallel with publish-image) publishes the arcanum-cli@<tag> npm package
+# via scripts/publish_cli_package.sh, with npm trusted publishing: npm
+# trades the job's CircleCI OIDC token for a short-lived publish credential
+# and attaches provenance. No npm token env var is needed, and none is
+# allowed (the script refuses NPM_TOKEN/NODE_AUTH_TOKEN). The image's
+# bundled npm is too old for trusted publishing, so the job installs an
+# exact npm 11.x pin first. Re-runs after a successful publish are no-ops
+# (npm versions are immutable). The trusted publisher must be registered
+# once by hand on npmjs.com; see docs/agents/architecture/
+# install-and-release.md.
+#
 # The `mod-checks` job (test workflow) runs `claude plugin validate` and
 # `claude plugin test` for the arcanum-next-step mod. Both work headless
 # with no credential. `tsc -p` is left out: it extends the engine-generated
@@ -31,7 +43,7 @@
 #
 # The `cli` and `cli-node-floor` jobs (test workflow) gate the cli/
 # package. Both check out the full repo and run from cli/, since its
-# esbuild build bundles ../core/lib and ../arcanum/migrations/repos (any
+# esbuild build bundles ../shared/lib and ../arcanum/migrations/repos (any
 # change there can break the CLI, so neither job has path filters).
 # `yarn test` does not build, so `yarn build` always runs first. `cli`
 # runs on the same image as `test`/`checks` (lint, build, test, then a
@@ -99,6 +111,29 @@ jobs:
       - run:
           name: Build and push the multi-arch runtime image
           command: scripts/publish_runtime_image.sh "$CIRCLE_TAG"
+
+  publish-cli:
+    docker:
+      - image: darthjee/circleci_node:0.2.1
+    working_directory: ~/project/cli
+    environment:
+      NPM_PIN: 11.21.1
+      NPM_MIN: 11.5.1
+    steps:
+      - checkout:
+          path: ~/project
+      - run:
+          name: Ensure npm supports trusted publishing
+          command: |
+            node --version
+            npm --version
+            if [ "$(printf '%s\n' "$NPM_MIN" "$(npm --version)" | sort -V | head -n 1)" != "$NPM_MIN" ]; then
+              npm install -g "npm@${NPM_PIN}"
+              npm --version
+            fi
+      - run:
+          name: Publish arcanum-cli to npm
+          command: ../scripts/publish_cli_package.sh "$CIRCLE_TAG"
 
   test:
     docker:
@@ -258,6 +293,13 @@ workflows:
             tags:
               only: /^\d+\.\d+\.\d+$/
       - publish-image:
+          requires: [build-and-release]
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^\d+\.\d+\.\d+$/
+      - publish-cli:
           requires: [build-and-release]
           filters:
             branches:
