@@ -54,7 +54,7 @@ There are no other lifecycle scripts. `preinstall`, `install` and `postinstall` 
 
 ### Build output
 
-`yarn build` (`cli/scripts/build.mjs`) writes one file, `cli/dist/arcanum.mjs`. It holds the CLI (`cli/lib/**`), the parts of `shared/lib/` it imports, `keys.json` (inlined by its JSON import), and three constants injected through `define`: `__ARCANUM_CLI_VERSION__` (`version`), `__ARCANUM_NODE_FLOOR__` (`engines.node`) and `__ARCANUM_MIGRATION_VERSIONS__` (below). The bundle is unminified, so a user can read what they installed and stack traces point at real source lines. Its `esbuild` target is derived from `engines.node` (`node22.13`), and the build fails if any bundled input lies outside `cli/lib/**` and `shared/lib/**` (see [Shared Lib → The CLI bundle](shared-lib.md#the-cli-bundle)). The CLI's runtime path, from the `bin/arcanum` gate to the bundle, is in [Arcanum CLI](arcanum-cli.md).
+`yarn build` (`cli/scripts/build.mjs`) writes one file, `cli/dist/arcanum.mjs`. It holds the CLI (`cli/lib/**`), the parts of `shared/lib/` it imports, `keys.json` (inlined by its JSON import), and three constants injected through `define`: `__ARCANUM_CLI_VERSION__` (`version`), `__ARCANUM_NODE_FLOOR__` (`engines.node`) and `__ARCANUM_MIGRATION_VERSIONS__` (below). The bundle is unminified, so a user can read what they installed and stack traces point at real source lines. Its `esbuild` target is derived from `engines.node` (`node22.13`), and the build fails if any bundled input lies outside `cli/lib/**` and `shared/lib/**` (see [Shared Lib → The CLI bundle](shared-lib.md#the-cli-bundle)). The CLI's runtime path, from the `bin/arcanum` gate to the bundle, is in [Arcanum CLI → Runtime path](arcanum-cli.md#runtime-path).
 
 **The embedded migration-version list.** The CLI's version-skew check needs to know, per scope, which arcanum versions shipped migrations. `build.mjs` computes it at build time:
 
@@ -68,7 +68,7 @@ There are no other lifecycle scripts. `preinstall`, `install` and `postinstall` 
 - **Order:** each list is sorted by semver, not as strings (`0.9.3` < `0.13.0`).
 - **Validation.** The build fails on a `migrations.json` that is not a JSON array, or on an entry whose `applies_to` is missing or not `repo`, `local` or `global`. It never guesses a scope.
 
-The list is data inside the bundle: the CLI never reads `arcanum/migrations/` at runtime, since it is not in the package. How the CLI counts pending migrations from it is in [Arcanum CLI](arcanum-cli.md).
+The list is data inside the bundle: the CLI never reads `arcanum/migrations/` at runtime, since it is not in the package. How the CLI counts pending migrations from it is in [Arcanum CLI → Version skew](arcanum-cli.md#version-skew).
 
 ### Install
 

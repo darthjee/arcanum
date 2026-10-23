@@ -145,7 +145,7 @@ These are the services on the surface besides the writer (see [Writer API](#writ
 - **The strict-keys guard** throws a plain `Error` naming the key, not a `ConfigError`. `ConfigError`'s doc comment still lists an `UNREGISTERED_KEY` code, but nothing throws it.
 - **Validation is not an error.** `KeyRegistry#check` returns a structured result instead of throwing.
 - **The dispatcher needs no mapping.** Since `ConfigError extends Error` with the same messages, `core/bin/arcanum`'s bare-`Error` path (`arcanum: <message>` on stderr, exit `1`) is unchanged, byte for byte.
-- **The CLI maps the codes** in one function, `exitCodeForError` in `cli/lib/exitCodes.js`: `LOCK_TIMEOUT` → `6`, `NOT_AN_OBJECT`, `INVALID_JSON` and any Node errno error → `7`, anything else → `1` (see [Arcanum CLI](arcanum-cli.md)). A non-object intermediate in a hand-edited file (e.g. `.git` is a string, then `set git.authors …`) therefore exits `7`: the problem is the file's content, not the key.
+- **The CLI maps the codes** in one function, `exitCodeForError` in `cli/lib/exitCodes.js`: `LOCK_TIMEOUT` → `6`, `NOT_AN_OBJECT`, `INVALID_JSON` and any Node errno error → `7`, anything else → `1` (see [Arcanum CLI → Exit codes](arcanum-cli.md#exit-codes)). A non-object intermediate in a hand-edited file (e.g. `.git` is a string, then `set git.authors …`) therefore exits `7`: the problem is the file's content, not the key.
 
 ### Lock and the CLI's bounded wait
 
@@ -158,7 +158,7 @@ These are the services on the surface besides the writer (see [Writer API](#writ
 
 ### `RepoPath#toplevel`
 
-`shared/lib/file/RepoPath.js` validates repo paths (`validate`) and resolves a repo's root: `toplevel(repoPath)` runs `git -C <path> rev-parse --show-toplevel` through `execFile` with an argument array and strips git's trailing newline. It throws `Error: not a git repository: <path>` when git cannot resolve a toplevel (not a repo, a missing path, a bare repo). The CLI uses it to normalize `--repo` and the current directory to the repo root (see [Arcanum CLI](arcanum-cli.md)), and reuses `validate`'s messages for its `--repo` usage errors.
+`shared/lib/file/RepoPath.js` validates repo paths (`validate`) and resolves a repo's root: `toplevel(repoPath)` runs `git -C <path> rev-parse --show-toplevel` through `execFile` with an argument array and strips git's trailing newline. It throws `Error: not a git repository: <path>` when git cannot resolve a toplevel (not a repo, a missing path, a bare repo). The CLI uses it to normalize `--repo` and the current directory to the repo root (see [Arcanum CLI → Repo](arcanum-cli.md#repo)), and reuses `validate`'s messages for its `--repo` usage errors.
 
 ### `ConfigChain#readWithSource` and `AgentEmail`
 
@@ -175,11 +175,11 @@ These are the services on the surface besides the writer (see [Writer API](#writ
 
 - **Precondition:** no file under `shared/lib/` relies on `import.meta.url` or `__dirname` to find other files, so bundling breaks no module-relative path.
 - **Metafile check.** The build reads esbuild's metafile and fails if any bundled input lies outside `cli/lib/**` and `shared/lib/**` (`ALLOWED_INPUT_DIRS`, `checkInputs`). This is the resolved-path half of the [Import boundary](#import-boundary); the lint rules cover specifiers.
-- The rest of the build (options, injected constants, the migration-version list) is in [Arcanum CLI](arcanum-cli.md) and [Install & Release → npm package](install-and-release.md#npm-package-arcanum-cli).
+- The rest of the build (options, injected constants, the migration-version list) is in [Arcanum CLI → Runtime path](arcanum-cli.md#runtime-path) and [Install & Release → npm package](install-and-release.md#npm-package-arcanum-cli).
 
 ### Malformed files stay the CLI's concern
 
-`RepoConfigWriter` keeps reading a malformed (unparseable) tier file as `{}`, as the shell writers do. The CLI checks the target file itself before calling the writer and refuses to write a malformed one (see [Arcanum CLI](arcanum-cli.md)). The refusal is CLI behaviour and stays out of `shared/`.
+`RepoConfigWriter` keeps reading a malformed (unparseable) tier file as `{}`, as the shell writers do. The CLI checks the target file itself before calling the writer and refuses to write a malformed one (see [Arcanum CLI → Missing and malformed tier files](arcanum-cli.md#missing-and-malformed-tier-files)). The refusal is CLI behaviour and stays out of `shared/`.
 
 ### CI coupling
 

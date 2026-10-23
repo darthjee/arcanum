@@ -35,7 +35,7 @@ The registry is a plain JSON table, checked by a small hand-written validator (`
 - **`default`** (optional): absent means no default. When present it must pass the entry's own value checks. It feeds the `default` field the CLI reports for a key.
 - **Number constraints** (optional, `number` only): `integer: true`, `min`, `max` (finite, with `min <= max`).
 - **`allow_empty`** (optional, `string` and `enum` only): see [Validation](#validation).
-- **`setup`** (optional): `{section, order, prompt, instances?}`, for the keys the [`config setup` wizard](arcanum-cli.md#setup-wizard) asks. The wizard asks exactly the entries that carry it, ordered by `section` in the canonical order `identity`, `engine`, `git`, `flow`, `ci` (`SETUP_SECTIONS`), then by the integer `order`; `prompt` is the question shown. `instances` is only allowed on a wildcard key and lists the concrete names the wizard asks about (e.g. `next_step.auto.<skill>` → `enhance-issue`, `discuss-issue`, `auto-plan-issue`). It is wizard-only: it never restricts which values are valid. `git.agents.<agent>` has no `instances`, because the wizard takes them from the target repo's `.claude/agents/*.md`. Adding a key to the wizard is a registry edit, not CLI code.
+- **`setup`** (optional): `{section, order, prompt, instances?}`, for the keys the [`config setup` wizard](arcanum-cli.md#setup-wizard) asks. The wizard asks exactly the entries that carry it, ordered by `section` in the canonical order `identity`, `engine`, `git`, `flow`, `ci` (`SETUP_SECTIONS`), then by the integer `order`. `prompt` is a required non-empty string, but the wizard currently shows the entry's `description` as the question, not `prompt`. `instances` is only allowed on a wildcard key and lists the concrete names the wizard asks about (e.g. `next_step.auto.<skill>` → `enhance-issue`, `discuss-issue`, `auto-plan-issue`). It is wizard-only: it never restricts which values are valid. `git.agents.<agent>` has no `instances`, because the wizard takes them from the target repo's `.claude/agents/*.md`. Adding a key to the wizard is a registry edit, not CLI code.
 - **Unknown fields are rejected**, at the top level, on an entry and inside `setup`, so a typo such as `"teirs"` fails the specs.
 
 Example:
@@ -77,7 +77,7 @@ Example:
 
 ### Validation
 
-`KeyRegistry#check(op, key, tier, value)` validates a `set` or `unset` and returns a structured result instead of throwing: `{ok: true}`, or `{ok: false, reason, ...details}` (e.g. `{reason: 'type', expected, got}`). The CLI maps it to its own messages and exit code `3` (see [Arcanum CLI](arcanum-cli.md)); arcanum's own code can reuse it with no CLI error type.
+`KeyRegistry#check(op, key, tier, value)` validates a `set` or `unset` and returns a structured result instead of throwing: `{ok: true}`, or `{ok: false, reason, ...details}` (e.g. `{reason: 'type', expected, got}`). The CLI maps it to its own messages and exit code `3` (see [Arcanum CLI → Error messages](arcanum-cli.md#error-messages)); arcanum's own code can reuse it with no CLI error type.
 
 1. **Fixed order, first failure wins:** `unknown` → `read_only` → `tier` → the value checks. `unset` stops after the tier check.
 2. **Value checks**, in order: `null` → `type` → `enum` → `empty` → `integer` / `min` / `max` → `format`. The same checks validate an entry's `default`.
@@ -87,7 +87,7 @@ Example:
 6. **`format: regex`.** Each element is compiled with `new RegExp(p, 'i')`, only to validate it. A failure carries the element `index` (for an array) and the compile error with V8's prefix stripped.
 7. **Reads never validate.** The CLI's reads show stored values even when they violate the registry, as skills read them.
 
-How `--force` interacts with these checks is part of the CLI's contract, in [Arcanum CLI](arcanum-cli.md): on an unknown key it stores the parsed value with no check, and on a known key it bypasses none of the checks above.
+How `--force` interacts with these checks is part of the CLI's contract, in [Arcanum CLI → `--force` scope](arcanum-cli.md#--force-scope): on an unknown key it stores the parsed value with no check, and on a known key it bypasses none of the checks above.
 
 ### Consumers
 
