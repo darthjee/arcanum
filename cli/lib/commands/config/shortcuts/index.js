@@ -5,6 +5,7 @@
 
 import { UsageError } from '../../../exitCodes.js';
 import { runAgentsEmail } from './agentsEmail.js';
+import { runIgnoreChecks } from './ignoreChecks.js';
 import { runNextStepAuto } from './nextStep.js';
 import { singleValue } from './singleValue.js';
 
@@ -17,7 +18,8 @@ export const SHORTCUTS = {
   },
   'auto-fix-all': {
     'clear-context': singleValue('auto-fix-all clear-context'),
-    'finish-on-empty-queue': singleValue('auto-fix-all finish-on-empty-queue')
+    'finish-on-empty-queue': singleValue('auto-fix-all finish-on-empty-queue'),
+    'ignore-checks': runIgnoreChecks
   },
   'monitor-issues': {
     'clear-context': singleValue('monitor-issues clear-context')
