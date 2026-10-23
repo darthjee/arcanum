@@ -26,6 +26,32 @@ Separate entrypoint, shared logic:
 2. The bundle's entry is `cli/lib/main.js`, which `cli/scripts/build.mjs` bundles with `esbuild` together with the `shared/lib/` files it imports. The build injects `__ARCANUM_CLI_VERSION__`, `__ARCANUM_NODE_FLOOR__` and `__ARCANUM_MIGRATION_VERSIONS__` through `define`. A source run, as in the specs, sees `0.0.0-dev`, a `>=22.13.0` fallback (kept equal to `engines.node` by a spec) and empty migration lists.
 3. `main.run(argv, { io, env, cwd, version, migrationVersions, deps })` never throws: every error goes through `output.reportError`, which uses `exitCodes.exitCodeForError` and returns the exit code. Everything a command touches (streams, env, cwd, versions, `execFileAsync`, `Lock`, signal hooks, Node version) can be injected, so specs never touch the real `~/.claude`, the real cwd or the real process. An error escaping the bundle (it shouldn't) is printed by `cli/bin/arcanum` as `arcanum: <message>` with exit `1`.
 
+## Module layout
+
+| Module | Role |
+| --- | --- |
+| `lib/main.js` | Global flags (`--help`, `--version`, `--json`, `--claude-config-dir`), the `--repo` pre-scan, command lookup, `parseArgs` (strict) and the command context. |
+| `lib/args.js` | The argument layer: `--repo` overload pre-scan, first-positional lookup that skips option values, tier-flag exclusivity, per-subcommand flag sets, strict arity, key syntax, `--lock-timeout`, required tier. |
+| `lib/target.js` | Targeting: the Claude config dir (flag → `CLAUDE_CONFIG_DIR` → `$HOME/.claude`, with its source and state) and the repo root (`RepoPath#validate`/`#toplevel`, "no repo", git missing from PATH, configured or not). |
+| `lib/values.js` | `set`'s value-parsing table. |
+| `lib/exitCodes.js` | Exit constants, the `CliError` family (`UsageError` `2`, `ValidationError` `3`, `TargetUnavailableError` `4`, `VersionSkewError` `5`, `LockTimeoutRefusal` `6`, `FileError` `7`, each with an optional `hint`) and `exitCodeForError`, the single mapping point (shared `ConfigError`/`LockTimeoutError` codes included). |
+| `lib/output.js` | Result writer (human text or exactly one JSON line), stderr warnings, error reporting (the `arcanum:` prefix, the `hint:` line, JSON error object, `ARCANUM_DEBUG=1` stacks). |
+| `lib/tierFiles.js` | Tier file paths and the never-throwing tier parse (`ok`, `missing`, `empty`, or a malformed state: `invalid_json`, `not_object`, `unreadable`, `not_utf8`; UTF-8 BOM stripped). `readTierTolerant` warns and reads as empty; `readTierForWrite` refuses with exit `7`. |
+| `lib/skew.js` | Version pointers (`.version` for repo, `.migrations.version` for local and global, `0.0.0` when missing), skew status against the CLI version and the embedded per-scope migration list, read warnings and the write refusal. |
+| `lib/writeTier.js` | The write path: target check, registry validation messages, `prepareWrite` (the ordered checks), `writeKey` (the `RepoConfigWriter` call with the quiet, bounded lock and SIGINT handling). |
+| `lib/commands/config.js` | The `config` namespace: help, then the checks every subcommand shares, then dispatch. |
+| `lib/commands/config/{get,set,unset,list,info}.js` | One module per subcommand, each exporting `options`, `positionals`, `acceptsTier` and `run`. |
+| `lib/commands/config/shortcuts/index.js` | The shortcut namespaces (`engine`, `git`, `auto-fix-all`, `monitor-issues`, `next-step`, `agents`): namespace → runner, or → shortcut name → runner. `config.js` dispatches to it before the generic subcommands. |
+| `lib/commands/config/shortcuts/common.js` | What every shortcut shares: the strict flag set (`--force`/`--string` refused, `--all-tiers` reads only, `--lock-timeout` writes only), `delegate` to the generic `get`/`set`/`unset`, `writeValue` and the shadowed-tier note. |
+| `lib/commands/config/shortcuts/{singleValue,nextStep,agentsEmail,ignoreChecks}.js` | The single-value table and runner, `next-step auto`, `agents email`, `auto-fix-all ignore-checks`. |
+| `lib/commands/config/shortcuts/defaultTier.js` | The default write tier of each key a shortcut covers (`defaultTier(key)`), shared by the shortcuts' tables and the setup wizard. |
+| `lib/booleanToken.js` | The shortcuts' `on`/`off`/`true`/`false` tokens, with the exit-`3` hint. |
+| `lib/commands/config/setup.js` | `config setup`: the `--json`/TTY/section usage checks, the item list built from the registry's `setup` fields, the no-repo skipping, the session and the per-item loop. |
+| `lib/commands/config/setup/{setting,identity,ci,summary}.js` | The wizard's scalar per-setting dialogue, the per-agent email overrides, the `ci` add/remove loop, and the stderr summary. |
+| `lib/prompter.js` | The wizard's line prompter over `node:readline` (questions to stderr, queued answers), rejecting with `Interrupted` on EOF or Ctrl-C; it owns `SIGINT` only while a question is open. |
+| `lib/commands/config/shared.js` | Read-side helpers: `readTiers` (targets, account/repo read rules, tolerant reads, skew warnings), file display, registry defaults. |
+| `lib/help.js` | Top-level, `config`, per-subcommand and per-shortcut usage. Key docs come from the registry. |
+
 ## Targeting
 
 Every invocation resolves two targets once, in `cli/lib/target.js`: the account (the Claude config directory, for the global tier) and the repo (for the repo and local tiers).
@@ -141,7 +167,7 @@ To know which migrations are pending, the build embeds, per scope, the list of r
 | Exit | JSON `code` | Error class | When |
 | --- | --- | --- | --- |
 | `0` | — | — | Success, including `unset` of an absent key and `info` in any environment. |
-| `1` | `error` | `CliError` | Generic error: an unexpected failure, a shared `ConfigError` with no dedicated mapping (`UNREGISTERED_KEY` included), or a Node.js below the floor (printed by `cli/bin/arcanum`, before any JSON mode exists). |
+| `1` | `error` | `CliError` | `get` of an unset key (a normal result, not an error object, like `git config`). Generic error: an unexpected failure, a shared `ConfigError` with no dedicated mapping (`UNREGISTERED_KEY` included), or a Node.js below the floor (printed by `cli/bin/arcanum`, before any JSON mode exists). |
 | `2` | `usage` | `UsageError` | Unknown command, subcommand or flag; bad arity; conflicting or missing tier flags; bad key syntax; bad `--lock-timeout`; a bad `--repo` or `--claude-config-dir` path. `parseArgs` errors (`ERR_PARSE_ARGS_*`) map here too. |
 | `3` | `validation` | `ValidationError` | Key registry refusal: unknown key, wrong type, enum, format, tier not allowed, read-only key. |
 | `4` | `target_unavailable` | `TargetUnavailableError` | Nowhere to read or write the requested tier: no repo, an unconfigured repo, or an unresolved, missing or non-directory Claude config dir. One code for every tier. Never bypassed by `--force`. |
@@ -152,41 +178,131 @@ To know which migrations are pending, the build embeds, per scope, the list of r
 
 Each `CliError` carries an optional `hint`, printed as a `hint:` line (see [Output](#output)).
 
-## Module layout
+## Commands
 
-| Module | Role |
+The top level holds only the meta flags and the `config` namespace, so `arcanum <command>` stays free for later, non-config features. `config` also hosts the [shortcuts](#shortcuts) and the [setup wizard](#setup-wizard).
+
+### Generic commands
+
+```text
+arcanum config get <key> [--global|--repo|--local] [--all-tiers]
+arcanum config set <key> <value> (--global|--repo|--local) [--string] [--force] [--lock-timeout <seconds>]
+arcanum config unset <key> (--global|--repo|--local) [--force] [--lock-timeout <seconds>]
+arcanum config list [--global|--repo|--local]
+arcanum config info
+```
+
+Each also accepts the [global flags](#global-flags) and `--help`.
+
+- **`get`** without a tier prints the resolved value and its source tier, resolving local → repo → global (the first present, non-`null` value wins, as in `ConfigChain`). With a tier flag it reads only that tier and prints the raw value. `--all-tiers` shows every tier's value, shadowed ones included. An unset key exits `1`, like `git config`.
+- **`set` / `unset`** require a tier flag. There is no default tier, so nothing is ever written by accident to the committed repo file or the shared global file.
+- **`list`** prints every key set in every tier (or only the given one), flattened to dotted keys, one line per key per tier, with the registry description of known keys.
+- **`info`** describes the environment; see [`config info`](#config-info).
+
+### Global flags
+
+| Flag | Effect |
 | --- | --- |
-| `lib/main.js` | Global flags (`--help`, `--version`, `--json`, `--claude-config-dir`), the `--repo` pre-scan, command lookup, `parseArgs` (strict) and the command context. |
-| `lib/args.js` | The argument layer: `--repo` overload pre-scan, first-positional lookup that skips option values, tier-flag exclusivity, per-subcommand flag sets, strict arity, key syntax, `--lock-timeout`, required tier. |
-| `lib/target.js` | Targeting: the Claude config dir (flag → `CLAUDE_CONFIG_DIR` → `$HOME/.claude`, with its source and state) and the repo root (`RepoPath#validate`/`#toplevel`, "no repo", git missing from PATH, configured or not). |
-| `lib/values.js` | `set`'s value-parsing table. |
-| `lib/exitCodes.js` | Exit constants, the `CliError` family (`UsageError` `2`, `ValidationError` `3`, `TargetUnavailableError` `4`, `VersionSkewError` `5`, `LockTimeoutRefusal` `6`, `FileError` `7`, each with an optional `hint`) and `exitCodeForError`, the single mapping point (shared `ConfigError`/`LockTimeoutError` codes included). |
-| `lib/output.js` | Result writer (human text or exactly one JSON line), stderr warnings, error reporting (the `arcanum:` prefix, the `hint:` line, JSON error object, `ARCANUM_DEBUG=1` stacks). |
-| `lib/tierFiles.js` | Tier file paths and the never-throwing tier parse (`ok`, `missing`, `empty`, or a malformed state: `invalid_json`, `not_object`, `unreadable`, `not_utf8`; UTF-8 BOM stripped). `readTierTolerant` warns and reads as empty; `readTierForWrite` refuses with exit `7`. |
-| `lib/skew.js` | Version pointers (`.version` for repo, `.migrations.version` for local and global, `0.0.0` when missing), skew status against the CLI version and the embedded per-scope migration list, read warnings and the write refusal. |
-| `lib/writeTier.js` | The write path: target check, registry validation messages, `prepareWrite` (the ordered checks), `writeKey` (the `RepoConfigWriter` call with the quiet, bounded lock and SIGINT handling). |
-| `lib/commands/config.js` | The `config` namespace: help, then the checks every subcommand shares, then dispatch. |
-| `lib/commands/config/{get,set,unset,list,info}.js` | One module per subcommand, each exporting `options`, `positionals`, `acceptsTier` and `run`. |
-| `lib/commands/config/shortcuts/index.js` | The shortcut namespaces (`engine`, `git`, `auto-fix-all`, `monitor-issues`, `next-step`, `agents`): namespace → runner, or → shortcut name → runner. `config.js` dispatches to it before the generic subcommands. |
-| `lib/commands/config/shortcuts/common.js` | What every shortcut shares: the strict flag set (`--force`/`--string` refused, `--all-tiers` reads only, `--lock-timeout` writes only), `delegate` to the generic `get`/`set`/`unset`, `writeValue` and the shadowed-tier note. |
-| `lib/commands/config/shortcuts/{singleValue,nextStep,agentsEmail,ignoreChecks}.js` | The single-value table and runner, `next-step auto`, `agents email`, `auto-fix-all ignore-checks`. |
-| `lib/commands/config/shortcuts/defaultTier.js` | The default write tier of each key a shortcut covers (`defaultTier(key)`), shared by the shortcuts' tables and the setup wizard. |
-| `lib/booleanToken.js` | The shortcuts' `on`/`off`/`true`/`false` tokens, with the exit-`3` hint. |
-| `lib/commands/config/setup.js` | `config setup`: the `--json`/TTY/section usage checks, the item list built from the registry's `setup` fields, the no-repo skipping, the session and the per-item loop. |
-| `lib/commands/config/setup/{setting,identity,ci,summary}.js` | The wizard's scalar per-setting dialogue, the per-agent email overrides, the `ci` add/remove loop, and the stderr summary. |
-| `lib/prompter.js` | The wizard's line prompter over `node:readline` (questions to stderr, queued answers), rejecting with `Interrupted` on EOF or Ctrl-C; it owns `SIGINT` only while a question is open. |
-| `lib/commands/config/shared.js` | Read-side helpers: `readTiers` (targets, account/repo read rules, tolerant reads, skew warnings), file display, registry defaults. |
-| `lib/help.js` | Top-level, `config`, per-subcommand and per-shortcut usage. Key docs come from the registry. |
+| `--repo <path>` | Targets the repo at `<path>` instead of the cwd (see [Targeting → Repo](#repo)). Only the targeting form; a bare `--repo` is the repo tier flag (see [Syntax rules](#syntax-rules)). |
+| `--claude-config-dir <dir>` | Targets that Claude config dir, overriding `CLAUDE_CONFIG_DIR`; a leading `~` is expanded (see [Targeting → Account](#account)). |
+| `--json` | Machine-readable output (see [JSON output](#json-output)). |
+| `-h`, `--help` | Usage on stdout, exit `0`. |
+
+`--lock-timeout <seconds>` is a flag of the write commands (`set`, `unset`, `setup` and the shortcuts' writes), described in [Lock contention](#lock-contention).
+
+### Meta commands
+
+- `arcanum --help`, `arcanum config --help`, `arcanum config <subcommand> --help` and `arcanum config <shortcut> --help` print usage on stdout and exit `0`. The `config` usage lists the subcommands, the shortcuts, the targeting flags and every registered key with its description, all from `cli/lib/help.js` and the key registry.
+- `arcanum --version` prints `arcanum-cli <version>` on stdout and exits `0`; with `--json`, `{"version":"<version>"}`. `--version` is checked first, so it wins wherever it appears.
+- `arcanum` with no arguments, or `arcanum config` with no subcommand, prints the matching usage on stderr and exits `2`. An unknown command or `config` subcommand is a usage error (`unknown command 'x'`, `unknown config subcommand 'x'`).
 
 ## Argument parsing
 
-- `parseArgs` only knows boolean `--repo` (the tier flag). Before it runs, `extractRepoTarget` removes the targeting forms (`--repo=<path>`, and `--repo <token>` when the token has a `/` or is `.`/`..`), stopping at `--`.
+### Syntax rules
+
+- **Flag placement.** Global and command flags may appear before or after the subcommand and its positionals: `arcanum --json config get k` and `arcanum config get k --json` are equivalent.
+- **Tier flags are mutually exclusive.** Any two of `--global`, `--repo`, `--local` is a usage error (`--global cannot be combined with --repo`). `info` takes no tier flag (`--repo is not accepted by info`).
+- **`--repo` is overloaded on purpose.** Without a value it is the repo tier flag; with a path it is the targeting flag. The rule is syntactic, never based on what exists on disk: `--repo=<path>` is always the targeting form; `--repo <token>` is the targeting form when `<token>` contains a `/` or is `.` or `..` (keys never do); any other `--repo`, a trailing one included, is the tier flag. To target a repo and select the repo tier, pass both: `--repo=<path> --repo`. A targeting path given twice, or an empty `--repo=`, is a usage error.
+- **Command-specific flags.** `--all-tiers` is accepted only by `get` (and not with a tier flag), `--string` only by `set`, `--force` only by `set` and `unset`, `--lock-timeout` only by `set`, `unset` and `setup`, and `--unset` only by the shortcuts. The error names the flag and who takes it: `--string is only accepted by set, not get`.
+- **`--`** ends option parsing; use it for values that start with `-`: `arcanum config set k --global -- -1`. A flag value starting with `-` needs the `=` form (`--lock-timeout=-1`), otherwise `parseArgs` refuses it as ambiguous.
+- **Arity** is exact: `set` takes `<key> <value>`, `get` and `unset` take `<key>`, `list` and `info` none. A missing positional is `set needs <value>`; an extra one is `get: unexpected argument 'x'`.
+- **Unknown flags** are usage errors (`parseArgs` strict mode).
+
+### How it is parsed
+
+- `parseArgs` only knows boolean `--repo` (the tier flag). Before it runs, `extractRepoTarget` removes the targeting forms, stopping at `--`.
 - The command name is the first positional, skipping the values of every string option of every command, so `--claude-config-dir /d config ...` and `--repo ./x config ...` work.
-- The `config` namespace merges the tier flags and the union of all subcommand flags into `parseArgs`. Which subcommand accepts which flag is checked afterwards (`checkFlags`), so the error names the flag and the subcommands that take it.
+- The `config` namespace merges the tier flags and the union of all subcommand and shortcut flags into `parseArgs`. Which subcommand accepts which flag is checked afterwards (`checkFlags`), so the error can name the flag and the subcommands that take it. Tier exclusivity, arity and key syntax follow, in `config.js`, before any subcommand runs.
+
+## Keys and `--force`
+
+### Keys
+
+- Keys are dotted paths, e.g. `next_step.auto.enhance-issue`. An empty segment (`a..b`, a leading or trailing `.`, an empty key) is a usage error: `invalid key 'a..b': a key segment may not be empty`.
+- Writes use nested `setpath` semantics: missing intermediate objects are created (a `null` intermediate is replaced by an object), siblings are kept, and a JSON object value replaces the whole subtree at its key rather than merging.
+- `set` and `unset` validate the key against the [key registry](shared-state-and-configuration.md#the-key-registry): known key, type, enum, format, tier and read-only-ness, all exit `3`. Wildcard entries (`git.agents.<agent>`, `next_step.auto.<skill>`) match any segment there. A registry tier restriction can make a key single-tier: `auto-fix-all.ignored_check_patterns` is repo-only, so writing it with `--global` or `--local` is `auto-fix-all.ignored_check_patterns is repo-only`.
+- Reads (`get`, `list`) accept any key, known or not, including top-level keys such as `version`.
+- `unset` of a key that is not in the target tier is a no-op that exits `0` and reports `"changed": false`, like `rm -f`. `unset` of the last key of an object leaves the empty parent in place (no pruning), as the shell helpers do.
+
+### `--force` scope
+
+`--force` is accepted only by `set` and `unset`. It is the escape hatch for keys newer than the installed CLI and for experimental keys; it never weakens checks on keys the CLI knows and never touches environment problems.
+
+| Refusal | Exit | Bypassed by `--force` |
+| --- | --- | --- |
+| Unknown key | `3` | Yes; the value checks are skipped too. |
+| Version skew: target tier ahead of the CLI | `5` | Yes |
+| Wrong type, enum or format for a known key | `3` | No |
+| Wrong tier for a known key | `3` | No |
+| Read-only key (`version`, `migrations.version`) | `3` | No: those pointers belong to the migrations and `/init-claude`. |
+| Number that would lose precision | `3` | No |
+| Usage error | `2` | No |
+| Target unavailable | `4` | No |
+| Lock timeout | `6` | No |
+| Malformed tier file, non-object on the key's path, I/O error | `7` | No |
+
+When `--force` actually bypassed a refusal, the JSON output reports `"forced": true`.
+
+## Value parsing
+
+`cli/lib/values.js` parses `set`'s value as typed. `true`, `false`, `null`, numbers (`-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?`) and anything that looks like JSON (starts with `[`, `{` or `"`, with no trimming) are parsed as JSON; everything else is a string. `--string` stores the value as a string, whatever it looks like. That matters because, for example, `next_step.auto.*` accepts only the JSON boolean `true`.
+
+| Input | Without `--string` | With `--string` |
+| --- | --- | --- |
+| `''` (empty) | the empty string `""` | `""` |
+| `true` / `false` | boolean | `"true"` / `"false"` |
+| `42`, `-1.5`, `1e3` | number | string |
+| `01`, `.5`, `+1` | string (not a JSON number) | string |
+| `9007199254740993`, `1e999` | refused, exit `3`: `<key>: <raw> cannot be stored as a number without losing precision`, `hint: pass --string to store it as text` (even with `--force`) | string |
+| `null` | JSON `null`: exit `3` for a known key (`hint: use 'config unset' to remove it`); stored as a value for an unknown key with `--force`. It is not `unset`: the key stays present. | `"null"` |
+| `[1,2]`, `{"a":1}` | array / object | string |
+| `"quoted"` | the string `quoted` | the string `"quoted"`, quotes kept |
+| `[1,` or `{a:1}` (looks like JSON, is not) | the string as typed, unless the key's registry type is array: then exit `3`, `<key> must be a JSON array: <parse error>` | string |
+| ` 42 ` | the string ` 42 `; values are never trimmed | string |
+
+After parsing, a known key's value is checked against the registry (type, enum, format, `min`/`max`, non-empty). A type mismatch with `--string` given gets `hint: drop --string`. An unknown key with `--force` skips the value checks.
+
+## Missing and malformed tier files
+
+`cli/lib/tierFiles.js` reads a tier file without ever throwing and classifies it:
+
+| State | Reads (`get`, `list`) | Writes (`set`, `unset`) to that tier |
+| --- | --- | --- |
+| `missing` | Empty tier, silent. | Normal; the file is created on first write (subject to [Targeting](#targeting)). |
+| `empty` (zero bytes or whitespace only) | Empty tier, silent. | Normal; written as if it were `{}`. |
+| `invalid_json` | Stderr warning naming the file (`<file> is not valid JSON (line N); ignoring it`); the tier reads as empty, so the other tiers still resolve. | Refused, exit `7`: `<file> is not valid JSON (line N); refusing to overwrite it`, `hint: fix or remove the file`. The file is left untouched. |
+| `not_object` (`null`, an array, a scalar) | Same, `<file> is not a JSON object (got …)`. | Refused, exit `7`. |
+| `unreadable` (permissions, a directory) | Same, `<file> is unreadable (<errno code>)`. | Refused, exit `7`. |
+| `not_utf8` | Same, `<file> is not UTF-8`. A UTF-8 BOM is stripped and not written back; it does not count as malformed. | Refused, exit `7`. |
+| Not writable | Normal. | Exit `7`, `cannot write <file>: <OS error>`. |
+
+- **Why writes refuse.** The shared `RepoConfigWriter` reads a malformed file as `{}`, so writing through it would silently replace a corrupted user file. The CLI never destroys data it cannot parse, so `readTierForWrite` reads and checks the target file itself before calling the writer. The check and the write are not atomic, but the window is the one a hand edit already has, and the writer still takes the lock. `--force` does not bypass this; the fix is to repair or remove the file.
+- **`get` with a tier flag** on a malformed file warns and behaves as an unset key (exit `1`).
+- **Non-object on the key's path.** A file that is an object can still hold a non-object where the key needs one (`.git` is a string, then `set git.safe_branch …`). The shared writer refuses it with `ConfigError('NOT_AN_OBJECT')` before writing, and the CLI reports `cannot write <key> to <file>: .git is not a JSON object; refusing to overwrite it` with exit `7`. How shared errors map to exit codes is in [Exit codes](#exit-codes) and [Shared Lib](shared-lib.md).
 
 ## Refusal order
 
-Each command runs its checks in the spec's precedence order instead of collecting errors and sorting them:
+When several refusals apply, the first in this order wins: usage `2`, target `4`, file `7`, registry `3`, skew `5`, lock `6`. Usage is checked before touching the filesystem, the target before its file, the file before the key, and the lock last. Each command runs its checks in that order instead of collecting errors and sorting them:
 
 1. Usage (`2`): `parseArgs`, flag sets, tier exclusivity, arity, key syntax (in `config.js`), then the required tier and `--lock-timeout` (in `set`/`unset`). Bad `--repo`/`--claude-config-dir` paths also raise `2`, during targeting, before any tier file is read.
 2. Target (`4`): `checkWriteTarget` for writes; for reads, an explicit `--repo`/`--local` with no repo, or a Claude config dir that is not a directory.
@@ -195,21 +311,157 @@ Each command runs its checks in the spec's precedence order instead of collectin
 5. Skew (`5`): `checkWriteSkew` on the target tier's pointer only.
 6. Lock (`6`): the shared `Lock`'s bounded acquire.
 
-`--force` only turns the unknown-key refusal and the skew refusal into a bypass, which the JSON output reports as `"forced": true`.
-
 ## Reads
 
+- Reads take no lock. A read racing a write sees either the old or the new file, since writes replace the file whole.
 - `get` and `list` read the tier files themselves with `readTierTolerant`, in local → repo → global order, and apply the same present-and-non-`null` rule as `ConfigChain`. They don't call `ConfigChain#readWithSource` directly, because it reads malformed files silently (the CLI must warn), needs a repo path (the CLI must work outside a repo), and only resolves namespaced keys (the CLI also reads top-level keys such as `version`). Two specs keep them aligned: `tierFiles_spec` checks the paths against `ConfigChain`'s, and `get_spec` checks resolution against `readWithSource`.
-- With no tier and no repo, only the global tier is read, with a note. An unresolved or missing Claude config dir reads as an empty global tier, with a warning.
-- A tier whose pointer is ahead of the CLI warns. A tier behind it warns only when its scope has migrations between the pointer and the CLI version. A pointer behind the CLI with nothing pending is reported as `up_to_date`.
+- With no tier and no repo, only the global tier is read, with a warning (`no repo at <path>; reading the global tier only`). An unresolved or missing Claude config dir reads as an empty global tier, with a warning.
+- A tier whose pointer is ahead of the CLI warns. A tier behind it warns only when its scope has migrations between the pointer and the CLI version (see [Version skew](#version-skew)).
+- `list` flattens each tier: non-empty objects are walked, anything else (scalars, arrays, `null`, empty objects) is a leaf, so an object emptied by `unset` shows up as `<parent> = {}`.
 - `info` uses the strict `readTier` and reports the malformed, missing and skew states instead of warning. It never fails on environment state.
 
 ## Writes
 
-- `RepoConfigWriter#write`/`#unset` do the actual write: nested `setpath`, kept siblings, no pruning, jq-identical serialization, atomic `<file>.tmp` + rename, under `<file>.lock`. A known key of two or more segments is passed as `namespace` + the rest. A one-segment key, or a `--force`d unknown key, uses the top-level form. The tier files have no legacy file.
-- The CLI wraps the shared `Lock` before handing it to the writer, so `acquire` always runs with `warn: false` (the timeout message replaces `Lock`'s "seems stuck" warning) and the CLI knows whether the lock is held. `timeoutMs` is `--lock-timeout` × 1000.
-- A SIGINT handler is installed for the duration of the write. It releases the lock if it is held (the release is owner-checked) and exits `130`.
+- `RepoConfigWriter#write`/`#unset` do the actual write: nested `setpath`, kept siblings, no pruning, jq-identical serialization, atomic `<file>.tmp` + rename, under `<file>.lock`. A known key of two or more segments is passed as `namespace` + the rest. A one-segment key, or a `--force`d unknown key, uses the top-level form. The tier files have no legacy file. The writer and the lock protocol are described in [Shared Lib](shared-lib.md) and [Lock System](lock-system.md).
 - `unset` of a key that is not in the file skips the writer: nothing is locked or written, `"changed": false`.
+
+### Lock contention
+
+- Writes go through the shared `Lock` on `<file>.lock`, the same protocol as `arcanum/_lib/lock.sh`, so the CLI and running skills exclude each other (atomic create-if-absent acquire, owner-checked release, stale-lock detection).
+- Unlike the skills, the CLI bounds the wait: `10` seconds by default, `--lock-timeout <seconds>` to change it (decimals allowed), `0` to try once. A negative or non-numeric value is a usage error (`--lock-timeout must be a non-negative number of seconds, got '<v>'`). `timeoutMs` is the value × 1000.
+- On timeout the CLI exits `6` with `timed out after <N>s waiting for <file>.lock` and `hint: if no arcanum process is running, remove that file`. A timeout means the lock file existed for the whole wait, so nothing was written and there is nothing to clean up.
+- The CLI wraps the shared `Lock` before handing it to the writer, so `acquire` always runs with `warn: false` (the timeout message replaces `Lock`'s "seems stuck" warning) and the CLI knows whether the lock is held.
+- A SIGINT handler is installed for the duration of the write. Ctrl-C while waiting exits `130` with nothing written and no lock left behind; Ctrl-C while holding the lock releases it first (the release is owner-checked, so only a lock file still holding the CLI's id is removed), then exits `130`.
+
+## Output
+
+- Human-readable by default, `--json` for scripting (`cli/lib/output.js`).
+- **stdout** carries only the command's result. **stderr** carries every warning (`arcanum: warning: …`), note (`arcanum: note: …`) and error, in both modes. So `--json` stdout is always either empty or exactly one JSON object followed by a newline. Warnings stay plain text in `--json` mode.
+
+### Human output
+
+```text
+$ arcanum config get engine.mode
+native   (repo: .claude/configuration/arcanum-repo-config.json)
+
+$ arcanum config get git.safe_branch
+(unset; default: origin/main)
+
+$ arcanum config get engine.mode --all-tiers
+local    -        (unset)
+repo     native   <- resolved
+global   -        (unset)
+
+$ arcanum config set next_step.auto.enhance-issue true --global
+set next_step.auto.enhance-issue = true   (global: /Users/x/.claude/arcanum-config.json, was: unset)
+
+$ arcanum config unset git.safe_branch --local
+unset git.safe_branch   (local: .claude/state/arcanum-config.json, was: origin/main)
+
+$ arcanum config unset git.safe_branch --local
+git.safe_branch was not set   (local: .claude/state/arcanum-config.json)
+
+$ arcanum config list
+repo    engine.mode = "native"   Script engine used to run migrated skill entrypoints
+global  next_step.auto.enhance-issue = true   Run this skill's suggested next step automatically
+```
+
+- Repo and local files show repo-relative, the global file absolute.
+- `get` and `set` print strings without quotes and anything else as compact JSON; `list` prints every value as JSON (strings quoted). `list` with a tier flag drops the tier column.
+- An unset key prints `(unset)`, or `(unset; default: <value>)` when the registry has a default, and exits `1`. In `--all-tiers`, a tier with no target (no repo, unresolved account) shows `(no target)`.
+- `get` with a tier flag prints the raw value only, so `$(arcanum config get k --repo)` is usable in scripts. When the key is unset there, stdout stays empty, a stderr warning says `<key> is unset in the <tier> tier` (with the default when there is one), and the exit is `1`.
+- `config setup` writes its prompts to stderr too, so stdout stays results-only.
+
+### JSON output
+
+Each command prints one stable object. Fields may be added; existing ones are not renamed or removed without a major version.
+
+`get` (with or without a tier flag):
+
+```json
+{"key":"engine.mode","set":true,"value":"native","source":"repo","default":"shell"}
+```
+
+- Unset: `{"key":"engine.mode","set":false,"value":null,"source":null,"default":"shell"}`, exit `1`. It is not an error object.
+- `default` is the registry default, or `null` when the key has none or is unknown. It is present whether the key is set or not.
+- `source` is `local`, `repo`, `global` or `null`; with a tier flag it is that tier.
+
+`get --all-tiers`:
+
+```json
+{"key":"engine.mode",
+ "resolved":{"set":true,"value":"native","source":"repo","default":"shell"},
+ "tiers":{
+   "local":{"set":false,"value":null,"file":"/x/foo/.claude/state/arcanum-config.json"},
+   "repo":{"set":true,"value":"native","file":"/x/foo/.claude/configuration/arcanum-repo-config.json"},
+   "global":{"set":false,"value":null,"file":"/Users/x/.claude/arcanum-config.json"}}}
+```
+
+- A tier with no target has `"file": null`. Exit `1` when `resolved.set` is false.
+
+`set` / `unset`:
+
+```json
+{"key":"next_step.auto.enhance-issue","tier":"global","file":"/Users/x/.claude/arcanum-config.json",
+ "changed":true,"previous":{"set":false,"value":null},"value":true,"forced":false}
+```
+
+- `changed` is false for a `set` that stores the value already there, and for an `unset` of an absent key. For `unset`, `value` is `null`.
+- `previous` is the key's state in that tier before the write (a `null` counts as unset).
+- `forced` is true only when `--force` actually bypassed a refusal.
+
+`list`:
+
+```json
+{"entries":[{"key":"engine.mode","tier":"repo","value":"native","known":true,"description":"Script engine used to run migrated skill entrypoints"}]}
+```
+
+- One entry per key per tier, so a shadowed key appears once per tier that sets it. `description` is `null` for unknown keys. Registry defaults of unset keys are not listed; `get` reports them in `default`.
+
+`info`: see [`config info`](#config-info). `--version`: `{"version":"2.4.0"}`.
+
+Errors, on stderr in `--json` mode:
+
+```json
+{"error":{"code":"target_unavailable","exit":4,"message":"arcanum: no repo at /x/bar; --repo and --local need a git repo","hint":null}}
+```
+
+- `code` is the identifier from [Exit codes](#exit-codes) (`error`, `usage`, `validation`, `target_unavailable`, `version_skew`, `lock_timeout`, `file`); `message` keeps the `arcanum: ` prefix; `hint` is a string or `null`.
+- `--json` is detected on the raw argv (before `--`) for errors raised before `parseArgs` runs, so even a usage error comes out as JSON.
+
+### Error messages
+
+- One line on stderr, `arcanum: <message>`: lowercase after the prefix, no trailing period, naming the key, tier and file that apply. A leading `Error: ` some shared messages carry is stripped.
+- An optional second line, `hint: <hint>`. A usage error with no hint of its own gets `Run 'arcanum --help' for usage.` instead.
+- No stack traces, unless `ARCANUM_DEBUG=1` is set (in both modes).
+- A value is echoed back only when its JSON is at most 40 characters; longer ones show as `a N-character value`.
+
+| Exit | Message |
+| --- | --- |
+| `1` | `Node.js >= 22.13.0 required, found 20.11.0` (from `cli/bin/arcanum`, no prefix) |
+| `2` | `arcanum: set needs a tier: --global, --repo or --local` |
+| `2` | `arcanum: --all-tiers cannot be combined with --repo` |
+| `2` | `arcanum: not a directory: /x/nope` (a bad `--repo` path) |
+| `3` | `arcanum: unknown key 'next_step.auto.enhanse-issue'` + `hint: check the spelling, or pass --force for a key newer than this CLI` |
+| `3` | `arcanum: next_step.auto.enhance-issue must be a boolean, got string "true"` + `hint: drop --string` |
+| `3` | `arcanum: engine.mode must be one of shell, native, docker, got "bogus"` |
+| `3` | `arcanum: version is read-only; it is managed by migrations` |
+| `3` | `arcanum: auto-fix-all.ignored_check_patterns is repo-only` |
+| `3` | `arcanum: auto-fix-all.ignored_check_patterns[2] is not a valid regex: <error>` |
+| `3` | `arcanum: git.safe_branch must be a string, got null` + `hint: use 'config unset' to remove it` |
+| `4` | `arcanum: /x/foo is not arcanum-configured (no .claude/configuration/arcanum-repo-config.json)` + `hint: run /init-claude in that repo` |
+| `4` | `arcanum: claude config dir /Users/x/.claude-favni does not exist` |
+| `5` | `arcanum: repo config is at 2.5.0, newer than this CLI (2.4.0)` + `hint: npm i -g arcanum-cli@latest, or pass --force` |
+| `6` | `arcanum: timed out after 10s waiting for /x/foo/.claude/state/arcanum-config.json.lock` + `hint: if no arcanum process is running, remove that file` |
+| `7` | `arcanum: /Users/x/.claude/arcanum-config.json is not valid JSON (line 3); refusing to overwrite it` + `hint: fix or remove the file` |
+
+## Edge cases
+
+- **Same file for two tiers.** Not possible: the tiers live at fixed, distinct paths.
+- **Concurrent CLI writes.** Serialized by the lock; the second waits or exits `6`.
+- **A global file created by the CLI** has no `.migrations.version` pointer, so it reads as `0.0.0` and later reads warn about pending global migrations until `/arcanum-migrate` stamps it.
+- **Very large values.** No size limit beyond the filesystem.
+- **Zero runtime dependencies.** Argument parsing is `node:util`'s `parseArgs` plus the in-house layer above, so no third-party code runs on a tool that writes into `~/.claude`.
 
 ## Shortcuts
 
