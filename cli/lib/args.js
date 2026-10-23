@@ -149,27 +149,40 @@ export function selectedTier(values) {
 export function checkFlags(subcommand, values, accepted, commandOptions) {
   for (const [name, option] of Object.entries(commandOptions)) {
     if (values[name] !== undefined && !Object.hasOwn(accepted, name)) {
-      throw new UsageError(`--${name} is only accepted by ${option.only.join(' and ')}, not ${subcommand}`);
+      throw new UsageError(`--${name} is only accepted by ${joinAnd(option.only)}, not ${subcommand}`);
     }
   }
 }
 
 /**
- * Enforces a subcommand's exact positional arity.
+ * @param {string[]} words - the words to list.
+ * @returns {string} `a`, `a and b`, or `a, b and c`.
+ */
+export function joinAnd(words) {
+  return words.length < 2 ? words.join('') : `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`;
+}
+
+/**
+ * Enforces a subcommand's positional arity: exact, unless the last name
+ * ends with `...`, which takes any number (zero included) of trailing
+ * positionals.
  * @param {string} subcommand - the subcommand name.
  * @param {string[]} positionals - its positionals (after the name).
  * @param {string[]} names - the expected positional names, e.g.
- *   `['key', 'value']`.
+ *   `['key', 'value']` or `['section...']`.
  * @throws {UsageError} on a missing or extra positional.
  */
 export function checkArity(subcommand, positionals, names) {
-  if (positionals.length < names.length) {
-    const missing = names.slice(positionals.length).map((name) => `<${name}>`).join(' ');
+  const variadic = names.length > 0 && names[names.length - 1].endsWith('...');
+  const required = variadic ? names.slice(0, -1) : names;
+
+  if (positionals.length < required.length) {
+    const missing = required.slice(positionals.length).map((name) => `<${name}>`).join(' ');
 
     throw new UsageError(`${subcommand} needs ${missing}`);
   }
 
-  if (positionals.length > names.length) {
+  if (!variadic && positionals.length > names.length) {
     throw new UsageError(`${subcommand}: unexpected argument '${positionals[names.length]}'`);
   }
 }

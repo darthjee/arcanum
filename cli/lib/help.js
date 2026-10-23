@@ -1,5 +1,7 @@
 // Help-text helpers for the CLI's usage and `--help` output.
 
+import { SETUP_SECTIONS } from '../../shared/lib/config/KeyRegistry.js';
+
 /**
  * @returns {string} the top-level usage text, newline-terminated.
  */
@@ -95,6 +97,16 @@ export const SUBCOMMAND_HELP = {
     synopsis: 'info',
     summary: 'Describe the environment: account, repo, tier files, versions',
     rows: []
+  },
+  setup: {
+    synopsis: 'setup [<section>...] [--lock-timeout <seconds>]',
+    summary: 'Walk through the onboarding settings interactively',
+    rows: [WRITE_ROWS[1]],
+    notes: [
+      `Sections, always asked in this order: ${SETUP_SECTIONS.join(', ')} (default: all).`,
+      'Needs an interactive terminal; prompts go to stderr. Each confirmed answer is',
+      'written at once, like \'config set\'/\'config unset\'. --json is not accepted.'
+    ]
   }
 };
 
@@ -247,6 +259,7 @@ export function subcommandUsage(name) {
     '',
     `${help.summary}.`,
     '',
+    ...(help.notes ? [...help.notes, ''] : []),
     'Options:',
     formatRows([...help.rows, ...TARGETING_ROWS]),
     ''

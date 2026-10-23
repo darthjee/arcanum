@@ -67,6 +67,7 @@ describe('commands/config', () => {
       ['all-tiers', 'force', 'global', 'local', 'lock-timeout', 'repo', 'string', 'unset']
     );
     expect(SUBCOMMAND_OPTIONS.force.only).toEqual(['set', 'unset']);
+    expect(SUBCOMMAND_OPTIONS['lock-timeout'].only).toEqual(['set', 'unset', 'setup']);
   });
 
   describe('shared checks', () => {
