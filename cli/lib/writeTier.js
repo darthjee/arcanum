@@ -200,7 +200,8 @@ export function validateUnset({ registry, key, tier, force }) {
  * @param {string} context.version - the CLI's version.
  * @param {object} context.migrationVersions - the per-scope migration versions.
  * @param {boolean} force - `--force`.
- * @param {() => {known: boolean, forced: boolean}} validate - the registry check.
+ * @param {(read: object) => {known: boolean, forced: boolean}} validate -
+ *   the registry check, given the target file's current read.
  * @returns {Promise<{targets: object, file: string, read: object, known: boolean, forced: boolean}>}
  *   the write's target file, its current content, and whether `--force`
  *   bypassed a refusal.
@@ -214,7 +215,7 @@ export async function prepareWrite(context, force, validate) {
 
   const file = tierFile(tier, targets);
   const read = await readTierForWrite(file);
-  const { known, forced: unknownForced } = validate();
+  const { known, forced: unknownForced } = validate(read);
   const skewForced = checkWriteSkew(tier, tierSkew(tier, read, { cliVersion: version, migrationVersions }), {
     cliVersion: version, force
   });
@@ -260,25 +261,30 @@ function processSignals() {
 }
 
 /**
- * Writes (or removes) one key through `RepoConfigWriter` under its lock,
- * with a bounded wait. A known key of two or more segments is written as
- * `namespace` + the rest; a one-segment or `--force`d unknown key uses
- * the top-level form. On SIGINT the lock is released (owner-checked) and
- * the process exits `130`.
+ * Writes, removes or updates one key through `RepoConfigWriter` under
+ * its lock, with a bounded wait. A known key of two or more segments is
+ * written as `namespace` + the rest; a one-segment or `--force`d unknown
+ * key uses the top-level form. `update` is the atomic read-modify-write
+ * (`RepoConfigWriter#update`): `mutate` runs inside the lock, on the
+ * value as re-read there. On SIGINT the lock is released (owner-checked)
+ * and the process exits `130`.
  * @param {object} args - the write's inputs.
- * @param {string} args.op - `set` or `unset`.
+ * @param {string} args.op - `set`, `unset` or `update`.
  * @param {string} args.file - the tier file.
  * @param {string} args.key - the dotted key.
  * @param {unknown} [args.value] - the value (for `set`).
+ * @param {(current: unknown) => unknown} [args.mutate] - builds the new
+ *   value from the current one (for `update`); what it throws propagates.
  * @param {boolean} args.known - whether the key is in the registry.
  * @param {number} args.timeoutMs - the lock wait bound.
  * @param {string} args.timeoutLabel - the bound as the user gave it, in seconds.
  * @param {object} [args.deps] - injectable collaborators: `lock`, `signals`.
- * @returns {Promise<void>} resolves once written and unlocked.
+ * @returns {Promise<(object|undefined)>} resolves once written and
+ *   unlocked; for `update`, to `{changed, previous, value}`.
  * @throws {CliError} `LockTimeoutRefusal` (exit `6`) on timeout, `FileError`
  *   (exit `7`) for a non-object on the key's path or an I/O error.
  */
-export async function writeKey({ op, file, key, value, known, timeoutMs, timeoutLabel, deps = {} }) {
+export async function writeKey({ op, file, key, value, mutate, known, timeoutMs, timeoutLabel, deps = {} }) {
   const lock = quietLock(deps.lock || new Lock());
   const signals = deps.signals || processSignals();
   const lockFile = `${file}.lock`;
@@ -298,9 +304,13 @@ export async function writeKey({ op, file, key, value, known, timeoutMs, timeout
   try {
     if (op === 'set') {
       await writer.write({ ...target, value });
+    } else if (op === 'update') {
+      return await writer.update({ ...target, mutate });
     } else {
       await writer.unset(target);
     }
+
+    return undefined;
   } catch (error) {
     throw writeError(error, { file, key, lockFile, timeoutLabel });
   } finally {

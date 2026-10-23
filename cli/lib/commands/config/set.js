@@ -26,6 +26,10 @@ export const acceptsTier = true;
  * @param {object} context.output - the output helpers.
  * @param {object} context.registry - the key registry.
  * @param {object} context.deps - injectable collaborators.
+ * @param {(raw: string) => object} [context.parseValue] - a value parser
+ *   replacing `parseValue` (the shortcuts' boolean tokens and plain
+ *   strings); one that throws defers its refusal to the registry check,
+ *   so the target and file refusals still win.
  * @returns {Promise<number>} the exit code.
  */
 export async function run(context) {
@@ -34,10 +38,14 @@ export async function run(context) {
   const timeoutMs = lockTimeoutMs(values['lock-timeout']);
   const force = Boolean(values.force);
   const string = Boolean(values.string);
-  const parsed = parseValue(raw, { string });
-  const { targets, file, read, known, forced } = await prepareWrite(context, force, () => (
-    validateSet({ registry, key, tier, parsed, raw, force, string })
-  ));
+  const { parsed, parseError } = parseRaw(context.parseValue || ((text) => parseValue(text, { string })), raw);
+  const { targets, file, read, known, forced } = await prepareWrite(context, force, () => {
+    if (parseError !== null) {
+      throw parseError;
+    }
+
+    return validateSet({ registry, key, tier, parsed, raw, force, string });
+  });
   const previous = lookupKey(read.data, key);
   const { value } = parsed;
 
@@ -59,6 +67,20 @@ export async function run(context) {
   );
 
   return EXIT_OK;
+}
+
+/**
+ * @param {(raw: string) => object} parse - the value parser.
+ * @param {string} raw - the value as typed.
+ * @returns {{parsed: (object|null), parseError: (unknown|null)}} the
+ *   parsed value, or what the parser threw.
+ */
+function parseRaw(parse, raw) {
+  try {
+    return { parsed: parse(raw), parseError: null };
+  } catch (error) {
+    return { parsed: null, parseError: error };
+  }
 }
 
 export default { name: 'set', options, positionals, acceptsTier, run };

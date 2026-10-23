@@ -65,6 +65,46 @@ arcanum config list --repo
 
 `arcanum config --help` lists every key arcanum knows.
 
+## Shortcuts
+
+The settings you change most often have shortcuts, so you don't have to remember dotted keys or pick a tier every time:
+
+```bash
+arcanum config engine docker                        # engine.mode, at the local tier
+arcanum config git merge-body full                  # git.merge_body_mode, local
+arcanum config git safe-branch origin/develop       # git.safe_branch, local
+arcanum config next-step auto enhance-issue on      # next_step.auto.enhance-issue, local
+arcanum config auto-fix-all clear-context on        # auto-fix-all.clear_context, local
+arcanum config monitor-issues clear-context off
+```
+
+- **No value reads, a value writes.** `arcanum config engine` shows the value that wins and where it comes from, exactly like `config get engine.mode`. A write goes to the shortcut's default tier (local for all of the above); add `--global` or `--repo` to pick another one, within what the key allows. `--unset` removes the key: `arcanum config engine --unset`.
+- **Same output as the generic commands.** Each shortcut prints what its `config get`/`set`/`unset` equivalent prints, `--json` included, so scripts can use either.
+- **On and off.** Toggles take `on`, `off`, `true` or `false` (lowercase). `off` stores `false` rather than removing the key, so turning a setting off locally beats an `on` in your global config. If a higher tier still overrides what you just wrote, a note on stderr tells you which one.
+- **`next-step auto`** with no skill lists every auto-advance you have set, and where it comes from.
+
+**Agent emails.** `arcanum config agents email` shows, for every agent of the repo (and every agent you configured), the email it commits with and where that comes from:
+
+```bash
+arcanum config agents email                             # the overview
+arcanum config agents email node                        # one agent, tier by tier
+arcanum config agents email set 'you+{agent}@example.com'   # the default, {agent} = the agent name
+arcanum config agents email set node node-bot@example.com   # one agent
+arcanum config agents email unset node
+```
+
+Writes go to your global config unless you pass a tier flag. `(model default)` means the commit will use the model's email.
+
+**CI checks to ignore.** `auto-fix-all ignore-checks` edits the list of checks `/auto-fix-all` ignores in this repo. The list lives only in the committed repo config:
+
+```bash
+arcanum config auto-fix-all ignore-checks                  # list
+arcanum config auto-fix-all ignore-checks add '^codacy'
+arcanum config auto-fix-all ignore-checks remove '^codacy'
+```
+
+The patterns are case-insensitive regular expressions, not globs: `^codacy` matches any check whose name starts with "Codacy", and `*` alone is invalid. An invalid pattern is refused and nothing is written. Put `--` before a pattern that starts with `-`.
+
 ## Targeting another account or repo
 
 - `CLAUDE_CONFIG_DIR=~/.claude-work arcanum config get git.email` targets another Claude account. The variable is used as is, like Claude Code does, so let your shell expand the `~` (don't quote it).
