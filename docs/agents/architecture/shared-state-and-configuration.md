@@ -20,12 +20,111 @@ Never write to these files directly — always use the dedicated scripts (e.g. `
 
 ## The key registry
 
-`shared/lib/config/keys.json` is the source of truth for every arcanum config key: its type, the tiers it may live in, its default, and its `setup` wizard entry. `shared/lib/config/KeyRegistry.js` loads it, matches dotted keys against it (`<name>` segments are wildcards, a literal entry beats a wildcard) and validates values. Both live in the [Shared Lib](shared-lib.md), owned by `shared`, but any agent may add, edit or remove an entry for a key its own change introduces (see [Shared Lib → Ownership](shared-lib.md#ownership)). Skills never read it at runtime, so they behave as before; the CLI's `config` command uses it for its usage text. Three specs keep it in sync with what arcanum actually reads: a defaults drift spec, the `ARCANUM_STRICT_CONFIG_KEYS` read guard and a static scan of shell config calls. See [Key Registry](../specs/arcanum-cli/key-registry.md) for the full format.
+`shared/lib/config/keys.json` is the source of truth for every arcanum config key: its type, the tiers it may live in, its default, and its `setup` wizard entry. `shared/lib/config/KeyRegistry.js` loads it, matches dotted keys against it and validates values. Both live in the [Shared Lib](shared-lib.md). The full key list is the file itself; this section describes its format and rules.
+
+### Entry shape
+
+The registry is a plain JSON table, checked by a small hand-written validator (`validateRegistry` in `KeyRegistry.js`):
+
+- **Top level:** `{"format_version": 1, "keys": [ ... ]}`. `KeyRegistry` refuses a registry whose `format_version` is higher than the one it knows (`FORMAT_VERSION`, currently `1`).
+- **Entries are an array**, not an object keyed by name, so a duplicate `key` is rejected instead of being dropped silently by `JSON.parse`.
+- **Required fields:** `key` (dotted, may contain [wildcard segments](#wildcard-matching)), `type`, `tiers` (a non-empty, non-repeating subset of `global`, `repo`, `local`) and a non-empty `description`.
+- **Closed type vocabulary:** `string`, `boolean`, `number`; `enum`, which requires `values` (a non-empty array of strings); and `array`, which requires `items` (one of `string`, `boolean`, `number`). There is no object type: every key is a leaf.
+- **`format`** (optional): a closed vocabulary of extra checks, currently only `regex`, allowed on a `string` or an array of strings. Each value (or array element) must compile with `new RegExp(v, 'i')`. New formats are added in code, never as free-form patterns in the registry.
+- **`read_only`** (optional): boolean, default `false`.
+- **`default`** (optional): absent means no default. When present it must pass the entry's own value checks. It feeds the `default` field the CLI reports for a key.
+- **Number constraints** (optional, `number` only): `integer: true`, `min`, `max` (finite, with `min <= max`).
+- **`allow_empty`** (optional, `string` and `enum` only): see [Validation](#validation).
+- **`setup`** (optional): `{section, order, prompt, instances?}`, for the keys the [`config setup` wizard](arcanum-cli.md#setup-wizard) asks. The wizard asks exactly the entries that carry it, ordered by `section` in the canonical order `identity`, `engine`, `git`, `flow`, `ci` (`SETUP_SECTIONS`), then by the integer `order`. `prompt` is a required non-empty string, but the wizard currently shows the entry's `description` as the question, not `prompt`. `instances` is only allowed on a wildcard key and lists the concrete names the wizard asks about (e.g. `next_step.auto.<skill>` → `enhance-issue`, `discuss-issue`, `auto-plan-issue`). It is wizard-only: it never restricts which values are valid. `git.agents.<agent>` has no `instances`, because the wizard takes them from the target repo's `.claude/agents/*.md`. Adding a key to the wizard is a registry edit, not CLI code.
+- **Unknown fields are rejected**, at the top level, on an entry and inside `setup`, so a typo such as `"teirs"` fails the specs.
+
+Example:
+
+```json
+{
+  "format_version": 1,
+  "keys": [
+    {
+      "key": "auto-fix-all.ignored_check_patterns",
+      "type": "array",
+      "items": "string",
+      "format": "regex",
+      "tiers": ["repo"],
+      "default": [],
+      "description": "Case-insensitive regexes of CI checks to ignore",
+      "setup": {"section": "ci", "order": 1, "prompt": "CI checks to ignore"}
+    }
+  ]
+}
+```
+
+### Location
+
+- `keys.json` and `KeyRegistry.js` sit side by side in `shared/lib/config/`, with their specs (`keys_spec.js`, `KeyRegistry_spec.js`) under `shared/spec/config/`. Both are owned by `shared`.
+- **The `keys.json` exception:** any agent may add, edit or remove an entry for a config key that its own change introduces, so adding a key never needs a separate `shared` dispatch (see [Shared Lib → Ownership](shared-lib.md#ownership)).
+- `KeyRegistry.js` loads the file with a static JSON import (`import registryData from './keys.json' with { type: 'json' }`) and never reads the filesystem. `esbuild` inlines the import, so the bundled `arcanum-cli` carries the registry it was built with and never reads one from an arcanum install. Inside `core/` the same import runs unbundled.
+- Being under `shared/lib/`, the registry is covered by the shared lib's existing guardrails: the import-boundary lint rule, the CLI build's metafile check and the always-on `cli` and `shared` CI jobs. It also ships with `shared/lib/` in the release zip and the runtime image, so shell scripts could read it with `jq`.
+- `architect` owns the docs rule that a new config key means a registry entry (see [Keeping it in sync](#keeping-it-in-sync)).
+
+### Wildcard matching
+
+1. **Syntax.** A segment written `<name>` matches exactly one dotted segment. Whole segments only: no `*`, no partial segments, no multi-segment wildcards. The label inside the brackets (`<agent>`, `<skill>`) is for docs and `--help` only.
+2. **Concrete segments** match `[A-Za-z0-9_-]+`; dots are always separators. The segment count must match, so `git.agents.foo.bar` matches nothing.
+3. **Precedence.** A fully literal entry always beats a wildcard entry, so a specific override such as `next_step.auto.arcanum-update` may sit next to `next_step.auto.<skill>`. The validator rejects two wildcard entries that could match the same concrete key, so precedence never needs more than "literal beats wildcard".
+4. **Leaf integrity.** The validator rejects an entry whose key is a prefix of another's (e.g. `git.agents` next to `git.agents.<agent>`). A whole namespace or subtree is therefore never a known key.
+5. **No existence check on wildcard values.** Any well-formed `<skill>` or `<agent>` name is accepted. The CLI is installed independently of arcanum and cannot reliably know the skill list.
+6. **Patterns.** `lookup(key)` matches a concrete key. `lookupPattern(pattern)` matches a pattern that itself has `<name>` segments, as the shell static scan builds them; a wildcard segment in the pattern only matches a wildcard segment of an entry.
+
+### Validation
+
+`KeyRegistry#check(op, key, tier, value)` validates a `set` or `unset` and returns a structured result instead of throwing: `{ok: true}`, or `{ok: false, reason, ...details}` (e.g. `{reason: 'type', expected, got}`). The CLI maps it to its own messages and exit code `3` (see [Arcanum CLI → Error messages](arcanum-cli.md#error-messages)); arcanum's own code can reuse it with no CLI error type.
+
+1. **Fixed order, first failure wins:** `unknown` → `read_only` → `tier` → the value checks. `unset` stops after the tier check.
+2. **Value checks**, in order: `null` → `type` → `enum` → `empty` → `integer` / `min` / `max` → `format`. The same checks validate an entry's `default`.
+3. **`null` on a known key** is refused with the hint `use 'config unset' to remove it`.
+4. **Empty strings.** `string` and `enum` values must be non-empty unless the entry sets `allow_empty: true`. Arrays may be empty.
+5. **Numbers** must be finite; an array element of the wrong type fails `type` with its `index`.
+6. **`format: regex`.** Each element is compiled with `new RegExp(p, 'i')`, only to validate it. A failure carries the element `index` (for an array) and the compile error with V8's prefix stripped.
+7. **Reads never validate.** The CLI's reads show stored values even when they violate the registry, as skills read them.
+
+How `--force` interacts with these checks is part of the CLI's contract, in [Arcanum CLI → `--force` scope](arcanum-cli.md#--force-scope): on an unknown key it stores the parsed value with no check, and on a known key it bypasses none of the checks above.
+
+### Consumers
+
+- The CLI's `config` command: the known-key list in `config --help` and `config list`, write validation, the shortcuts' defaults and the `setup` wizard's questions and order.
+- The specs that keep the registry in sync with arcanum's own reads (below).
+
+Skills never read it at runtime, so they behave as before and keep their hardcoded defaults (e.g. `DEFAULT_MAX_RETRY_COUNT` in `SpawnIssue.js`, `origin/main` in `safe_branch.sh`).
+
+### Keeping it in sync
+
+Three checks keep the registry equal to what arcanum actually reads:
+
+1. **Defaults drift spec** (`core/spec/lib/utils/config/KeyRegistryDefaults_spec.js`): every registry `default` equals the default the code applies. Node defaults are compared through exported constants (e.g. `DEFAULT_MERGE_BODY_MODE`, `DEFAULT_SAFE_BRANCH`) or the reader's result with no config present; shell defaults by running the helper against a temp repo with no config files.
+2. **Strict-keys read guard.** When `ARCANUM_STRICT_CONFIG_KEYS=1`, `ConfigChain#read` / `#readWithSource` and `RepoConfig`'s reads throw a plain `Error` naming any key that matches no registry entry (`assertRegisteredConfigKey` in `KeyRegistry.js`). The guard sits there, not in `RepoContext.readConfig`, because some code reads through `RepoConfig` or `ConfigChain` directly. Core's spec runner sets the flag (`core/spec/support/strictConfigKeys.js`), so every core spec, and every child process it spawns, exercises it. Production never sets it.
+3. **Shell static scan** (`core/spec/lib/utils/config/ShellConfigKeyScan_spec.js`): scans `*.sh` for `config_chain_read`, `repo_config_read` / `repo_config_write` and `global_config_read` / `global_config_write` calls, builds the dotted key from the namespace and key arguments (a `${var}` segment becomes a wildcard segment), and fails if it matches no entry. A call whose key cannot be built needs a `# config-key: <dotted.key>` annotation on the line above.
+
+There is no reverse check for registry entries that nothing reads: it would be too noisy with wildcards and migration-only keys. An invalid registry fails the `keys_spec.js` validator spec, so it never reaches a build or a runtime path.
 
 **Checklist — adding a config key:**
 
 - [ ] Add a `shared/lib/config/keys.json` entry for it (type, tiers, default, and `setup` if the wizard asks for it).
 - [ ] If a shell call reads or writes it through a key the static scan can't build (a variable used as the whole namespace or the whole key argument), put a `# config-key: <dotted.key>` annotation on the line directly above the call.
+
+### Future work
+
+- **Per-key skew granularity.** Optional `since: "<version>"`, `moved_in: {"version", "from"}` and possibly a tombstone `removed_in` field would let the CLI refuse a write (exit `5`, bypassable with `--force`) when the target tier is below the version whose migration moved the key, instead of today's tier-level skew rule. It is not done yet because no migration has moved a key in a way a CLI write could race, and every entry would carry the extra authoring burden. It needs no `format_version` bump: the CLI only ever reads the registry bundled into it, and unknown fields are rejected, so nobody can add the fields early by accident. A bump is only needed if the registry is ever read at runtime from outside the bundle.
+- **Runtime consumption.** Arcanum's own code could read its defaults (and possibly validation) from the registry instead of hardcoded constants checked by the drift spec.
+
+### Alternatives considered
+
+- **No registry, with a free-form `set`.** Rejected: typos and wrong types would only fail later, when a skill reads the key.
+- **A registry inside `cli/` only.** Rejected: it would drift from what arcanum reads, and arcanum could not use it.
+- **JSON Schema.** Rejected: it needs `ajv` at runtime, breaking the zero-dependency rule, and tiers, read-only and `setup` would be extensions anyway.
+- **A JS module, or an object keyed by key name.** Rejected: a module is unreadable from shell and makes adding a key a code change; an object silently drops duplicate keys.
+- **Another location** (`core/registry/`, `arcanum/_lib/`, a new root folder). Rejected: each adds a second guarded path, splits one feature across owners, or needs a new owner for one file.
+- **Reading defaults from the registry at runtime now.** Rejected: runtime coupling and `core` churn, while the drift spec gives the same guarantee.
+- **An existence check on `<skill>`, or a reverse check for unread entries.** Rejected: the independently installed CLI cannot know arcanum's skill list, and the reverse check is too noisy.
 
 ## The global config tier
 

@@ -41,7 +41,7 @@ You do not own:
 
 ## Conventions
 
-This file is the source of truth for `client`'s working conventions. The [Arcanum CLI spec](../../docs/agents/specs/arcanum-cli.md) keeps only the ownership table and the agent boundaries.
+This file is the source of truth for `client`'s working conventions. The [agent roster](../../docs/agents/architecture/agent-roster-and-delegation.md) keeps only the agent boundaries, and the [Arcanum CLI architecture doc](../../docs/agents/architecture/arcanum-cli.md) holds the CLI's design.
 
 - Config is written only through the shared config logic, never by writing a config file directly.
 - Output is human-readable by default, with `--json` for scripting.
@@ -54,4 +54,4 @@ This file is the source of truth for `client`'s working conventions. The [Arcanu
 - You never edit `core/lib/` or `shared/`. When the CLI needs a change on the shared surface, request it through `architect`, who plans it for `shared`.
 - A PR changing a shared-surface file keeps the CLI specs green in the same PR, with the plan split across the surface's owner and `client`.
 - CI, Docker, docker-compose and Makefile needs go to `infra` through `architect`, rather than being edited by you.
-- Until the CLI's permanent architecture doc exists (#785), the design lives in the [Arcanum CLI spec](../../docs/agents/specs/arcanum-cli.md) and its sub-specs under `docs/agents/specs/arcanum-cli/`. Align with `architect` before changing anything it defines.
+- The CLI's design lives in the [Arcanum CLI architecture doc](../../docs/agents/architecture/arcanum-cli.md), which you own. Align with `architect` before changing anything that crosses into another agent's scope.
