@@ -158,7 +158,7 @@ Arcanum configuration keys are resolved through a 3-tier chain, in order of prec
 | `next_step.auto.discuss-issue` | When `true`, skips `discuss-issue`'s `/auto-plan-issue` offer and runs it automatically (default: `false`). |
 | `next_step.auto.auto-plan-issue` | When `true`, skips the `/loop /auto-resolve-issue` offer made once a plan exists and runs it automatically (default: `false`). |
 
-The `next_step.auto.<skill>` keys can be set through `/init-claude` (writes repo config) or `/arcanum-migrate` (one skippable migration per tier: local, repo, global).
+The `next_step.auto.<skill>` keys can be set through `/init-claude` (writes repo config) or `/arcanum-migrate` (one skippable migration per tier: local, repo, global), or from a terminal with `arcanum config next-step auto <skill> on` (or the `arcanum config setup flow` wizard) — see [Arcanum CLI](#arcanum-cli) below.
 
 **Example, showing every key together:**
 
@@ -198,3 +198,21 @@ The `next_step.auto.<skill>` keys can be set through `/init-claude` (writes repo
   }
 }
 ```
+
+## Arcanum CLI
+
+The `arcanum` CLI reads and writes these settings from a terminal, without hand-editing the JSON files. Values of known keys are validated, and writes take the same lock as the skills' own writes. Install it from npm (it needs Node.js 22.13.0 or newer):
+
+```bash
+npm i -g arcanum-cli
+```
+
+A few examples:
+
+```bash
+arcanum config info             # which files and tiers are in effect here
+arcanum config setup            # interactive wizard over the common settings
+arcanum config engine native    # shortcut for: config set engine.mode native --local
+```
+
+See the [Arcanum CLI user guide](docs/guides/arcanum-cli.md) for every command, shortcut and flag, and [`cli/README.md`](cli/README.md) for the package's own reference page.

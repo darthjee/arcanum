@@ -46,6 +46,20 @@ Two ways, either is fine:
 
 You can also edit `.claude/configuration/arcanum-repo-config.json` / `.claude/state/arcanum-config.json` by hand — just nest whatever you're adding under the right feature's key.
 
+### From a terminal
+
+The [`arcanum` CLI](arcanum-cli.md) (`npm i -g arcanum-cli`) edits this
+pair of files for you, with validation and the same write lock the
+skills use:
+
+```bash
+arcanum config set <key> <value> --repo    # .claude/configuration/arcanum-repo-config.json
+arcanum config set <key> <value> --local   # .claude/state/arcanum-config.json
+```
+
+The CLI writes only the new files above, never the legacy ones. See the
+[CLI user guide](arcanum-cli.md) for every command and shortcut.
+
 ## Per-repo migrations use this same pair of files, for two independent version pointers
 
 The top-level `.version` field on `arcanum-repo-config.json` (committed, shared via git) and the namespaced `.migrations.version` field on `arcanum-config.json` (gitignored, local per clone) each track how far this repo/clone has caught up on `arcanum/migrations/repos/<version>/migrations.json`'s entries — one pointer per entry `applies_to` scope (`"repo"` or `"local"`). See `docs/guides/arcanum-repo-version.md` for why there are two pointers instead of one, and `docs/agents/architecture/per-repo-migrations.md` for the full `migrations.json` schema.
