@@ -127,6 +127,69 @@ See [Install & Release Pipeline](install-and-release.md) and [Docker Engine](doc
 
 Every write holds `<file>.lock` through `Lock.js`, the same protocol as `arcanum/_lib/lock.sh`, so shell and native writers exclude each other. The output matches jq's default formatting (`JSON.stringify(obj, null, 2) + '\n'`, existing key order kept, new keys appended). The file is written atomically through `<file>.tmp` and a rename. See [Lock System](lock-system.md).
 
+## Config services
+
+These are the services on the surface besides the writer (see [Writer API](#writer-api)) and the key registry (see [Shared State & Configuration → The key registry](shared-state-and-configuration.md#the-key-registry)). The CLI reads every key through `ConfigChain` and writes every key through `RepoConfigWriter`, so it reads and writes config exactly like the skills: same tier files, same dotted-path semantics, same lock.
+
+### `ConfigError`
+
+`shared/lib/config/ConfigError.js` is the surface's error contract. Every failure the config code raises on purpose carries a stable `code`, so a caller can branch on it. It extends `Error`, takes `(code, message, { file, cause })` and keeps the original messages.
+
+| `code` | Thrown by | Message |
+| --- | --- | --- |
+| `NOT_AN_OBJECT` | `RepoConfigWriter`: the file, the namespace or an intermediate path holds a non-object value | `Cannot index <file\|.path>: not a JSON object` |
+| `INVALID_JSON` | `RepoConfigWriter`, reading a legacy file | The parse error, unchanged |
+| `LOCK_TIMEOUT` | `Lock`, when its optional `timeoutMs` bound runs out. Thrown as `LockTimeoutError` (`shared/lib/file/LockTimeoutError.js`), not a `ConfigError`, with the same kind of `code` | Names the lock file |
+
+- **Native fs errors** (`EACCES`, `ENOSPC`, `EISDIR`, …) are never wrapped: they already carry `error.code`.
+- **The strict-keys guard** throws a plain `Error` naming the key, not a `ConfigError`. `ConfigError`'s doc comment still lists an `UNREGISTERED_KEY` code, but nothing throws it.
+- **Validation is not an error.** `KeyRegistry#check` returns a structured result instead of throwing.
+- **The dispatcher needs no mapping.** Since `ConfigError extends Error` with the same messages, `core/bin/arcanum`'s bare-`Error` path (`arcanum: <message>` on stderr, exit `1`) is unchanged, byte for byte.
+- **The CLI maps the codes** in one function, `exitCodeForError` in `cli/lib/exitCodes.js`: `LOCK_TIMEOUT` → `6`, `NOT_AN_OBJECT`, `INVALID_JSON` and any Node errno error → `7`, anything else → `1` (see [Arcanum CLI](arcanum-cli.md)). A non-object intermediate in a hand-edited file (e.g. `.git` is a string, then `set git.authors …`) therefore exits `7`: the problem is the file's content, not the key.
+
+### Lock and the CLI's bounded wait
+
+`shared/lib/file/Lock.js` mirrors `arcanum/_lib/lock.sh`, so shell and native writers exclude each other. Since #807 the protocol has an atomic create-if-absent acquire, an owner-checked release and stale-lock detection (same host, dead pid); see [Lock System](lock-system.md) for the protocol and the mixed-version behaviour.
+
+- **Skills wait forever.** `lock.sh` and `Lock#acquire` without `timeoutMs` retry until they get the lock.
+- **The CLI waits a bounded time.** `acquire(lockFile, { timeoutMs })`, passed through by every `RepoConfigWriter` method, gives up when the bound runs out and throws `LockTimeoutError` (`code: 'LOCK_TIMEOUT'`) having written nothing. The CLI passes its `--lock-timeout <seconds>` (default 10, `0` tries once) and hands the writer a wrapped `Lock` that acquires with `warn: false`, so its own timeout message (exit `6`) replaces the "seems stuck" warning.
+- **A timeout leaves nothing to clean up.** It means the lock file existed for the whole wait, so the CLI wrote nothing. On Ctrl-C while it holds the lock, the CLI releases it (owner-checked) and exits `130`.
+- **Read-only commands take no lock.**
+
+### `RepoPath#toplevel`
+
+`shared/lib/file/RepoPath.js` validates repo paths (`validate`) and resolves a repo's root: `toplevel(repoPath)` runs `git -C <path> rev-parse --show-toplevel` through `execFile` with an argument array and strips git's trailing newline. It throws `Error: not a git repository: <path>` when git cannot resolve a toplevel (not a repo, a missing path, a bare repo). The CLI uses it to normalize `--repo` and the current directory to the repo root (see [Arcanum CLI](arcanum-cli.md)), and reuses `validate`'s messages for its `--repo` usage errors.
+
+### `ConfigChain#readWithSource` and `AgentEmail`
+
+- **`ConfigChain#readWithSource(repoPath, namespace, ...keys)`** is the one resolution loop: it returns `{ value, tier, file, key }` (the raw value, the winning tier, that tier's absolute file and the winning key as passed), or `undefined` when every key in every tier is absent or `null`. `read` is a thin wrapper over it, so value and provenance cannot drift. `readTiers` returns what each tier holds for one key, shadowed tiers included.
+- **`shared/lib/config/AgentEmail.js`** wraps the two-key, per-tier lookup `git.agents.<agent>` then `git.email`:
+  - `resolve(repoPath, agent)` → `{ email, raw, tier, key }` or `undefined`. `raw` is the value before `{agent}` substitution, `key` the full dotted key. An explicit `""` resolves with `email: undefined`, so a caller can still show where the empty value lives. This is the CLI's entry point (`agents email` and the setup wizard's identity section).
+  - `get(repoPath, agent, modelEmail)` → `resolve`'s email, or `modelEmail` when nothing resolves or the value is `""`. It replaced the three private `_agentEmailGet` copies in core's commit commands (`AutoNewIssueCommitIssue`, `AutoPlanIssueCommitPlan`, `AutoFixIssueCommitChange`).
+- **Aligned with the shell.** `arcanum/_lib/agent_email.sh`'s `agent_email_get` keeps serving the shell engine. Both treat an explicit `""` as "no email" and fall back to the model email; an empty string is not an opt-out of the co-author line. `core/spec/bin/agentEmailParity_spec.js` keeps the two in parity, including `null`, `""`, a generic key beating a specific one across tiers, and `{agent}` substitution.
+- **Non-string values** (only from hand edits) are unsupported: native stringifies with `String(value)`, the shell prints the `jq -c` form. The registry types `git.email` and `git.agents.<agent>` as strings, so the CLI never writes one.
+
+### The CLI bundle
+
+`shared/` is not in the `arcanum-cli` npm package, so the CLI cannot import it at runtime. `cli/scripts/build.mjs` bundles `cli/lib/main.js`, the parts of `shared/lib/` it imports, and `keys.json` (inlined by its JSON import) into one file, `cli/dist/arcanum.mjs`, with `esbuild`, a devDependency only.
+
+- **Precondition:** no file under `shared/lib/` relies on `import.meta.url` or `__dirname` to find other files, so bundling breaks no module-relative path.
+- **Metafile check.** The build reads esbuild's metafile and fails if any bundled input lies outside `cli/lib/**` and `shared/lib/**` (`ALLOWED_INPUT_DIRS`, `checkInputs`). This is the resolved-path half of the [Import boundary](#import-boundary); the lint rules cover specifiers.
+- The rest of the build (options, injected constants, the migration-version list) is in [Arcanum CLI](arcanum-cli.md) and [Install & Release → npm package](install-and-release.md#npm-package-arcanum-cli).
+
+### Malformed files stay the CLI's concern
+
+`RepoConfigWriter` keeps reading a malformed (unparseable) tier file as `{}`, as the shell writers do. The CLI checks the target file itself before calling the writer and refuses to write a malformed one (see [Arcanum CLI](arcanum-cli.md)). The refusal is CLI behaviour and stays out of `shared/`.
+
+### CI coupling
+
+The `cli` and `shared` jobs of the `test` workflow run on every push, with no path filters, like every other job there.
+
+- Path filters on CircleCI need the `path-filtering` orb and dynamic config: a restructuring of the whole `.circleci/config.yml`.
+- A filter would be a second, hand-kept copy of the surface, which is really defined by the import graph `esbuild` follows. Add a file without updating the filter and the CLI job would silently stop covering it while CI stays green.
+- The jobs are cheap: install, lint, a small `esbuild` build and the specs.
+- The `cli` job builds the bundle and runs the smoke specs against it; the release's `publish-cli` job runs the same build script, so the tested artefact is the shipped one. The surface-side lint rule lives in `shared/eslint.config.mjs`, so the `shared` job enforces it on every push.
+
 ## Security
 
 - **Zero runtime dependencies,** enforced by a spec (see [Testing](#testing)), so the CLI never pulls third-party code into `~/.claude`.
@@ -143,9 +206,16 @@ Every write holds `<file>.lock` through `Lock.js`, the same protocol as `arcanum
 - **A published npm package, or a workspace package.** Rejected: `core/` ships with no runtime npm dependency in the release zip and the image, and installs run it straight from disk. A workspace needs a root `package.json` and an install step that no install flow has.
 - **A mount, copy or symlink of `shared/` at a core path.** Rejected: the native engine, git-clone installs and zip installs run core from disk with no mount or build step; a committed symlink means double linting, double coverage and two copies in the zip, and is fragile on Windows; an install-time copy would be needed in the installer, the updater and the git-clone flow.
 - **Keeping the surface in core.** Reversed by #816: it needed a hand-kept file list and import regex in `core/eslint.config.mjs`, put CLI-only writer changes in `node`'s scope, and let a `core/` edit change the CLI bundle silently.
+- **Reimplementing the config logic in the CLI.** Rejected: it would drift from arcanum, especially the locking.
+- **A plain copy script instead of `esbuild`.** Rejected: copied files keep their relative imports and need their own module layout in the package, whereas a bundle is one self-contained file.
+- **A path-resolving lint (`eslint-plugin-import`).** Rejected: a new devDependency, while the build's metafile check already covers resolved paths.
+- **Path-filtered CI for the `cli` job.** Rejected: it needs CircleCI dynamic config, and a hand-kept filter can silently stop covering a new surface file.
+- **A CLI-only, stricter lock.** Rejected: it would not exclude running skills. The shared protocol was fixed instead (#807).
+- **Keeping `BooleanKeyConfig` on the surface.** Rejected: it is core's `config.sh` dispatch layer (subcommand-named methods, `toggle`, `DispatchFailure` as `is-enabled`'s "false" signal), and the CLI reads and writes those keys through `ConfigChain` and `RepoConfigWriter` anyway.
 
 ## See also
 
 - [Script Engine](script-engine.md): the native dispatcher that consumes the surface.
 - [Shared State & Configuration Files](shared-state-and-configuration.md): the config tiers and the key registry.
-- [Arcanum CLI spec](../specs/arcanum-cli.md): the CLI that bundles the surface (still a spec until #785 and #786 promote it).
+- [Lock System](lock-system.md): the lock protocol `Lock.js` shares with `lock.sh`.
+- [Arcanum CLI](arcanum-cli.md): the CLI that bundles the surface.

@@ -241,4 +241,4 @@ From the repository root, the Docker-based `make cli-install`, `make cli-lint`, 
 
 - [User guide](https://github.com/darthjee/arcanum/blob/main/docs/guides/arcanum-cli.md)
 - [Architecture](https://github.com/darthjee/arcanum/blob/main/docs/agents/architecture/arcanum-cli.md) of the CLI's internals
-- [Arcanum CLI spec](https://github.com/darthjee/arcanum/blob/main/docs/agents/specs/arcanum-cli.md) and its parts under `docs/agents/specs/arcanum-cli/`
+- [Arcanum CLI architecture](https://github.com/darthjee/arcanum/blob/main/docs/agents/architecture/arcanum-cli.md)

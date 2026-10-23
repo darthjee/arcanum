@@ -15,7 +15,75 @@ After the zip is uploaded, the same `release` workflow also publishes the multi-
 
 ## npm package (arcanum-cli)
 
-The same `release` workflow publishes the `arcanum-cli` npm package (the `cli/` client) as `arcanum-cli@<version>`, on every release tag. The design is in [Arcanum CLI: Packaging and Release → Release](../specs/arcanum-cli/packaging-and-release.md#release).
+The same `release` workflow publishes the `arcanum-cli` npm package (the `cli/` client, see [Arcanum CLI](arcanum-cli.md)) as `arcanum-cli@<version>`, on every release tag.
+
+### Code layout
+
+The CLI lives in the root folder `cli/`, owned by `client`. The stack mirrors `core/`: Node.js ESM, Yarn, Jasmine, c8 and ESLint.
+
+| Path | Contents |
+| --- | --- |
+| `cli/bin/arcanum` | The npm `bin` entry: the unbundled Node-floor gate |
+| `cli/lib/` | The CLI source; `cli/lib/main.js` is the bundle entry |
+| `cli/scripts/build.mjs` | The `esbuild` build, the embedded migration-version list and the metafile check |
+| `cli/dist/` | The bundle, `arcanum.mjs`; gitignored, never committed |
+| `cli/spec/` | Jasmine specs mirroring `cli/lib/`, plus the `bin`, build, packaging and smoke specs |
+| `cli/package.json`, `cli/yarn.lock` | The manifest and the committed lockfile for the devDependencies |
+| `cli/eslint.config.mjs` | The lint config, with the CLI side of the [import boundary](shared-lib.md#import-boundary) |
+| `cli/README.md` | The developer README, which is also the npm package page |
+
+`cli/` is **not** part of the release zip: it is in `build_release_zip.sh`'s `EXCLUDES`, so arcanum installs never carry a copy of the CLI. `core/spec/release/buildReleaseZipList_spec.js` asserts that `--list` names nothing under `cli/`.
+
+### Package manifest
+
+| Field | Value | Why |
+| --- | --- | --- |
+| `name` | `arcanum-cli` | Unscoped, so the install is `npm i -g arcanum-cli`. |
+| `version` | arcanum's version | Lockstep, see [Version lockstep](#version-lockstep). |
+| `description`, `homepage`, `repository` (with `directory: "cli"`), `bugs` | arcanum's values | The npm page links back to this repo and folder. The repo has no license file, so there is no `license` field. |
+| `type` | `module` | ESM, like `core/`. |
+| `bin` | `{"arcanum": "bin/arcanum"}` | The installed command is `arcanum`. |
+| `files` | `["bin/", "dist/", "README.md"]` | A whitelist: sources, specs, the build script and the lockfile never ship. npm always adds `package.json`. |
+| `engines.node` | `>=22.13.0` | Equal to `core/package.json`'s. |
+| `scripts` | `build`, `prepack: "yarn build"`, `test`, `lint` | `npm pack` and `npm publish` always ship a fresh bundle. |
+| `dependencies` | absent | Zero runtime dependencies. |
+| `devDependencies` | Jasmine, c8, ESLint and its plugins, `esbuild` | Exact versions, pinned by `cli/yarn.lock`. |
+| `publishConfig` | `{"access": "public", "tag": "latest"}` | A local `npm publish` cannot pick another dist-tag by accident. |
+
+There are no other lifecycle scripts. `preinstall`, `install` and `postinstall` are forbidden: installing the package never runs code. `private` is absent; only the release job publishes. `cli/spec/packaging/manifest_spec.js` asserts the shape: the name and `bin`, no `dependencies` / `optionalDependencies` / `peerDependencies`, no install scripts, exact devDependency versions, the wired scripts, and an `npm pack --dry-run` file list of exactly `README.md`, `bin/arcanum`, `dist/arcanum.mjs` and `package.json`.
+
+### Build output
+
+`yarn build` (`cli/scripts/build.mjs`) writes one file, `cli/dist/arcanum.mjs`. It holds the CLI (`cli/lib/**`), the parts of `shared/lib/` it imports, `keys.json` (inlined by its JSON import), and three constants injected through `define`: `__ARCANUM_CLI_VERSION__` (`version`), `__ARCANUM_NODE_FLOOR__` (`engines.node`) and `__ARCANUM_MIGRATION_VERSIONS__` (below). The bundle is unminified, so a user can read what they installed and stack traces point at real source lines. Its `esbuild` target is derived from `engines.node` (`node22.13`), and the build fails if any bundled input lies outside `cli/lib/**` and `shared/lib/**` (see [Shared Lib → The CLI bundle](shared-lib.md#the-cli-bundle)). The CLI's runtime path, from the `bin/arcanum` gate to the bundle, is in [Arcanum CLI](arcanum-cli.md).
+
+**The embedded migration-version list.** The CLI's version-skew check needs to know, per scope, which arcanum versions shipped migrations. `build.mjs` computes it at build time:
+
+```json
+{"repo": ["0.9.3", "0.13.0", "..."], "local": ["..."], "global": ["..."]}
+```
+
+- **Source:** every `arcanum/migrations/repos/<X.Y.Z>/migrations.json`, read-only. A version is listed under a scope when at least one of its entries has that `applies_to`.
+- **Released versions only.** Only bare `X.Y.Z` directories count; `next/` and directories without a `migrations.json` are skipped. At release time `scripts/bump-version.sh` has already rolled `next/` into the version's folder, so a released bundle never misses its own migrations.
+- **Upper bound.** Versions above the CLI's own are dropped, so a development build never reports migrations "from the future".
+- **Order:** each list is sorted by semver, not as strings (`0.9.3` < `0.13.0`).
+- **Validation.** The build fails on a `migrations.json` that is not a JSON array, or on an entry whose `applies_to` is missing or not `repo`, `local` or `global`. It never guesses a scope.
+
+The list is data inside the bundle: the CLI never reads `arcanum/migrations/` at runtime, since it is not in the package. How the CLI counts pending migrations from it is in [Arcanum CLI](arcanum-cli.md).
+
+### Install
+
+- `npm i -g arcanum-cli`. npm handles PATH, updates and uninstall, so there is no custom installer.
+- `npx arcanum-cli config info` works with no global install, as a one-off way to inspect an environment.
+- The CLI is optional. No per-repo migration installs it or nudges the user to.
+
+### Version lockstep
+
+The CLI's version always equals the arcanum version it was released with. The CLI's skew check relies on it: it compares the tiers' version pointers, which hold arcanum versions, with its own version.
+
+- **Bump.** `scripts/bump-version.sh` also rewrites `cli/package.json`'s `version`, in the same run that updates `arcanum.version`.
+- **Push-time guard.** `cli/spec/packaging/lockstep_spec.js` asserts that `cli/package.json`'s `version` equals the root `arcanum.version`, that `engines.node` equals `core/package.json`'s, and that the floor literal in `cli/bin/arcanum` (and the source-run fallback) equals `engines.node`. The `cli` CI job runs on every push, so a hand edit fails CI before a tag exists.
+- **Tag-time guard.** `publish_cli_package.sh` refuses to publish when `cli/package.json` disagrees with the tag (step 1 below).
+- **Every release publishes**, even when nothing under `cli/` or `shared/` changed, so "CLI version = newest arcanum version" stays true.
 
 ### Job and script
 
@@ -35,6 +103,8 @@ The same `release` workflow publishes the `arcanum-cli` npm package (the `cli/` 
 
 `publish-cli` authenticates with **npm trusted publishing** over CircleCI OIDC. npm exchanges the job's OIDC token, which CircleCI injects into every job, for a short-lived publish credential, and attaches **provenance** to the published version automatically. There is no long-lived npm token anywhere: no `NPM_TOKEN` env var, no CircleCI context, no `.npmrc` auth line. The script refuses a real publish when `NPM_TOKEN` or `NODE_AUTH_TOKEN` is set, so a stray token cannot silently bypass OIDC and drop provenance. Trusted publishing needs npm ≥ 11.5.1 and Node ≥ 22.14.0.
 
+**Provenance.** Trusted publishing generates and attaches the provenance statement itself, with no `--provenance` flag, linking each published version to the CircleCI pipeline and commit that built it. The bootstrap's manual first publish has none; every CI publish after it does. The verify step also prints the published tarball's `dist.integrity`, which can be compared with a local `npm pack` of the same tag. The OIDC identity only exists in CircleCI jobs, and only `publish-cli` calls `npm publish`; the `test` workflow never publishes. The script runs without `set -x`.
+
 **One-time bootstrap**, done by hand by the package owner. A trusted publisher can only be attached to a package that exists, so until this is done every `publish-cli` run fails at the publish step:
 
 1. Run `make cli-publish-dry-run` and check the output (file list, version, `latest` tag).
@@ -44,10 +114,48 @@ The same `release` workflow publishes the `arcanum-cli` npm package (the `cli/` 
 
 ### Failure and recovery
 
+- **Order.** `build-and-release` runs first, so a failed npm publish leaves a GitHub release with no matching CLI. That is the safe direction: arcanum installs work as before, and the CLI is optional.
+- **Partial publish is impossible.** `npm publish` uploads one tarball in one request: the version either exists or it does not.
 - **Auth failure before the bootstrap.** A release tagged before the bootstrap fails `publish-cli` at the publish step (npm `E404`/`E403`/`ENEEDAUTH`). Do the bootstrap, then use CircleCI's "Rerun workflow from failed". The same applies if the trusted-publisher entry is removed or no longer matches the job.
 - **Registry lag.** If the version is not visible within a minute of the publish, the verify step fails with a "registry lag; re-run" message. Re-run from failed: step 2 then finds the version and stops with success.
 - **Re-runs are no-ops once published.** npm versions are immutable, so step 2 stops with success when the version already exists. That makes "Rerun workflow from failed" and whole-workflow re-runs safe. `build-and-release` is idempotent too.
 - **A broken published version** is never unpublished (its version number could never be reused). Ship a new arcanum patch release, which publishes a new CLI version, and run `npm deprecate arcanum-cli@X.Y.Z "<reason>; upgrade to X.Y.Z+1"` by hand.
+- **A lagging CLI.** While a publish is missing, the newest CLI on npm is the previous version. Users who already migrated to the new arcanum version see their tiers as ahead of the CLI, so reads warn and writes are refused without `--force`. That is the designed fail-safe, not a data risk, and it ends when the re-run publishes.
+
+### Dist-tags
+
+Every publish goes to `latest`; there is no pre-release channel. The `release` workflow only triggers on bare `X.Y.Z` tags, `publishConfig.tag` is pinned to `latest`, and the script's preflight rejects any tag that is not a bare `X.Y.Z`.
+
+### Local tooling
+
+The `cli` compose service and the root `Makefile`'s `cli-*` targets (owned by `infra`) run the CLI's tooling: `make cli-install`, `cli-lint`, `cli-build`, `cli-test` (which builds first, since the smoke specs need the bundle), `cli-check`, `cli-shell`, `cli-audit`, and `make cli-publish-dry-run`, which runs `scripts/publish_cli_package.sh <version> --dry-run`.
+
+### Supply chain
+
+What a user installs, and what can reach it:
+
+- **Zero runtime dependencies.** `npm i -g arcanum-cli` installs exactly one package.
+- **No install-time code:** no install lifecycle scripts, enforced by the manifest spec.
+- **A readable bundle.** `dist/arcanum.mjs` is unminified.
+- **Bounded build inputs.** The metafile check fails the build if anything outside `cli/lib/**` and `shared/lib/**` is bundled. The devDependencies, `esbuild` included, run only at build time, pinned to exact versions by `cli/yarn.lock` and installed with `--frozen-lockfile`.
+- **Whitelisted contents.** `files` plus the `npm pack --dry-run` check mean no source, spec, lockfile or stray local file is published.
+- **No long-lived credentials,** and provenance on every CI publish (see [npm trusted publishing](#npm-trusted-publishing)).
+- **Audit.** The `cli` CI job runs `yarn audit`, non-blocking, over the devDependencies.
+- **No runtime network or install lookups.** The CLI never reads `arcanum/migrations/` or any network resource at runtime, and `cli/bin/arcanum` only imports the bundle next to it, by a relative path.
+
+### Future work
+
+- **A pre-release channel** (`X.Y.Z-rc.N` under the `next` dist-tag). It needs the `release` workflow to accept pre-release tags for the zip and the image too, which is a decision for the whole release pipeline, not the CLI alone.
+
+### Alternatives considered
+
+- **A release-zip tarball with its own `curl | bash` bootstrap,** or **a standalone binary** (`bun build --compile`, `pkg`). Rejected: arcanum would own PATH handling, updates and uninstall, or need per-OS builds, where npm already does the job.
+- **Shipping the CLI inside each arcanum install, plus a PATH migration.** Rejected: several installs would mean several competing clients.
+- **Publishing from GitHub Actions to get provenance.** Rejected, and moot since CircleCI supports trusted publishing: it would split one release across two CI providers.
+- **Publishing the CLI before the GitHub release.** Rejected: a CLI published for a release that then fails would describe a version that does not exist.
+- **Publishing only when `cli/` or `shared/` changed.** Rejected: the CLI version would lag arcanum's, and the skew check would refuse writes to freshly migrated tiers.
+- **Failing `publish-cli` when the version already exists,** like `publish-image`. Rejected: npm already guarantees immutability, so failing would only block whole-workflow re-runs.
+- **Reading `arcanum/migrations/` at runtime.** Impossible: it is not in the npm package, and the CLI does not locate arcanum installs.
 
 ## Update
 
