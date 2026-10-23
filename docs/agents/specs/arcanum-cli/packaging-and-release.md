@@ -46,7 +46,7 @@ The stack mirrors `core/`: Node.js ESM, Yarn, Jasmine, c8, ESLint.
 
 No other lifecycle scripts. In particular `preinstall`, `install` and `postinstall` are **forbidden**: installing the package must never run code. A packaging spec asserts that the manifest has no such script and no `dependencies`, `optionalDependencies` or `peerDependencies`.
 
-`private` is absent. The `test`/`checks` workflows never publish, and only the release job holds the npm token (see [Token storage](#token-storage)).
+`private` is absent. The `test`/`checks` workflows never publish, and only the release job can publish, through npm trusted publishing (see [Authentication](#authentication)).
 
 ### Build output
 
@@ -106,7 +106,7 @@ The package is published from the existing CircleCI `release` workflow (see [Ins
   3. `yarn install --frozen-lockfile`.
   4. `yarn lint`, then `yarn build`, then the CLI specs including the smoke specs on the bundle. The `test` workflow ignores tag pushes, so the release job runs them itself, on the exact tree it publishes.
   5. **Content check:** `npm pack --dry-run --json`, asserting the file list is exactly `bin/arcanum`, `dist/arcanum.mjs`, `README.md` and `package.json`.
-  6. `npm publish`, through a temporary `.npmrc` (see [Token storage](#token-storage)).
+  6. `npm publish`, authenticated by npm trusted publishing over the job's CircleCI OIDC token, with no npm token and no `.npmrc` (see [Authentication](#authentication)).
   7. **Verify:** `npm view arcanum-cli@$CIRCLE_TAG version` returns the tag, retried for up to a minute to absorb registry lag.
 - The steps live in a script, `scripts/publish_cli_package.sh <tag>` (owner: `infra`), like `scripts/publish_runtime_image.sh`, so the job's YAML stays a single call and the logic is testable locally against a dry run (`--dry-run` maps to `npm publish --dry-run` and skips steps 2 and 7).
 - `prepack` rebuilds the bundle during `npm publish`. That is the same `yarn build` as step 4 on the same tree, so the tested artefact is the shipped artefact (see [Shared Config Logic](shared-config-logic.md#ci-coupling)).
@@ -120,29 +120,32 @@ The CLI version always equals the arcanum version it was released with. The inde
 - **Tag-time guard.** `publish-cli`'s first step (above) refuses to publish when `cli/package.json` disagrees with the tag. Nothing is published under the wrong version.
 - **Every release publishes.** The CLI is published on every arcanum release, even when nothing under `cli/` or the shared surface changed. That keeps "CLI version = newest arcanum version" true, which the skew check depends on. Release notes say so for releases with no CLI change.
 
-#### Token storage
+#### Authentication
 
-- **`NPM_TOKEN`**, a CircleCI project (or context) environment variable, documented in `.circleci/config.yml`'s header next to `GH_TOKEN` and `DOCKERHUB_TOKEN`.
-- It is an npm **granular access token** with read-and-write permission on the `arcanum-cli` package only, an expiry date, and "bypass 2FA" enabled (CI cannot answer an OTP). The package owner account keeps 2FA on for interactive logins.
-- It is never echoed. `publish_cli_package.sh` writes a temporary `.npmrc` containing the literal `//registry.npmjs.org/:_authToken=${NPM_TOKEN}`, so npm expands the variable itself and the value never appears on a command line or in the log. The file is created with mode `600` outside the checkout and removed by an `EXIT` trap. The script runs with `set +x`.
-- The token exists only in the `release` workflow. The `test` workflow's jobs never receive it. When it is held in a CircleCI context, the context is restricted to the `release` workflow's jobs.
-- **Rotation.** The token's expiry is at most one year. Rotating it is a CircleCI settings change, with no code change. An expired token fails the publish step with npm's `E401`/`E403`; see [Failure handling](#failure-handling).
+**Decision: npm trusted publishing over CircleCI OIDC; no long-lived token.**
+
+- npm accepts CircleCI as a trusted-publisher OIDC provider. The `arcanum-cli` package's trusted publisher is the `darthjee/arcanum` CircleCI project, and npm exchanges the `publish-cli` job's OIDC token (which CircleCI injects into every job) for a short-lived publish credential.
+- There is no `NPM_TOKEN`: no CircleCI env var or context holds an npm secret, and the script writes no `.npmrc` auth line. Nothing can leak and nothing expires.
+- **Guard.** `publish_cli_package.sh` refuses a real publish when `NPM_TOKEN` or `NODE_AUTH_TOKEN` is set, so a stray token cannot silently bypass OIDC (and drop provenance). It also requires the CircleCI OIDC token (`CIRCLE_OIDC_TOKEN_V2`, or `CIRCLE_OIDC_TOKEN`) before doing any work. The script runs without `set -x`.
+- **Bootstrap.** A trusted publisher can only be attached to an existing package, so the package owner does a one-time manual first publish (interactive login, 2FA), registers the trusted publisher, and sets the package's publishing access to disallow tokens. The procedure is in [Install & Release → npm trusted publishing](../../architecture/install-and-release.md#npm-trusted-publishing). A release tagged before then fails `publish-cli` at the publish step and is recovered with "Rerun workflow from failed".
+- The OIDC identity only exists in CircleCI jobs, and only the `release` workflow's `publish-cli` job calls `npm publish`; the `test` workflow never publishes.
 
 #### Provenance
 
-**Decision: publish without `--provenance` for now; adopt npm trusted publishing with provenance once npm supports CircleCI as an OIDC provider.**
+**Decision: adopted. Every CI publish carries npm provenance, attached automatically by trusted publishing.**
 
-- `npm publish --provenance` needs a CI provider that npm accepts as an OIDC identity source. npm launched this for GitHub Actions and GitLab CI/CD; arcanum releases from CircleCI.
-- The `infra` sub-issue checks npm's current list of trusted-publisher providers when it implements `publish-cli`. If CircleCI is on it, the job uses trusted publishing instead of `NPM_TOKEN` (no long-lived secret at all) and publishes with provenance, and this section is updated.
-- Until then, the same tarball integrity is available through other means: the `npm pack` file list is checked (step 5), and the published tarball's `dist.integrity` is printed by the verify step. It can be compared with a local `npm pack` of the same tag.
-- Moving the publish job to GitHub Actions only to get provenance is rejected (see [Alternatives considered](#alternatives-considered)).
+- Trusted publishing generates and attaches the provenance statement itself; no `--provenance` flag is needed. It links each published version to the CircleCI pipeline and commit that built it.
+- Requirements: npm ≥ 11.5.1 and Node ≥ 22.14.0 on the publishing job. The `darthjee/circleci_node` image has Node 22.14.0 but an older npm, so `publish-cli` installs an exact npm 11.x pin before publishing. The script checks both floors before a real publish.
+- The bootstrap's manual first publish has no provenance; every version after it does.
+- On top of that, the `npm pack` file list is checked (step 5), and the published tarball's `dist.integrity` is printed by the verify step. It can be compared with a local `npm pack` of the same tag.
+- Moving the publish job to GitHub Actions to get provenance was rejected (see [Alternatives considered](#alternatives-considered)), and is no longer needed.
 
 #### Failure handling
 
 npm versions are **immutable**: a published `arcanum-cli@X.Y.Z` cannot be overwritten, and its version number can never be reused, even after an unpublish. The release flow follows from that:
 
 - **Order.** `build-and-release` (the GitHub release) runs first; `publish-cli` and `publish-image` run after it, in parallel. A failed npm publish therefore leaves a GitHub release with no matching CLI. That is the safe direction: arcanum installs work as before, and the CLI is optional.
-- **Recovery.** Fix the cause (usually an expired or revoked token) and use CircleCI's "Rerun workflow from failed". `build-and-release` is already idempotent (`upload_release_asset.sh` creates or updates the release), so only the failed jobs redo work.
+- **Recovery.** Fix the cause (usually a missing or mismatched trusted-publisher entry, e.g. before the bootstrap) and use CircleCI's "Rerun workflow from failed". `build-and-release` is already idempotent (`upload_release_asset.sh` creates or updates the release), so only the failed jobs redo work.
 - **Re-runs are a no-op once published.** Step 2 stops with success when the version already exists on the registry. Unlike `publish-image`, which must fail on an existing tag because Docker tags can be overwritten, npm itself guarantees the published version cannot change, so skipping is safe and makes a whole-workflow re-run usable.
 - **Partial publish is impossible.** `npm publish` uploads one tarball in one request: the version either exists or it does not.
 - **A broken published version** is never unpublished. It is fixed by a new arcanum patch release (which publishes a new CLI version) plus `npm deprecate arcanum-cli@X.Y.Z "<reason>; upgrade to X.Y.Z+1"`, run by hand by the package owner.
@@ -169,7 +172,7 @@ What a user installs, and what can reach it:
 - **Readable bundle.** `dist/arcanum.mjs` is unminified, so what runs is what can be read in the package.
 - **Bounded build inputs.** The metafile check fails the build if anything outside `cli/lib/**` and `shared/lib/**` gets bundled (see [Shared Config Logic](shared-config-logic.md#bundle-at-build-time-with-esbuild)). The devDependencies, including `esbuild`, run only at build time and are pinned by `cli/yarn.lock` with exact versions; the release job installs with `--frozen-lockfile`.
 - **Whitelisted contents.** `files` plus the `npm pack --dry-run` check (step 5) mean no source, spec, lockfile or stray local file is published.
-- **Narrow credentials.** The npm token is scoped to one package, expires, lives only in the `release` workflow, and is never printed (see [Token storage](#token-storage)).
+- **No long-lived credentials.** Publishing uses npm trusted publishing over CircleCI OIDC: a short-lived credential bound to the `darthjee/arcanum` CircleCI project, no npm token stored anywhere, and token-based publishing disallowed on the package (see [Authentication](#authentication)). Every CI-published version carries provenance (see [Provenance](#provenance)).
 - **Audit.** The `cli` CI job runs `yarn audit` as a non-blocking step, like the `checks` job does for `core/`. It only covers devDependencies, since there are no runtime ones.
 
 ## Edge cases
@@ -178,7 +181,8 @@ What a user installs, and what can reach it:
 | --- | --- |
 | `cli/package.json` version ≠ tag | `publish-cli` fails at step 1; nothing is published. The push-time spec should have caught it earlier. |
 | Tag pushed again / workflow re-run after a successful publish | Step 2 finds the version on npm and exits with success. |
-| npm token missing, expired or revoked | `publish-cli` fails (`NPM_TOKEN` unset is checked before any npm call, like `publish-image`'s `DOCKERHUB_TOKEN` check). Rotate the token and re-run from failed. |
+| Trusted publisher not set up yet, or no longer matching the job | `publish-cli` fails at the publish step. Do the bootstrap or fix the trusted-publisher entry, then re-run from failed. |
+| `NPM_TOKEN` or `NODE_AUTH_TOKEN` set on the job | `publish-cli` fails in preflight, before any registry call, so a token cannot bypass OIDC. Remove the variable and re-run. |
 | Registry outage or lag after publish | The verify step retries for a minute, then fails. A re-run finds the version published and stops at step 2. |
 | `next/` contains migrations at tag time | Cannot happen through `bump-version.sh`. If it happens anyway, the build ignores `next/`, so those migrations are not counted, and the release itself is wrong for arcanum too, not just the CLI. |
 | A `migrations.json` has an entry without a valid `applies_to` | The build fails, on the `cli` job at push time and again at release. |
@@ -215,7 +219,7 @@ Nothing load-sensitive. The package is a single unminified file of roughly 1–2
 ## Security
 
 - No install-time code, zero runtime dependencies, and a whitelisted, checked package content (see [Supply chain](#supply-chain)).
-- The npm token is package-scoped, expiring, release-only, and never printed or placed on a command line (see [Token storage](#token-storage)).
+- No npm token exists: publishing uses trusted publishing over CircleCI OIDC, the script refuses stray token env vars, and the package disallows token-based publishing (see [Authentication](#authentication)). CI-published versions carry provenance (see [Provenance](#provenance)).
 - Published versions are immutable and never unpublished; a bad version is deprecated and superseded (see [Failure handling](#failure-handling)).
 - The CLI never reads `arcanum/migrations/` or any network resource at runtime; the migration-version list is baked into the bundle.
 - `cli/bin/arcanum` only imports the bundle shipped next to it, by a relative path; it never resolves code from the current directory.
@@ -225,7 +229,7 @@ Nothing load-sensitive. The package is a single unminified file of roughly 1–2
 - **A release-zip tarball with its own `curl | bash` bootstrap.** Rejected: arcanum would have to own PATH handling, updates and uninstall, which npm already does.
 - **A standalone binary via `bun build --compile` or `pkg`.** Rejected: it needs per-OS builds and heavier CI.
 - **Shipping the CLI inside each arcanum install, plus a PATH migration.** Rejected: users with several installs would get several competing clients.
-- **Publishing from GitHub Actions to get npm provenance today.** Rejected: it splits the release pipeline across two CI providers for one job, and the GitHub release, the image and the npm package would no longer come from one workflow run.
+- **Publishing from GitHub Actions to get npm provenance.** Rejected (and moot now that CircleCI supports trusted publishing): it splits the release pipeline across two CI providers for one job, and the GitHub release, the image and the npm package would no longer come from one workflow run.
 - **Publishing the CLI before the GitHub release.** Rejected: the GitHub release is arcanum's canonical artefact. A CLI published for a release that then fails would describe a version that does not exist.
 - **Publishing only when `cli/` or the shared surface changed.** Rejected: the CLI version would lag arcanum's, and the skew check would refuse writes to freshly migrated tiers.
 - **Failing `publish-cli` when the version already exists**, like `publish-image`. Rejected: npm already guarantees immutability, so failing would only block whole-workflow re-runs.
@@ -235,5 +239,4 @@ Nothing load-sensitive. The package is a single unminified file of roughly 1–2
 
 None left. Future work:
 
-- Switch to npm trusted publishing with provenance once npm accepts CircleCI as an OIDC provider (see [Provenance](#provenance)).
 - A pre-release channel under the `next` dist-tag, decided together with pre-release tags for the whole release pipeline (see [Dist-tags](#dist-tags)).

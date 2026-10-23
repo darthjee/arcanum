@@ -11,7 +11,43 @@ Spec folders (`core/spec/`, `shared/spec/`) are dev-only and never packaged: bot
 
 CI, lint and test tooling is dev-only too and listed in `EXCLUDES`: `.circleci/`, `.codacy.yml`, the markdownlint files, the root `Makefile`, `core/eslint.config.mjs`, `core/.jscpd.json`, `core/docker-compose.yml`, `shared/eslint.config.mjs`, and the mod's `hooks/*.test.ts`, `hooks/test-support.ts` and `tsconfig.json`; `arcanum.png` (the README loads it from a remote URL) is excluded as well. An `EXCLUDES` entry containing `*` is a glob, matched with bash pattern matching. Some Docker files keep shipping on purpose: `core/Dockerfile` and `.dockerignore` (the docker engine's local-build fallback) and `core/docker-entrypoint.sh` (the `test` stage `COPY`s it, and the legacy builder builds that stage even with `--target runtime`), along with `core/package.json`, `core/yarn.lock` and `README.md`. The packaging spec guards both sides: excluded paths must not be listed, kept ones must be. Existing zip installs drop the excluded files on their next update, through the `MANIFEST` diff.
 
-After the zip is uploaded, the same `release` workflow also publishes the multi-arch runtime Docker image `darthjee/arcanum:<version>` (job `publish-image`), used by `engine.mode=docker`. See [Docker Engine → Distribution and versioning](docker-engine.md#distribution-and-versioning).
+After the zip is uploaded, the same `release` workflow also publishes the multi-arch runtime Docker image `darthjee/arcanum:<version>` (job `publish-image`), used by `engine.mode=docker`. See [Docker Engine → Distribution and versioning](docker-engine.md#distribution-and-versioning). In parallel, it publishes the `arcanum-cli` npm package (job `publish-cli`); see [npm package (arcanum-cli)](#npm-package-arcanum-cli).
+
+## npm package (arcanum-cli)
+
+The same `release` workflow publishes the `arcanum-cli` npm package (the `cli/` client) as `arcanum-cli@<version>`, on every release tag. The design is in [Arcanum CLI: Packaging and Release → Release](../specs/arcanum-cli/packaging-and-release.md#release).
+
+### Job and script
+
+- **Job `publish-cli`** (`.circleci/config.yml`): release-only, with the same tag filters as its siblings. It `requires: [build-and-release]` and runs in parallel with `publish-image`, so the GitHub release always exists first and a failure in one publish job does not hold back the other. It runs on `darthjee/circleci_node` (the `cli` test job's image) from `cli/` in a full checkout. That image's npm is older than trusted publishing needs, so the job first installs an exact npm 11.x pin, then makes one call to `scripts/publish_cli_package.sh "$CIRCLE_TAG"`.
+- **Script `scripts/publish_cli_package.sh <tag> [--dry-run]`.** Each step fails the job on error:
+  0. Preflight: the tag is a bare `X.Y.Z` and Node is ≥ 22.14.0. For a real publish, npm must also be ≥ 11.5.1, `NPM_TOKEN`/`NODE_AUTH_TOKEN` must be unset, and a CircleCI OIDC token (`CIRCLE_OIDC_TOKEN_V2` or `CIRCLE_OIDC_TOKEN`) must be present.
+  1. `cli/package.json`'s `version` equals the tag.
+  2. If `arcanum-cli@<tag>` is already on the registry, stop with success.
+  3. `yarn install --frozen-lockfile`.
+  4. `yarn lint`, `yarn build`, `yarn test`.
+  5. The `npm pack --dry-run` file list is exactly `README.md`, `bin/arcanum`, `dist/arcanum.mjs` and `package.json`.
+  6. `npm publish` (`publishConfig` pins `access: public` and `tag: latest`).
+  7. Poll the registry for up to a minute until the version is visible, then print its `dist.integrity`.
+- **Dry run.** `--dry-run` skips steps 2 and 7, replaces step 6 with `npm publish --dry-run`, and needs no OIDC token and no npm 11. Run it locally with `make cli-publish-dry-run` (inside the `cli` compose service; `VERSION` defaults to `cli/package.json`'s). The script's own regression check is `bash scripts/test_publish_cli_package.sh`, run by hand.
+
+### npm trusted publishing
+
+`publish-cli` authenticates with **npm trusted publishing** over CircleCI OIDC. npm exchanges the job's OIDC token, which CircleCI injects into every job, for a short-lived publish credential, and attaches **provenance** to the published version automatically. There is no long-lived npm token anywhere: no `NPM_TOKEN` env var, no CircleCI context, no `.npmrc` auth line. The script refuses a real publish when `NPM_TOKEN` or `NODE_AUTH_TOKEN` is set, so a stray token cannot silently bypass OIDC and drop provenance. Trusted publishing needs npm ≥ 11.5.1 and Node ≥ 22.14.0.
+
+**One-time bootstrap**, done by hand by the package owner. A trusted publisher can only be attached to a package that exists, so until this is done every `publish-cli` run fails at the publish step:
+
+1. Run `make cli-publish-dry-run` and check the output (file list, version, `latest` tag).
+2. From a clean checkout of a release tag, logged in to npm interactively (`npm login`, 2FA on), run `cd cli && yarn install --frozen-lockfile && npm publish`. This first version has no provenance.
+3. Register the trusted publisher, either on npmjs.com (package → Settings → Trusted Publisher → CircleCI) or with `npm trust circleci arcanum-cli --org-id <uuid> --project-id <uuid> --pipeline-definition-id <uuid> --vcs-origin github.com/darthjee/arcanum --allow-publish`. The IDs come from the CircleCI organization and project settings. `--context-id` is optional; only pass it if `publish-cli` is ever moved into that context, since the job would otherwise no longer match.
+4. In the package's settings, set publishing access to require 2FA and disallow tokens, so only the trusted publisher (and interactive 2FA logins) can publish.
+
+### Failure and recovery
+
+- **Auth failure before the bootstrap.** A release tagged before the bootstrap fails `publish-cli` at the publish step (npm `E404`/`E403`/`ENEEDAUTH`). Do the bootstrap, then use CircleCI's "Rerun workflow from failed". The same applies if the trusted-publisher entry is removed or no longer matches the job.
+- **Registry lag.** If the version is not visible within a minute of the publish, the verify step fails with a "registry lag; re-run" message. Re-run from failed: step 2 then finds the version and stops with success.
+- **Re-runs are no-ops once published.** npm versions are immutable, so step 2 stops with success when the version already exists. That makes "Rerun workflow from failed" and whole-workflow re-runs safe. `build-and-release` is idempotent too.
+- **A broken published version** is never unpublished (its version number could never be reused). Ship a new arcanum patch release, which publishes a new CLI version, and run `npm deprecate arcanum-cli@X.Y.Z "<reason>; upgrade to X.Y.Z+1"` by hand.
 
 ## Update
 
