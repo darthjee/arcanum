@@ -4,6 +4,7 @@
 // name → runner (`git safe-branch`, `auto-fix-all clear-context`, …).
 
 import { UsageError } from '../../../exitCodes.js';
+import { runAgentsEmail } from './agentsEmail.js';
 import { runNextStepAuto } from './nextStep.js';
 import { singleValue } from './singleValue.js';
 
@@ -23,6 +24,9 @@ export const SHORTCUTS = {
   },
   'next-step': {
     auto: runNextStepAuto
+  },
+  agents: {
+    email: runAgentsEmail
   }
 };
 
