@@ -114,6 +114,22 @@ Two ways:
    }
    ```
 
+## From a terminal
+
+The [`arcanum` CLI](arcanum-cli.md) (`npm i -g arcanum-cli`) reads and
+writes this file for you, with validation and the same write lock the
+skills use, instead of hand-editing the JSON:
+
+```bash
+arcanum config list --global
+arcanum config set <key> <value> --global
+CLAUDE_CONFIG_DIR=~/.claude-work arcanum config list --global
+```
+
+The last line targets another account's global file. Leave `~`
+unquoted so the shell expands it. See the
+[CLI user guide](arcanum-cli.md) for every command and shortcut.
+
 ## Notes
 
 - **Important — `git.email` holds a per-agent *template*, not a static
