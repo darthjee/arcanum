@@ -1,25 +1,55 @@
 import KeyRegistry from '../../../shared/lib/config/KeyRegistry.js';
-import { EXIT_ERROR, EXIT_OK, EXIT_USAGE, UsageError } from '../exitCodes.js';
+import { TIER_FLAGS, checkArity, checkFlags, checkKey, selectedTier } from '../args.js';
+import { EXIT_OK, EXIT_USAGE, UsageError } from '../exitCodes.js';
 import { configUsage } from '../help.js';
+import get from './config/get.js';
+import info from './config/info.js';
+import list from './config/list.js';
+import set from './config/set.js';
+import unset from './config/unset.js';
 
-const SUBCOMMANDS = ['get', 'set', 'unset', 'list', 'info'];
+/** The `arcanum config` subcommands: name → module. */
+export const SUBCOMMANDS = { get, set, unset, list, info };
 
-/** The command's own `parseArgs` options (none yet, see #780). */
-export const options = {};
+const TIER_OPTIONS = Object.fromEntries(TIER_FLAGS.map((tier) => [tier, { type: 'boolean' }]));
 
 /**
- * The `arcanum config` namespace. Only its help is implemented; the
- * `get/set/unset/list/info` subcommands arrive with #780.
+ * Every subcommand-specific option, each with the `only` list of the
+ * subcommands that accept it (used for the "only accepted by" error).
+ */
+export const SUBCOMMAND_OPTIONS = Object.values(SUBCOMMANDS).reduce((all, subcommand) => {
+  for (const [name, option] of Object.entries(subcommand.options)) {
+    all[name] = { ...option, only: [...(all[name] ? all[name].only : []), subcommand.name] };
+  }
+
+  return all;
+}, {});
+
+/**
+ * The namespace's `parseArgs` options: the tier flags plus the union of
+ * every subcommand's own flags. Which subcommand accepts which flag is
+ * enforced after parsing, so the error can name the flag.
+ */
+export const options = {
+  ...TIER_OPTIONS,
+  ...Object.fromEntries(Object.entries(SUBCOMMAND_OPTIONS).map(([name, { type }]) => [name, { type }]))
+};
+
+/**
+ * The `arcanum config` namespace: prints its help, or runs the
+ * subcommand after the checks every subcommand shares (flags it
+ * accepts, tier-flag exclusivity, arity and key syntax).
  * @param {object} context - the parsed invocation.
  * @param {string[]} context.positionals - the arguments after `config`.
  * @param {object} context.values - the parsed flags.
  * @param {{stdout: {write: (text: string) => void}, stderr: {write: (text: string) => void}}} context.io - output streams.
  * @param {KeyRegistry} [context.registry] - the key registry, injectable for testing.
- * @returns {number} the exit code.
- * @throws {UsageError} on an unknown subcommand.
+ * @returns {Promise<number>} the exit code.
+ * @throws {UsageError} on an unknown subcommand or a usage error.
  */
-export function run({ positionals, values, io, registry = new KeyRegistry() }) {
-  const [subcommand] = positionals;
+export async function run(context) {
+  const { positionals, values, io, registry = new KeyRegistry() } = context;
+  const [name, ...args] = positionals;
   const usage = configUsage(registry.entries());
 
   if (values.help) {
@@ -28,19 +58,33 @@ export function run({ positionals, values, io, registry = new KeyRegistry() }) {
     return EXIT_OK;
   }
 
-  if (subcommand === undefined) {
+  if (name === undefined) {
     io.stderr.write(usage);
 
     return EXIT_USAGE;
   }
 
-  if (!SUBCOMMANDS.includes(subcommand)) {
-    throw new UsageError(`unknown config subcommand '${subcommand}'`);
+  if (!Object.hasOwn(SUBCOMMANDS, name)) {
+    throw new UsageError(`unknown config subcommand '${name}'`);
   }
 
-  io.stderr.write(`arcanum: config ${subcommand} is not implemented yet\n`);
+  const subcommand = SUBCOMMANDS[name];
 
-  return EXIT_ERROR;
+  checkFlags(name, values, subcommand.options, SUBCOMMAND_OPTIONS);
+
+  const tier = selectedTier(values);
+
+  if (!subcommand.acceptsTier && tier !== undefined) {
+    throw new UsageError(`--${tier} is not accepted by ${name}`);
+  }
+
+  checkArity(name, args, subcommand.positionals);
+
+  if (subcommand.positionals[0] === 'key') {
+    checkKey(args[0]);
+  }
+
+  return subcommand.run({ ...context, registry, args, tier });
 }
 
 export default { options, run };

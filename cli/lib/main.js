@@ -1,7 +1,9 @@
 import { parseArgs } from 'node:util';
+import { extractRepoTarget, firstPositional, valueOptionNames } from './args.js';
 import configCommand from './commands/config.js';
 import { EXIT_OK, EXIT_USAGE, UsageError, exitCodeForError } from './exitCodes.js';
 import { topLevelUsage } from './help.js';
+import { resolveTargets } from './target.js';
 
 /** The CLI's command registry: top-level command name → module. */
 export const COMMANDS = {
@@ -12,8 +14,16 @@ export const COMMANDS = {
 export const GLOBAL_OPTIONS = {
   help: { type: 'boolean', short: 'h' },
   version: { type: 'boolean' },
-  json: { type: 'boolean' }
+  json: { type: 'boolean' },
+  'claude-config-dir': { type: 'string' }
 };
+
+/**
+ * The long names of every option, global or command-level, that takes
+ * a value; their values are never mistaken for the command name.
+ */
+const VALUE_OPTIONS = [GLOBAL_OPTIONS, ...Object.values(COMMANDS).map((command) => command.options)]
+  .flatMap(valueOptionNames);
 
 /**
  * The CLI version, injected by the build through `define`; a source
@@ -42,11 +52,24 @@ const DEFAULT_IO = { stdout: process.stdout, stderr: process.stderr };
  * @param {object} [options] - injectable dependencies.
  * @param {{stdout: {write: (text: string) => void}, stderr: {write: (text: string) => void}}} [options.io] - output streams.
  * @param {string} [options.version] - the version `--version` reports.
+ * @param {object} [options.env] - the environment (`CLAUDE_CONFIG_DIR`, `HOME`).
+ * @param {string} [options.cwd] - the working directory.
+ * @param {object} [options.migrationVersions] - the per-scope migration
+ *   versions the version-skew checks use.
+ * @param {object} [options.deps] - further injectable collaborators,
+ *   forwarded to the command (e.g. `execFileAsync`, `lock`).
  * @returns {Promise<number>} the exit code.
  */
-export async function run(argv, { io = DEFAULT_IO, version = CLI_VERSION } = {}) {
+export async function run(argv, {
+  io = DEFAULT_IO,
+  version = CLI_VERSION,
+  env = process.env,
+  cwd = process.cwd(),
+  migrationVersions = MIGRATION_VERSIONS,
+  deps = {}
+} = {}) {
   try {
-    return await dispatch(argv, io, version);
+    return await dispatch(argv, { io, version, env, cwd, migrationVersions, deps });
   } catch (error) {
     io.stderr.write(`arcanum: ${error && error.message ? error.message : String(error)}\n`);
 
@@ -72,21 +95,23 @@ export async function main(argv) {
 
 /**
  * @param {string[]} argv - the arguments after the program name.
- * @param {object} io - output streams.
- * @param {string} version - the CLI version.
+ * @param {object} invocation - the invocation's streams, version,
+ *   environment and collaborators (see `run`).
  * @returns {Promise<number>} the exit code.
  * @throws {Error} on a usage error or a command failure.
  */
-async function dispatch(argv, io, version) {
-  const name = argv.find((arg) => !arg.startsWith('-'));
-  const command = name === undefined ? undefined : COMMANDS[name];
+async function dispatch(argv, invocation) {
+  const { io, version, env, cwd, migrationVersions, deps } = invocation;
+  const { args, repoPath } = extractRepoTarget(argv);
+  const name = firstPositional(args, VALUE_OPTIONS);
+  const command = name === undefined || !Object.hasOwn(COMMANDS, name) ? undefined : COMMANDS[name];
 
   if (name !== undefined && !command) {
     throw new UsageError(`unknown command '${name}'`);
   }
 
   const { values, positionals } = parseArgs({
-    args: argv,
+    args,
     options: { ...GLOBAL_OPTIONS, ...(command ? command.options : {}) },
     allowPositionals: true,
     strict: true
@@ -110,5 +135,20 @@ async function dispatch(argv, io, version) {
     return EXIT_USAGE;
   }
 
-  return command.run({ positionals: positionals.slice(1), values, io });
+  const warn = (message) => io.stderr.write(`arcanum: warning: ${message}\n`);
+  const targeting = { repo: repoPath, claudeConfigDir: values['claude-config-dir'] };
+
+  return command.run({
+    positionals: positionals.slice(1),
+    values,
+    io,
+    env,
+    cwd,
+    version,
+    migrationVersions,
+    deps,
+    warn,
+    targeting,
+    resolveTargets: () => resolveTargets({ ...targeting, env, cwd, warn, execFileAsync: deps.execFileAsync })
+  });
 }
