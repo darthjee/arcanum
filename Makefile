@@ -7,6 +7,8 @@
 # service: same test image, whole repo mounted, cli/ as working dir).
 # cli-test builds cli/dist/arcanum.mjs before running the specs, since
 # `yarn test` does not build; cli-check runs lint then test.
+# cli-publish-dry-run runs scripts/publish_cli_package.sh --dry-run in the
+# same service (VERSION defaults to cli/package.json's version).
 #
 # The shared-* targets do the same for the shared/ package (the `shared`
 # compose service). shared/ has no build step, so shared-test only runs
@@ -21,6 +23,12 @@ CORE_COMPOSE := docker compose -f core/docker-compose.yml
 CLI_SERVICE := cli
 SHARED_SERVICE := shared
 YARN_INSTALL := yarn install --frozen-lockfile
+
+# cli-publish-dry-run: the script path is relative to the cli service's
+# working dir (cli/). VERSION falls back to a sed read without a host node.
+CLI_PACKAGE_JSON := cli/package.json
+CLI_PUBLISH_SCRIPT := ../scripts/publish_cli_package.sh
+VERSION ?= $(shell node -p "require('./$(CLI_PACKAGE_JSON)').version" 2>/dev/null || sed -n 's/^[[:space:]]*"version":[[:space:]]*"\([^"]*\)".*/\1/p' $(CLI_PACKAGE_JSON) | head -n 1)
 
 # The engine.mode=docker runtime image (the `runtime` target of
 # core/Dockerfile, built from the install root). See
@@ -59,7 +67,7 @@ MOD_TYPES_TSCONFIG := .claude-plugin/types/tsconfig.json
 .PHONY: core-test core-lint core-check core-shell core-report core-audit \
 	core-build-runtime core-smoke-runtime docker-parity docker-benchmark \
 	mod-check cli-install cli-lint cli-build cli-test cli-check cli-shell \
-	cli-audit shared-install shared-lint shared-test shared-check \
+	cli-audit cli-publish-dry-run shared-install shared-lint shared-test shared-check \
 	shared-shell shared-audit
 
 core-test:
@@ -98,6 +106,9 @@ cli-shell:
 
 cli-audit:
 	$(CORE_COMPOSE) run --rm $(CLI_SERVICE) sh -c "$(YARN_INSTALL) && yarn audit"
+
+cli-publish-dry-run:
+	$(CORE_COMPOSE) run --rm $(CLI_SERVICE) sh -c "$(CLI_PUBLISH_SCRIPT) $(VERSION) --dry-run"
 
 shared-install:
 	$(CORE_COMPOSE) run --rm $(SHARED_SERVICE) sh -c "$(YARN_INSTALL)"

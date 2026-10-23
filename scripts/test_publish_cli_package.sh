@@ -13,7 +13,7 @@
 # Cases:
 #   1. Non-bare tag: exits 1.
 #   2. Version mismatch: exits 1, nothing installed or published.
-#   3. npm too old: exits 1.
+#   3. npm too old on a real publish: exits 1 (a dry run accepts it).
 #   4. Token env var on a real publish: exits 1.
 #   5. OIDC variable missing on a real publish: exits 1.
 #   6. Already published: exits 0, no install and no publish.
@@ -147,15 +147,19 @@ assert_contains "$ERR" "does not match tag 9.9.9" "version mismatch"
 assert_not_contains "$CALL_LOG" "yarn install" "version mismatch"
 assert_not_contains "$CALL_LOG" "npm publish" "version mismatch"
 
-# --- Case 3: npm too old ---
+# --- Case 3: npm too old on a real publish ---
 run_publish FAKE_NPM_VERSION="11.4.9" -- "$VERSION"
 assert_status 1 "npm too old"
 assert_contains "$ERR" "npm 11.4.9 is too old" "npm too old"
 assert_not_contains "$CALL_LOG" "npm publish" "npm too old"
 
 # Numeric (not lexical) comparison: 11.10.0 >= 11.5.1.
-run_publish FAKE_NPM_VERSION="11.10.0" -- "$VERSION" --dry-run
+run_publish FAKE_NPM_VERSION="11.10.0" FAKE_VIEW_VISIBLE_FROM=1 -- "$VERSION"
 assert_status 0 "npm 11.10.0"
+
+# The npm floor is for trusted publishing only: a dry run accepts npm 10.
+run_publish FAKE_NPM_VERSION="10.9.9" -- "$VERSION" --dry-run
+assert_status 0 "dry run with npm 10"
 
 # --- Case 4: token env var on a real publish ---
 for var in NPM_TOKEN NODE_AUTH_TOKEN; do

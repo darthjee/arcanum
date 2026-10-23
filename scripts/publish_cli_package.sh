@@ -15,9 +15,9 @@
 # docs/agents/architecture/install-and-release.md#npm-trusted-publishing).
 #
 # Behavior (each step fails the script on error):
-#   0. Preflight: <tag> must be a bare X.Y.Z; node >= 22.14.0 and
-#      npm >= 11.5.1; unless --dry-run, no npm token in the environment and
-#      a CircleCI OIDC token present.
+#   0. Preflight: <tag> must be a bare X.Y.Z and node >= 22.14.0; unless
+#      --dry-run, npm >= 11.5.1, no npm token in the environment and a
+#      CircleCI OIDC token present.
 #   1. Version check: cli/package.json's version must equal <tag>.
 #   2. Already published? (skipped on --dry-run) If arcanum-cli@<tag> is on
 #      the registry, stop with success: npm versions are immutable, so a
@@ -83,13 +83,14 @@ if ! version_ge "$node_version" "$MIN_NODE_VERSION"; then
   echo "node ${node_version} is too old; trusted publishing needs >= ${MIN_NODE_VERSION}" >&2
   exit 1
 fi
-npm_version="$(npm --version)"
-if ! version_ge "$npm_version" "$MIN_NPM_VERSION"; then
-  echo "npm ${npm_version} is too old; trusted publishing needs >= ${MIN_NPM_VERSION}" >&2
-  exit 1
-fi
-
 if [[ "$DRY_RUN" == false ]]; then
+  # The npm floor exists for trusted publishing, which a dry run never does
+  # (so the dry run also works with the compose test image's npm 10).
+  npm_version="$(npm --version)"
+  if ! version_ge "$npm_version" "$MIN_NPM_VERSION"; then
+    echo "npm ${npm_version} is too old; trusted publishing needs >= ${MIN_NPM_VERSION}" >&2
+    exit 1
+  fi
   if [[ -n "${NPM_TOKEN:-}" || -n "${NODE_AUTH_TOKEN:-}" ]]; then
     echo "NPM_TOKEN or NODE_AUTH_TOKEN is set; publishing is OIDC-only (trusted publishing), unset it" >&2
     exit 1
