@@ -11,6 +11,8 @@ arcanum --version
 
 It needs Node.js 22.13.0 or newer and has no runtime dependencies. For a one-off look without a global install, use `npx arcanum-cli --help`.
 
+Releases are published from CI with npm provenance, which links each version to the commit and pipeline that built it. `npm audit signatures` checks it after install.
+
 This package is not the internal `core/bin/arcanum` dispatcher that Arcanum's skills call. That one ships inside Arcanum installs and is not meant to be run by hand.
 
 ## The three tiers
@@ -175,6 +177,23 @@ $ arcanum config auto-fix-all ignore-checks add -- -flaky    # `--` before a pat
 
 Patterns are **case-insensitive regexes**, not globs. They match by exact string, `add` skips patterns already present and `remove` skips missing ones. Every pattern given to `add` must compile, or nothing is written. The key is repo-only: `--local`/`--global` exit `3`. Each `add`/`remove` re-reads the file inside the lock, so concurrent calls never lose a pattern.
 
+### setup
+
+```bash
+arcanum config setup                  # every section
+arcanum config setup identity flow    # only some sections
+```
+
+`arcanum config setup [<section>...]` is an interactive wizard over the settings a new user has to decide on. The sections are `identity`, `engine`, `git`, `flow` and `ci`, and they always run in that order, whatever order you give them in. With no section, all of them run.
+
+- **Per setting**, the wizard shows the current value and its tier, then asks for a new one: Enter keeps it, `-` unsets it, and an invalid value is explained and asked again.
+- **The tier** is asked only when the key allows more than one; Enter picks the matching shortcut's default tier.
+- **A `[Y/n]` confirmation** shows the exact write, then the answer is written at once, with the same checks and lock as `config set`.
+- **It needs an interactive terminal.** Prompts go to stderr; without a TTY on stdin and stderr it exits `2`. `--json` is refused (exit `2`).
+- **Ctrl-C or Ctrl-D** stops it with exit `130`. Settings already written stay written, and a summary on stderr lists what was written, kept, failed and not reached.
+
+See the [Setup wizard](https://github.com/darthjee/arcanum/blob/main/docs/guides/arcanum-cli.md#setup-wizard) section of the user guide for a walkthrough.
+
 ## Targeting
 
 | Flag | Effect |
@@ -195,13 +214,13 @@ Flags may appear before or after the subcommand.
 | --- | --- |
 | `0` | Success. |
 | `1` | Generic error, or `get` of an unset key. |
-| `2` | Usage error: unknown flag, bad arity, conflicting flags, bad `--repo` or `--claude-config-dir` path. |
+| `2` | Usage error: unknown flag or command, bad arity, conflicting flags, bad `--repo` or `--claude-config-dir` path, or `config setup` without an interactive terminal. |
 | `3` | Validation error against the key registry: unknown key, type, enum, tier, read-only. |
 | `4` | Target unavailable: no repo, an unconfigured repo, or no usable Claude config dir. |
 | `5` | Version skew: a write to a tier newer than this CLI, without `--force`. |
 | `6` | The write lock was not acquired within `--lock-timeout`. |
 | `7` | Malformed tier file, or an I/O error. |
-| `130` | Interrupted (Ctrl-C). |
+| `130` | Interrupted (Ctrl-C, or Ctrl-D in `config setup`). |
 
 When several apply, the first of `2`, `4`, `7`, `3`, `5`, `6` wins. Set `ARCANUM_DEBUG=1` for stack traces.
 
