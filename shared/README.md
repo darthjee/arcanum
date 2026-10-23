@@ -5,7 +5,7 @@ Arcanum's config surface: `ConfigChain`, `RepoConfig`, `RepoConfigWriter`,
 `ConfigError`, `AgentEmail`, `KeyRegistry` (with `keys.json`), `Lock`,
 `LockTimeoutError` and `RepoPath`.
 
-The design lives in the [Shared Lib spec](../docs/agents/specs/shared-lib.md).
+The design lives in [Shared Lib](../docs/agents/architecture/shared-lib.md).
 
 ## Layout
 

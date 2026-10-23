@@ -4,11 +4,12 @@ import globals from 'globals';
 
 // `shared/spec/**` is `shared`'s own test tree, never a library: core may
 // import `shared/lib/**` but nothing under `shared/spec/` (see
-// docs/agents/specs/shared-lib.md). Repeated in every block below that sets
-// `no-restricted-imports` (flat config: the last matching block wins).
+// docs/agents/architecture/shared-lib.md#import-boundary). Repeated in every
+// block below that sets `no-restricted-imports` (flat config: the last
+// matching block wins).
 const SHARED_SPEC_BAN = {
   regex: '(?:^|/)shared/spec/',
-  message: 'core/ may import shared/lib/** but never shared/spec/** — see docs/agents/specs/shared-lib.md.'
+  message: 'core/ may import shared/lib/** but never shared/spec/** — see docs/agents/architecture/shared-lib.md#import-boundary.'
 };
 
 export default [

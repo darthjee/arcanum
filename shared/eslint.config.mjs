@@ -51,7 +51,8 @@ export default [
     }
   },
   {
-    // The import boundary (see docs/agents/specs/shared-lib.md): everything
+    // The import boundary (see
+    // docs/agents/architecture/shared-lib.md#import-boundary): everything
     // under `shared/lib/` is public, so the folder itself is the declaration
     // of the surface. Its files may import only `node:` built-ins and
     // relative paths that stay inside `shared/lib/`, with no dynamic

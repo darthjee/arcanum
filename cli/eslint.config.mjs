@@ -101,13 +101,14 @@ export default [
               regex: '(?:^|/)core/',
               message:
                 'cli/ may not import core/ — use the shared surface in ' +
-                'shared/lib/ instead; see docs/agents/specs/shared-lib.md.'
+                'shared/lib/ instead; see ' +
+                'docs/agents/architecture/shared-lib.md#import-boundary.'
             },
             {
               regex: '(?:^|/)shared/spec/',
               message:
                 'cli/ may import shared/lib/** only, never shared/spec/** — see ' +
-                'docs/agents/specs/shared-lib.md.'
+                'docs/agents/architecture/shared-lib.md#import-boundary.'
             }
           ]
         }
