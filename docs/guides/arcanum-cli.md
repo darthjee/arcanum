@@ -105,6 +105,44 @@ arcanum config auto-fix-all ignore-checks remove '^codacy'
 
 The patterns are case-insensitive regular expressions, not globs: `^codacy` matches any check whose name starts with "Codacy", and `*` alone is invalid. An invalid pattern is refused and nothing is written. Put `--` before a pattern that starts with `-`.
 
+## Setup wizard
+
+`arcanum config setup` walks you through the settings a new user has to decide on, one question at a time:
+
+```bash
+arcanum config setup                  # every section
+arcanum config setup identity flow    # only some sections
+```
+
+The sections are always asked in this order, whatever order you give them in: `identity` (your agents' commit email, then optionally one per agent), `engine`, `git` (safe branch and merge body), `flow` (auto-advance after `enhance-issue`, `discuss-issue` and `auto-plan-issue`) and `ci` (the CI checks `/auto-fix-all` ignores).
+
+For each setting the wizard shows its current value and where it comes from, then asks:
+
+- **The new value.** Enter keeps the current value and moves on. `-` removes the key. Choices are shown inline; yes/no settings take `y`/`n`, `on`/`off` or `true`/`false`. An invalid value is explained and asked again.
+- **The tier.** Only the tiers the key allows are offered, and Enter picks the same default as the matching shortcut. Keys with a single tier skip this question.
+- **Confirmation.** The wizard shows the exact write, `[Y/n]`, and notes when a higher tier will still override it.
+
+Each confirmed answer is written straight away, with the same checks and lock as `config set`. For the `ci` list you add or remove one pattern at a time, then answer `d` when done.
+
+```console
+$ arcanum config setup engine
+
+engine.mode — Script engine used to run migrated skill entrypoints
+  current: native (repo)
+  new value [shell/native/docker, Enter keeps, - unsets]: shell
+  tier [local/repo/global] (local):
+  set engine.mode = "shell" at local (/x/foo/.claude/state/arcanum-config.json)? [Y/n]
+
+summary
+  written      engine.mode    local   (unset) -> shell
+```
+
+- **It needs a terminal.** Questions go to stderr, so the wizard refuses to run (exit `2`) when stdin or stderr is not a terminal, and it does not take `--json`. For scripts, use `config set` or the shortcuts.
+- **Outside a repo**, or in one that hasn't run `/init-claude`, only the global settings are asked. Everything else is skipped with a note.
+- **Ctrl-C or Ctrl-D** stops the wizard (exit `130`). What was already written stays written.
+- **A failed write** (a lock timeout, for example) is reported and the wizard moves on. It exits with the first failure's code.
+- **A summary** on stderr always ends the run: what was written (old -> new), kept, failed and not reached.
+
 ## Targeting another account or repo
 
 - `CLAUDE_CONFIG_DIR=~/.claude-work arcanum config get git.email` targets another Claude account. The variable is used as is, like Claude Code does, so let your shell expand the `~` (don't quote it).

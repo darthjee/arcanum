@@ -6,11 +6,12 @@ import get from './config/get.js';
 import info from './config/info.js';
 import list from './config/list.js';
 import set from './config/set.js';
+import setup from './config/setup.js';
 import unset from './config/unset.js';
 import { isShortcut, runShortcut } from './config/shortcuts/index.js';
 
 /** The `arcanum config` subcommands: name → module. */
-export const SUBCOMMANDS = { get, set, unset, list, info };
+export const SUBCOMMANDS = { get, set, unset, list, info, setup };
 
 const TIER_OPTIONS = Object.fromEntries(TIER_FLAGS.map((tier) => [tier, { type: 'boolean' }]));
 

@@ -31,6 +31,7 @@ arcanum config set <key> <value> (--global|--repo|--local) [--string] [--force] 
 arcanum config unset <key> (--global|--repo|--local) [--force] [--lock-timeout <seconds>]
 arcanum config list [--global|--repo|--local]
 arcanum config info
+arcanum config setup [<section>...] [--lock-timeout <seconds>]   # interactive wizard
 ```
 
 `arcanum config --help` lists every known key, and `arcanum config <subcommand> --help` shows a subcommand's flags.

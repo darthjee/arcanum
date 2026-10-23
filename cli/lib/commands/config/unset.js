@@ -18,21 +18,42 @@ export const acceptsTier = true;
  * through the shared writer and its lock, after the target, file,
  * registry and skew checks. A key that is not there is a no-op (exit
  * `0`, `"changed": false`); an emptied parent object is kept.
- * @param {object} context - the subcommand context.
- * @param {string[]} context.args - `[key]`.
- * @param {(string|undefined)} context.tier - the tier flag.
- * @param {object} context.values - the parsed flags.
+ * @param {object} context - the subcommand context (see `applyUnset`).
  * @param {object} context.output - the output helpers.
- * @param {object} context.registry - the key registry.
- * @param {object} context.deps - injectable collaborators.
  * @returns {Promise<number>} the exit code.
  */
 export async function run(context) {
-  const { args: [key], values, output, registry, deps } = context;
+  const { args: [key], output } = context;
+  const { tier, file, targets, previous, changed, forced } = await applyUnset(context);
+  const where = `(${tier}: ${displayFile(tier, file, targets)}`;
+
+  output.result(
+    changed ? `unset ${key}   ${where}, was: ${wasText(previous)})` : `${key} was not set   ${where})`,
+    { key, tier, file, changed, previous, value: null, forced }
+  );
+
+  return EXIT_OK;
+}
+
+/**
+ * The body of `config unset`, without its output, shared with the
+ * `config setup` wizard so both run the same checks and write.
+ * @param {object} context - the subcommand context.
+ * @param {string[]} context.args - `[key]`.
+ * @param {(string|undefined)} context.tier - the tier flag.
+ * @param {object} context.values - the parsed flags (`force`, `lock-timeout`).
+ * @param {object} context.registry - the key registry.
+ * @param {object} context.deps - injectable collaborators.
+ * @returns {Promise<{tier: string, file: string, targets: object, previous: object, changed: boolean, forced: boolean}>}
+ *   what was removed, and the key's previous state in that tier.
+ * @throws {Error} the first refusal that applies (a `CliError`).
+ */
+export async function applyUnset(context) {
+  const { args: [key], values, registry, deps } = context;
   const tier = requireTier('unset', context.tier);
   const timeoutMs = lockTimeoutMs(values['lock-timeout']);
   const force = Boolean(values.force);
-  const { targets, file, read, known, forced } = await prepareWrite(context, force, () => (
+  const { targets, file, read, known, forced } = await prepareWrite({ ...context, tier }, force, () => (
     validateUnset({ registry, key, tier, force })
   ));
   const previous = lookupKey(read.data, key);
@@ -42,14 +63,7 @@ export async function run(context) {
     await writeKey({ op: 'unset', file, key, known, timeoutMs, timeoutLabel: values['lock-timeout'] || '10', deps });
   }
 
-  const where = `(${tier}: ${displayFile(tier, file, targets)}`;
-
-  output.result(
-    changed ? `unset ${key}   ${where}, was: ${wasText(previous)})` : `${key} was not set   ${where})`,
-    { key, tier, file, changed, previous, value: null, forced }
-  );
-
-  return EXIT_OK;
+  return { tier, file, targets, previous, changed, forced };
 }
 
 /**
@@ -71,4 +85,4 @@ export function hasPath(data, key) {
   return true;
 }
 
-export default { name: 'unset', options, positionals, acceptsTier, run };
+export default { name: 'unset', options, positionals, acceptsTier, run, applyUnset };

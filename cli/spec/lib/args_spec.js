@@ -5,6 +5,7 @@ import {
   extractRepoTarget,
   firstPositional,
   isPathToken,
+  joinAnd,
   lockTimeoutMs,
   requireTier,
   selectedTier,
@@ -139,6 +140,23 @@ describe('args', () => {
 
     it('refuses an extra positional', () => {
       expect(() => checkArity('list', ['x'], [])).toThrowError(UsageError, 'list: unexpected argument \'x\'');
+    });
+
+    it('accepts any number of positionals for a trailing variadic name', () => {
+      expect(() => checkArity('setup', [], ['section...'])).not.toThrow();
+      expect(() => checkArity('setup', ['a', 'b', 'c'], ['section...'])).not.toThrow();
+    });
+
+    it('still requires the names before a variadic one', () => {
+      expect(() => checkArity('x', [], ['key', 'rest...'])).toThrowError(UsageError, 'x needs <key>');
+    });
+  });
+
+  describe('joinAnd', () => {
+    it('lists one, two or more words', () => {
+      expect(joinAnd(['set'])).toBe('set');
+      expect(joinAnd(['set', 'unset'])).toBe('set and unset');
+      expect(joinAnd(['set', 'unset', 'setup'])).toBe('set, unset and setup');
     });
   });
 

@@ -28,7 +28,11 @@ How the user-facing `arcanum` CLI (`cli/`, the npm package `arcanum-cli`) is put
 | `lib/commands/config/shortcuts/index.js` | The shortcut namespaces (`engine`, `git`, `auto-fix-all`, `monitor-issues`, `next-step`, `agents`): namespace → runner, or → shortcut name → runner. `config.js` dispatches to it before the generic subcommands. |
 | `lib/commands/config/shortcuts/common.js` | What every shortcut shares: the strict flag set (`--force`/`--string` refused, `--all-tiers` reads only, `--lock-timeout` writes only), `delegate` to the generic `get`/`set`/`unset`, `writeValue` and the shadowed-tier note. |
 | `lib/commands/config/shortcuts/{singleValue,nextStep,agentsEmail,ignoreChecks}.js` | The single-value table and runner, `next-step auto`, `agents email`, `auto-fix-all ignore-checks`. |
+| `lib/commands/config/shortcuts/defaultTier.js` | The default write tier of each key a shortcut covers (`defaultTier(key)`), shared by the shortcuts' tables and the setup wizard. |
 | `lib/booleanToken.js` | The shortcuts' `on`/`off`/`true`/`false` tokens, with the exit-`3` hint. |
+| `lib/commands/config/setup.js` | `config setup`: the `--json`/TTY/section usage checks, the item list built from the registry's `setup` fields, the no-repo skipping, the session and the per-item loop. |
+| `lib/commands/config/setup/{setting,identity,ci,summary}.js` | The wizard's scalar per-setting dialogue, the per-agent email overrides, the `ci` add/remove loop, and the stderr summary. |
+| `lib/prompter.js` | The wizard's line prompter over `node:readline` (questions to stderr, queued answers), rejecting with `Interrupted` on EOF or Ctrl-C; it owns `SIGINT` only while a question is open. |
 | `lib/commands/config/shared.js` | Read-side helpers: `readTiers` (targets, account/repo read rules, tolerant reads, skew warnings), file display, registry defaults. |
 | `lib/help.js` | Top-level, `config`, per-subcommand and per-shortcut usage. Key docs come from the registry. |
 
@@ -76,8 +80,20 @@ The contract is [Shortcuts and Setup](../specs/arcanum-cli/shortcuts-and-setup.m
 - **`agents email`** resolves through `AgentEmail#resolve` (`ConfigChain#readWithSource`), never through its own loop. `ConfigChain` gets `CLAUDE_CONFIG_DIR` from the resolved account. Outside a repo, a small `ConfigChain` subclass drops the repo and local files, so nothing is read from a non-repo cwd. The per-tier detail and the agent discovery read the tiers with `readTiers` (`allTiers: true`, so `file: null` marks a tier with no target). Agents come from `git.agents.*` in any tier plus the repo's `.claude/agents/*.md`.
 - **`ignore-checks`** goes through `prepareWrite` (target, file, registry — tier and, for `add`, `format: regex` over the given patterns — then skew) and then `writeKey`'s `update` op, which calls `RepoConfigWriter#update`: the `mutate` callback re-reads the array inside the lock, refuses a non-array, appends or removes, and returns the new array. A remove on an absent key throws an internal no-change marker, so the file isn't created.
 
+## Setup wizard
+
+The contract is [Shortcuts and Setup → `arcanum config setup` wizard](../specs/arcanum-cli/shortcuts-and-setup.md#arcanum-config-setup-wizard).
+
+- **Items.** `setupItems` takes every registry entry with `setup`, sorted by `SETUP_SECTIONS` index then `setup.order`, and expands `setup.instances` into concrete keys. `git.agents.<agent>` stays one `agents` item, expanded from `repoAgents(root)` once the user opts in. Each item's default tier comes from `defaultTier(key)`.
+- **Targeting.** Targets are resolved once (`memoizeTargets`). Without a configured repo, the `agents` item, the `ci` section and every item whose default tier is not `global` are dropped, with one `note:` per section; nothing left is exit `4`.
+- **Writes.** `set.js` and `unset.js` expose their bodies as `applySet`/`applyUnset`, and `ignoreChecks.js` exposes `updatePatterns`; the wizard calls them with the chosen tier and a fixed `parseValue`, so the target, file, registry, skew and lock checks are the generic code. Each write takes and releases its own lock; no lock is held while prompting.
+- **Errors.** A `ValidationError` while typing a value re-asks. A write failure is printed with `reportError`, recorded as failed, and the wizard goes on; the exit code is the first failure's.
+- **Interrupts.** The prompter rejects with `Interrupted` on EOF or SIGINT; the wizard prints the summary and returns `130`. During a write, `writeKey`'s own SIGINT handler runs with signal hooks whose `exit` prints the summary first.
+- **Summary.** Every exit path after the first question prints it once, on stderr. Items with no recorded result are "not reached"; a wildcard entry none of whose instances was reached collapses to `next_step.auto.*` / `git.agents.*`.
+
 ## Specs
 
 - `cli/spec/support/fixtures.js` builds temp git repos and tier files; `cli/spec/support/cli.js` runs `main.run` in-process against them, with an injected env and cwd.
 - Every exit code and precedence pair, each malformed-file kind (with byte-unchanged checks on refused writes), each value-parsing row with and without `--string`, the JSON shapes, the lock cases (held by a live fake owner, `--lock-timeout 0`, acquired after release, no "seems stuck" warning) and SIGINT each have a spec.
+- `setup_spec` drives the wizard with a scripted prompter (`cli/spec/support/prompter.js`, with `EOF`/`SIGINT` answers) and `deps.isInteractive`; `fakeIo` can also fake a TTY stdin. One bundle smoke spec checks the real no-TTY refusal.
 - The shortcut specs (`cli/spec/lib/commands/config/shortcuts/`) use `cli/spec/support/shortcuts.js`, which re-seeds the tiers before each run, so a shortcut and its generic equivalent run against the same files and their stdout, stderr and exit code are compared directly. `agentsEmail_spec` runs the `AgentEmail` shell/native parity table (`cli/spec/support/agentEmailFixtures.js`, a copy of `shared/spec`'s, since `cli/` never imports `shared/spec/**`).

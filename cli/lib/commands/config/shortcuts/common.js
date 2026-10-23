@@ -112,15 +112,15 @@ export async function writeValue(context, { key, raw, tier, parseValue }) {
 }
 
 /**
- * Prints `arcanum: note: <tier> still overrides <key> (value: …)` for the
- * first higher-precedence tier holding a value. Unreadable or malformed
- * files are skipped silently (the write already succeeded).
- * @param {object} context - the shortcut's context.
- * @param {string} key - the key written.
- * @param {string} tier - the tier written.
- * @returns {Promise<void>} resolves once checked.
+ * Finds the first higher-precedence tier than `tier` holding a value for
+ * `key`. Unreadable or malformed files are skipped silently.
+ * @param {object} context - the command's context (`resolveTargets`).
+ * @param {string} key - the key.
+ * @param {string} tier - the tier written (or about to be).
+ * @returns {Promise<({tier: string, value: unknown}|null)>} the
+ *   overriding tier and its value, or `null`.
  */
-export async function noteShadowing(context, key, tier) {
+export async function findShadowing(context, key, tier) {
   const targets = await context.resolveTargets();
 
   for (const higher of TIERS.slice(0, TIERS.indexOf(tier))) {
@@ -134,9 +134,25 @@ export async function noteShadowing(context, key, tier) {
     const found = read.state === 'ok' ? lookupKey(read.data, key) : { set: false };
 
     if (found.set) {
-      context.output.note(`${higher} still overrides ${key} (value: ${formatValue(found.value)})`);
-
-      return;
+      return { tier: higher, value: found.value };
     }
+  }
+
+  return null;
+}
+
+/**
+ * Prints `arcanum: note: <tier> still overrides <key> (value: …)` for the
+ * first higher-precedence tier holding a value (see `findShadowing`).
+ * @param {object} context - the shortcut's context.
+ * @param {string} key - the key written.
+ * @param {string} tier - the tier written.
+ * @returns {Promise<void>} resolves once checked.
+ */
+export async function noteShadowing(context, key, tier) {
+  const shadowing = await findShadowing(context, key, tier);
+
+  if (shadowing !== null) {
+    context.output.note(`${shadowing.tier} still overrides ${key} (value: ${formatValue(shadowing.value)})`);
   }
 }

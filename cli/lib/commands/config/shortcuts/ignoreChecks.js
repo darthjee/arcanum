@@ -151,10 +151,8 @@ export function applyPatterns(verb, current, patterns) {
 }
 
 /**
- * `ignore-checks add|remove <pattern>...`: after the generic pre-write
- * checks (target `4`, file `7`, registry `3` — tier and, for `add`,
- * every pattern compiling with `new RegExp(p, 'i')` — and skew `5`),
- * re-reads, modifies and writes the array inside the lock.
+ * `ignore-checks add|remove <pattern>...`: edits the array (see
+ * `updatePatterns`) and prints one line per distinct pattern given.
  * @param {object} context - the `config` context.
  * @param {object} edit - the edit.
  * @param {string} edit.verb - `add` or `remove`.
@@ -163,6 +161,33 @@ export function applyPatterns(verb, current, patterns) {
  * @returns {Promise<number>} the exit code.
  */
 async function editPatterns(context, { verb, patterns, tier }) {
+  const { targets, file, changed, previous, value, changes } = await updatePatterns(context, { verb, patterns, tier });
+  const where = `(${tier}: ${displayFile(tier, file, targets)})`;
+
+  context.output.result(editText(verb, patterns, changes, where), {
+    key: KEY, tier, file, changed, previous, value, forced: false, added: changes.added, removed: changes.removed
+  });
+
+  return EXIT_OK;
+}
+
+/**
+ * The core of `ignore-checks add|remove`, shared with the `config setup`
+ * wizard: after the generic pre-write checks (target `4`, file `7`,
+ * registry `3` — tier and, for `add`, every pattern compiling with
+ * `new RegExp(p, 'i')` — and skew `5`), re-reads, modifies and writes
+ * the array inside the lock.
+ * @param {object} context - the command's context (`values`,
+ *   `registry`, `deps`, `resolveTargets`, `version`, `migrationVersions`).
+ * @param {object} edit - the edit.
+ * @param {string} edit.verb - `add` or `remove`.
+ * @param {string[]} edit.patterns - the patterns given.
+ * @param {string} [edit.tier] - the target tier (default: repo).
+ * @returns {Promise<{targets: object, file: string, changed: boolean, previous: object, value: unknown[], changes: {added: string[], removed: string[]}}>}
+ *   the outcome: the previous state and the new patterns.
+ * @throws {Error} the first refusal that applies (a `CliError`).
+ */
+export async function updatePatterns(context, { verb, patterns, tier = TIER }) {
   const { values, registry, deps } = context;
   const timeoutMs = lockTimeoutMs(values['lock-timeout']);
   const resolveTargets = memoizeTargets(context.resolveTargets);
@@ -210,17 +235,16 @@ async function editPatterns(context, { verb, patterns, tier }) {
     outcome = { changed: false, previous: undefined, value: undefined };
   }
 
-  const previous = outcome.previous === undefined || outcome.previous === null
-    ? { set: false, value: null }
-    : { set: true, value: outcome.previous };
-  const value = outcome.value === undefined || outcome.value === null ? [] : outcome.value;
-  const where = `(${tier}: ${displayFile(tier, file, targets)})`;
-
-  context.output.result(editText(verb, patterns, changes, where), {
-    key: KEY, tier, file, changed: outcome.changed, previous, value, forced: false, added: changes.added, removed: changes.removed
-  });
-
-  return EXIT_OK;
+  return {
+    targets,
+    file,
+    changed: outcome.changed,
+    previous: outcome.previous === undefined || outcome.previous === null
+      ? { set: false, value: null }
+      : { set: true, value: outcome.previous },
+    value: outcome.value === undefined || outcome.value === null ? [] : outcome.value,
+    changes: { added: changes.added, removed: changes.removed }
+  };
 }
 
 /**

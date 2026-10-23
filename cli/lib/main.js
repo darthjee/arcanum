@@ -53,14 +53,15 @@ export const MIGRATION_VERSIONS = typeof __ARCANUM_MIGRATION_VERSIONS__ === 'und
   ? { repo: [], local: [], global: [] }
   : __ARCANUM_MIGRATION_VERSIONS__;
 
-const DEFAULT_IO = { stdout: process.stdout, stderr: process.stderr };
+const DEFAULT_IO = { stdout: process.stdout, stderr: process.stderr, stdin: process.stdin };
 
 /**
  * Runs the CLI for one argv and returns its exit code. Never throws:
  * every error goes through `reportError` (and so `exitCodeForError`).
  * @param {string[]} argv - the arguments after the program name.
  * @param {object} [options] - injectable dependencies.
- * @param {{stdout: {write: (text: string) => void}, stderr: {write: (text: string) => void}}} [options.io] - output streams.
+ * @param {{stdout: {write: (text: string) => void}, stderr: {write: (text: string) => void}, stdin: (object|undefined)}} [options.io] -
+ *   the streams: output, and the input `config setup` prompts on.
  * @param {string} [options.version] - the version `--version` reports.
  * @param {object} [options.env] - the environment (`CLAUDE_CONFIG_DIR`, `HOME`).
  * @param {string} [options.cwd] - the working directory.
