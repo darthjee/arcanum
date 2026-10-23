@@ -6,8 +6,9 @@ import ConfigError from './ConfigError.js';
 /**
  * Native equivalent of `arcanum/_lib/repo_config.sh`'s writers
  * (`repo_config_write` and `repo_config_set_version`), plus a
- * native-only `unset` that deletes a key (no shell counterpart yet).
- * Every write is
+ * native-only `unset` that deletes a key (no shell counterpart yet) and
+ * a native-only `update` that atomically reads, modifies and writes one
+ * key under the lock. Every write is
  * guarded by `<file>.lock` through `Lock.js` (the same protocol as
  * `arcanum/_lib/lock.sh`, so shell and native writers exclude each
  * other), serialized byte-identically to jq's default output
@@ -130,6 +131,91 @@ class RepoConfigWriter {
 
       return RepoConfigWriter._deletePath(section, keyPath, namespace, newFile) ? config : null;
     }, { timeoutMs });
+  }
+
+  /**
+   * Atomic read-modify-write of one key: under `<newFile>.lock`, seeds
+   * `.<namespace>` from `legacyFile` when `newFile` lacks it (exactly as
+   * `write` does), reads the current value at `.<namespace>.<key>` (or
+   * `.<key>` from the root when `namespace` is omitted, in which case
+   * `legacyFile` is ignored), and passes `mutate` a `structuredClone` of
+   * it — so mutating the argument in place can't corrupt `previous`.
+   * The current value is `undefined` when the leaf is absent or a
+   * missing/`null` intermediate (or namespace) is in the way. A dotted
+   * `key` is a nested path.
+   *
+   * `mutate`'s result is written with `write`'s semantics (same
+   * serialization, atomic tmp+rename, siblings and key order kept,
+   * missing intermediates created). When the result deep-equals the
+   * current value — a structural comparison of plain JSON values in
+   * which object key order is ignored — nothing is written: the file is
+   * neither rewritten nor created, and a legacy seed alone is not
+   * persisted (as with `unset`).
+   *
+   * When `mutate` throws (or rejects), nothing is written, the lock is
+   * released and the error propagates unchanged.
+   * @param {object} args - the update's arguments.
+   * @param {string} args.newFile - the namespaced config file's path.
+   * @param {string} [args.legacyFile] - the legacy config file's path
+   *   (only read, as a seed); ignored without a `namespace`.
+   * @param {string} [args.namespace] - the top-level namespace key;
+   *   omitted for a top-level update.
+   * @param {string} args.key - the key (or dot-separated path) to update.
+   * @param {function(unknown): (unknown|Promise<unknown>)} args.mutate -
+   *   receives a copy of the current value (`undefined` when absent) and
+   *   returns, or resolves to, the JSON-serializable new value. It may
+   *   be async; it must not return `undefined` (deleting is `unset`'s
+   *   job).
+   * @param {number} [args.timeoutMs] - bound on waiting for the lock;
+   *   omitted waits forever.
+   * @returns {Promise<{changed: boolean, previous: unknown, value: unknown}>}
+   *   whether the file was written, the value before the call and the
+   *   value after it.
+   * @throws {TypeError} when `mutate` returns `undefined` (nothing is
+   *   written).
+   * @throws {ConfigError} `NOT_AN_OBJECT` when the file, the namespace
+   *   or an intermediate holds a non-object value.
+   * @throws {Error} a `LockTimeoutError` when `timeoutMs` runs out
+   *   (nothing is written).
+   */
+  async update({ newFile, legacyFile, namespace, key, mutate, timeoutMs }) {
+    let previous;
+    let next;
+    let changed = false;
+
+    await this._locked(newFile, async () => {
+      const config = await this._readBase(newFile);
+      const keyPath = key.split('.');
+
+      if (namespace === undefined) {
+        previous = RepoConfigWriter._getPath(config, keyPath, '', newFile);
+      } else {
+        await this._seedNamespace(config, namespace, legacyFile);
+        previous = RepoConfigWriter._readSection(config, namespace, keyPath, newFile);
+      }
+
+      next = await mutate(structuredClone(previous));
+
+      if (next === undefined) {
+        throw new TypeError('update\'s mutate must return a value; use unset to delete');
+      }
+
+      if (RepoConfigWriter._deepEqual(next, previous)) {
+        return null;
+      }
+
+      if (namespace === undefined) {
+        RepoConfigWriter._setPath(config, keyPath, next, '', newFile);
+      } else {
+        this._setNamespaced(config, namespace, keyPath, next, newFile);
+      }
+
+      changed = true;
+
+      return config;
+    }, { timeoutMs });
+
+    return { changed, previous, value: changed ? next : previous };
   }
 
   /**
@@ -384,6 +470,103 @@ class RepoConfigWriter {
     }
 
     return RepoConfigWriter._deletePath(child, rest, current, file);
+  }
+
+  /**
+   * Walks `keyPath` from `target` and returns the leaf value, without
+   * mutating anything.
+   * @param {object} target - the object to read the path from.
+   * @param {string[]} keyPath - the (non-empty) path to read.
+   * @param {string} prefix - the path walked so far, for error messages
+   *   (`''` at the root of the file).
+   * @param {string} file - the config file's path, for the error.
+   * @returns {unknown} the leaf value, or `undefined` when the leaf or a
+   *   `null`/missing intermediate is absent (inherited keys never count).
+   * @throws {ConfigError} `NOT_AN_OBJECT` when an intermediate holds a
+   *   non-object value.
+   */
+  static _getPath(target, keyPath, prefix, file) {
+    const [head, ...rest] = keyPath;
+
+    if (!Object.hasOwn(target, head)) {
+      return undefined;
+    }
+
+    const child = target[head];
+
+    if (rest.length === 0) {
+      return child;
+    }
+
+    if (child === null) {
+      return undefined;
+    }
+
+    const current = RepoConfigWriter._joinPath(prefix, head);
+
+    if (!RepoConfigWriter._isObject(child)) {
+      throw new ConfigError('NOT_AN_OBJECT', `Cannot index .${current}: not a JSON object`, { file });
+    }
+
+    return RepoConfigWriter._getPath(child, rest, current, file);
+  }
+
+  /**
+   * Reads `.<namespace>.<keyPath>` from `config`, treating a missing or
+   * `null` namespace as absent.
+   * @param {object} config - the (already seeded) config object.
+   * @param {string} namespace - the namespace key.
+   * @param {string[]} keyPath - the (non-empty) path under `namespace`.
+   * @param {string} file - the config file's path, for the error.
+   * @returns {unknown} the value, or `undefined` when absent.
+   * @throws {ConfigError} `NOT_AN_OBJECT` when the namespace or an
+   *   intermediate holds a non-object value.
+   */
+  static _readSection(config, namespace, keyPath, file) {
+    const section = config[namespace];
+
+    if (section === undefined || section === null) {
+      return undefined;
+    }
+
+    if (!RepoConfigWriter._isObject(section)) {
+      throw new ConfigError('NOT_AN_OBJECT', `Cannot index .${namespace}: not a JSON object`, { file });
+    }
+
+    return RepoConfigWriter._getPath(section, keyPath, namespace, file);
+  }
+
+  /**
+   * Structural equality of plain JSON values: primitives compare through
+   * `Object.is`, arrays by length and then element by element, objects
+   * by the same set of own keys (key order is ignored) and recursively
+   * equal values. A reordered object therefore counts as unchanged.
+   *
+   * Only meant for parsed JSON (and values built like it): there are no
+   * cycles, Dates, Maps or other non-JSON types to handle.
+   * @param {unknown} a - the first value.
+   * @param {unknown} b - the second value.
+   * @returns {boolean} whether `a` and `b` are structurally equal.
+   */
+  static _deepEqual(a, b) {
+    if (Object.is(a, b)) {
+      return true;
+    }
+
+    if (Array.isArray(a) || Array.isArray(b)) {
+      return Array.isArray(a) && Array.isArray(b)
+        && a.length === b.length
+        && a.every((item, index) => RepoConfigWriter._deepEqual(item, b[index]));
+    }
+
+    if (!RepoConfigWriter._isObject(a) || !RepoConfigWriter._isObject(b)) {
+      return false;
+    }
+
+    const keys = Object.keys(a);
+
+    return keys.length === Object.keys(b).length
+      && keys.every((key) => Object.hasOwn(b, key) && RepoConfigWriter._deepEqual(a[key], b[key]));
   }
 
   /**
