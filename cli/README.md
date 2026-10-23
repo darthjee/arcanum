@@ -104,6 +104,76 @@ Repo
 
 `info` never prints config values and always exits `0` (usage errors aside).
 
+## Shortcuts
+
+Curated shortcuts over the most common keys. Each one is a thin front-end over generic `get`/`set`/`unset`: it prints exactly what the generic command prints (human, `--json` and exit codes), with a default write tier so you don't have to name one.
+
+| Shortcut | Key(s) | Default write tier |
+| --- | --- | --- |
+| `agents email [<agent>]`, `agents email set <pattern>`, `agents email set <agent> <email>`, `agents email unset [<agent>]` | `git.email`, `git.agents.<agent>` | global |
+| `engine [shell\|native\|docker \| --unset]` | `engine.mode` | local |
+| `next-step auto [<skill> [on\|off \| --unset]]` | `next_step.auto.<skill>` | local |
+| `git safe-branch [<ref> \| --unset]` | `git.safe_branch` | local (local only) |
+| `git merge-body [full\|empty\|coauthors \| --unset]` | `git.merge_body_mode` | local |
+| `auto-fix-all clear-context [on\|off \| --unset]` | `auto-fix-all.clear_context` | local (local only) |
+| `auto-fix-all finish-on-empty-queue [on\|off \| --unset]` | `auto-fix-all.finish_on_empty_queue` | local (local only) |
+| `auto-fix-all ignore-checks [list]`, `add <pattern>...`, `remove <pattern>...` | `auto-fix-all.ignored_check_patterns` | repo (repo only) |
+| `monitor-issues clear-context [on\|off \| --unset]` | `monitor-issues.clear_context` | local (local only) |
+
+All of them live under `arcanum config`; `arcanum config <shortcut> --help` shows each one's flags.
+
+```console
+$ arcanum config engine                          # same as: config get engine.mode
+native   (repo: .claude/configuration/arcanum-repo-config.json)
+
+$ arcanum config engine docker                   # same as: config set engine.mode docker --local
+$ arcanum config engine docker --global          # a tier flag overrides the default tier
+$ arcanum config engine --unset                  # same as: config unset engine.mode --local
+
+$ arcanum config next-step auto enhance-issue on # same as: config set next_step.auto.enhance-issue true --local
+$ arcanum config next-step auto                  # every next_step.auto.* key set, sorted
+auto-plan-issue  false  (local)
+enhance-issue    true   (global)
+```
+
+- **Single-value shortcuts.** No value reads (resolved, or one tier with a tier flag, or `--all-tiers`); a value writes to the default tier; `--unset` removes the key from it. `--unset` together with a value is exit `2`. `--force` and `--string` are not accepted: use `config set` for unknown keys or forced strings.
+- **Booleans** take `on`/`off`/`true`/`false`, lowercase only, and are stored as JSON booleans. `off` stores `false`, so it can shadow an `on` from a lower tier; `--unset` removes the key. Any other token is exit `3`.
+- **Shadowed writes.** When a higher-precedence tier still holds a value for the key you just wrote, a note on stderr names it: `arcanum: note: local still overrides engine.mode (value: docker)`.
+
+### agents email
+
+```console
+$ arcanum config agents email
+default  you+{agent}@example.com   (global: git.email)
+
+agent      effective email            from
+architect  you+architect@example.com  global git.email
+node       node-bot@example.com       repo   git.agents.node
+reviewer   rev@example.com            global git.agents.reviewer   (not in this repo)
+
+$ arcanum config agents email node               # both keys in every tier; exit 1 if the model email applies
+$ arcanum config agents email set 'you+{agent}@example.com'   # git.email, global
+$ arcanum config agents email set node node-bot@example.com --repo
+$ arcanum config agents email unset node         # git.agents.node, global
+```
+
+The emails are resolved exactly like the commit helpers do (local, then repo, then global; within a tier `git.agents.<agent>` before `git.email`; `{agent}` substituted; an explicit `""` means the model email). The agents listed are the configured ones plus the repo's `.claude/agents/*.md`.
+
+### auto-fix-all ignore-checks
+
+```console
+$ arcanum config auto-fix-all ignore-checks add '^codacy' '^sonar'
+added '^codacy' to auto-fix-all.ignored_check_patterns (repo: .claude/configuration/arcanum-repo-config.json)
+added '^sonar' to auto-fix-all.ignored_check_patterns (repo: .claude/configuration/arcanum-repo-config.json)
+$ arcanum config auto-fix-all ignore-checks
+^codacy
+^sonar
+$ arcanum config auto-fix-all ignore-checks remove '^sonar'
+$ arcanum config auto-fix-all ignore-checks add -- -flaky    # `--` before a pattern starting with -
+```
+
+Patterns are **case-insensitive regexes**, not globs. They match by exact string, `add` skips patterns already present and `remove` skips missing ones. Every pattern given to `add` must compile, or nothing is written. The key is repo-only: `--local`/`--global` exit `3`. Each `add`/`remove` re-reads the file inside the lock, so concurrent calls never lose a pattern.
+
 ## Targeting
 
 | Flag | Effect |

@@ -29,12 +29,23 @@ describe('commands/config', () => {
     expect(await run({ positionals: [], values: { help: true }, io, registry })).toBe(0);
     expect(io.out()).toContain('only.key');
     expect(io.out()).toContain('The only key');
-    expect(io.out()).not.toContain('engine.mode');
+    expect(io.out().split('Keys:')[1]).not.toContain('engine.mode');
   });
 
   it('prints a subcommand\'s help for <subcommand> --help', async () => {
     expect(await run({ positionals: ['set'], values: { help: true }, io })).toBe(0);
     expect(io.out()).toMatch(/^Usage: arcanum config set <key> <value>/);
+  });
+
+  it('prints a shortcut\'s help for <shortcut> --help', async () => {
+    expect(await run({ positionals: ['git', 'safe-branch'], values: { help: true }, io })).toBe(0);
+    expect(io.out()).toMatch(/^Usage: arcanum config git safe-branch/);
+  });
+
+  it('prints a namespace\'s shortcuts for <namespace> --help', async () => {
+    expect(await run({ positionals: ['agents'], values: { help: true }, io })).toBe(0);
+    expect(io.out()).toMatch(/^Usage: arcanum config agents <shortcut>/);
+    expect(io.out()).toContain('agents email');
   });
 
   it('prints its help on stderr and exits 2 with no subcommand', async () => {

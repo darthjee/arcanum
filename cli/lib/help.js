@@ -35,13 +35,17 @@ export function configUsage(entries) {
     'Subcommands:',
     formatRows(Object.values(SUBCOMMAND_HELP).map((help) => [help.synopsis.replace(/ \[.*$| \(.*$/, ''), help.summary])),
     '',
+    'Shortcuts:',
+    formatRows(Object.entries(SHORTCUT_HELP).map(([name, help]) => [name, help.summary])),
+    '',
     'Options:',
     formatRows(TARGETING_ROWS),
     '',
     'Keys:',
     formatRows(entries.map((entry) => [entry.key, entry.description])),
     '',
-    'Run \'arcanum config <subcommand> --help\' for a subcommand\'s usage.',
+    'Run \'arcanum config <subcommand> --help\' for a subcommand\'s usage,',
+    'or \'arcanum config <shortcut> --help\' for a shortcut\'s.',
     ''
   ].join('\n');
 }
@@ -93,6 +97,143 @@ export const SUBCOMMAND_HELP = {
     rows: []
   }
 };
+
+const SINGLE_VALUE_ROWS = [
+  ['--unset', 'Remove the key from the write tier'],
+  ['--global|--repo|--local', 'Write to that tier instead of the default; on a read, read only that tier'],
+  ['--all-tiers', 'On a read, show every tier\'s value, shadowed ones included'],
+  ['--lock-timeout <seconds>', 'On a write, wait at most this long for the lock (default 10)']
+];
+
+const SINGLE_VALUE_NOTES = [
+  'With no value, prints the value like \'config get\'; with a value, writes it like',
+  '\'config set\'. Output, JSON and exit codes are those of the generic command.',
+  '--force and --string are not accepted: use \'config set\' for those.'
+];
+
+const BOOLEAN_NOTE = 'Booleans: on, off, true or false (lowercase), stored as JSON true/false; off shadows a lower tier\'s on.';
+
+/**
+ * Each shortcut's synopsis, summary, own options and notes, keyed by the
+ * shortcut as typed after `arcanum config`.
+ */
+export const SHORTCUT_HELP = {
+  'agents email': {
+    synopsis: 'agents email [<agent>] | set <pattern> | set <agent> <email> | unset [<agent>]',
+    summary: 'Show each agent\'s effective commit email, or set git.email / git.agents.<agent> (default: global)',
+    rows: [
+      ['--global|--repo|--local', 'set/unset: write to that tier instead of the global one'],
+      ['--lock-timeout <seconds>', 'set/unset: wait at most this long for the lock (default 10)']
+    ],
+    notes: [
+      'With no argument, lists the default git.email and every agent (configured, or in',
+      'the repo\'s .claude/agents/*.md) with the email it commits with and where it comes from.',
+      'With <agent>, shows both keys in every tier; exits 1 when the model email would apply.',
+      'set <pattern> writes git.email ({agent} is replaced by the agent name);',
+      'set <agent> <email> writes git.agents.<agent>. Default write tier: global.'
+    ]
+  },
+  engine: {
+    synopsis: 'engine [shell|native|docker | --unset]',
+    summary: 'Read or set engine.mode (default write tier: local)',
+    rows: SINGLE_VALUE_ROWS,
+    notes: SINGLE_VALUE_NOTES
+  },
+  'next-step auto': {
+    synopsis: 'next-step auto [<skill> [on|off | --unset]]',
+    summary: 'List the next_step.auto.* keys set, or read or set one skill\'s (default write tier: local)',
+    rows: SINGLE_VALUE_ROWS,
+    notes: [
+      'With no <skill>, lists every set next_step.auto.<skill>, resolved and sorted; always exits 0.',
+      'Any well-formed skill name is accepted.',
+      ...SINGLE_VALUE_NOTES,
+      BOOLEAN_NOTE
+    ]
+  },
+  'git safe-branch': {
+    synopsis: 'git safe-branch [<ref> | --unset]',
+    summary: 'Read or set git.safe_branch (local tier only)',
+    rows: SINGLE_VALUE_ROWS,
+    notes: [...SINGLE_VALUE_NOTES, 'The ref is stored as typed.']
+  },
+  'git merge-body': {
+    synopsis: 'git merge-body [full|empty|coauthors | --unset]',
+    summary: 'Read or set git.merge_body_mode (default write tier: local)',
+    rows: SINGLE_VALUE_ROWS,
+    notes: SINGLE_VALUE_NOTES
+  },
+  'auto-fix-all clear-context': {
+    synopsis: 'auto-fix-all clear-context [on|off | --unset]',
+    summary: 'Read or set auto-fix-all.clear_context (local tier only)',
+    rows: SINGLE_VALUE_ROWS,
+    notes: [...SINGLE_VALUE_NOTES, BOOLEAN_NOTE]
+  },
+  'auto-fix-all finish-on-empty-queue': {
+    synopsis: 'auto-fix-all finish-on-empty-queue [on|off | --unset]',
+    summary: 'Read or set auto-fix-all.finish_on_empty_queue (local tier only)',
+    rows: SINGLE_VALUE_ROWS,
+    notes: [...SINGLE_VALUE_NOTES, BOOLEAN_NOTE]
+  },
+  'auto-fix-all ignore-checks': {
+    synopsis: 'auto-fix-all ignore-checks [list] | add <pattern>... | remove <pattern>...',
+    summary: 'List or edit auto-fix-all.ignored_check_patterns (repo tier only)',
+    rows: [
+      ['--repo', 'The only tier accepted (--local and --global exit 3)'],
+      ['--lock-timeout <seconds>', 'add/remove: wait at most this long for the lock (default 10)']
+    ],
+    notes: [
+      'Patterns are case-insensitive regexes (as new RegExp(p, \'i\')), not globs.',
+      'add appends in order and skips patterns already present; remove skips missing ones.',
+      'Patterns match by exact string. Use -- before a pattern starting with -.',
+      'An invalid regex is refused (exit 3) and nothing is written.'
+    ]
+  },
+  'monitor-issues clear-context': {
+    synopsis: 'monitor-issues clear-context [on|off | --unset]',
+    summary: 'Read or set monitor-issues.clear_context (local tier only)',
+    rows: SINGLE_VALUE_ROWS,
+    notes: [...SINGLE_VALUE_NOTES, BOOLEAN_NOTE]
+  }
+};
+
+/**
+ * @param {string} namespace - a shortcut namespace (e.g. `git`).
+ * @param {(string|undefined)} name - the word after it, if any.
+ * @returns {string} the shortcut's usage, or the namespace's (listing
+ *   its shortcuts) when `name` names none, newline-terminated.
+ */
+export function shortcutUsage(namespace, name) {
+  const full = name === undefined ? namespace : `${namespace} ${name}`;
+  const key = Object.hasOwn(SHORTCUT_HELP, full) ? full : namespace;
+
+  if (Object.hasOwn(SHORTCUT_HELP, key)) {
+    const help = SHORTCUT_HELP[key];
+
+    return [
+      `Usage: arcanum config ${help.synopsis}`,
+      '',
+      `${help.summary}.`,
+      '',
+      ...help.notes,
+      '',
+      'Options:',
+      formatRows([...help.rows, ...TARGETING_ROWS]),
+      ''
+    ].join('\n');
+  }
+
+  const shortcuts = Object.entries(SHORTCUT_HELP).filter(([shortcut]) => shortcut.startsWith(`${namespace} `));
+
+  return [
+    `Usage: arcanum config ${namespace} <shortcut> [options]`,
+    '',
+    'Shortcuts:',
+    formatRows(shortcuts.map(([, help]) => [help.synopsis, help.summary])),
+    '',
+    `Run 'arcanum config ${namespace} <shortcut> --help' for a shortcut's usage.`,
+    ''
+  ].join('\n');
+}
 
 /**
  * @param {string} name - a `config` subcommand.
