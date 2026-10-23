@@ -1,7 +1,7 @@
 import KeyRegistry from '../../../shared/lib/config/KeyRegistry.js';
 import { TIER_FLAGS, checkArity, checkFlags, checkKey, selectedTier } from '../args.js';
 import { EXIT_OK, EXIT_USAGE, UsageError } from '../exitCodes.js';
-import { configUsage } from '../help.js';
+import { configUsage, subcommandUsage } from '../help.js';
 import get from './config/get.js';
 import info from './config/info.js';
 import list from './config/list.js';
@@ -53,7 +53,7 @@ export async function run(context) {
   const usage = configUsage(registry.entries());
 
   if (values.help) {
-    io.stdout.write(usage);
+    io.stdout.write(Object.hasOwn(SUBCOMMANDS, name || '') ? subcommandUsage(name) : usage);
 
     return EXIT_OK;
   }

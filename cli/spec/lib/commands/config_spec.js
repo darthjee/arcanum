@@ -32,6 +32,11 @@ describe('commands/config', () => {
     expect(io.out()).not.toContain('engine.mode');
   });
 
+  it('prints a subcommand\'s help for <subcommand> --help', async () => {
+    expect(await run({ positionals: ['set'], values: { help: true }, io })).toBe(0);
+    expect(io.out()).toMatch(/^Usage: arcanum config set <key> <value>/);
+  });
+
   it('prints its help on stderr and exits 2 with no subcommand', async () => {
     expect(await run({ positionals: [], values: {}, io })).toBe(2);
     expect(io.out()).toBe('');
