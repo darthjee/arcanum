@@ -184,7 +184,7 @@ describe('config shortcuts: auto-fix-all ignore-checks', () => {
       const result = await harness.run(checks('add'));
 
       expect(result.code).toBe(2);
-      expect(result.err).toContain(`arcanum: auto-fix-all ignore-checks add needs <pattern>...`);
+      expect(result.err).toContain('arcanum: auto-fix-all ignore-checks add needs <pattern>...');
     });
 
     for (const tier of ['local', 'global']) {
