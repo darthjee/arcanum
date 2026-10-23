@@ -26,6 +26,9 @@ export const DEFAULT_TIER = 'global';
 /** The generic email key. */
 export const EMAIL_KEY = 'git.email';
 
+/** The per-agent email key, as the registry names it. */
+export const AGENTS_PATTERN = 'git.agents.<agent>';
+
 /** A well-formed agent name: one registry wildcard segment. */
 export const AGENT_PATTERN = /^[A-Za-z0-9_-]+$/;
 

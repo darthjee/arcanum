@@ -8,13 +8,13 @@
 import { SETUP_SECTIONS } from '../../../../shared/lib/config/KeyRegistry.js';
 import { lockTimeoutMs } from '../../args.js';
 import { EXIT_OK, TargetUnavailableError, UsageError } from '../../exitCodes.js';
-import { createPrompter } from '../../prompter.js';
+import { EXIT_SIGINT } from '../../writeTier.js';
+import { Interrupted, createPrompter } from '../../prompter.js';
 import { REPO_CONFIG_FILE } from '../../tierFiles.js';
-import { DEFAULT_TIER as AGENTS_EMAIL_TIER, EMAIL_KEY } from './shortcuts/agentsEmail.js';
+import { askSetting } from './setup/setting.js';
+import { AGENTS_PATTERN } from './shortcuts/agentsEmail.js';
 import { memoizeTargets } from './shortcuts/common.js';
-import { KEY as IGNORE_CHECKS_KEY, TIER as IGNORE_CHECKS_TIER } from './shortcuts/ignoreChecks.js';
-import { DEFAULT_TIER as NEXT_STEP_TIER, PREFIX as NEXT_STEP_PREFIX } from './shortcuts/nextStep.js';
-import { SINGLE_VALUE } from './shortcuts/singleValue.js';
+import { defaultTier } from './shortcuts/defaultTier.js';
 
 /** `config setup`'s own flags, beyond the global ones. */
 export const options = { 'lock-timeout': { type: 'string' } };
@@ -26,22 +26,10 @@ export const positionals = ['section...'];
 export const acceptsTier = false;
 
 /** The per-agent email entry, whose instances come from the repo's agents. */
-export const AGENTS_KEY = 'git.agents.<agent>';
+export const AGENTS_KEY = AGENTS_PATTERN;
 
 /** The section whose items all need a configured repo. */
 export const CI_SECTION = 'ci';
-
-/**
- * The wizard's default write tier per registry key, the same as the
- * matching shortcut's (a single-tier key always uses its only tier).
- */
-export const DEFAULT_TIERS = {
-  ...Object.fromEntries(Object.values(SINGLE_VALUE).map(({ key, tier }) => [key, tier])),
-  [EMAIL_KEY]: AGENTS_EMAIL_TIER,
-  [AGENTS_KEY]: AGENTS_EMAIL_TIER,
-  [`${NEXT_STEP_PREFIX}.<skill>`]: NEXT_STEP_TIER,
-  [IGNORE_CHECKS_KEY]: IGNORE_CHECKS_TIER
-};
 
 const WILDCARD = /^<[^>]+>$/;
 
@@ -74,18 +62,21 @@ export async function run(context) {
   }
 
   const sections = selectSections(args);
-  const timeoutMs = lockTimeoutMs(values['lock-timeout']);
+
+  lockTimeoutMs(values['lock-timeout']);
+
   const resolveTargets = memoizeTargets(context.resolveTargets);
   const targets = await resolveTargets();
   const items = availableItems(setupItems(registry, sections), targets, output);
 
   const prompter = deps.prompter || createPrompter({ input: io.stdin, output: io.stderr });
   const session = {
-    context: { ...context, resolveTargets },
+    context: { ...context, resolveTargets, warn: onceOnly(context.warn) },
+    io,
+    output,
+    registry,
     prompter,
     targets,
-    timeoutMs,
-    timeoutLabel: values['lock-timeout'] || '10',
     results: []
   };
 
@@ -129,23 +120,6 @@ export function selectSections(args) {
 }
 
 /**
- * @param {object} entry - a registry entry.
- * @returns {string} its default write tier: its only tier, or the
- *   matching shortcut's, or `local` when allowed, or its first tier.
- */
-export function defaultTier(entry) {
-  if (entry.tiers.length === 1) {
-    return entry.tiers[0];
-  }
-
-  if (Object.hasOwn(DEFAULT_TIERS, entry.key) && entry.tiers.includes(DEFAULT_TIERS[entry.key])) {
-    return DEFAULT_TIERS[entry.key];
-  }
-
-  return entry.tiers.includes('local') ? 'local' : entry.tiers[0];
-}
-
-/**
  * Builds the wizard's items for the given sections: every entry carrying
  * `setup`, by section, then by `setup.order`, with a wildcard entry's
  * `setup.instances` expanded into one item each. The per-agent entry
@@ -163,7 +137,7 @@ export function setupItems(registry, sections) {
     ));
 
   return entries.flatMap((entry) => {
-    const base = { section: entry.setup.section, entry, defaultTier: defaultTier(entry) };
+    const base = { section: entry.setup.section, entry, defaultTier: defaultTier(entry.key, registry) };
 
     if (entry.key === AGENTS_KEY) {
       return [{ ...base, key: entry.key, kind: 'agents' }];
@@ -242,16 +216,47 @@ export function availableItems(items, { repo }, output) {
 }
 
 /**
+ * @param {(message: string) => void} warn - prints a stderr warning.
+ * @returns {(message: string) => void} the same, printing each distinct
+ *   message once, so re-reading the tiers per setting does not repeat
+ *   the read warnings.
+ */
+export function onceOnly(warn) {
+  const seen = new Set();
+
+  return (message) => {
+    if (!seen.has(message)) {
+      seen.add(message);
+      warn(message);
+    }
+  };
+}
+
+/**
  * Asks each item in turn.
  * @param {object} session - the wizard's state.
  * @param {object[]} items - the items to ask.
- * @returns {Promise<number>} the exit code.
+ * @returns {Promise<number>} the exit code: the first failed write's,
+ *   `130` when interrupted, else `0`.
  */
 export async function runItems(session, items) {
-  void session;
-  void items;
+  try {
+    for (const item of items) {
+      if (item.kind === 'value') {
+        await askSetting(session, item);
+      }
+    }
+  } catch (error) {
+    if (!(error instanceof Interrupted)) {
+      throw error;
+    }
 
-  return EXIT_OK;
+    return EXIT_SIGINT;
+  }
+
+  const failed = session.results.find((result) => result.status === 'failed');
+
+  return failed ? failed.exit : EXIT_OK;
 }
 
 export default { name: 'setup', options, positionals, acceptsTier, run };

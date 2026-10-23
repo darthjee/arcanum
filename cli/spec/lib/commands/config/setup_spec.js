@@ -1,8 +1,9 @@
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import KeyRegistry from '../../../../../shared/lib/config/KeyRegistry.js';
-import {
-  defaultTier, needsRepo, selectSections, setupItems
-} from '../../../../lib/commands/config/setup.js';
+import Lock from '../../../../../shared/lib/file/Lock.js';
+import { needsRepo, selectSections, setupItems } from '../../../../lib/commands/config/setup.js';
+import { defaultTier } from '../../../../lib/commands/config/shortcuts/defaultTier.js';
 import { UsageError } from '../../../../lib/exitCodes.js';
 import { makeRepo } from '../../../support/fixtures.js';
 import { scriptedPrompter } from '../../../support/prompter.js';
@@ -125,15 +126,20 @@ describe('config setup', () => {
     });
 
     it('orders by setup.order within a section, whatever the registry order', () => {
-      const entry = (key, order) => ({ key, type: 'string', tiers: ['global'], setup: { section: 'git', order, prompt: key } });
-      const fake = { entries: () => [entry('b.b', 2), entry('a.a', 1), { key: 'c.c', type: 'string', tiers: ['global'] }] };
+      const entry = (key, order) => ({
+        key, type: 'string', tiers: ['global'], description: key, setup: { section: 'git', order, prompt: key }
+      });
+      const fake = new KeyRegistry({
+        format_version: 1,
+        keys: [entry('b.b', 2), entry('a.a', 1), { key: 'c.c', type: 'string', tiers: ['global'], description: 'c' }]
+      });
 
       expect(setupItems(fake, ['git']).map(({ key }) => key)).toEqual(['a.a', 'b.b']);
     });
   });
 
   describe('default tiers', () => {
-    const tierOf = (key) => defaultTier(registry.lookup(key));
+    const tierOf = (key) => defaultTier(key);
 
     it('uses the matching shortcut\'s default tier', () => {
       expect(tierOf('git.email')).toBe('global');
@@ -149,8 +155,21 @@ describe('config setup', () => {
     });
 
     it('falls back to local, then to the first tier, for a key with no shortcut', () => {
-      expect(defaultTier({ key: 'x.y', tiers: ['global', 'local'] })).toBe('local');
-      expect(defaultTier({ key: 'x.y', tiers: ['global', 'repo'] })).toBe('global');
+      const fake = new KeyRegistry({
+        format_version: 1,
+        keys: [
+          { key: 'x.local', type: 'string', tiers: ['global', 'local'], description: 'x' },
+          { key: 'x.global', type: 'string', tiers: ['global', 'repo'], description: 'x' }
+        ]
+      });
+
+      expect(defaultTier('x.local', fake)).toBe('local');
+      expect(defaultTier('x.global', fake)).toBe('global');
+    });
+
+    it('knows the registry key patterns', () => {
+      expect(tierOf('git.agents.<agent>')).toBe('global');
+      expect(tierOf('nope.nope')).toBeNull();
     });
 
     it('marks the repo-dependent items', () => {
@@ -206,6 +225,131 @@ describe('config setup', () => {
       const { err } = await wizard(['ci']);
 
       expect(err).not.toContain('note: skipping');
+    });
+  });
+
+  describe('the per-setting flow', () => {
+    /**
+     * @param {string} file - a tier file.
+     * @returns {Promise<(object|null)>} its content, `null` when absent.
+     */
+    async function tier(file) {
+      try {
+        return JSON.parse(await readFile(file, 'utf8'));
+      } catch {
+        return null;
+      }
+    }
+
+    it('shows the setting and keeps the current value on Enter, asking nothing more', async () => {
+      await harness.seed({ repo: { engine: { mode: 'native' } } });
+      const { code, out, err, prompter } = await wizard(['engine'], ['']);
+
+      expect(code).toBe(0);
+      expect(out).toBe('');
+      expect(err).toContain('engine.mode — Script engine used to run migrated skill entrypoints\n  current: native (repo)\n');
+      expect(prompter.questions).toEqual(['  new value [shell/native/docker, Enter keeps, - unsets]: ']);
+      expect(await tier(harness.localFile)).toBeNull();
+    });
+
+    it('shows an unset key with its registry default', async () => {
+      await harness.seed();
+      const { err } = await wizard(['engine'], ['']);
+
+      expect(err).toContain('  current: (unset; default: shell)\n');
+    });
+
+    it('sets a value at the default tier after confirming', async () => {
+      await harness.seed();
+      const { code, prompter } = await wizard(['engine'], ['shell', '', '']);
+
+      expect(code).toBe(0);
+      expect(prompter.questions).toEqual([
+        '  new value [shell/native/docker, Enter keeps, - unsets]: ',
+        '  tier [local/repo/global] (local): ',
+        `  set engine.mode = "shell" at local (${harness.localFile})? [Y/n] `
+      ]);
+      expect(await tier(harness.localFile)).toEqual({ engine: { mode: 'shell' } });
+    });
+
+    it('unsets the key at the chosen tier with -', async () => {
+      await harness.seed({ local: { engine: { mode: 'docker' } } });
+      const { code, prompter } = await wizard(['engine'], ['-', '', 'y']);
+
+      expect(code).toBe(0);
+      expect(prompter.questions[2]).toBe(`  unset engine.mode at local (${harness.localFile})? [Y/n] `);
+      expect(await tier(harness.localFile)).toEqual({ engine: {} });
+    });
+
+    it('re-asks after an invalid enum value, printing the error', async () => {
+      await harness.seed();
+      const { code, err, prompter } = await wizard(['engine'], ['bogus', 'docker', '', '']);
+
+      expect(code).toBe(0);
+      expect(err).toContain('arcanum: engine.mode must be one of shell, native, docker, got "bogus"\n');
+      expect(prompter.questions.slice(0, 2)).toEqual([
+        '  new value [shell/native/docker, Enter keeps, - unsets]: ',
+        '  new value [shell/native/docker, Enter keeps, - unsets]: '
+      ]);
+      expect(await tier(harness.localFile)).toEqual({ engine: { mode: 'docker' } });
+    });
+
+    it('stores booleans as JSON booleans, re-asking after an invalid token', async () => {
+      await harness.seed();
+      const { code, err } = await wizard(['flow'], ['maybe', 'y', '', '', 'off', '', '', '']);
+
+      expect(code).toBe(0);
+      expect(err).toContain('arcanum: next_step.auto.enhance-issue must be y or n, got "maybe"\n');
+      expect(err).toContain('hint: accepted: y, n, on, off, true, false (lowercase)\n');
+      expect(await tier(harness.localFile)).toEqual({
+        next_step: { auto: { 'enhance-issue': true, 'discuss-issue': false } }
+      });
+    });
+
+    it('writes to a non-default tier, re-asking after an invalid one', async () => {
+      await harness.seed();
+      const { err, prompter } = await wizard(['engine'], ['native', 'nowhere', 'global', '']);
+
+      expect(err).toContain('arcanum: tier must be one of local, repo, global\n');
+      expect(prompter.questions[3]).toBe(`  set engine.mode = "native" at global (${harness.globalFile})? [Y/n] `);
+      expect(await tier(harness.globalFile)).toEqual({ engine: { mode: 'native' } });
+    });
+
+    it('skips the tier question for a single-tier key', async () => {
+      await harness.seed();
+      const { prompter } = await wizard(['git'], ['origin/dev', '', '']);
+
+      expect(prompter.questions.slice(0, 2)).toEqual([
+        '  new value [Enter keeps, - unsets]: ',
+        `  set git.safe_branch = "origin/dev" at local (${harness.localFile})? [Y/n] `
+      ]);
+      expect(await tier(harness.localFile)).toEqual({ git: { safe_branch: 'origin/dev' } });
+    });
+
+    it('notes a higher-precedence tier that still overrides the chosen one', async () => {
+      await harness.seed({ local: { engine: { mode: 'native' } } });
+      const { err } = await wizard(['engine'], ['docker', 'global', '']);
+
+      expect(err).toContain('arcanum: note: local still overrides this (value: native)\n');
+      expect(await tier(harness.globalFile)).toEqual({ engine: { mode: 'docker' } });
+    });
+
+    it('writes nothing when the change is declined, re-asking an unclear answer', async () => {
+      await harness.seed();
+      const { code, err } = await wizard(['engine'], ['shell', '', 'maybe', 'n']);
+
+      expect(code).toBe(0);
+      expect(err).toContain('arcanum: answer y or n\n');
+      expect(await tier(harness.localFile)).toBeNull();
+    });
+
+    it('forwards --lock-timeout to the write', async () => {
+      await harness.seed();
+      await new Lock().acquire(`${harness.localFile}.lock`);
+      const { code, err } = await wizard(['engine', '--lock-timeout', '0'], ['shell', '', '']);
+
+      expect(code).toBe(6);
+      expect(err).toContain(`arcanum: timed out after 0s waiting for ${harness.localFile}.lock\n`);
     });
   });
 });
