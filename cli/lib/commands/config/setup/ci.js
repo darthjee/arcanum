@@ -1,5 +1,5 @@
-// The `config setup` ci section (see the Input handling section of
-// docs/agents/specs/arcanum-cli/shortcuts-and-setup.md): the repo-only
+// The `config setup` ci section (see
+// docs/agents/architecture/arcanum-cli.md#per-setting-flow): the repo-only
 // `auto-fix-all.ignored_check_patterns` array, edited one pattern at a
 // time through an `[a]dd / [r]emove / [d]one` loop. Each change is
 // confirmed, then written like `ignore-checks add/remove`: an atomic

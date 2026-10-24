@@ -1,7 +1,7 @@
-// The `config setup` summary (see the Interrupts and errors section of
-// docs/agents/specs/arcanum-cli/shortcuts-and-setup.md), printed to
-// stderr on every exit path: what was written (old -> new), kept, failed
-// (with the reason) and not reached.
+// The `config setup` summary (see
+// docs/agents/architecture/arcanum-cli.md#errors-interrupts-and-summary),
+// printed to stderr on every exit path: what was written (old -> new),
+// kept, failed (with the reason) and not reached.
 
 import { formatValue } from '../../../output.js';
 

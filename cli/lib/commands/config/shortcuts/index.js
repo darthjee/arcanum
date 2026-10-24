@@ -1,5 +1,5 @@
 // The `arcanum config` shortcut namespaces (see
-// docs/agents/specs/arcanum-cli/shortcuts-and-setup.md#shortcut-set).
+// docs/agents/architecture/arcanum-cli.md#shortcuts).
 // A namespace is either a runner itself (`engine`) or a map of shortcut
 // name → runner (`git safe-branch`, `auto-fix-all clear-context`, …).
 

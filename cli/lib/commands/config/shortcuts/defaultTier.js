@@ -1,6 +1,6 @@
 // The default write tier of each key a shortcut covers, in one place, so
 // the shortcuts and the `config setup` wizard cannot drift apart (see
-// docs/agents/specs/arcanum-cli/shortcuts-and-setup.md#per-setting-flow).
+// docs/agents/architecture/arcanum-cli.md#per-setting-flow).
 
 import KeyRegistry from '../../../../../shared/lib/config/KeyRegistry.js';
 import { AGENTS_PATTERN, DEFAULT_TIER as AGENTS_EMAIL_TIER, EMAIL_KEY } from './agentsEmail.js';
