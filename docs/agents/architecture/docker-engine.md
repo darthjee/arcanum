@@ -71,10 +71,10 @@ The entrypoint is `/usr/local/bin/arcanum-entrypoint` (source: `core/docker-runt
 
 ### Version pins
 
-Every input is pinned, following the `jq` convention in `core/Dockerfile`: an exact version string next to a comment explaining how to find the current candidate when refreshing it.
+Every input is pinned to a version string next to a comment explaining how to find the current candidate when refreshing it. The base image and `gh` are pinned exactly; apt packages pin their upstream version and let the Debian security revision float (see below).
 
 - **Base image:** an exact `darthjee/node:<x.y.z>` tag (Debian bookworm, published for `linux/amd64` and `linux/arm64`), shared by both targets, pinned by tag only.
-- **apt packages:** `jq`, `git`, `openssh-client` and `libnss-wrapper` as `pkg=<version>`, with `--no-install-recommends`.
+- **apt packages:** `jq`, `git` and `openssh-client` as `"pkg=<upstream>+deb12u*"` (quoted, so the shell never glob-expands them; apt matches the `*`), and `libnss-wrapper`, which has no Debian security revision, as an exact `pkg=<version>`; all with `--no-install-recommends`. Debian mirrors keep only the latest revision of a package in a suite, so an exact `+deb12u<N>` pin breaks the build as soon as a security update ships (#850). Wildcarding only the revision keeps security fixes flowing in, while a real upstream version change (e.g. a Debian release bump of the base image) still breaks the build loudly.
 - **`gh`:** from GitHub's release tarball, pinned by version (`GH_VERSION`) with one SHA-256 per architecture (`GH_SHA256_AMD64`, `GH_SHA256_ARM64`), verified before extraction. The architecture is read from `dpkg --print-architecture`, not `TARGETARCH`, so the binary always matches the base image's actual platform.
 
 Refreshing a pin is a normal PR. Pins change the image content, so they reach users only through the next arcanum release.
