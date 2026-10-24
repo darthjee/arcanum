@@ -1,8 +1,8 @@
-// The line-based prompter of `arcanum config setup` (see the TTY
-// requirement and Interrupts sections of
-// docs/agents/specs/arcanum-cli/shortcuts-and-setup.md): questions go to
-// stderr, answers are read line by line from stdin, and EOF (Ctrl-D) or
-// Ctrl-C at a prompt rejects with `Interrupted`.
+// The line-based prompter of `arcanum config setup` (see
+// docs/agents/architecture/arcanum-cli.md#terminal and
+// docs/agents/architecture/arcanum-cli.md#errors-interrupts-and-summary):
+// questions go to stderr, answers are read line by line from stdin, and
+// EOF (Ctrl-D) or Ctrl-C at a prompt rejects with `Interrupted`.
 
 import readline from 'node:readline';
 

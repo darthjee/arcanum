@@ -2,7 +2,7 @@
 # Publish the arcanum-cli npm package (cli/) to the npm registry, with the
 # release version. Run by the `publish-cli` job of the CircleCI `release`
 # workflow, after the release zip is uploaded. See
-# docs/agents/specs/arcanum-cli/packaging-and-release.md#release.
+# docs/agents/architecture/install-and-release.md#job-and-script.
 #
 # Usage: publish_cli_package.sh <tag> [--dry-run]
 #

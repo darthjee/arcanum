@@ -1,6 +1,6 @@
-// `arcanum config next-step auto [<skill> [on|off | --unset]]` (see the
-// Design rules and Output sections of
-// docs/agents/specs/arcanum-cli/shortcuts-and-setup.md): with a skill, a
+// `arcanum config next-step auto [<skill> [on|off | --unset]]` (see
+// docs/agents/architecture/arcanum-cli.md#shortcuts, with its Design rules
+// and Shortcut output subsections): with a skill, a
 // boolean single-value shortcut over `next_step.auto.<skill>`; without
 // one, the listing of every `next_step.auto.*` key that is set.
 

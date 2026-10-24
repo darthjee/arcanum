@@ -1,7 +1,7 @@
 // Targeting: which Claude config directory (account) and which repo a
-// command reads and writes (see the Targeting section of
-// docs/agents/specs/arcanum-cli.md and
-// docs/agents/specs/arcanum-cli/command-surface.md#--repo-normalization).
+// command reads and writes (see
+// docs/agents/architecture/arcanum-cli.md#targeting and, for `--repo`
+// normalization, docs/agents/architecture/arcanum-cli.md#repo).
 
 import { execFile } from 'node:child_process';
 import { stat } from 'node:fs/promises';

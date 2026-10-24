@@ -1,5 +1,6 @@
-// The single-value shortcuts (see the Shortcut set, Design rules and
-// Output sections of docs/agents/specs/arcanum-cli/shortcuts-and-setup.md):
+// The single-value shortcuts (see
+// docs/agents/architecture/arcanum-cli.md#shortcuts, its Design rules and
+// docs/agents/architecture/arcanum-cli.md#shortcut-output):
 // no value reads like `config get`, a value writes like `config set` at
 // the shortcut's default tier, `--unset` removes like `config unset`.
 

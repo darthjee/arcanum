@@ -1,6 +1,6 @@
-// Version skew between a tier file and the CLI (see the Version skew
-// section of docs/agents/specs/arcanum-cli.md). Each tier's pointer is
-// compared with the CLI's own version and with the embedded per-scope
+// Version skew between a tier file and the CLI (see
+// docs/agents/architecture/arcanum-cli.md#version-skew). Each tier's
+// pointer is compared with the CLI's own version and with the embedded per-scope
 // list of arcanum versions that shipped migrations.
 
 import { VersionSkewError } from './exitCodes.js';

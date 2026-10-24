@@ -1,6 +1,5 @@
-// The `config setup` wizard's per-setting dialogue (see the Per-setting
-// flow and Input handling sections of
-// docs/agents/specs/arcanum-cli/shortcuts-and-setup.md): show the
+// The `config setup` wizard's per-setting dialogue (see
+// docs/agents/architecture/arcanum-cli.md#per-setting-flow): show the
 // setting, ask the value, ask the tier, confirm, then write through the
 // generic `set`/`unset` path. No lock is held while a question is open.
 

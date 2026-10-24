@@ -2,7 +2,7 @@
 // `--repo` overload pre-scan, tier-flag exclusivity, per-subcommand flag
 // sets, strict arity, key syntax and `--lock-timeout`. Everything here
 // runs before any filesystem access, so usage errors (exit `2`) always
-// win (see docs/agents/specs/arcanum-cli/command-surface.md#syntax-rules).
+// win (see docs/agents/architecture/arcanum-cli.md#syntax-rules).
 
 import { UsageError } from './exitCodes.js';
 

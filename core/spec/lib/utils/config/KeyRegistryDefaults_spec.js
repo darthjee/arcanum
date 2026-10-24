@@ -12,12 +12,12 @@ import MergeBodyResolver, { DEFAULT_MERGE_BODY_MODE } from '../../../../lib/util
 import { createRepoContextMock } from '../../../support/factories/repoContextFactory.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
-// Defaults drift spec (issue #777, docs/agents/specs/arcanum-cli/key-registry.md
-// "How arcanum's own code consumes the registry"): every keys.json
-// `default` must equal the default the code actually applies. Node
-// defaults are compared through their exported constants (or, where the
-// default is only implicit, the reader's observable result with no
-// config present); shell defaults by running the helper against a temp
+// Defaults drift spec (issue #777, check 1 of
+// docs/agents/architecture/shared-state-and-configuration.md#keeping-it-in-sync):
+// every keys.json `default` must equal the default the code actually
+// applies. Node defaults are compared through their exported constants
+// (or, where the default is only implicit, the reader's observable
+// result with no config present); shell defaults by running the helper against a temp
 // repo with no config files and an empty CLAUDE_CONFIG_DIR. A fake `gh`
 // / `curl` / `sleep` on PATH keeps every shell case offline and fast.
 

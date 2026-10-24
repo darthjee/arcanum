@@ -1,8 +1,9 @@
 // `arcanum config setup [<section>...]`: the interactive onboarding
-// wizard (see the `arcanum config setup` wizard section of
-// docs/agents/specs/arcanum-cli/shortcuts-and-setup.md). It asks every
-// registry entry carrying `setup`, in canonical section order, then by
-// `setup.order`, and writes each confirmed answer immediately through
+// wizard (see docs/agents/architecture/arcanum-cli.md#setup-wizard and,
+// for the section order,
+// docs/agents/architecture/arcanum-cli.md#coverage-and-order). It asks
+// every registry entry carrying `setup`, in canonical section order,
+// then by `setup.order`, and writes each confirmed answer immediately through
 // the generic `set`/`unset` path. It never holds a lock while prompting.
 
 import { SETUP_SECTIONS } from '../../../../shared/lib/config/KeyRegistry.js';

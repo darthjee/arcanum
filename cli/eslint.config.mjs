@@ -3,7 +3,7 @@ import jsdoc from 'eslint-plugin-jsdoc';
 import globals from 'globals';
 
 // Same style rules as core/eslint.config.mjs, plus the CLI-only blocks
-// below (see docs/agents/specs/arcanum-cli/shared-config-logic.md).
+// below (see docs/agents/architecture/shared-lib.md#import-boundary).
 
 const styleRules = {
   indent: ['error', 2],

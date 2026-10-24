@@ -1,6 +1,5 @@
-// The `config setup` identity section's per-agent overrides (see the
-// Input handling section of
-// docs/agents/specs/arcanum-cli/shortcuts-and-setup.md): behind an
+// The `config setup` identity section's per-agent overrides (see
+// docs/agents/architecture/arcanum-cli.md#coverage-and-order): behind an
 // opt-in question, one `git.agents.<agent>` setting per agent in the
 // repo's `.claude/agents/`, each showing what its email resolves to now.
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // arcanum-cli's npm `bin` entry: the Node-floor gate (see
-// docs/agents/specs/arcanum-cli.md#runtime).
+// docs/agents/architecture/arcanum-cli.md#runtime-path).
 //
 // This file is not bundled. It must parse on a Node.js older than the
 // floor, so it sticks to ES2020 syntax (no top-level await, no `?.` or

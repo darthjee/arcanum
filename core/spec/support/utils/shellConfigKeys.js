@@ -1,9 +1,9 @@
-// Spec-support parser for the shell static scan (issue #777, layer 2 of
-// docs/agents/specs/arcanum-cli/key-registry.md's "Enforcing 'a new key
-// means a registry entry'"). It finds `config_chain_read`,
-// `repo_config_read|write` and `global_config_read|write` calls in shell
-// source, builds the dotted key(s) each one touches, and honours
-// `# config-key: <key>` annotations, following the parsing rules in
+// Spec-support parser for the shell static scan (issue #777, check 3 of
+// docs/agents/architecture/shared-state-and-configuration.md#keeping-it-in-sync).
+// It finds `config_chain_read`, `repo_config_read|write` and
+// `global_config_read|write` calls in shell source, builds the dotted
+// key(s) each one touches, and honours `# config-key: <key>`
+// annotations, following the parsing rules in
 // docs/agents/plans/777-shared-config-key-registry/plan.md's shared
 // contracts. Not shipped code.
 

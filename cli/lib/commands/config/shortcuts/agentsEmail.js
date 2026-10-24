@@ -1,5 +1,5 @@
-// `arcanum config agents email` (see the `agents email` section of
-// docs/agents/specs/arcanum-cli/shortcuts-and-setup.md): the listing of
+// `arcanum config agents email` (see
+// docs/agents/architecture/arcanum-cli.md#agents-email): the listing of
 // every agent's effective commit email, the per-tier detail of one
 // agent, and the `set`/`unset` writes of `git.email` and
 // `git.agents.<agent>`. Resolution goes only through the shared

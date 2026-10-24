@@ -10,8 +10,8 @@ const NAMESPACE = 'git';
  * a tier fully resolved before the next one), substituting any
  * `{agent}` placeholder with the agent's name. Part of the shared
  * config surface bundled into `arcanum-cli` (see
- * `docs/agents/specs/arcanum-cli/shared-config-logic.md`), so it
- * imports only `ConfigChain`.
+ * `docs/agents/architecture/shared-lib.md#configchainreadwithsource-and-agentemail`),
+ * so it imports only `ConfigChain`.
  */
 class AgentEmail {
   /**

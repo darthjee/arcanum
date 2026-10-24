@@ -6,12 +6,11 @@ import { promisify } from 'node:util';
 import KeyRegistry from '../../../../../shared/lib/config/KeyRegistry.js';
 import { checkShellSource, findConfigCalls } from '../../../support/utils/shellConfigKeys.js';
 
-// Shell static scan (issue #777, layer 2 of
-// docs/agents/specs/arcanum-cli/key-registry.md's "Enforcing 'a new key
-// means a registry entry'"): every config helper call in a tracked *.sh
-// must touch a key registered in shared/lib/config/keys.json, or
-// carry `# config-key: <key>` annotations when its key can't be read
-// statically.
+// Shell static scan (issue #777, check 3 of
+// docs/agents/architecture/shared-state-and-configuration.md#keeping-it-in-sync):
+// every config helper call in a tracked *.sh must touch a key registered
+// in shared/lib/config/keys.json, or carry `# config-key: <key>`
+// annotations when its key can't be read statically.
 
 const execFileAsync = promisify(execFile);
 

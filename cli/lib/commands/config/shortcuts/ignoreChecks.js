@@ -1,6 +1,6 @@
 // `arcanum config auto-fix-all ignore-checks [list] | add <pattern>... |
-// remove <pattern>...` (see the `ignore-checks` section of
-// docs/agents/specs/arcanum-cli/shortcuts-and-setup.md). The key is
+// remove <pattern>...` (see
+// docs/agents/architecture/arcanum-cli.md#ignore-checks). The key is
 // repo-only, its entries are case-insensitive regex strings (not globs),
 // and `add`/`remove` are a read-modify-write inside the lock
 // (`RepoConfigWriter#update`), so concurrent calls never lose updates.

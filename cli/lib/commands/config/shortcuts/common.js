@@ -1,5 +1,5 @@
-// What every `arcanum config` shortcut shares (see the Design rules of
-// docs/agents/specs/arcanum-cli/shortcuts-and-setup.md): the strict flag
+// What every `arcanum config` shortcut shares (see
+// docs/agents/architecture/arcanum-cli.md#design-rules): the strict flag
 // set, the delegation to the generic get/set/unset (so the output, JSON
 // and exit codes are the generic ones) and the shadowed-tier note.
 

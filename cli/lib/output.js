@@ -1,5 +1,5 @@
 // The CLI's output layer (see the Output, JSON output and Error messages
-// sections of docs/agents/specs/arcanum-cli/command-surface.md): stdout
+// sections of docs/agents/architecture/arcanum-cli.md#output): stdout
 // carries only the result; every warning and error goes to stderr.
 
 import { EXIT_IDENTIFIERS, EXIT_USAGE, exitCodeForError } from './exitCodes.js';

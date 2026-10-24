@@ -1,5 +1,5 @@
-// The boolean tokens the shortcuts accept (see the Design rules of
-// docs/agents/specs/arcanum-cli/shortcuts-and-setup.md): `on`/`true` and
+// The boolean tokens the shortcuts accept (see
+// docs/agents/architecture/arcanum-cli.md#design-rules): `on`/`true` and
 // `off`/`false`, lowercase only, always stored as JSON booleans.
 
 import { ValidationError } from './exitCodes.js';
