@@ -27,7 +27,8 @@ const NULL_HINT = 'use \'config unset\' to remove it';
 
 /**
  * Loader, matcher and validator for arcanum's config key registry,
- * `keys.json` (see docs/agents/specs/arcanum-cli/key-registry.md).
+ * `keys.json` (see
+ * docs/agents/architecture/shared-state-and-configuration.md#the-key-registry).
  * The registry is imported statically so `esbuild` inlines it into the
  * bundled CLI; nothing here reads the filesystem. Validation never
  * throws: `check` returns a structured result and `validateRegistry`
