@@ -1,6 +1,6 @@
 // The write path shared by `config set` and `config unset` (see
-// docs/agents/specs/arcanum-cli/command-surface.md). Refusals run in the
-// spec's precedence order — usage (already checked), then target (`4`),
+// docs/agents/architecture/arcanum-cli.md#refusal-order). Refusals run
+// in the documented precedence order — usage (already checked), then target (`4`),
 // file (`7`), registry (`3`), skew (`5`) and lock (`6`) — so the first
 // failing check wins. Writes go through the shared `RepoConfigWriter`
 // and its `Lock`, with a bounded wait.

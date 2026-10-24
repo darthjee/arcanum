@@ -1,5 +1,5 @@
 // The three tier files: where they live and how the CLI reads them (see
-// docs/agents/specs/arcanum-cli/command-surface.md#missing-and-malformed-tier-files).
+// docs/agents/architecture/arcanum-cli.md#missing-and-malformed-tier-files).
 // The paths match `ConfigChain`'s (`shared/lib/config/ConfigChain.js`),
 // which a spec cross-checks, so the CLI and the skills read the same files.
 

@@ -1,5 +1,5 @@
 // `config set`'s value parsing (see the Value parsing table in
-// docs/agents/specs/arcanum-cli/command-surface.md#value-parsing).
+// docs/agents/architecture/arcanum-cli.md#value-parsing).
 
 const NUMBER_PATTERN = /^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$/;
 const INTEGER_PATTERN = /^-?\d+$/;

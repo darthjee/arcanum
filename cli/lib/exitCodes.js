@@ -1,5 +1,5 @@
 // The CLI's exit codes, see the Exit codes table in
-// docs/agents/specs/arcanum-cli/command-surface.md.
+// docs/agents/architecture/arcanum-cli.md#exit-codes.
 
 /** Success. */
 export const EXIT_OK = 0;

@@ -1,7 +1,7 @@
 import { looksLikeJson, parseValue } from '../../lib/values.js';
 
 // One case per row of the Value parsing table in
-// docs/agents/specs/arcanum-cli/command-surface.md#value-parsing.
+// docs/agents/architecture/arcanum-cli.md#value-parsing.
 describe('values', () => {
   describe('parseValue', () => {
     const rows = [
