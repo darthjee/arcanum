@@ -136,7 +136,7 @@ export class FileError extends CliError {
 /**
  * Maps any error thrown while running a command to the CLI's exit code.
  * This is the single mapping point (see
- * docs/agents/specs/arcanum-cli/shared-config-logic.md#configerror):
+ * docs/agents/architecture/shared-lib.md#configerror):
  * the CLI's own refusals carry their code (usage `2`, validation `3`,
  * target `4`, skew `5`, lock `6`, file `7`); `node:util` `parseArgs`
  * errors → `2`; `LOCK_TIMEOUT` → `6`; `NOT_AN_OBJECT`, `INVALID_JSON`

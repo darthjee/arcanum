@@ -1,6 +1,6 @@
 // Builds arcanum-cli's single-file bundle, dist/arcanum.mjs, with esbuild
-// (see docs/agents/specs/arcanum-cli/shared-config-logic.md#bundle-at-build-time-with-esbuild
-// and docs/agents/specs/arcanum-cli/packaging-and-release.md#build-output).
+// (see docs/agents/architecture/shared-lib.md#the-cli-bundle and
+// docs/agents/architecture/install-and-release.md#build-output).
 //
 // Besides bundling, it:
 // - injects the CLI version, the Node floor (`engines.node`) and the
@@ -117,7 +117,7 @@ export function checkInputs(metafile, {
 /**
  * Builds the per-scope migration-version list from
  * `<reposDir>/<X.Y.Z>/migrations.json` (see
- * docs/agents/specs/arcanum-cli/packaging-and-release.md#embedded-migration-version-list).
+ * docs/agents/architecture/install-and-release.md#build-output).
  * Non-`X.Y.Z` directories (such as `next/`) and directories without a
  * `migrations.json` are skipped; versions above `cliVersion` are dropped.
  * @param {string} reposDir - e.g. `arcanum/migrations/repos`.

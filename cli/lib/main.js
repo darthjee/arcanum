@@ -46,7 +46,7 @@ export const NODE_FLOOR = typeof __ARCANUM_NODE_FLOOR__ === 'undefined'
 /**
  * The per-scope list of arcanum versions that shipped migrations,
  * injected by the build through `define` (see
- * docs/agents/specs/arcanum-cli/packaging-and-release.md#embedded-migration-version-list).
+ * docs/agents/architecture/install-and-release.md#build-output).
  * A source run has no define and sees empty lists.
  */
 export const MIGRATION_VERSIONS = typeof __ARCANUM_MIGRATION_VERSIONS__ === 'undefined'
