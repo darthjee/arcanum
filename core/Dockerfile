@@ -29,10 +29,16 @@ FROM darthjee/node:0.2.2 AS base
 # Hadolint DL4006: fail the build if any command in a pipe fails.
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Every apt package is pinned for reproducible builds, from the base
-# image's Debian release (bookworm for darthjee/node:0.2.2). To find the
-# current candidate version for this base image (e.g. when refreshing a
-# pin), run:
+# Every apt package is pinned to its upstream version, from the base
+# image's Debian release (bookworm for darthjee/node:0.2.2). The Debian
+# security revision (+deb12u<N>) is wildcarded rather than pinned: Debian
+# mirrors only keep the latest revision of a suite, so an exact revision
+# pin breaks the build as soon as a security update ships (see #850).
+# The wildcard pins are quoted so bash never glob-expands them; apt
+# matches the `*` itself. Packages without a security revision
+# (libnss-wrapper) stay exact. To find the current upstream version for
+# this base image (e.g. when the base image moves to a new Debian
+# release), run:
 #   docker run --rm darthjee/node:0.2.2 sh -c \
 #     "apt-get update -qq && apt-cache policy jq git openssh-client libnss-wrapper"
 # Debian ships the same version for amd64 and arm64.
@@ -50,9 +56,9 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 #   symlinked to a fixed path for an arch-independent LD_PRELOAD.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        jq=1.6-2.1+deb12u2 \
-        git=1:2.39.5-0+deb12u3 \
-        openssh-client=1:9.2p1-2+deb12u10 \
+        "jq=1.6-2.1+deb12u*" \
+        "git=1:2.39.5-0+deb12u*" \
+        "openssh-client=1:9.2p1-2+deb12u*" \
         libnss-wrapper=1.1.12-1 \
     && rm -rf /var/lib/apt/lists/* \
     && nss_wrapper_so="$(dpkg -L libnss-wrapper | grep -E '/libnss_wrapper\.so$')" \
