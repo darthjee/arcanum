@@ -70,6 +70,7 @@ Native-only commands (dispatched with `engine_dispatch --native-only`, e.g. `arc
 | `github-issue-update` | `docker` | #588 |
 | `init-claude-set-ci-ignored-patterns` | `docker` | #230 |
 | `init-claude-set-next-step-auto` | `docker` | #739 |
+| `init-claude-set-next-step-clear` | `docker` | #796 |
 | `init-claude-setup-docs-structure` | `docker` | #230 |
 | `init-claude-setup-templates` | `docker` | #230 |
 | `init-claude-stamp-arcanum-version` | `docker` | #230 |

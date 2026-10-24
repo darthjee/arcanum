@@ -12,7 +12,7 @@ import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 // NOT a parity spec: the migration script has no native counterpart.
 // It runs with cwd = a plain temp directory, the target repo.
 
-const SCRIPT = path.join(REPO_ROOT, 'arcanum/migrations/repos/next/001.sh');
+const SCRIPT = path.join(REPO_ROOT, 'arcanum/migrations/repos/2.2.0/001.sh');
 const NEW_STATE = path.join('.claude', 'state', 'arcanum-config.json');
 const LEGACY_STATE = path.join('.claude', 'state', 'monitor-issues-config.json');
 

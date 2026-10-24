@@ -29,7 +29,7 @@ The new files are shared across every arcanum feature, each keeping its own key 
 }
 ```
 
-`monitor-issues` follows the same layout under a top-level `"monitor-issues"` key: its `clear_context` toggle lives in `.claude/state/arcanum-config.json` as `{"monitor-issues": {"clear_context": true}}`, and any other key lives in `.claude/configuration/arcanum-repo-config.json`. `clear_context` has no legacy-file fallback — the non-skippable local migration `arcanum/migrations/repos/next/001.sh` copies an existing `.claude/state/monitor-issues-config.json` value forward instead (run `/arcanum-migrate`). Other `monitor-issues` keys still fall back to `.claude/configuration/monitor-issues.json`, with the warning above.
+`monitor-issues` follows the same layout under a top-level `"monitor-issues"` key: its `clear_context` toggle lives in `.claude/state/arcanum-config.json` as `{"monitor-issues": {"clear_context": true}}`, and any other key lives in `.claude/configuration/arcanum-repo-config.json`. `clear_context` has no legacy-file fallback — the non-skippable local migration `arcanum/migrations/repos/2.2.0/001.sh` copies an existing `.claude/state/monitor-issues-config.json` value forward instead (run `/arcanum-migrate`). Other `monitor-issues` keys still fall back to `.claude/configuration/monitor-issues.json`, with the warning above.
 
 This lets future arcanum features store their own settings (under their own key) without colliding with `auto-fix-all`'s, or inventing yet another ad-hoc file.
 
