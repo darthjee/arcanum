@@ -6,18 +6,19 @@
 #
 # Usage: publish_cli_package.sh <tag> [--dry-run]
 #
-# Authentication is npm trusted publishing only (CircleCI OIDC): npm
-# exchanges the job's OIDC token for a short-lived publish credential and
-# attaches provenance itself. No long-lived token is used; a real publish
-# refuses to run when NPM_TOKEN or NODE_AUTH_TOKEN is set, so a stray token
-# cannot silently bypass OIDC and drop provenance. The package's trusted
-# publisher must have been bootstrapped once by hand (see
+# Authentication is npm trusted publishing only (CircleCI OIDC): the script
+# mints a CircleCI OIDC token with the npm audience and hands it to npm as
+# NPM_ID_TOKEN, which npm exchanges for a short-lived publish credential.
+# No long-lived token is used; a real publish refuses to run when NPM_TOKEN
+# or NODE_AUTH_TOKEN is set, so a stray token cannot silently bypass trusted
+# publishing. npm does not attach provenance to CircleCI publishes. The
+# package's trusted publisher must have been bootstrapped once by hand (see
 # docs/agents/architecture/install-and-release.md#npm-trusted-publishing).
 #
 # Behavior (each step fails the script on error):
 #   0. Preflight: <tag> must be a bare X.Y.Z and node >= 22.14.0; unless
-#      --dry-run, npm >= 11.5.1, no npm token in the environment and a
-#      CircleCI OIDC token present.
+#      --dry-run, npm >= 11.5.1, no npm token in the environment and the
+#      CircleCI `circleci` CLI present (to mint the OIDC token).
 #   1. Version check: cli/package.json's version must equal <tag>.
 #   2. Already published? (skipped on --dry-run) If arcanum-cli@<tag> is on
 #      the registry, stop with success: npm versions are immutable, so a
@@ -26,8 +27,9 @@
 #   4. yarn lint, yarn build, yarn test.
 #   5. Content check: the `npm pack --dry-run` file list must be exactly
 #      README.md, bin/arcanum, dist/arcanum.mjs and package.json.
-#   6. npm publish (npm publish --dry-run with --dry-run). publishConfig
-#      pins access=public and tag=latest.
+#   6. npm publish, with NPM_ID_TOKEN set to a CircleCI OIDC token whose
+#      audience is npm:registry.npmjs.org (npm publish --dry-run with
+#      --dry-run, no token). publishConfig pins access=public and tag=latest.
 #   7. Verify: (skipped on --dry-run) poll the registry until
 #      arcanum-cli@<tag> is visible, then print its dist.integrity.
 
@@ -95,8 +97,8 @@ if [[ "$DRY_RUN" == false ]]; then
     echo "NPM_TOKEN or NODE_AUTH_TOKEN is set; publishing is OIDC-only (trusted publishing), unset it" >&2
     exit 1
   fi
-  if [[ -z "${CIRCLE_OIDC_TOKEN_V2:-}" && -z "${CIRCLE_OIDC_TOKEN:-}" ]]; then
-    echo "No CircleCI OIDC token (CIRCLE_OIDC_TOKEN_V2 / CIRCLE_OIDC_TOKEN); trusted publishing needs one." >&2
+  if ! command -v circleci > /dev/null; then
+    echo "No circleci CLI to mint the OIDC token; trusted publishing only works in a CircleCI job." >&2
     echo "See ${BOOTSTRAP_DOC} for the trusted-publisher bootstrap." >&2
     exit 1
   fi
@@ -155,6 +157,10 @@ if [[ "$DRY_RUN" == true ]]; then
 fi
 
 echo "Publishing ${PACKAGE_NAME}@${TAG}..."
+# npm only uses an OIDC token passed as NPM_ID_TOKEN, with the npm audience
+# (CircleCI's default CIRCLE_OIDC_TOKEN_V2 has the org ID as its audience).
+NPM_ID_TOKEN="$(circleci run oidc get --claims '{"aud": "npm:registry.npmjs.org"}')"
+export NPM_ID_TOKEN
 npm publish
 
 echo "Verifying ${PACKAGE_NAME}@${TAG} on the registry..."
