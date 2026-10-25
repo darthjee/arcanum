@@ -468,6 +468,7 @@ A script called directly by skills that needs the docker treatment must become a
 | --- | --- | --- | --- |
 | [Routing specs](#routing-specs-ci) | dispatch picks the right engine, builds the right `docker run` argv, and passes exit codes and streams through | CircleCI `test` job, and `make core-test` | no, `docker` is faked |
 | [Parity specs](#parity-specs-local-only) | a real container produces the same output, exit code and files as native on the host | locally, `make docker-parity` | yes |
+| Runtime smoke | the `runtime` image builds, and its entrypoint, user setup, bundled tools and baked version work | CircleCI `runtime-image` job, and `make core-smoke-runtime` | yes |
 | Manual checks | macOS Docker Desktop specifics: file-sharing ownership, the SSH agent proxy, per-call cost | by the PR author, noted in the PR | yes |
 
 ### Routing specs (CI)
@@ -527,9 +528,9 @@ Example: `ARCANUM_DOCKER_PARITY_SSH=1 ARCANUM_DOCKER_PARITY_SSH_REMOTE=git@githu
 ### Not in CI, and why
 
 - CircleCI's `setup_remote_docker` runs the daemon on a separate remote host, so bind mounts refer to that host's filesystem, not the job's checkout, and the [path-identity](#path-identity) mounts can't work.
-- A machine executor job could run Docker locally, but it is slower, costs more, and means a second job definition for one feature.
+- A machine executor job does run Docker locally: the `runtime-image` job builds the `runtime` image and runs `make core-smoke-runtime` on every branch, so image build breakage (such as #850's stale apt pin) fails before a release. The parity specs still stay local-only: running them there too would make that slower, costlier job longer still, for checks that only matter when a command moves to `"docker"`.
 
-The remaining risk is drift between the `runtime` image and the code (a missing tool, a wrong path in the baked install), caught only by whoever runs `make docker-parity`. It is mitigated by the shared `base` stage, by the routing specs' passthrough mode, and by the rule that no command becomes `"docker"` without a local parity run.
+The remaining risk is drift between the `runtime` image and the code (a missing tool, a wrong path in the baked install), caught by the `runtime-image` smoke checks only for the tools and paths they exercise, and otherwise only by whoever runs `make docker-parity`. It is mitigated by the shared `base` stage, by the routing specs' passthrough mode, and by the rule that no command becomes `"docker"` without a local parity run.
 
 ## See also
 
