@@ -1,0 +1,102 @@
+# Spec: CLI Install
+
+## Status
+
+Proposed. Nothing in this spec is implemented yet.
+
+## Origin
+
+Origin: epic #861; this spec supersedes the epic body.
+
+From this spec's merge on, this file and its parts are the source of truth for the design. The epic body is a discussion snapshot and is no longer maintained.
+
+## Goal
+
+Installing or updating arcanum also installs or updates the `arcanum-cli` npm package, and the CLI can update itself. Today the client is a separate, manual step: neither installing arcanum nor `/arcanum-update` touches it.
+
+## Scope
+
+In scope:
+
+- The `curl | bash` installer (`arcanum/install/`) installs `arcanum-cli` as part of installing arcanum.
+- The updater (`arcanum/update/`), from both its local and its `curl | bash` entry points, installs or updates `arcanum-cli`.
+- The `/arcanum-update` skill, which runs the same update flow, picks up the client update too.
+- `git clone` installs (README Option 2) also get the client, through the update path and a documented one-time step.
+- **Double installation:** the client is already installed globally. Installing or updating arcanum then updates the existing `arcanum-cli` to the target version, and must not fail or produce a duplicate install.
+- A new CLI command, `arcanum self-update`, that updates the client itself. Today the CLI only has `config`.
+
+Out of scope:
+
+- Changing the arcanum installer's own behavior when the target directory already has an arcanum install. It keeps refusing and pointing to `update`.
+- Installing Node.js or npm when they are missing.
+- Uninstalling the client.
+
+## Shared rules
+
+Every part relies on these rules. The parts reference them and do not repeat them.
+
+- **Prompt.** After the existing arcanum confirmation, a separate prompt asks whether to install or update the client. It names the target (`arcanum-cli@<version>`, via `npm i -g`), defaults to yes (`[Y/n]`), and reads from `/dev/tty`.
+- **`ARCANUM_SKIP_CLI=1`** skips the client step without asking.
+- **`ARCANUM_ASSUME_YES=1`** does **not** answer the client prompt. It still only skips the main arcanum confirmation.
+- **Opt-in `FALLBACK=chat`.** Inside `/arcanum-update` there is no `/dev/tty`. The client step exits `4` with `FALLBACK=chat` only when the caller opts in with a flag, such as `ARCANUM_CLI_PROMPT=chat`, that only the new skill sets. The skill then asks the same question with `AskUserQuestion`, following the project's TTY-first convention.
+- **No-TTY skip.** With no TTY, no `ARCANUM_SKIP_CLI` and no opt-in flag, the client step is skipped with a warning naming the manual command. It never hangs and never fails the arcanum install or update.
+- **Warn and continue.** Any client failure warns with the reason and the manual command, and never fails arcanum: the arcanum install or update still exits `0`. This covers:
+  - Node or npm missing;
+  - Node below the CLI's floor (22.13.0);
+  - `npm i -g` failing, for example EACCES on a global prefix that needs `sudo`, or a network error.
+
+  The step never retries with `sudo`.
+
+## Version pinning
+
+- The installer and updater install `arcanum-cli@<the arcanum version being installed>`, not `@latest`. This keeps the lockstep the CLI's version-skew check relies on, and honors `ARCANUM_VERSION` pins.
+- If that version is not on npm, the client is left untouched, with a warning naming the manual `npm i -g arcanum-cli` command. Examples: a fork's own version, or an arcanum release older than the first CLI publish. The arcanum install or update still succeeds.
+- `arcanum self-update` stays on `@latest`. See [self-update.md](cli-install/self-update.md).
+
+## Backward compatibility
+
+The feature only adds behavior. No config shape changes, and existing installs keep working. The risk is in which copy of the scripts runs during the first update after this ships.
+
+- **Zip-tracked installs.** The old local `arcanum/update/bootstrap.sh` downloads the new release and execs the *new* `updater.sh`, so the client step runs on the first update. No special handling is needed.
+- **`git clone` installs.** `bootstrap.sh` updates directly with `git fetch`/`git checkout` and never runs `updater.sh`. The client step goes in a separate script that `bootstrap.sh` calls *from the checked-out tree* after the checkout, so every later update runs the new copy. The first update after the release still runs the old `bootstrap.sh`, which has no client step. The README and release notes point those users to `npm i -g arcanum-cli` once.
+- **An older `/arcanum-update` session** does not know the new exit `4` / `FALLBACK=chat`. Because the client step only exits `4` when the caller opts in (see [Shared rules](#shared-rules)), an old skill gets the no-TTY behavior instead: the client is skipped with a warning and the update exits `0`. An old skill therefore never reports a successful arcanum update as failed.
+
+## Migration
+
+A migration is needed.
+
+- A `next/` entry in `arcanum/migrations/repos/` with `applies_to: "global"` and `skippable: true`. It installs or updates `arcanum-cli@<version>` with the same rules as the installer and updater: version pinning, warn-and-continue on failure, never downgrade.
+- The scope is global because the client is installed machine-wide. It runs once per machine or account through `/arcanum-migrate`, not once per repo.
+- It also covers existing installs that update before the new client step reaches them, such as the `git clone` first-update gap.
+- It reverses the current rule in [Install & Release Pipeline](../architecture/install-and-release.md) ("No per-repo migration installs it or nudges the user to"). That doc changes with the migration, not with this spec.
+- Docs that mention the pending migration cite the specific `next/NNN` file, following [Per-Repo Migrations](../architecture/per-repo-migrations.md)' "Referencing pending migrations" rule. The id is an open point of [update.md](cli-install/update.md).
+
+## Parts
+
+| Part | Covers |
+| --- | --- |
+| [install.md](cli-install/install.md) | The installer (`arcanum/install/`) installing `arcanum-cli@<version>`. |
+| [update.md](cli-install/update.md) | The updater (`arcanum/update/`), the `/arcanum-update` skill, `git clone` installs and the global migration. |
+| [already-installed.md](cli-install/already-installed.md) | Double installation (update the existing client) and a client newer than the target (leave it). |
+| [self-update.md](cli-install/self-update.md) | The `arcanum self-update` CLI command. |
+
+## Alternatives considered
+
+- **Pinning to `@latest`** instead of the arcanum version. Rejected: it breaks the lockstep the CLI's version-skew check relies on, and ignores `ARCANUM_VERSION` pins.
+- **Always installing the client, with no opt-out.** Rejected: the client needs Node and a writable npm global prefix, which not every user has or wants.
+- **Opt-out by env var only, with no prompt.** Rejected: a global `npm i -g` is a machine-wide change, so the user is asked.
+- **`ARCANUM_ASSUME_YES` answering the client prompt.** Rejected: that flag only covers the arcanum confirmation; a machine-wide npm install needs its own consent or `ARCANUM_SKIP_CLI`.
+- **Failing the arcanum install or update when the client step fails.** Rejected: the client is optional, so its failure must not block arcanum.
+- **Accepting that an older `/arcanum-update` skill misreads exit `4`.** Rejected in favor of the opt-in flag, so an old skill never reports a successful update as failed.
+
+## Open points
+
+- The exact env var names: `ARCANUM_SKIP_CLI`, and the opt-in flag `/arcanum-update` sets (`ARCANUM_CLI_PROMPT=chat` is a placeholder).
+- The exact wording of the client prompt and of each warning.
+
+## See also
+
+- [Install & Release Pipeline](../architecture/install-and-release.md): how arcanum and `arcanum-cli` are installed and released today.
+- [Arcanum CLI](../architecture/arcanum-cli.md): the CLI's architecture, including its version-skew check.
+- [Per-Repo Migrations](../architecture/per-repo-migrations.md): how `global`-scoped migrations work.
+- [Arcanum CLI guide](../../guides/arcanum-cli.md): the end-user guide for the CLI.
