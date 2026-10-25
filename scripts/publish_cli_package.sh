@@ -15,7 +15,7 @@
 # package's trusted publisher must have been bootstrapped once by hand (see
 # docs/agents/architecture/install-and-release.md#npm-trusted-publishing).
 #
-# Behavior (each step fails the script on error):
+# Behavior (each step fails the script on error, except step 7):
 #   0. Preflight: <tag> must be a bare X.Y.Z and node >= 22.14.0; unless
 #      --dry-run, npm >= 11.5.1, no npm token in the environment and the
 #      CircleCI `circleci` CLI present (to mint the OIDC token).
@@ -31,7 +31,9 @@
 #      audience is npm:registry.npmjs.org (npm publish --dry-run with
 #      --dry-run, no token). publishConfig pins access=public and tag=latest.
 #   7. Verify: (skipped on --dry-run) poll the registry until
-#      arcanum-cli@<tag> is visible, then print its dist.integrity.
+#      arcanum-cli@<tag> is visible, then print its dist.integrity. The
+#      publish already succeeded, so a timeout (registry lag) only warns
+#      and still exits with success.
 
 set -euo pipefail
 
@@ -43,7 +45,7 @@ bin/arcanum
 dist/arcanum.mjs
 package.json"
 VERIFY_INTERVAL=5
-VERIFY_TIMEOUT=60
+VERIFY_TIMEOUT=300
 BOOTSTRAP_DOC="docs/agents/architecture/install-and-release.md#npm-trusted-publishing"
 
 usage() {
@@ -171,8 +173,8 @@ while true; do
     break
   fi
   if (( elapsed >= VERIFY_TIMEOUT )); then
-    echo "${PACKAGE_NAME}@${TAG} not visible after ${VERIFY_TIMEOUT}s (registry lag); re-run the verify" >&2
-    exit 1
+    echo "Warning: ${PACKAGE_NAME}@${TAG} was published but is not visible after ${VERIFY_TIMEOUT}s (registry lag); check it later with: npm view ${PACKAGE_NAME}@${TAG} version" >&2
+    exit 0
   fi
   sleep "$VERIFY_INTERVAL"
   elapsed=$(( elapsed + VERIFY_INTERVAL ))
