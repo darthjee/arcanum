@@ -26,13 +26,13 @@ Make the `curl | bash` installer (`arcanum/install/`) install `arcanum-cli@<vers
 3. `installer.sh` refuses an existing arcanum install, then copies the tree and writes `arcanum.json`.
 4. `installer.sh` prints `arcanum installed to <target>`.
 5. `installer.sh` runs the client step through the shared script. It is the last step:
-   1. If `ARCANUM_SKIP_CLI=1`, skip without asking and without calling `node` or `npm`.
+   1. If `ARCANUM_SKIP_CLI` is set, skip without asking and without calling `node` or `npm`.
    2. If there is no TTY (and no opt-in `FALLBACK=chat` flag), skip with a warning, without calling `npm`.
    3. Check `node` and `npm`: both must be on `PATH`, and Node must be at least 22.13.0.
    4. Check that `arcanum-cli@$VERSION` is published, with `npm view`.
    5. If the client is already installed, follow [already-installed.md](already-installed.md).
    6. Ask the `[Y/n]` prompt from `/dev/tty`, naming `arcanum-cli@<version>` and `npm i -g`. Enter means yes.
-   7. Run `npm i -g arcanum-cli@<version>`.
+   7. Run `npm i -g --ignore-scripts arcanum-cli@<version>`.
 
 Steps 1 to 4 keep their current behavior and exit codes. In particular, aborting the target confirmation or hitting an existing arcanum install still exits `1`, before the client step runs.
 
@@ -47,7 +47,8 @@ Every outcome exits `0`. Each skip or failure prints one line on stderr, naming 
 | Case | Condition | Output | Exit |
 | --- | --- | --- | --- |
 | Installed | The user accepts and `npm i -g` succeeds. | Info: `arcanum-cli@<version>` installed. | `0` |
-| Skipped by env | `ARCANUM_SKIP_CLI=1`. | Info: client step skipped. | `0` |
+| Skipped by env | `ARCANUM_SKIP_CLI` is set (any non-empty value). | Info: client step skipped. | `0` |
+| Invalid version | `VERSION` is not a plain semver. | Warning, with the manual command. No `npm` call. | `0` |
 | Skipped, no TTY | No `/dev/tty` and no opt-in flag. | Warning, with the manual command. | `0` |
 | Declined | The user answers no. | Info, with the manual command. | `0` |
 | No Node or npm | `node` or `npm` is not on `PATH`. | Warning, with the manual command. | `0` |
@@ -78,4 +79,4 @@ For #869 and #868:
 
 ## Open points
 
-None left in this part. The shared open points (env var names, the exact prompt and warning wording) stay in the index's [Open points](../cli-install.md#open-points).
+None left in this part. The shared open point (the exact prompt and warning wording) stay in the index's [Open points](../cli-install.md#open-points).
