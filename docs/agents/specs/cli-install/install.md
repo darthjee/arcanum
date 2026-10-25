@@ -29,16 +29,17 @@ Make the `curl | bash` installer (`arcanum/install/`) install `arcanum-cli@<vers
    1. If `ARCANUM_SKIP_CLI` is set, skip without asking and without calling `node` or `npm`.
    2. If there is no TTY (and no opt-in `FALLBACK=chat` flag), skip with a warning, without calling `npm`.
    3. Check `node` and `npm`: both must be on `PATH`, and Node must be at least 22.13.0.
-   4. Check that `arcanum-cli@$VERSION` is published, with `npm view`.
-   5. If the client is already installed, follow [already-installed.md](already-installed.md).
-   6. Ask the `[Y/n]` prompt from `/dev/tty`, naming `arcanum-cli@<version>` and `npm i -g`. Enter means yes.
+   4. Detect an installed client with `npm ls` (local). If one is installed, follow [already-installed.md](already-installed.md#flow): an unchanged, newer, linked or unreadable client ends the step here, and an older one continues as an update.
+   5. Check that `arcanum-cli@$VERSION` is published, with `npm view`.
+   6. Ask the `[Y/n]` prompt from `/dev/tty`, naming `arcanum-cli@<version>` and `npm i -g`. Enter means yes. For an older client, the prompt is worded as an update naming both versions.
    7. Run `npm i -g --ignore-scripts arcanum-cli@<version>`.
+   8. Check that `arcanum` on `PATH` is the client just installed, and warn otherwise (see [already-installed.md](already-installed.md#foreign-arcanum-on-path)).
 
 Steps 1 to 4 keep their current behavior and exit codes. In particular, aborting the target confirmation or hitting an existing arcanum install still exits `1`, before the client step runs.
 
 In this installer, step 5.2 is rarely reached: the target-directory prompt already reads `/dev/tty`, so a run with no TTY fails there first. The shared script still handles it, because the update paths can reach it.
 
-The order of 5.3 to 5.6 is a proposal: checks that need no user input run first, so the prompt is only asked when the install can actually happen. #868 may reorder them, as long as every outcome below holds.
+Checks that need no user input run first, so the prompt is only asked when the install can actually happen. Detection (5.4) before `npm view` (5.5) is fixed by [already-installed.md](already-installed.md#flow), so an up-to-date client costs no network call. The full order, including the version validation, is in [already-installed.md's Flow](already-installed.md#flow); #868 may otherwise reorder checks, as long as every outcome below holds.
 
 ## Outcomes
 
@@ -56,7 +57,7 @@ Every outcome exits `0`. Each skip or failure prints one line on stderr, naming 
 | Unpublished version | `npm view` reports `E404`, or prints nothing. | Warning that `arcanum-cli@<version>` is not on npm, with the manual command (`npm i -g arcanum-cli`). | `0` |
 | EACCES | `npm i -g` fails with `EACCES`. | Warning with a hint to fix the npm global prefix or run the manual command with the right permissions. No `sudo` retry. | `0` |
 | Network error | `npm view` or `npm i -g` fails for any other reason. | Warning with the reason and the manual command. | `0` |
-| Client already installed | `arcanum-cli` is already installed globally. | See [already-installed.md](already-installed.md). | `0` |
+| Client already installed | `arcanum-cli` is already installed globally. | Updated, unchanged, newer kept, linked or unknown: see [already-installed.md's Outcomes](already-installed.md#outcomes). | `0` |
 
 ## Testing strategy
 

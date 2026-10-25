@@ -26,10 +26,10 @@ Make every update path install or update `arcanum-cli@<version>`: the updater (`
 ### `/arcanum-update` (opt-in `FALLBACK=chat`)
 
 - **Opt-in.** `run_update_apply` sets `ARCANUM_CLI_PROMPT=chat` next to `ARCANUM_ASSUME_YES=1` when it runs `bootstrap.sh`. This applies to both its shell implementation and the native `ArcanumUpdateRunUpdate.js`.
-- **Exit `4`.** With the flag and no TTY, the shared script runs its non-interactive checks first (Node and npm, `npm view`, already installed). Only if an install or update would actually happen does it print `FALLBACK=chat` and `CLI_VERSION=<v>` on stdout and exit `4`. Because the client step is last, the arcanum update is already complete at that point.
+- **Exit `4`.** With the flag and no TTY, the shared script runs its non-interactive checks first (Node and npm, `npm view`, already installed). Only if an install or update would actually happen does it print `FALLBACK=chat` and `CLI_VERSION=<v>` on stdout, plus `CLI_INSTALLED=<v>` when a client is already installed, and exit `4`. An unchanged, newer, linked or unreadable client ends with exit `0` and no question (see [already-installed.md](already-installed.md#flow)). Because the client step is last, the arcanum update is already complete at that point.
 - **Propagation.** `updater.sh` and the git path of `bootstrap.sh` propagate that exit `4`. `bootstrap.sh` runs with inherited stdout, so both lines reach the skill directly. On exit `4`, `run_update_apply` still prints its normal `RESULT=updated FROM=<old> TO=<new>` line after them, and exits `4`.
-- **Resume.** The skill reports the update as successful, then asks with `AskUserQuestion`: `Install arcanum-cli@<v> with npm i -g?`, with options Yes, No and Chat.
-  - **Yes:** run a new subcommand, `scripts/run_update.sh install-cli <version>`, with the `CLI_VERSION` value. It runs the shared script with the pre-answer `--no-confirm`, so the step skips the prompt and installs, under the same warn-and-continue rules, and exits `0`.
+- **Resume.** The skill reports the update as successful, then asks with `AskUserQuestion`: `Install arcanum-cli@<v> with npm i -g?`, with options Yes, No and Chat. With `CLI_INSTALLED=<v>` set, the question is worded as an update naming both versions.
+  - **Yes:** run a new subcommand, `scripts/run_update.sh install-cli <version>`, with the `CLI_VERSION` value. It runs the shared script with the pre-answer `--no-confirm`, so the step skips the prompt and installs, under the same warn-and-continue rules, and exits `0`. It re-detects the installed client first, so a change since the question (for example a `self-update`) is handled, and it never downgrades.
   - **No:** print the manual command (`npm i -g arcanum-cli@<v>`).
   - **Chat:** return to the conversation.
 - **Other exits.** Any other non-zero exit keeps today's meaning: the arcanum update failed.
@@ -43,7 +43,7 @@ Make every update path install or update `arcanum-cli@<version>`: the updater (`
 - **Target version.** The installed arcanum version: `arcanum.json`'s `.version`, or else `git describe --tags --exact-match` for a git clone. If neither resolves (a clone on a branch or an untagged commit), the migration warns and skips, naming the manual command.
 - **Consent.** Choosing `[R]un` (or All in the fallback) at the migration prompt is the consent. The migration calls the shared script with `--no-confirm`, the same pre-answer as the `/arcanum-update` resume, so there is no second `[Y/n]`. Users who don't want the client pick `[S]kip`.
 - **Exit code.** It always exits `0` (warn-and-continue), so the global pointer advances even if the client could not be installed. The warning names the manual command, and the user is not asked again.
-- **Never downgrade.** Already-installed handling follows [already-installed.md](already-installed.md).
+- **Never downgrade.** Already-installed handling follows [already-installed.md](already-installed.md). `--no-confirm` only answers the prompt: it never downgrades, leaves a linked client alone, and skips an unreadable one.
 - **Rule change.** In the same PR (#872), [Install & Release Pipeline](../../architecture/install-and-release.md) drops "No per-repo migration installs it or nudges the user to" and describes the migration.
 
 ### Exit code
@@ -71,7 +71,7 @@ The update exits `0` whatever the client outcome, except the opt-in exit `4` of 
 ### `/arcanum-update`
 
 1. `run_update_apply` runs `bootstrap.sh` with `ARCANUM_ASSUME_YES=1` and `ARCANUM_CLI_PROMPT=chat`.
-2. The zip or git flow above runs. With no TTY, the shared script runs its checks and, only if an install or update would happen, prints `FALLBACK=chat` and `CLI_VERSION=<v>` and exits `4`.
+2. The zip or git flow above runs. With no TTY, the shared script runs its checks and, only if an install or update would happen, prints `FALLBACK=chat`, `CLI_VERSION=<v>` and, when a client is installed, `CLI_INSTALLED=<v>`, and exits `4`.
 3. `run_update_apply` prints `RESULT=updated FROM=<old> TO=<new>` and exits with the same code (`0` or `4`).
 4. On exit `4`, the skill reports the successful update and asks Yes / No / Chat with `AskUserQuestion`.
 5. On Yes, it runs `scripts/run_update.sh install-cli <CLI_VERSION>`, which runs the shared script with `--no-confirm` and exits `0`. On No, it prints `npm i -g arcanum-cli@<v>`.
@@ -81,7 +81,7 @@ The update exits `0` whatever the client outcome, except the opt-in exit `4` of 
 1. `/arcanum-migrate` offers `next/001` once per machine or account, as a skippable global migration.
 2. On `[S]kip`, nothing runs and the pointer advances.
 3. On `[R]un`, the migration resolves the target version from `arcanum.json`'s `.version`, or else from `git describe --tags --exact-match`. If neither resolves, it warns with the manual command and exits `0`.
-4. It runs the shared script for `arcanum-cli@<version>` with `--no-confirm`, and exits `0` whatever the client outcome.
+4. It runs the shared script for `arcanum-cli@<version>` with `--no-confirm`, and exits `0` whatever the client outcome. `--no-confirm` keeps the [already-installed.md](already-installed.md) rules: never a downgrade, a linked client left alone, an unreadable one skipped.
 
 ## Outcomes
 
@@ -89,8 +89,8 @@ The update exits `0` whatever the client outcome, except the opt-in exit `4` of 
 | --- | --- | --- |
 | Update applied, client step installs, updates, skips or warns | As in [install.md's Outcomes](install.md#outcomes) | `0` |
 | Already on the version | No client step | `0` |
-| `/arcanum-update`, no TTY, flag set, install would happen | `FALLBACK=chat`, `CLI_VERSION=<v>`, then `RESULT=...` from `run_update_apply` | `4` |
-| `/arcanum-update`, no TTY, flag set, nothing to do (already current, unpublished, no Node...) | Note or warning, no question | `0` |
+| `/arcanum-update`, no TTY, flag set, install would happen | `FALLBACK=chat`, `CLI_VERSION=<v>`, `CLI_INSTALLED=<v>` (only when a client is installed), then `RESULT=...` from `run_update_apply` | `4` |
+| `/arcanum-update`, no TTY, flag set, nothing to do (unchanged, newer, linked or unreadable client, unpublished, no Node...) | Note or warning, no question | `0` |
 | `/arcanum-update` resume, Yes | `install-cli` runs the client step with `--no-confirm`, per [install.md's Outcomes](install.md#outcomes) | `0` |
 | Old skill (no flag), no TTY | No-TTY skip with a warning | `0` |
 | Git path, checked-out tree has no client-step script | Skipped silently | `0` |
@@ -105,7 +105,7 @@ The update exits `0` whatever the client outcome, except the opt-in exit `4` of 
 | `ARCANUM_SKIP_CLI` | env var | Any non-empty value skips the client step without asking or calling `npm`. Same convention as `ARCANUM_ASSUME_YES`; docs show `ARCANUM_SKIP_CLI=1`. |
 | `ARCANUM_CLI_PROMPT=chat` | env var | Opt-in: with no TTY, exit `4` / `FALLBACK=chat` instead of the no-TTY skip. Any other value, or unset, keeps the no-TTY skip. Only `run_update_apply` sets it. It must be an env var, because it has to cross `bootstrap.sh` → `exec updater.sh`. It only asks; it never consents. |
 | `--no-confirm` | argument of the shared script | Pre-answers yes and skips the `[Y/n]` prompt. Used only by `run_update.sh install-cli` and the migration. Same name and meaning as `update_per_file.sh --no-confirm`. |
-| `FALLBACK=chat`, `CLI_VERSION=<v>` | stdout keys, exit `4` | What the skill reads to ask the question and resume. |
+| `FALLBACK=chat`, `CLI_VERSION=<v>`, `CLI_INSTALLED=<v>` | stdout keys, exit `4` | What the skill reads to ask the question and resume. `CLI_INSTALLED` is printed only when a client is already installed, so the question can name both versions; it is additive, and an old skill ignores it. See [already-installed.md's Names](already-installed.md#names). |
 | `run_update.sh install-cli <version>` | skill subcommand | Resumes only the client step after the chat answer. A verb, like `check` and `apply`. |
 
 ## Testing strategy

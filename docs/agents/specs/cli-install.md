@@ -49,11 +49,11 @@ Every part relies on these rules. The parts reference them and do not repeat the
 
 - **Validated version.** The shared script validates `VERSION` as a plain semver (`MAJOR.MINOR.PATCH[-prerelease]`) before any `npm` call. Anything else is a warning and a skip, never an `npm` call. `VERSION` comes from `ARCANUM_VERSION` or a GitHub `tag_name`, and on `/arcanum-update` it travels through `CLI_VERSION=` and back as an argument.
 - **Exact pin, one argument, no install scripts.** The install is always `npm i -g --ignore-scripts arcanum-cli@<v>`, with `arcanum-cli@<v>` passed as one quoted argument. It is never a range or a dist-tag, so the version installed is the version named in the prompt. `arcanum-cli` has no dependencies and no install-time scripts, so `--ignore-scripts` loses nothing, and a compromised publish cannot run code at install time.
-- **Consent only by argument.** The pre-answer that skips the `[Y/n]` prompt is the shared script's `--no-confirm` argument, used only by the `/arcanum-update` resume and the migration. It is never an env var, so an exported variable cannot silently consent to a machine-wide install. `ARCANUM_SKIP_CLI` can only *skip*.
+- **Consent only by argument.** The pre-answer that skips the `[Y/n]` prompt is the shared script's `--no-confirm` argument, used only by the `/arcanum-update` resume and the migration. It is never an env var, so an exported variable cannot silently consent to a machine-wide install. `ARCANUM_SKIP_CLI` can only *skip*. `--no-confirm` only answers the prompt and never bypasses the installed-version check: it never downgrades, leaves a linked dev checkout alone, and skips an unreadable install (see [already-installed.md](cli-install/already-installed.md)).
 - **Bounded `npm view`.** `npm view` runs with `--fetch-retries=0` and a bounded `--fetch-timeout` (about 15 seconds), so an offline machine warns quickly instead of stalling. A timeout means "network error, warn and skip". `npm i -g` keeps npm's defaults: the user has consented and is waiting for it.
 - **npm config honored.** The user's npm config (registry, proxy, prefix) is used as is. The step passes no registry override.
 - **Forks.** The package name is always `arcanum-cli` on the user's configured npm registry, whatever `ARCANUM_REPO` is. A fork whose tag matches an official version gets the official client of that version. This is documented, not special-cased.
-- **Skipped paths cost nothing.** `ARCANUM_SKIP_CLI`, a no-TTY run without the flag, `Already on <v>` and a git checkout without the script make no `npm` call. Otherwise the cost is one `npm view` and the installed-version check before asking, plus `npm i -g` only after consent.
+- **Skipped paths cost nothing.** `ARCANUM_SKIP_CLI`, a no-TTY run without the flag, `Already on <v>` and a git checkout without the script make no `npm` call. Otherwise the local installed-version check (`npm ls`) runs first, so an unchanged, newer or linked client costs one local `npm ls` and no network call. Only an install or update that would actually happen adds one `npm view` before asking, plus `npm i -g` after consent.
 
 ## Version pinning
 
@@ -85,7 +85,7 @@ A migration is needed.
 | --- | --- |
 | [install.md](cli-install/install.md) | The installer (`arcanum/install/`) installing `arcanum-cli@<version>`. |
 | [update.md](cli-install/update.md) | The updater (`arcanum/update/`), the `/arcanum-update` skill, `git clone` installs and the global migration. |
-| [already-installed.md](cli-install/already-installed.md) | Double installation (update the existing client) and a client newer than the target (leave it). |
+| [already-installed.md](cli-install/already-installed.md) | Double installation: detecting the installed client with `npm ls`, updating an older one, leaving a newer or linked (`npm link`) one, skipping an unreadable one, and warning about a foreign `arcanum` on `PATH`. |
 | [self-update.md](cli-install/self-update.md) | The `arcanum self-update` CLI command. |
 
 ## Alternatives considered
