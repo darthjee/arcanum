@@ -41,6 +41,15 @@
 # .claude-plugin/types/ folder, which only a live session writes, so
 # `make mod-check` (run locally) is the full gate for it.
 #
+# The `runtime-image` job (test workflow) runs `make core-smoke-runtime` on
+# a machine executor, since the smoke's `--user`/`--read-only`/`--tmpfs`
+# runs need a local Docker daemon (not setup_remote_docker). It builds only
+# the native linux/amd64 `runtime` target of core/Dockerfile, with no push
+# and no Docker Hub login, so image breakage (e.g. #850's stale apt pin)
+# fails on the branch instead of in the release-only `publish-image` job.
+# It has no path filters: upstream drift (Debian mirrors, the darthjee/node
+# base image) can break the build with no repo change.
+#
 # The `cli` and `cli-node-floor` jobs (test workflow) gate the cli/
 # package. Both check out the full repo and run from cli/, since its
 # esbuild build bundles ../shared/lib and ../arcanum/migrations/repos (any
@@ -283,6 +292,15 @@ jobs:
           name: Test the arcanum-next-step mod
           command: claude plugin test arcanum-next-step
 
+  runtime-image:
+    machine:
+      image: ubuntu-2204:current
+    steps:
+      - checkout
+      - run:
+          name: Build and smoke-test the runtime image
+          command: make core-smoke-runtime
+
 workflows:
   release:
     jobs:
@@ -334,6 +352,10 @@ workflows:
             tags:
               ignore: /.*/
       - shared-node-floor:
+          filters:
+            tags:
+              ignore: /.*/
+      - runtime-image:
           filters:
             tags:
               ignore: /.*/
