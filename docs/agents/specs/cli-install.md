@@ -36,9 +36,9 @@ Out of scope:
 Every part relies on these rules. The parts reference them and do not repeat them.
 
 - **Prompt.** After the existing arcanum confirmation, a separate prompt asks whether to install or update the client. It names the target (`arcanum-cli@<version>`, via `npm i -g`), defaults to yes (`[Y/n]`), and reads from `/dev/tty`.
-- **`ARCANUM_SKIP_CLI=1`** skips the client step without asking.
+- **`ARCANUM_SKIP_CLI`**: any non-empty value (docs show `ARCANUM_SKIP_CLI=1`) skips the client step without asking and without calling `node` or `npm`.
 - **`ARCANUM_ASSUME_YES=1`** does **not** answer the client prompt. It still only skips the main arcanum confirmation.
-- **Opt-in `FALLBACK=chat`.** Inside `/arcanum-update` there is no `/dev/tty`. The client step exits `4` with `FALLBACK=chat` only when the caller opts in with a flag, such as `ARCANUM_CLI_PROMPT=chat`, that only the new skill sets. The skill then asks the same question with `AskUserQuestion`, following the project's TTY-first convention.
+- **Opt-in `FALLBACK=chat`.** Inside `/arcanum-update` there is no `/dev/tty`. The client step exits `4` with `FALLBACK=chat` (and `CLI_VERSION=<v>`) only when the caller opts in with `ARCANUM_CLI_PROMPT=chat`, which only the new skill sets. Any other value, or unset, keeps the no-TTY skip. The flag only asks; it never consents. The skill then asks the same question with `AskUserQuestion`, following the project's TTY-first convention.
 - **No-TTY skip.** With no TTY, no `ARCANUM_SKIP_CLI` and no opt-in flag, the client step is skipped with a warning naming the manual command. It never hangs and never fails the arcanum install or update.
 - **Warn and continue.** Any client failure warns with the reason and the manual command, and never fails arcanum: the arcanum install or update still exits `0`. This covers:
   - Node or npm missing;
@@ -46,6 +46,14 @@ Every part relies on these rules. The parts reference them and do not repeat the
   - `npm i -g` failing, for example EACCES on a global prefix that needs `sudo`, or a network error.
 
   The step never retries with `sudo`.
+
+- **Validated version.** The shared script validates `VERSION` as a plain semver (`MAJOR.MINOR.PATCH[-prerelease]`) before any `npm` call. Anything else is a warning and a skip, never an `npm` call. `VERSION` comes from `ARCANUM_VERSION` or a GitHub `tag_name`, and on `/arcanum-update` it travels through `CLI_VERSION=` and back as an argument.
+- **Exact pin, one argument, no install scripts.** The install is always `npm i -g --ignore-scripts arcanum-cli@<v>`, with `arcanum-cli@<v>` passed as one quoted argument. It is never a range or a dist-tag, so the version installed is the version named in the prompt. `arcanum-cli` has no dependencies and no install-time scripts, so `--ignore-scripts` loses nothing, and a compromised publish cannot run code at install time.
+- **Consent only by argument.** The pre-answer that skips the `[Y/n]` prompt is the shared script's `--no-confirm` argument, used only by the `/arcanum-update` resume and the migration. It is never an env var, so an exported variable cannot silently consent to a machine-wide install. `ARCANUM_SKIP_CLI` can only *skip*.
+- **Bounded `npm view`.** `npm view` runs with `--fetch-retries=0` and a bounded `--fetch-timeout` (about 15 seconds), so an offline machine warns quickly instead of stalling. A timeout means "network error, warn and skip". `npm i -g` keeps npm's defaults: the user has consented and is waiting for it.
+- **npm config honored.** The user's npm config (registry, proxy, prefix) is used as is. The step passes no registry override.
+- **Forks.** The package name is always `arcanum-cli` on the user's configured npm registry, whatever `ARCANUM_REPO` is. A fork whose tag matches an official version gets the official client of that version. This is documented, not special-cased.
+- **Skipped paths cost nothing.** `ARCANUM_SKIP_CLI`, a no-TTY run without the flag, `Already on <v>` and a git checkout without the script make no `npm` call. Otherwise the cost is one `npm view` and the installed-version check before asking, plus `npm i -g` only after consent.
 
 ## Version pinning
 
@@ -69,7 +77,7 @@ A migration is needed.
 - The scope is global because the client is installed machine-wide. It runs once per machine or account through `/arcanum-migrate`, not once per repo.
 - It also covers existing installs that update before the new client step reaches them, such as the `git clone` first-update gap.
 - It reverses the current rule in [Install & Release Pipeline](../architecture/install-and-release.md) ("No per-repo migration installs it or nudges the user to"). That doc changes with the migration, not with this spec.
-- Docs that mention the pending migration cite the specific `next/NNN` file, following [Per-Repo Migrations](../architecture/per-repo-migrations.md)' "Referencing pending migrations" rule. The id is an open point of [update.md](cli-install/update.md).
+- The migration is `next/001`; see [update.md](cli-install/update.md#global-migration-next001). Until #872 creates the file, docs cite it as `next/001`, without the `repos/` prefix, because `scripts/bump-version.sh` aborts on a `repos/next/NNN` reference with no matching file. #872 then switches them to the full path, following [Per-Repo Migrations](../architecture/per-repo-migrations.md)' "Referencing pending migrations" rule.
 
 ## Parts
 
@@ -91,7 +99,6 @@ A migration is needed.
 
 ## Open points
 
-- The exact env var names: `ARCANUM_SKIP_CLI`, and the opt-in flag `/arcanum-update` sets (`ARCANUM_CLI_PROMPT=chat` is a placeholder).
 - The exact wording of the client prompt and of each warning.
 
 ## See also
