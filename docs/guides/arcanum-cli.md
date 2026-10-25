@@ -13,7 +13,7 @@ arcanum --version
 
 You need Node.js 22.13.0 or newer. One install serves every Arcanum install and every Claude account on the machine.
 
-Releases are published from CI with npm provenance, which links each version to the commit and pipeline that built it. `npm audit signatures` checks it after install.
+Releases are published from CI (CircleCI) through npm trusted publishing, with no long-lived npm token. npm does not attach provenance to CircleCI publishes, so `npm audit signatures` verifies the registry signatures but has no provenance attestation to check.
 
 ## The three tiers
 

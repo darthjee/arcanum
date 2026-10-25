@@ -11,7 +11,7 @@ arcanum --version
 
 It needs Node.js 22.13.0 or newer and has no runtime dependencies. For a one-off look without a global install, use `npx arcanum-cli --help`.
 
-Releases are published from CI with npm provenance, which links each version to the commit and pipeline that built it. `npm audit signatures` checks it after install.
+Releases are published from CI (CircleCI) through npm trusted publishing, with no long-lived npm token. npm does not attach provenance to CircleCI publishes, so `npm audit signatures` verifies the registry signatures but has no provenance attestation to check.
 
 This package is not the internal `core/bin/arcanum` dispatcher that Arcanum's skills call. That one ships inside Arcanum installs and is not meant to be run by hand.
 
