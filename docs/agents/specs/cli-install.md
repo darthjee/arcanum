@@ -33,7 +33,7 @@ Out of scope:
 
 ## Shared rules
 
-Every part relies on these rules. The parts reference them and do not repeat them.
+Every part relies on these rules. The parts reference them and do not repeat them. They govern the installer, the updater and the migration's client step. `arcanum self-update` applies them as listed in [its part](cli-install/self-update.md#shared-rules): it ignores `ARCANUM_SKIP_CLI`, has no prompt, and fails instead of warning.
 
 - **Prompt.** After the existing arcanum confirmation, a separate prompt asks whether to install or update the client. It names the target (`arcanum-cli@<version>`, via `npm i -g`), defaults to yes (`[Y/n]`), and reads from `/dev/tty`.
 - **`ARCANUM_SKIP_CLI`**: any non-empty value (docs show `ARCANUM_SKIP_CLI=1`) skips the client step without asking and without calling `node` or `npm`.
@@ -59,7 +59,7 @@ Every part relies on these rules. The parts reference them and do not repeat the
 
 - The installer and updater install `arcanum-cli@<the arcanum version being installed>`, not `@latest`. This keeps the lockstep the CLI's version-skew check relies on, and honors `ARCANUM_VERSION` pins.
 - If that version is not on npm, the client is left untouched, with a warning naming the manual `npm i -g arcanum-cli` command. Examples: a fork's own version, or an arcanum release older than the first CLI publish. The arcanum install or update still succeeds.
-- `arcanum self-update` stays on `@latest`. See [self-update.md](cli-install/self-update.md).
+- `arcanum self-update` targets `latest` instead: it resolves `latest` with a bounded `npm view` and installs that exact version. See [self-update.md](cli-install/self-update.md).
 
 ## Backward compatibility
 
@@ -86,7 +86,7 @@ A migration is needed.
 | [install.md](cli-install/install.md) | The installer (`arcanum/install/`) installing `arcanum-cli@<version>`. |
 | [update.md](cli-install/update.md) | The updater (`arcanum/update/`), the `/arcanum-update` skill, `git clone` installs and the global migration. |
 | [already-installed.md](cli-install/already-installed.md) | Double installation: detecting the installed client with `npm ls`, updating an older one, leaving a newer or linked (`npm link`) one, skipping an unreadable one, and warning about a foreign `arcanum` on `PATH`. |
-| [self-update.md](cli-install/self-update.md) | The `arcanum self-update` CLI command. |
+| [self-update.md](cli-install/self-update.md) | The `arcanum self-update` CLI command: resolving `latest` and installing that exact version, refusing a linked or non-global copy, no prompt, its `--json` output and the new exit code `8` (`npm`). |
 
 ## Alternatives considered
 
