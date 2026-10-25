@@ -25,15 +25,18 @@
 #
 # The `publish-cli` job (also release-only, run after build-and-release, in
 # parallel with publish-image) publishes the arcanum-cli@<tag> npm package
-# via scripts/publish_cli_package.sh, with npm trusted publishing: npm
-# trades the job's CircleCI OIDC token for a short-lived publish credential
-# and attaches provenance. No npm token env var is needed, and none is
-# allowed (the script refuses NPM_TOKEN/NODE_AUTH_TOKEN). The image's
-# bundled npm is too old for trusted publishing, so the job installs an
-# exact npm 11.x pin first. Re-runs after a successful publish are no-ops
-# (npm versions are immutable). The trusted publisher must be registered
-# once by hand on npmjs.com; see docs/agents/architecture/
-# install-and-release.md.
+# via scripts/publish_cli_package.sh, with npm trusted publishing. npm
+# does not read CircleCI's default CIRCLE_OIDC_TOKEN_V2 (its audience is
+# the org ID), so the script mints an npm-audience token with
+# `circleci run oidc get --claims '{"aud": "npm:registry.npmjs.org"}'`
+# and exports it as NPM_ID_TOKEN, which npm exchanges for a short-lived
+# publish credential. npm generates no provenance for CircleCI publishes.
+# No npm token env var is needed, and none is allowed (the script
+# refuses NPM_TOKEN/NODE_AUTH_TOKEN). The image's bundled npm is too old
+# for trusted publishing, so the job installs an exact npm 11.x pin first.
+# Re-runs after a successful publish are no-ops (npm versions are
+# immutable). The trusted publisher must be registered once by hand on
+# npmjs.com; see docs/agents/architecture/install-and-release.md.
 #
 # The `mod-checks` job (test workflow) runs `claude plugin validate` and
 # `claude plugin test` for the arcanum-next-step mod. Both work headless
