@@ -173,3 +173,124 @@ if [[ ! "$NODE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
   _warn "Node ${NODE_VERSION:-unknown} found, ${CLI_NODE_FLOOR} or later required, client step skipped"
   exit 0
 fi
+
+# Detection and comparison wrapper, run with `node -e`. Arguments (never
+# interpolated into the source): process.argv[1] = target version,
+# process.argv[2] = timeout in ms. Runs `npm ls -g --json --depth=0
+# arcanum-cli` bounded by spawnSync's timeout (macOS has no portable
+# `timeout`), parses its JSON (never its exit code) and prints KEY=value
+# lines:
+#   CLI_STATE=missing|older|same|newer|linked|unknown
+#   CLI_INSTALLED=<v>   when the installed version is known
+#   CLI_LINK=<path>     for `linked`, when npm reports a `file:` target
+#   CLI_REASON=<text>   for `unknown`
+# Semver precedence per already-installed.md's Version comparison: numeric
+# MAJOR.MINOR.PATCH, a prerelease below its release, prerelease identifiers
+# pairwise (numeric numerically, numeric before alphanumeric, else ASCII),
+# a shorter identifier list lower, build metadata ignored.
+CLI_DETECT_JS="$(cat <<'JS'
+const { spawnSync } = require('child_process');
+const target = process.argv[1];
+const timeout = Number(process.argv[2]) > 0 ? Number(process.argv[2]) : 15000;
+const out = (k, v) => process.stdout.write(k + '=' + String(v).replace(/[\r\n]+/g, ' ') + '\n');
+const done = (state, extra) => {
+  out('CLI_STATE', state);
+  Object.keys(extra || {}).forEach((k) => { if (extra[k] !== undefined) out(k, extra[k]); });
+  process.exit(0);
+};
+const unknown = (reason, installed) => done('unknown', { CLI_INSTALLED: installed, CLI_REASON: reason });
+const parse = (v) => {
+  const m = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.exec(String(v));
+  return m && { nums: [m[1], m[2], m[3]].map(BigInt), pre: m[4] ? m[4].split('.') : [] };
+};
+const sign = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+const cmpId = (a, b) => {
+  const an = /^\d+$/.test(a), bn = /^\d+$/.test(b);
+  if (an && bn) return sign(BigInt(a), BigInt(b));
+  if (an !== bn) return an ? -1 : 1;
+  return sign(a, b);
+};
+const compare = (a, b) => {
+  for (let i = 0; i < 3; i++) if (a.nums[i] !== b.nums[i]) return sign(a.nums[i], b.nums[i]);
+  if (!a.pre.length || !b.pre.length) return sign(b.pre.length, a.pre.length);
+  for (let i = 0; i < Math.min(a.pre.length, b.pre.length); i++) {
+    const c = cmpId(a.pre[i], b.pre[i]);
+    if (c) return c;
+  }
+  return sign(a.pre.length, b.pre.length);
+};
+const wanted = parse(target);
+if (!wanted) unknown('target version is not plain semver');
+const r = spawnSync('npm', ['ls', '-g', '--json', '--depth=0', 'arcanum-cli'], {
+  encoding: 'utf8', timeout, stdio: ['ignore', 'pipe', 'ignore'],
+});
+if (r.error) unknown(r.error.code === 'ETIMEDOUT' ? 'npm ls timed out' : 'npm ls could not run');
+if (r.signal) unknown('npm ls timed out');
+if (!r.stdout || !r.stdout.trim()) unknown('npm ls printed nothing');
+let data;
+try { data = JSON.parse(r.stdout); } catch (e) { unknown('npm ls printed invalid JSON'); }
+if (!data || typeof data !== 'object') unknown('npm ls printed unexpected JSON');
+const entry = data.dependencies && data.dependencies['arcanum-cli'];
+if (entry === undefined || entry === null) done('missing');
+if (typeof entry !== 'object') unknown('npm ls reported an unreadable arcanum-cli entry');
+const resolved = typeof entry.resolved === 'string' ? entry.resolved : '';
+if (entry.link === true || resolved.startsWith('file:')) {
+  done('linked', { CLI_LINK: resolved.startsWith('file:') ? resolved.slice(5) : undefined });
+}
+if (entry.missing === true || entry.version === undefined || entry.version === null || entry.version === '') {
+  unknown('npm ls reported arcanum-cli without a version');
+}
+const have = parse(entry.version);
+if (!have) unknown('installed version ' + entry.version + ' is not plain semver', entry.version);
+const c = compare(have, wanted);
+done(c < 0 ? 'older' : c > 0 ? 'newer' : 'same', { CLI_INSTALLED: entry.version });
+JS
+)"
+
+# _path_check — warns when `arcanum` on PATH is not the client in the npm
+# global prefix (filled in with the install flow).
+_path_check() {
+  :
+}
+
+# 5. Detect the installed client (local `npm ls`, no network).
+CLI_STATE=""
+CLI_INSTALLED=""
+CLI_LINK=""
+CLI_REASON=""
+CLI_DETECT_OUT="$(node -e "$CLI_DETECT_JS" "$VERSION" "$CLI_TIMEOUT_MS" 2>/dev/null || true)"
+while IFS= read -r _line; do
+  case "$_line" in
+    CLI_STATE=*) CLI_STATE="${_line#CLI_STATE=}" ;;
+    CLI_INSTALLED=*) CLI_INSTALLED="${_line#CLI_INSTALLED=}" ;;
+    CLI_LINK=*) CLI_LINK="${_line#CLI_LINK=}" ;;
+    CLI_REASON=*) CLI_REASON="${_line#CLI_REASON=}" ;;
+  esac
+done <<< "$CLI_DETECT_OUT"
+
+case "$CLI_STATE" in
+  same)
+    _info "${CLI_PACKAGE}@${VERSION} is already up to date."
+    _path_check
+    exit 0
+    ;;
+  newer)
+    _info "${CLI_PACKAGE}@${CLI_INSTALLED} is newer than ${VERSION}; left as is. Downgrade with: npm i -g --ignore-scripts ${CLI_PACKAGE}@${VERSION}"
+    _path_check
+    exit 0
+    ;;
+  linked)
+    if [[ -n "$CLI_LINK" ]]; then
+      _info "${CLI_PACKAGE} is linked from ${CLI_LINK}; left as is."
+    else
+      _info "${CLI_PACKAGE} is linked (npm link); left as is."
+    fi
+    exit 0
+    ;;
+  older|missing)
+    ;;
+  *)
+    _warn "could not read the installed ${CLI_PACKAGE} version (${CLI_REASON:-npm ls failed}), client step skipped"
+    exit 0
+    ;;
+esac
