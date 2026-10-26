@@ -1,7 +1,8 @@
 import {
-  CliError, EXIT_ERROR, EXIT_FILE, EXIT_IDENTIFIERS, EXIT_LOCK_TIMEOUT, EXIT_OK, EXIT_TARGET_UNAVAILABLE,
-  EXIT_USAGE, EXIT_VALIDATION, EXIT_VERSION_SKEW, FileError, LockTimeoutRefusal, TargetUnavailableError,
-  UsageError, ValidationError, VersionSkewError, exitCodeForError
+  CliError, EXIT_ERROR, EXIT_FILE, EXIT_IDENTIFIERS, EXIT_INTERRUPTED, EXIT_LOCK_TIMEOUT, EXIT_NPM, EXIT_OK,
+  EXIT_TARGET_UNAVAILABLE, EXIT_USAGE, EXIT_VALIDATION, EXIT_VERSION_SKEW, FileError, InterruptedError,
+  LockTimeoutRefusal, NpmError, TargetUnavailableError, UsageError, ValidationError, VersionSkewError,
+  exitCodeForError
 } from '../../lib/exitCodes.js';
 
 describe('exitCodes', () => {
@@ -10,6 +11,10 @@ describe('exitCodes', () => {
       EXIT_OK, EXIT_ERROR, EXIT_USAGE, EXIT_VALIDATION, EXIT_TARGET_UNAVAILABLE,
       EXIT_VERSION_SKEW, EXIT_LOCK_TIMEOUT, EXIT_FILE
     ]).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+  });
+
+  it('adds npm 8 and interrupted 130 without renumbering', () => {
+    expect([EXIT_NPM, EXIT_INTERRUPTED]).toEqual([8, 130]);
   });
 
   describe('UsageError', () => {
@@ -30,7 +35,9 @@ describe('exitCodes', () => {
       [VersionSkewError, EXIT_VERSION_SKEW, 'VERSION_SKEW'],
       [LockTimeoutRefusal, EXIT_LOCK_TIMEOUT, 'LOCK_TIMEOUT'],
       [FileError, EXIT_FILE, 'FILE'],
-      [UsageError, EXIT_USAGE, 'USAGE']
+      [UsageError, EXIT_USAGE, 'USAGE'],
+      [NpmError, EXIT_NPM, 'NPM'],
+      [InterruptedError, EXIT_INTERRUPTED, 'INTERRUPTED']
     ].forEach(([ErrorClass, exit, code]) => {
       it(`maps ${ErrorClass.name} to ${exit}, with its hint`, () => {
         const error = new ErrorClass('no', { hint: 'try this' });
@@ -43,6 +50,11 @@ describe('exitCodes', () => {
       });
     });
 
+    it('carries npm\'s captured output on an NpmError', () => {
+      expect(new NpmError('x', { npmOutput: 'npm error code E1' }).npmOutput).toBe('npm error code E1');
+      expect(new NpmError('x').npmOutput).toBeNull();
+    });
+
     it('defaults a CliError to 1 with no hint', () => {
       const error = new CliError('x');
 
@@ -53,7 +65,7 @@ describe('exitCodes', () => {
     it('names every non-zero exit code in snake case', () => {
       expect(EXIT_IDENTIFIERS).toEqual({
         1: 'error', 2: 'usage', 3: 'validation', 4: 'target_unavailable',
-        5: 'version_skew', 6: 'lock_timeout', 7: 'file'
+        5: 'version_skew', 6: 'lock_timeout', 7: 'file', 8: 'npm', 130: 'interrupted'
       });
     });
   });
@@ -80,6 +92,14 @@ describe('exitCodes', () => {
 
     it('maps a Node errno error to 7', () => {
       expect(exitCodeForError(withCode('EACCES', { errno: -13, syscall: 'open' }))).toBe(EXIT_FILE);
+    });
+
+    it('maps an NpmError wrapping a spawn ENOENT to 8, not 7', () => {
+      const spawnError = withCode('ENOENT', { errno: -2, syscall: 'spawn npm' });
+      const error = Object.assign(new NpmError('npm not found on PATH'), { cause: spawnError, errno: -2, syscall: 'spawn npm' });
+
+      expect(exitCodeForError(spawnError)).toBe(EXIT_FILE);
+      expect(exitCodeForError(error)).toBe(EXIT_NPM);
     });
 
     it('maps UNREGISTERED_KEY to 1', () => {

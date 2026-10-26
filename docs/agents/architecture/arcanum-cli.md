@@ -1,12 +1,12 @@
 # Arcanum CLI
 
-The user-facing `arcanum` command (`cli/`, published as the optional npm package `arcanum-cli`) manages Arcanum's configuration from outside Claude Code, through `arcanum config ...`. It reads and writes the three tier files described in [Shared State & Configuration Files](shared-state-and-configuration.md) — global (`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/arcanum-config.json`), repo (`.claude/configuration/arcanum-repo-config.json`) and local (`.claude/state/arcanum-config.json`), resolved local → repo → global — with the same dotted-path rules, the same writer and the same lock as the skills, through the [shared lib](shared-lib.md). This doc covers both the contract the CLI implements (targeting, commands, value parsing, output, exit codes, shortcuts, the setup wizard) and how it is built.
+The user-facing `arcanum` command (`cli/`, published as the optional npm package `arcanum-cli`) manages Arcanum's configuration from outside Claude Code, through `arcanum config ...`. It reads and writes the three tier files described in [Shared State & Configuration Files](shared-state-and-configuration.md) — global (`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/arcanum-config.json`), repo (`.claude/configuration/arcanum-repo-config.json`) and local (`.claude/state/arcanum-config.json`), resolved local → repo → global — with the same dotted-path rules, the same writer and the same lock as the skills, through the [shared lib](shared-lib.md). Its one other command, `arcanum self-update`, updates the global `arcanum-cli` itself. This doc covers both the contract the CLI implements (targeting, commands, value parsing, output, exit codes, shortcuts, the setup wizard, `self-update`) and how it is built.
 
 `cli/` is owned by the `client` agent (see [Agent Roster and Delegation](agent-roster-and-delegation.md)). End-user docs: [the guide](../../guides/arcanum-cli.md) and [`cli/README.md`](../../../cli/README.md).
 
 ## Goal and distribution
 
-- **Configuration only.** Every command lives under `arcanum config ...`, so the top-level `arcanum <command>` namespace stays free for later features. The CLI does not install, update or remove Arcanum itself.
+- **Configuration, plus updating itself.** Every configuration command lives under `arcanum config ...`, so the top-level `arcanum <command>` namespace stays free for later features. The only other command, [`arcanum self-update`](#self-update), updates the CLI itself. The CLI does not install, update or remove Arcanum itself.
 - **Optional, installed separately.** `npm i -g arcanum-cli` installs the `arcanum` command. No per-repo migration installs it or nudges the user towards it; the README and the guide explain how to install it.
 - **One install per machine.** A single global install serves every Arcanum install and every Claude account on the machine (see [Targeting](#targeting)), so users with several `CLAUDE_CONFIG_DIR`s never end up with competing clients.
 - **Host Node.js, no Docker fallback.** Node is already a prerequisite of Arcanum's native engine. The floor is in [Runtime path](#runtime-path).
@@ -34,10 +34,10 @@ Separate entrypoint, shared logic:
 | `lib/args.js` | The argument layer: `--repo` overload pre-scan, first-positional lookup that skips option values, tier-flag exclusivity, per-subcommand flag sets, strict arity, key syntax, `--lock-timeout`, required tier. |
 | `lib/target.js` | Targeting: the Claude config dir (flag → `CLAUDE_CONFIG_DIR` → `$HOME/.claude`, with its source and state) and the repo root (`RepoPath#validate`/`#toplevel`, "no repo", git missing from PATH, configured or not). |
 | `lib/values.js` | `set`'s value-parsing table. |
-| `lib/exitCodes.js` | Exit constants, the `CliError` family (`UsageError` `2`, `ValidationError` `3`, `TargetUnavailableError` `4`, `VersionSkewError` `5`, `LockTimeoutRefusal` `6`, `FileError` `7`, each with an optional `hint`) and `exitCodeForError`, the single mapping point (shared `ConfigError`/`LockTimeoutError` codes included). |
+| `lib/exitCodes.js` | Exit constants, the `CliError` family (`UsageError` `2`, `ValidationError` `3`, `TargetUnavailableError` `4`, `VersionSkewError` `5`, `LockTimeoutRefusal` `6`, `FileError` `7`, `NpmError` `8`, `InterruptedError` `130`, each with an optional `hint`) and `exitCodeForError`, the single mapping point (shared `ConfigError`/`LockTimeoutError` codes included). |
 | `lib/output.js` | Result writer (human text or exactly one JSON line), stderr warnings, error reporting (the `arcanum:` prefix, the `hint:` line, JSON error object, `ARCANUM_DEBUG=1` stacks). |
 | `lib/tierFiles.js` | Tier file paths and the never-throwing tier parse (`ok`, `missing`, `empty`, or a malformed state: `invalid_json`, `not_object`, `unreadable`, `not_utf8`; UTF-8 BOM stripped). `readTierTolerant` warns and reads as empty; `readTierForWrite` refuses with exit `7`. |
-| `lib/skew.js` | Version pointers (`.version` for repo, `.migrations.version` for local and global, `0.0.0` when missing), skew status against the CLI version and the embedded per-scope migration list, read warnings and the write refusal. |
+| `lib/skew.js` | `compareVersions` (semver precedence, shared with `self-update`), version pointers (`.version` for repo, `.migrations.version` for local and global, `0.0.0` when missing), skew status against the CLI version and the embedded per-scope migration list, read warnings and the write refusal. |
 | `lib/writeTier.js` | The write path: target check, registry validation messages, `prepareWrite` (the ordered checks), `writeKey` (the `RepoConfigWriter` call with the quiet, bounded lock and SIGINT handling). |
 | `lib/commands/config.js` | The `config` namespace: help, then the checks every subcommand shares, then dispatch. |
 | `lib/commands/config/{get,set,unset,list,info}.js` | One module per subcommand, each exporting `options`, `positionals`, `acceptsTier` and `run`. |
@@ -50,7 +50,9 @@ Separate entrypoint, shared logic:
 | `lib/commands/config/setup/{setting,identity,ci,summary}.js` | The wizard's scalar per-setting dialogue, the per-agent email overrides, the `ci` add/remove loop, and the stderr summary. |
 | `lib/prompter.js` | The wizard's line prompter over `node:readline` (questions to stderr, queued answers), rejecting with `Interrupted` on EOF or Ctrl-C; it owns `SIGINT` only while a question is open. |
 | `lib/commands/config/shared.js` | Read-side helpers: `readTiers` (targets, account/repo read rules, tolerant reads, skew warnings), file display, registry defaults. |
-| `lib/help.js` | Top-level, `config`, per-subcommand and per-shortcut usage. Key docs come from the registry. |
+| `lib/commands/selfUpdate.js` | `arcanum self-update`: the platform, arity and targeting checks, the global-copy check, the `latest` lookup and validation, the comparison, `npm i -g` and the post-install verification (see [`self-update`](#self-update)). |
+| `lib/npm.js` | `runNpm(args, { timeout, execFileAsync })`: npm through `execFile` with an argument array and captured output, never a shell. Failures become an `NpmError` with a `category` (`not_installed`, `timeout`, `permission`, `not_found`, `network`, `failed`), npm's exit code and its last 10 stderr lines, or an `InterruptedError` on `SIGINT`. |
+| `lib/help.js` | Top-level, `config`, per-subcommand, per-shortcut and `self-update` usage. Key docs come from the registry. |
 
 ## Targeting
 
@@ -146,7 +148,7 @@ One CLI may face repos and accounts on different Arcanum versions. `cli/lib/skew
 | Repo | `.version` in `.claude/configuration/arcanum-repo-config.json` (see [the repo version guide](../../guides/arcanum-repo-version.md)) |
 | Local | `.migrations.version` in `.claude/state/arcanum-config.json` |
 
-A pointer holds an Arcanum version, not a migration number. A missing (or non-string) pointer counts as `0.0.0`, as in `arcanum/migrations/run.sh`. Versions compare numerically (`0.9.3` < `0.13.0`). Migrations are scoped per tier (`applies_to: repo|local|global`), so the three files can sit at different versions.
+A pointer holds an Arcanum version, not a migration number. A missing (or non-string) pointer counts as `0.0.0`, as in `arcanum/migrations/run.sh`, and is never `ahead`, even of a prerelease CLI such as a source run's `0.0.0-dev`. Versions compare by semver precedence: numerically (`0.9.3` < `0.13.0`), a prerelease below its release (`2.3.0-rc.1` < `2.3.0`), prerelease identifiers one by one (numeric numerically, alphanumeric in ASCII order, numeric below alphanumeric), and build metadata ignored. Migrations are scoped per tier (`applies_to: repo|local|global`), so the three files can sit at different versions.
 
 To know which migrations are pending, the build embeds, per scope, the list of released Arcanum versions that shipped a migration for it, read from `arcanum/migrations/repos/<X.Y.Z>/migrations.json` (`next/` excluded, versions above the CLI's dropped; see [Install & Release → npm package](install-and-release.md#npm-package-arcanum-cli)).
 
@@ -174,13 +176,14 @@ To know which migrations are pending, the build embeds, per scope, the list of r
 | `5` | `version_skew` | `VersionSkewError` | A write to a tier whose pointer is ahead of the CLI, without `--force`. |
 | `6` | `lock_timeout` | `LockTimeoutRefusal` | The write lock was not acquired within `--lock-timeout`. A shared `LOCK_TIMEOUT` maps here too. |
 | `7` | `file` | `FileError` | A malformed tier file the CLI refuses to write over, or an I/O error. The shared `NOT_AN_OBJECT` and `INVALID_JSON` codes and any Node errno error (`EACCES`, `ENOSPC`, `EISDIR`, …) map here too. |
-| `130` | — | — | Interrupted by Ctrl-C (`SIGINT`) during a write or the setup wizard. |
+| `8` | `npm` | `NpmError` | `self-update`: npm missing from `PATH`, or any npm call failing, including the post-install verification. A spawn `ENOENT` is wrapped in an `NpmError`, so it maps here, not to `7`. |
+| `130` | `interrupted` | `InterruptedError` | Interrupted by Ctrl-C (`SIGINT`) during a write, the setup wizard, or `self-update`'s `npm i -g`. Only `self-update` raises an `InterruptedError`, so only it prints an error object under `--json`; a write and the wizard exit `130` directly. |
 
 Each `CliError` carries an optional `hint`, printed as a `hint:` line (see [Output](#output)).
 
 ## Commands
 
-The top level holds only the meta flags and the `config` namespace, so `arcanum <command>` stays free for later, non-config features. `config` also hosts the [shortcuts](#shortcuts) and the [setup wizard](#setup-wizard).
+The top level holds only the meta flags, the `config` namespace and [`self-update`](#self-update), so `arcanum <command>` stays free for later, non-config features. `config` also hosts the [shortcuts](#shortcuts) and the [setup wizard](#setup-wizard).
 
 ### Generic commands
 
@@ -420,13 +423,21 @@ Each command prints one stable object. Fields may be added; existing ones are no
 
 `info`: see [`config info`](#config-info). `--version`: `{"version":"2.4.0"}`.
 
+`self-update`:
+
+```json
+{"status":"updated","from":"2.2.3","to":"2.3.0","latest":"2.3.0"}
+```
+
+- `status` is a closed enum: `updated`, `up_to_date`, `newer`. `from` is the running version, `to` the global version after the command (equal to `from` on a no-op), `latest` the resolved `npm view` result.
+
 Errors, on stderr in `--json` mode:
 
 ```json
 {"error":{"code":"target_unavailable","exit":4,"message":"arcanum: no repo at /x/bar; --repo and --local need a git repo","hint":null}}
 ```
 
-- `code` is the identifier from [Exit codes](#exit-codes) (`error`, `usage`, `validation`, `target_unavailable`, `version_skew`, `lock_timeout`, `file`); `message` keeps the `arcanum: ` prefix; `hint` is a string or `null`.
+- `code` is the identifier from [Exit codes](#exit-codes) (`error`, `usage`, `validation`, `target_unavailable`, `version_skew`, `lock_timeout`, `file`, `npm`, `interrupted`); `message` keeps the `arcanum: ` prefix; `hint` is a string or `null`.
 - `--json` is detected on the raw argv (before `--`) for errors raised before `parseArgs` runs, so even a usage error comes out as JSON.
 
 ### Error messages
@@ -655,11 +666,24 @@ summary
 - **Interrupts.** The prompter (`cli/lib/prompter.js`) rejects with `Interrupted` on EOF or SIGINT, owning `SIGINT` only while a question is open; the wizard prints the summary and returns `130`. During a write, `writeKey`'s own SIGINT handler runs with signal hooks whose `exit` prints the summary first.
 - **Summary.** Printed once (`summary.js`). Items with no recorded result are "not reached"; a wildcard entry none of whose instances was reached collapses to `next_step.auto.*` / `git.agents.*`. Read warnings are printed once per run, not once per setting.
 
+## `self-update`
+
+`arcanum self-update [--json]` updates the global `arcanum-cli` to the exact `latest` version. The [self-update spec](../specs/cli-install/self-update.md) is the source of truth for its messages, outcomes and failures; this section records how `cli/lib/commands/selfUpdate.js` implements it.
+
+1. `--help` prints the usage. On `win32` it errors before any npm call (exit `1`). A positional, `--repo <path>` or `--claude-config-dir` is a usage error (exit `2`). `ARCANUM_SKIP_CLI` is ignored, and there is no prompt.
+2. **Global-copy check, local calls only.** The running package is the nearest `package.json` named `arcanum-cli` above `import.meta.url` (`deps.packageDir` in specs), through `realpath`. `npm root -g` (15 s timeout) gives `<root>/arcanum-cli`: a symlink is a linked checkout, and a missing copy, a non-directory or a different real path is "not the global install". Both refuse with exit `4` before any network call.
+3. **Lookup.** `npm view arcanum-cli@latest version --json --fetch-retries=0 --fetch-timeout=15000`, with a 30 s process timeout. The result must be a plain `MAJOR.MINOR.PATCH[-prerelease]`, or nothing is installed. On `E404` a best-effort `npm config get registry` (5 s timeout) names the registry.
+4. **Comparison** with the running `CLI_VERSION` through `compareVersions`: equal is `up_to_date`, newer is `newer`, both exit `0` with no install.
+5. **Install.** A progress note on stderr, then `npm i -g --ignore-scripts arcanum-cli@<v>`, the package as one argument and no timeout. A no-op `SIGINT` listener keeps the CLI alive while npm runs, so a Ctrl-C (which reaches npm too) is reported as exit `130` with the `npm i -g arcanum-cli@latest` fallback. `EACCES`/`EPERM` names the prefix (two `dirname`s above `npm root -g`); arcanum never retries with `sudo`.
+6. **Verification.** `<root>/arcanum-cli/package.json` must be at `<v>`, so `to` is a fact.
+
+npm's output is always captured: dropped on success (written to stderr under `ARCANUM_DEBUG=1`), and its last 10 stderr lines printed after the `arcanum: ...` and `hint:` lines on failure (`NpmError#npmOutput`, kept out of the JSON error object). The whole command path is imported statically: `npm i -g` may replace the bundle mid-run, so nothing is loaded lazily after it. Every collaborator (`runNpm` or `execFileAsync`, `realpath`, `lstat`, `readFile`, `platform`, `packageDir`, `signals`) comes through `deps`, so no spec touches the real npm or the network. There is no real-install smoke test in CI, since it would mutate the global prefix; before a release, check it by hand with `npm i -g arcanum-cli@<old>`, then `arcanum self-update`.
+
 ## Specs
 
 - `cli/spec/support/fixtures.js` builds temp git repos and tier files; `cli/spec/support/cli.js` runs `main.run` in-process against them, with an injected env and cwd.
 - Every exit code and precedence pair, each malformed-file kind (with byte-unchanged checks on refused writes), each value-parsing row with and without `--string`, the JSON shapes, the lock cases (held by a live fake owner, `--lock-timeout 0`, acquired after release, no "seems stuck" warning) and SIGINT each have a spec.
-- `setup_spec` drives the wizard with a scripted prompter (`cli/spec/support/prompter.js`, with `EOF`/`SIGINT` answers) and `deps.isInteractive`; `fakeIo` can also fake a TTY stdin. One bundle smoke spec checks the real no-TTY refusal.
+- `setup_spec` drives the wizard with a scripted prompter (`cli/spec/support/prompter.js`, with `EOF`/`SIGINT` answers) and `deps.isInteractive`; `fakeIo` can also fake a TTY stdin. One bundle smoke spec checks the real no-TTY refusal, another runs `self-update --help` from the bundle with no npm on `PATH`.
 - The shortcut specs (`cli/spec/lib/commands/config/shortcuts/`) use `cli/spec/support/shortcuts.js`, which re-seeds the tiers before each run, so a shortcut and its generic equivalent run against the same files and their stdout, stderr and exit code are compared directly. `agentsEmail_spec` runs the `AgentEmail` shell/native parity table (`cli/spec/support/agentEmailFixtures.js`, a copy of `shared/spec`'s, since `cli/` never imports `shared/spec/**`).
 
 ## Alternatives considered

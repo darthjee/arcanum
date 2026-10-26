@@ -77,9 +77,9 @@ How each of the index's [shared rules](../cli-install.md#shared-rules) applies:
 | `8` | `npm` (**new**) | npm missing, or any npm call failing, including the post-install verification. |
 | `1` | `error` (existing) | Windows (see [Edge cases](#edge-cases)). Node below the floor, already checked by `bin/arcanum`. |
 | `2` | `usage` (existing) | Usage errors, for example an extra argument or a targeting flag. |
-| `130` | — | Interrupted by Ctrl-C during `npm i -g`. |
+| `130` | `interrupted` (**new**) | Interrupted by Ctrl-C during `npm i -g` (`InterruptedError`). |
 
-The new `8` lets scripts tell "npm or the network broke" from "refused" without overloading `1`. The implementation adds it, never renumbering existing codes, to `cli/lib/exitCodes.js` (`EXIT_NPM`, its `EXIT_IDENTIFIERS` entry, the `NpmError` class) and to the [Exit codes](../../architecture/arcanum-cli.md#exit-codes) table of the architecture doc. This issue does not change either.
+The new `8` lets scripts tell "npm or the network broke" from "refused" without overloading `1`. The implementation adds it, never renumbering existing codes, to `cli/lib/exitCodes.js` (`EXIT_NPM`, its `EXIT_IDENTIFIERS` entry, the `NpmError` class, plus `EXIT_INTERRUPTED` / `interrupted` / `InterruptedError` for `130`) and to the [Exit codes](../../architecture/arcanum-cli.md#exit-codes) table of the architecture doc.
 
 ### `--help`
 
@@ -166,7 +166,10 @@ All exit `8`. The command never retries with `sudo`.
 | --- | --- | --- |
 | `self-update` | CLI command | `arcanum self-update [--json]`. |
 | `EXIT_NPM` / `npm` | exit code `8` and its identifier | npm missing, or an npm call failing. New, added to `cli/lib/exitCodes.js`. |
-| `NpmError` | `CliError` subclass | Wraps every npm failure with exit `8` and code `npm`. |
+| `NpmError` | `CliError` subclass | Wraps every npm failure with exit `8` and code `npm`, carrying npm's last stderr lines. |
+| `EXIT_INTERRUPTED` / `interrupted` | exit code `130` and its identifier | Ctrl-C during `npm i -g`. |
+| `InterruptedError` | `CliError` subclass | The interruption, with exit `130` and code `interrupted`. |
+| `cli/lib/npm.js` | module | `runNpm`: npm through `execFile` with captured output, classifying each failure. |
 | `cli/lib/commands/selfUpdate.js` | module | The command's implementation. |
 | `updated`, `up_to_date`, `newer` | `--json` `status` values | The closed enum of successful outcomes. |
 

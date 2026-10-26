@@ -11,11 +11,12 @@ import { CLI_DIR, REPO_ROOT } from '../support/paths.js';
  * @param {string} gate - the copied bin/arcanum.
  * @param {string[]} args - the CLI arguments.
  * @param {string} cwd - the working directory.
+ * @param {object} [env] - the environment (default: the inherited one).
  * @returns {Promise<{code: number, stdout: string, stderr: string}>} the outcome.
  */
-function runCli(gate, args, cwd) {
+function runCli(gate, args, cwd, env = process.env) {
   return new Promise((resolve) => {
-    execFile(process.execPath, [gate, ...args], { cwd }, (error, stdout, stderr) => {
+    execFile(process.execPath, [gate, ...args], { cwd, env }, (error, stdout, stderr) => {
       resolve({ code: error ? error.code : 0, stdout, stderr });
     });
   });
@@ -72,6 +73,14 @@ describe('smoke: dist/arcanum.mjs', () => {
 
     expect(result.code).toBe(0);
     expect(result.stdout).toContain('Usage: arcanum <command>');
+    expect(result.stderr).toBe('');
+  });
+
+  it('prints the self-update usage for self-update --help, with no npm on PATH', async () => {
+    const result = await runCli(gate, ['self-update', '--help'], tmp, { PATH: path.join(tmp, 'no-bin') });
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).toMatch(/^Usage: arcanum self-update/);
     expect(result.stderr).toBe('');
   });
 

@@ -13,6 +13,23 @@ arcanum --version
 
 You need Node.js 22.13.0 or newer. One install serves every Arcanum install and every Claude account on the machine.
 
+### Updating the CLI
+
+```console
+$ arcanum self-update
+arcanum: note: updating arcanum-cli 2.2.3 → 2.3.0...
+Updated arcanum-cli 2.2.3 → 2.3.0
+```
+
+`arcanum self-update` looks up the latest release on your configured npm registry and, when your CLI is older, installs that exact version with `npm i -g --ignore-scripts arcanum-cli@<version>`. There is no prompt: running the command is the consent. When you're already on the latest release, or on something newer (a prerelease or a local build), it says so and changes nothing. `--json` prints `{"status":"updated"|"up_to_date"|"newer","from":...,"to":...,"latest":...}`.
+
+It only updates the global install it is running from, and refuses (exit `4`) anything else:
+
+- **A linked checkout** (`npm link`): update it with `git pull` and a rebuild instead.
+- **Not the global copy** (`npx`, a project's `node_modules/.bin/arcanum`, a source run, or a different Node/npm on `PATH`, e.g. with nvm): run `npm i -g arcanum-cli@latest`, or update it through the project's package manager.
+
+If npm says the global prefix is not writable (`EACCES`), fix its permissions or switch to a user-owned prefix (`npm config set prefix ~/.npm-global`). arcanum never retries with `sudo`. It is not supported on Windows: use `npm i -g arcanum-cli@latest` there.
+
 Releases are published from CI (CircleCI) through npm trusted publishing, with no long-lived npm token. npm does not attach provenance to CircleCI publishes, so `npm audit signatures` verifies the registry signatures but has no provenance attestation to check.
 
 ## The three tiers
@@ -170,10 +187,16 @@ Branch on the exit code (see the table in [`cli/README.md`](../../cli/README.md#
 
 ## Troubleshooting
 
-**Exit `5`: version skew.** The target file was migrated by a newer Arcanum than this CLI, so the CLI may not know about renamed or moved keys. Update the CLI with `npm i -g arcanum-cli@latest`. If you're sure about the key, `--force` writes anyway. When a file is *behind* and has migrations pending, reads print a hint to run `/arcanum-migrate`.
+**Exit `4` from `self-update`: not the global install.** The `arcanum` you ran is a linked checkout, or not the copy `npm i -g` manages (see [Updating the CLI](#updating-the-cli)). Nothing was installed and no network call was made.
+
+**Exit `5`: version skew.** The target file was migrated by a newer Arcanum than this CLI, so the CLI may not know about renamed or moved keys. Update the CLI with `arcanum self-update` (or `npm i -g arcanum-cli@latest`). If you're sure about the key, `--force` writes anyway. When a file is *behind* and has migrations pending, reads print a hint to run `/arcanum-migrate`.
 
 **Exit `6`: lock timeout.** Another writer (a running skill, or another `arcanum` command) held the file's lock for longer than `--lock-timeout` (10 seconds by default). Nothing was written. Retry, or pass a longer `--lock-timeout`. If no arcanum process is running, the lock file named in the message is left over: remove it by hand.
 
 **Exit `7`: malformed file.** The file is not valid JSON, its top level is not an object, it isn't UTF-8, or it can't be read. The CLI won't overwrite a file it can't parse, and `--force` doesn't change that. Reads still work: the broken tier is skipped with a warning. Fix or remove the file named in the message, then retry. A set can also exit `7` when a parent of the key holds a non-object (e.g. `git` is a string and you set `git.email`).
 
-Set `ARCANUM_DEBUG=1` to see stack traces.
+**Exit `8`: npm failed.** `self-update` could not run npm, or npm failed: npm missing from `PATH`, the registry unreachable, the package not on the configured registry, an unwritable global prefix, or an install that did not end at the expected version. The message names the cause, followed by npm's last lines. Fix it and run `arcanum self-update` again.
+
+**Exit `130`: interrupted.** Ctrl-C stopped the command. During `self-update`, the install may be incomplete: run `arcanum self-update` again, or `npm i -g arcanum-cli@latest` if `arcanum` no longer runs.
+
+Set `ARCANUM_DEBUG=1` to see stack traces (and, for `self-update`, npm's output on success).
