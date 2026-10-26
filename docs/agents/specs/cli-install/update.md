@@ -11,7 +11,7 @@ Make every update path install or update `arcanum-cli@<version>`: the updater (`
 ### Zip updater (`arcanum/update/updater.sh`)
 
 - **Placement.** The client step is the last step of `updater.sh`. It runs after the copy, the delete set, the `arcanum.json` write and the `arcanum updated to <v> at <target>` line, and before `cleanup` removes the release tree. A client failure therefore never leaves the arcanum update half-done or blocks a retry.
-- **Shared script.** It calls the shared client-step script (#868, for example `arcanum/_lib/install_cli.sh`) from the **installed** tree (`$TARGET/arcanum/_lib/...`), so the script outlives `cleanup` and the same path works for every caller. The old local `bootstrap.sh` execs the *new* `updater.sh`, so this works from the first update after the release.
+- **Shared script.** It calls the shared client-step script (#868, `arcanum/_lib/install_cli.sh`) from the **installed** tree (`$TARGET/arcanum/_lib/...`), so the script outlives `cleanup` and the same path works for every caller. The old local `bootstrap.sh` execs the *new* `updater.sh`, so this works from the first update after the release.
 - **Target.** `arcanum-cli@$VERSION`, the version being installed. See [Version pinning](../cli-install.md#version-pinning).
 - **Already on the version.** On `Already on <v>.` (exit `0`), the client step is **not** run. A no-op update stays a no-op and asks nothing. The [global migration](#global-migration-next001) and `arcanum self-update` cover a client that was skipped earlier.
 

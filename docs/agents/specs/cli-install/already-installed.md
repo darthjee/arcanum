@@ -53,7 +53,7 @@ Define what the client step does when `arcanum-cli` is already installed globall
 
 ### Per-caller behavior
 
-- **One implementation.** All of this lives in the shared client-step script (#868, for example `arcanum/_lib/install_cli.sh`). No caller has code of its own; callers differ only in how consent arrives (see [Callers](#callers)).
+- **One implementation.** All of this lives in the shared client-step script (#868, `arcanum/_lib/install_cli.sh`). No caller has code of its own; callers differ only in how consent arrives (see [Callers](#callers)).
 - **`--no-confirm` only answers the prompt.** It never bypasses detection: it never downgrades, leaves `linked` alone, and skips `unknown`.
 - **The resume re-detects.** `run_update.sh install-cli <v>` runs the full flow with `--no-confirm`, so a state change between the question and the answer (for example a `self-update` meanwhile) is handled. The cost is one more local `npm ls`.
 - **Installer.** An already-installed client is rare on a fresh arcanum install, but possible (a client from an earlier arcanum, or installed by hand). Nothing is special-cased.
@@ -64,7 +64,7 @@ The client step ([install.md's Flow](install.md#flow) step 5, shared by every ca
 
 1. `ARCANUM_SKIP_CLI` set: skip.
 2. `VERSION` not a plain semver: warn and skip.
-3. No TTY and no opt-in flag: skip with a warning.
+3. No TTY, no `--no-confirm` and no `ARCANUM_CLI_PROMPT=chat`: skip with a warning. The TTY is only probed when it is needed: with `--no-confirm` the script never opens `/dev/tty`, and with `ARCANUM_CLI_PROMPT=chat` a missing TTY becomes the exit `4` at step 7.
 4. `node` and `npm` present and Node at least 22.13.0, else warn and skip.
 5. **Detect** with `npm ls -g --json --depth=0 arcanum-cli` (local):
    - `unknown`: warn and skip;
@@ -80,22 +80,22 @@ The client step ([install.md's Flow](install.md#flow) step 5, shared by every ca
 - **Detection before `npm view`.** Only an install that would actually happen touches the network. Same, newer and linked cost one local `npm ls`: no `npm view`, no prompt.
 - **Detection after the TTY check.** Same and newer need neither a TTY nor a prompt, but detection still runs after step 3, so the index's "no TTY, no `npm` call" and [Skipped paths cost nothing](../cli-install.md#shared-rules) rules stay simple.
 - **`/arcanum-update`.** With `ARCANUM_CLI_PROMPT=chat` and no TTY, step 7 is where the script exits `4` with `FALLBACK=chat`. Same, newer, linked and unknown end with exit `0` before that, with no question in chat.
-- **Prompt wording.** The update prompt uses the same `[Y/n]`, default yes, from `/dev/tty`, worded as an update naming both versions, for example `Update arcanum-cli 2.2.3 → 2.3.0 (npm i -g)? [Y/n]`. The `/arcanum-update` `AskUserQuestion` uses the same wording, which is why exit `4` also carries `CLI_INSTALLED=<v>`. The exact wording stays with #868 (see the index's [Open points](../cli-install.md#open-points)).
+- **Prompt wording.** The update prompt uses the same `[Y/n]`, default yes, from `/dev/tty`, worded as an update naming both versions, for example `Update arcanum-cli 2.2.3 → 2.3.0 (npm i -g)? [Y/n]`. The `/arcanum-update` `AskUserQuestion` uses the same wording, which is why exit `4` also carries `CLI_INSTALLED=<v>`. The final wording is in the [Outcomes](#outcomes) table below.
 
 ## Outcomes
 
-Every case exits `0` and prints one line on stderr, following [install.md's Outcomes](install.md#outcomes) convention. The exact wording stays open for #868; this table fixes each line's content.
+Every case exits `0` and prints one line on stderr, following [install.md's Outcomes](install.md#outcomes) convention (`arcanum-cli:` prefix, warnings ending with the manual command). `<v>` is the target version.
 
 | Case | Condition | Output | Exit |
 | --- | --- | --- | --- |
-| Updated | `older`; the user accepts; `npm i -g` succeeds. | Info: `arcanum-cli` updated `<old>` → `<target>`. | `0` |
-| Unchanged | `same`. | Info: `arcanum-cli@<v>` already up to date. No prompt, no `npm view`. | `0` |
-| Newer kept | `newer`. | Info (not a warning): `arcanum-cli@<installed>` is newer than `<target>`, left as is; downgrade with `npm i -g --ignore-scripts arcanum-cli@<target>`. No prompt, no `npm view`. | `0` |
-| Linked | `linked`. | Info: `arcanum-cli` is linked from `<path>`, left as is. No prompt, no `npm view`, no `npm i -g`. | `0` |
-| Unknown | `npm ls` timed out, failed, or gave no readable version. | Warning with the reason and the manual command. No `npm i -g`. | `0` |
-| Declined (update) | `older`; the user answers no. | Info, with the manual command. | `0` |
+| Updated | `older`; the user accepts (`Update arcanum-cli <old> → <v> (npm i -g)? [Y/n]`); `npm i -g` succeeds. | `arcanum-cli: arcanum-cli updated <old> → <v>.` | `0` |
+| Unchanged | `same`. | `arcanum-cli: arcanum-cli@<v> is already up to date.` No prompt, no `npm view`. | `0` |
+| Newer kept | `newer`. | `arcanum-cli: arcanum-cli@<installed> is newer than <v>; left as is. Downgrade with: npm i -g --ignore-scripts arcanum-cli@<v>` (info, not a warning). No prompt, no `npm view`. | `0` |
+| Linked | `linked`. | `arcanum-cli: arcanum-cli is linked from <path>; left as is.` (`arcanum-cli is linked (npm link); left as is.` when npm reports no `file:` path). No prompt, no `npm view`, no `npm i -g`. | `0` |
+| Unknown | `npm ls` timed out, failed, or gave no readable version. | `arcanum-cli: warning: could not read the installed arcanum-cli version (<reason>), client step skipped. Install it manually with: npm i -g arcanum-cli@<v>`. No `npm i -g`. | `0` |
+| Declined (update) | `older`; the user answers no. | `arcanum-cli: skipped by user. Install it manually with: npm i -g arcanum-cli@<v>` | `0` |
 | Update failed | `npm i -g` fails (`EACCES`, `EEXIST`, network). | [install.md](install.md#outcomes)'s matching warning rows, unchanged. The old client stays in place. | `0` |
-| `PATH` warning | See [Foreign `arcanum` on `PATH`](#foreign-arcanum-on-path). | One extra warning line after the outcome line. | `0` |
+| `PATH` warning | See [Foreign `arcanum` on `PATH`](#foreign-arcanum-on-path). | One extra line after the outcome line: `arcanum-cli: warning: arcanum on PATH is <path>, not the client at <prefix>/bin/arcanum; reorder PATH or remove the other one.` or `arcanum-cli: warning: the client is at <prefix>/bin/arcanum, but <prefix>/bin is not on PATH.` | `0` |
 
 "Newer kept" is info because it is the expected state after `arcanum self-update`.
 
@@ -133,7 +133,7 @@ Every case exits `0` and prints one line on stderr, following [install.md's Outc
 
 For #868:
 
-- bats tests with a stub `npm` returning canned `npm ls --json` output: missing, older, same, newer, prerelease target with the release installed, `linked`, an entry without `version`, invalid JSON, an `invalid`-flagged entry with a readable version, and a timeout (the stub sleeps; the timeout is shortened through an env seam).
+- Standalone shell tests (`arcanum/_lib/test_install_cli.sh`, in the style of `arcanum/_lib/test_lock.sh`; running them in CI is #882) with a stub `npm` returning canned `npm ls --json` output: missing, older, same, newer, prerelease target with the release installed, `linked`, an entry without `version`, invalid JSON, an `invalid`-flagged entry with a readable version, and a timeout (the stub sleeps; the timeout is shortened through an env seam).
 - Each asserts `CLI_STATE` and the outcome line, and that same, newer, linked and unknown make no `npm view` and no `npm i -g` call.
 - `--no-confirm` with a newer client: asserts no downgrade.
 - `PATH` check: a temp prefix with a fake `arcanum` earlier on `PATH`, and a run where the prefix `bin` is not on `PATH`.
