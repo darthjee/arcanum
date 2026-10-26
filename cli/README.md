@@ -11,6 +11,8 @@ arcanum --version
 
 It needs Node.js 22.13.0 or newer and has no runtime dependencies. For a one-off look without a global install, use `npx arcanum-cli --help`.
 
+`arcanum self-update` updates it later to the latest release.
+
 Releases are published from CI (CircleCI) through npm trusted publishing, with no long-lived npm token. npm does not attach provenance to CircleCI publishes, so `npm audit signatures` verifies the registry signatures but has no provenance attestation to check.
 
 This package is not the internal `core/bin/arcanum` dispatcher that Arcanum's skills call. That one ships inside Arcanum installs and is not meant to be run by hand.
@@ -34,6 +36,7 @@ arcanum config unset <key> (--global|--repo|--local) [--force] [--lock-timeout <
 arcanum config list [--global|--repo|--local]
 arcanum config info
 arcanum config setup [<section>...] [--lock-timeout <seconds>]   # interactive wizard
+arcanum self-update [--json]                                      # update this CLI to the latest release
 ```
 
 `arcanum config --help` lists every known key, and `arcanum config <subcommand> --help` shows a subcommand's flags.
@@ -216,11 +219,12 @@ Flags may appear before or after the subcommand.
 | `1` | Generic error, or `get` of an unset key. |
 | `2` | Usage error: unknown flag or command, bad arity, conflicting flags, bad `--repo` or `--claude-config-dir` path, or `config setup` without an interactive terminal. |
 | `3` | Validation error against the key registry: unknown key, type, enum, tier, read-only. |
-| `4` | Target unavailable: no repo, an unconfigured repo, or no usable Claude config dir. |
+| `4` | Target unavailable: no repo, an unconfigured repo, or no usable Claude config dir; for `self-update`, a linked checkout or a copy other than the global install. |
 | `5` | Version skew: a write to a tier newer than this CLI, without `--force`. |
 | `6` | The write lock was not acquired within `--lock-timeout`. |
 | `7` | Malformed tier file, or an I/O error. |
-| `130` | Interrupted (Ctrl-C, or Ctrl-D in `config setup`). |
+| `8` | `self-update`: npm missing, or an npm call failing. |
+| `130` | Interrupted (Ctrl-C, or Ctrl-D in `config setup`; Ctrl-C during `self-update`'s install). |
 
 When several apply, the first of `2`, `4`, `7`, `3`, `5`, `6` wins. Set `ARCANUM_DEBUG=1` for stack traces.
 
