@@ -125,13 +125,14 @@ export function pointerOf(tier, data) {
  * @param {string} options.cliVersion - the CLI's version.
  * @param {object} options.migrationVersions - the per-scope migration versions.
  * @returns {{status: string, pending: number}} `ahead` when the pointer
- *   is newer than the CLI; `behind` with the count of `scope`'s
+ *   is newer than the CLI (never for `0.0.0`, a missing pointer); `behind` with the count of `scope`'s
  *   migrations after the pointer, up to the CLI version; otherwise
  *   `up_to_date` (a pointer behind the CLI with nothing pending is up to
  *   date: only a shape change matters).
  */
 export function skewStatus(version, { scope, cliVersion, migrationVersions }) {
-  if (compareVersions(version, cliVersion) > 0) {
+  // A missing pointer is never ahead, even of a prerelease CLI (`0.0.0-dev`).
+  if (version !== NO_POINTER && compareVersions(version, cliVersion) > 0) {
     return { status: 'ahead', pending: 0 };
   }
 

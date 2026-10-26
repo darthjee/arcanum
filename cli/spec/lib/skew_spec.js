@@ -36,6 +36,11 @@ describe('skew', () => {
       expect(compareVersions('2.3.0-rc.1', '2.3.0-rc.1')).toBe(0);
     });
 
+    it('pads a short version with zeros', () => {
+      expect(compareVersions('2', '2.0.0')).toBe(0);
+      expect(compareVersions('2.1', '2.0.9')).toBeGreaterThan(0);
+    });
+
     it('ignores build metadata', () => {
       expect(compareVersions('2.3.0+build.5', '2.3.0')).toBe(0);
       expect(compareVersions('2.3.0-rc.1+abc', '2.3.0-rc.1+def')).toBe(0);
@@ -59,6 +64,11 @@ describe('skew', () => {
   });
 
   describe('skewStatus', () => {
+    it('never counts a missing pointer as ahead of a prerelease CLI', () => {
+      expect(skewStatus('0.0.0', { scope: 'repo', cliVersion: '0.0.0-dev', migrationVersions: {} }))
+        .toEqual({ status: 'up_to_date', pending: 0 });
+    });
+
     it('is ahead when a released pointer is above a prerelease CLI', () => {
       expect(skewStatus('2.3.0', { scope: 'repo', cliVersion: '2.3.0-rc.1', migrationVersions }))
         .toEqual({ status: 'ahead', pending: 0 });
