@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. Nothing in this spec is implemented yet.
+Proposed. The shared client-step script, `arcanum/_lib/install_cli.sh`, exists (#868); its callers (installer, updater, `/arcanum-update`, migration) and `arcanum self-update` are still pending.
 
 ## Origin
 
@@ -39,7 +39,7 @@ Every part relies on these rules. The parts reference them and do not repeat the
 - **`ARCANUM_SKIP_CLI`**: any non-empty value (docs show `ARCANUM_SKIP_CLI=1`) skips the client step without asking and without calling `node` or `npm`.
 - **`ARCANUM_ASSUME_YES=1`** does **not** answer the client prompt. It still only skips the main arcanum confirmation.
 - **Opt-in `FALLBACK=chat`.** Inside `/arcanum-update` there is no `/dev/tty`. The client step exits `4` with `FALLBACK=chat` (and `CLI_VERSION=<v>`) only when the caller opts in with `ARCANUM_CLI_PROMPT=chat`, which only the new skill sets. Any other value, or unset, keeps the no-TTY skip. The flag only asks; it never consents. The skill then asks the same question with `AskUserQuestion`, following the project's TTY-first convention.
-- **No-TTY skip.** With no TTY, no `ARCANUM_SKIP_CLI` and no opt-in flag, the client step is skipped with a warning naming the manual command. It never hangs and never fails the arcanum install or update.
+- **No-TTY skip.** With no TTY, no `ARCANUM_SKIP_CLI`, no `--no-confirm` and no opt-in flag, the client step is skipped with a warning naming the manual command. It never hangs and never fails the arcanum install or update.
 - **Warn and continue.** Any client failure warns with the reason and the manual command, and never fails arcanum: the arcanum install or update still exits `0`. This covers:
   - Node or npm missing;
   - Node below the CLI's floor (22.13.0);
@@ -99,7 +99,7 @@ A migration is needed.
 
 ## Open points
 
-- The exact wording of the client prompt and of each warning.
+None. The prompt and warning wording is fixed in the Outcomes tables of [install.md](cli-install/install.md#outcomes) and [already-installed.md](cli-install/already-installed.md#outcomes).
 
 ## See also
 
