@@ -247,11 +247,34 @@ done(c < 0 ? 'older' : c > 0 ? 'newer' : 'same', { CLI_INSTALLED: entry.version 
 JS
 )"
 
-# _path_check — warns when `arcanum` on PATH is not the client in the npm
-# global prefix (filled in with the install flow).
-_path_check() {
-  :
+# _warn_plain <msg> — warning line on stderr, without the manual-install
+# suffix (used by the PATH check).
+_warn_plain() {
+  echo "arcanum-cli: warning: $1" >&2
 }
+
+# _path_check — warns when `arcanum` on PATH is not the client in the npm
+# global prefix. Both directories are resolved with `cd -P`, so symlinked
+# PATH entries raise no false alarm. The binary found is never run.
+_path_check() {
+  local prefix prefix_bin resolved_prefix_bin found found_dir
+  prefix="$(npm prefix -g 2>/dev/null || true)"
+  [[ -n "$prefix" ]] || return 0
+  prefix_bin="${prefix}/bin"
+  resolved_prefix_bin="$(cd -P "$prefix_bin" 2>/dev/null && pwd -P || true)"
+  [[ -n "$resolved_prefix_bin" ]] || resolved_prefix_bin="$prefix_bin"
+  found="$(command -v arcanum 2>/dev/null || true)"
+  if [[ -z "$found" || "$found" != */* ]]; then
+    _warn_plain "the client is at ${prefix_bin}/arcanum, but ${prefix_bin} is not on PATH."
+    return 0
+  fi
+  found_dir="$(cd -P "$(dirname "$found")" 2>/dev/null && pwd -P || true)"
+  if [[ "$found_dir" != "$resolved_prefix_bin" ]]; then
+    _warn_plain "arcanum on PATH is ${found}, not the client at ${prefix_bin}/arcanum; reorder PATH or remove the other one."
+  fi
+  return 0
+}
+
 
 # 5. Detect the installed client (local `npm ls`, no network).
 CLI_STATE=""
@@ -294,3 +317,100 @@ case "$CLI_STATE" in
     exit 0
     ;;
 esac
+
+# 6. Is the target published? Bounded, no retry.
+VIEW_OUT=""
+VIEW_ERR_FILE="$(mktemp "${TMPDIR:-/tmp}/install_cli.XXXXXX")"
+trap 'rm -f "$VIEW_ERR_FILE"' EXIT
+VIEW_RC=0
+VIEW_OUT="$(npm view "${CLI_PACKAGE}@${VERSION}" version \
+  --fetch-retries=0 "--fetch-timeout=${CLI_TIMEOUT_MS}" 2>"$VIEW_ERR_FILE")" || VIEW_RC=$?
+VIEW_ERR="$(cat "$VIEW_ERR_FILE" 2>/dev/null || true)"
+VIEW_OUT="$(printf '%s' "$VIEW_OUT" | tr -d '[:space:]')"
+
+# _npm_code <text> — first npm error code (E404, EACCES, ...) in <text>.
+_npm_code() {
+  printf '%s\n' "$1" | sed -n 's/.*code \(E[A-Z0-9]*\).*/\1/p' | head -n 1 || true
+}
+
+if [[ "$VIEW_RC" -eq 0 && -z "$VIEW_OUT" ]] || [[ "$VIEW_ERR" == *E404* ]]; then
+  _warn "${CLI_PACKAGE}@${VERSION} is not published on npm, client step skipped" "npm i -g ${CLI_PACKAGE}"
+  exit 0
+fi
+if [[ "$VIEW_RC" -ne 0 ]]; then
+  VIEW_CODE="$(_npm_code "$VIEW_ERR")"
+  _warn "could not reach the npm registry (network error${VIEW_CODE:+: ${VIEW_CODE}}), client step skipped"
+  exit 0
+fi
+
+# 7. Consent.
+if [[ "$CLI_STATE" == "older" ]]; then
+  PROMPT_TEXT="Update ${CLI_PACKAGE} ${CLI_INSTALLED} → ${VERSION} (npm i -g)? [Y/n] "
+else
+  PROMPT_TEXT="Install ${CLI_PACKAGE}@${VERSION} globally (npm i -g)? [Y/n] "
+fi
+
+# _ask — asks PROMPT_TEXT on the TTY until a valid answer. Returns 0 for
+# yes (Enter, y, yes), 1 for no (n, no, or the TTY closed first).
+_ask() {
+  local answer
+  exec 3< "$TTY_DEVICE"
+  while true; do
+    printf '%s' "$PROMPT_TEXT" >> "$TTY_DEVICE"
+    if ! IFS= read -r answer <&3; then
+      exec 3<&-
+      return 1
+    fi
+    answer="$(printf '%s' "$answer" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+    case "$answer" in
+      ""|y|yes) exec 3<&-; return 0 ;;
+      n|no) exec 3<&-; return 1 ;;
+    esac
+  done
+}
+
+if [[ "$NO_CONFIRM" -eq 0 ]]; then
+  if _tty_available; then
+    if ! _ask; then
+      _info "skipped by user. Install it manually with: ${MANUAL_CMD}"
+      exit 0
+    fi
+  elif [[ "$PROMPT_CHAT" -eq 1 ]]; then
+    echo "FALLBACK=chat"
+    echo "CLI_VERSION=${VERSION}"
+    [[ "$CLI_STATE" == "older" && -n "$CLI_INSTALLED" ]] && echo "CLI_INSTALLED=${CLI_INSTALLED}"
+    exit 4
+  else
+    _warn "no TTY to ask for consent, client step skipped"
+    exit 0
+  fi
+fi
+
+# 8. Install: exact pin, one quoted argument, no install scripts. Never
+# sudo, never --force, never a retry. npm's output goes to stderr.
+INSTALL_LOG="$(mktemp "${TMPDIR:-/tmp}/install_cli.XXXXXX")"
+trap 'rm -f "$VIEW_ERR_FILE" "$INSTALL_LOG"' EXIT
+INSTALL_RC=0
+npm i -g --ignore-scripts "${CLI_PACKAGE}@${VERSION}" 2>&1 | tee "$INSTALL_LOG" >&2 || INSTALL_RC=$?
+if [[ "$INSTALL_RC" -ne 0 ]]; then
+  INSTALL_OUT="$(cat "$INSTALL_LOG")"
+  if [[ "$INSTALL_OUT" == *EACCES* ]]; then
+    _warn "npm i -g failed with EACCES (no write access to the npm global prefix); fix the prefix (npm config set prefix) or run the command with the right permissions"
+  elif [[ "$INSTALL_OUT" == *EEXIST* ]]; then
+    _warn "npm i -g failed with EEXIST (another package owns the arcanum binary)"
+  else
+    INSTALL_CODE="$(_npm_code "$INSTALL_OUT")"
+    _warn "npm i -g failed (${INSTALL_CODE:-exit ${INSTALL_RC}})"
+  fi
+  exit 0
+fi
+
+if [[ "$CLI_STATE" == "older" ]]; then
+  _info "${CLI_PACKAGE} updated ${CLI_INSTALLED} → ${VERSION}."
+else
+  _info "${CLI_PACKAGE}@${VERSION} installed."
+fi
+
+# 9. PATH check.
+_path_check
+exit 0
