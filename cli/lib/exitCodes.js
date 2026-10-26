@@ -149,11 +149,17 @@ export class NpmError extends CliError {
    * @param {object} [options] - extra details.
    * @param {(string|null)} [options.hint] - an optional hint.
    * @param {(string|null)} [options.npmOutput] - npm's last stderr lines.
+   * @param {(string|null)} [options.category] - the failure class
+   *   (`not_installed`, `timeout`, `permission`, `not_found`, `network`,
+   *   `failed`), as classified by `cli/lib/npm.js`.
+   * @param {(number|null)} [options.npmExit] - npm's own exit code.
    */
-  constructor(message, { hint = null, npmOutput = null } = {}) {
+  constructor(message, { hint = null, npmOutput = null, category = null, npmExit = null } = {}) {
     super(message, { exit: EXIT_NPM, code: 'NPM', hint });
     this.name = 'NpmError';
     this.npmOutput = npmOutput;
+    this.category = category;
+    this.npmExit = npmExit;
   }
 }
 
