@@ -12,30 +12,95 @@ export const NO_POINTER = '0.0.0';
 const UPGRADE_HINT = 'npm i -g arcanum-cli@latest';
 
 /**
- * @param {string} version - an `X.Y.Z` version (a suffix is ignored).
- * @returns {number[]} its numeric parts.
+ * @param {string} version - a semver version (`X.Y.Z[-prerelease][+build]`).
+ * @returns {{core: number[], prerelease: string[]}} its numeric core and
+ *   its prerelease identifiers (empty when none); build metadata is dropped.
  */
-function versionParts(version) {
-  return String(version).split('.').slice(0, 3).map((part) => parseInt(part, 10) || 0);
+function parseVersion(version) {
+  const withoutBuild = String(version).split('+')[0];
+  const dash = withoutBuild.indexOf('-');
+  const coreText = dash === -1 ? withoutBuild : withoutBuild.slice(0, dash);
+  const prereleaseText = dash === -1 ? '' : withoutBuild.slice(dash + 1);
+  const core = coreText.split('.').slice(0, 3).map((part) => parseInt(part, 10) || 0);
+
+  while (core.length < 3) {
+    core.push(0);
+  }
+
+  return { core, prerelease: prereleaseText === '' ? [] : prereleaseText.split('.') };
+}
+
+const NUMERIC = /^\d+$/;
+
+/**
+ * Compares two prerelease identifiers: numeric ones numerically,
+ * alphanumeric ones lexically (ASCII), numeric below alphanumeric.
+ * @param {string} a - one identifier.
+ * @param {string} b - another identifier.
+ * @returns {number} negative, zero or positive.
+ */
+function compareIdentifiers(a, b) {
+  const aNumeric = NUMERIC.test(a);
+  const bNumeric = NUMERIC.test(b);
+
+  if (aNumeric && bNumeric) {
+    return Math.sign(Number(a) - Number(b));
+  }
+
+  if (aNumeric !== bNumeric) {
+    return aNumeric ? -1 : 1;
+  }
+
+  if (a === b) {
+    return 0;
+  }
+
+  return a < b ? -1 : 1;
 }
 
 /**
- * Compares two `X.Y.Z` versions numerically (`0.9.3` < `0.13.0`).
+ * Compares two prerelease identifier lists; an empty list (a release)
+ * ranks above any prerelease.
+ * @param {string[]} left - one version's identifiers.
+ * @param {string[]} right - another version's identifiers.
+ * @returns {number} negative, zero or positive.
+ */
+function comparePrereleases(left, right) {
+  if (left.length === 0 || right.length === 0) {
+    return right.length - left.length;
+  }
+
+  const length = Math.min(left.length, right.length);
+
+  for (let index = 0; index < length; index += 1) {
+    const result = compareIdentifiers(left[index], right[index]);
+
+    if (result !== 0) {
+      return result;
+    }
+  }
+
+  return left.length - right.length;
+}
+
+/**
+ * Compares two versions by semver precedence (`0.9.3` < `0.13.0`,
+ * `2.3.0-rc.1` < `2.3.0`); build metadata is ignored.
  * @param {string} a - one version.
  * @param {string} b - another version.
  * @returns {number} negative, zero or positive, as for `Array#sort`.
  */
 export function compareVersions(a, b) {
-  const left = versionParts(a);
-  const right = versionParts(b);
+  const left = parseVersion(a);
+  const right = parseVersion(b);
 
   for (let index = 0; index < 3; index += 1) {
-    if (left[index] !== right[index]) {
-      return left[index] - right[index];
+    if (left.core[index] !== right.core[index]) {
+      return left.core[index] - right.core[index];
     }
   }
 
-  return 0;
+  return comparePrereleases(left.prerelease, right.prerelease);
 }
 
 /**

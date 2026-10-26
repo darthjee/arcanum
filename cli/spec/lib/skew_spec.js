@@ -13,6 +13,33 @@ describe('skew', () => {
       expect(compareVersions('2.4.0', '2.4.0')).toBe(0);
       expect(compareVersions('3.0.0', '2.9.9')).toBeGreaterThan(0);
     });
+
+    it('follows the semver.org precedence chain', () => {
+      const chain = [
+        '1.0.0-alpha', '1.0.0-alpha.1', '1.0.0-alpha.beta', '1.0.0-beta',
+        '1.0.0-beta.2', '1.0.0-beta.11', '1.0.0-rc.1', '1.0.0'
+      ];
+
+      chain.slice(1).forEach((version, index) => {
+        expect(compareVersions(chain[index], version)).toBeLessThan(0);
+        expect(compareVersions(version, chain[index])).toBeGreaterThan(0);
+      });
+    });
+
+    it('ranks a prerelease below its release', () => {
+      expect(compareVersions('2.3.0-rc.1', '2.3.0')).toBeLessThan(0);
+      expect(compareVersions('2.3.0', '2.3.0-rc.1')).toBeGreaterThan(0);
+      expect(compareVersions('2.3.0-rc.1', '2.2.9')).toBeGreaterThan(0);
+    });
+
+    it('treats equal prereleases as equal', () => {
+      expect(compareVersions('2.3.0-rc.1', '2.3.0-rc.1')).toBe(0);
+    });
+
+    it('ignores build metadata', () => {
+      expect(compareVersions('2.3.0+build.5', '2.3.0')).toBe(0);
+      expect(compareVersions('2.3.0-rc.1+abc', '2.3.0-rc.1+def')).toBe(0);
+    });
   });
 
   describe('pointerOf', () => {
@@ -32,6 +59,11 @@ describe('skew', () => {
   });
 
   describe('skewStatus', () => {
+    it('is ahead when a released pointer is above a prerelease CLI', () => {
+      expect(skewStatus('2.3.0', { scope: 'repo', cliVersion: '2.3.0-rc.1', migrationVersions }))
+        .toEqual({ status: 'ahead', pending: 0 });
+    });
+
     it('is ahead when the pointer is newer than the CLI', () => {
       expect(skewStatus('2.5.0', { scope: 'repo', ...options })).toEqual({ status: 'ahead', pending: 0 });
     });
