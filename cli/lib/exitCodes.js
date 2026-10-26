@@ -17,6 +17,10 @@ export const EXIT_VERSION_SKEW = 5;
 export const EXIT_LOCK_TIMEOUT = 6;
 /** Malformed tier file, or an I/O error. */
 export const EXIT_FILE = 7;
+/** npm missing, or an npm call failing (see `arcanum self-update`). */
+export const EXIT_NPM = 8;
+/** Interrupted by a signal (Ctrl-C) while a child process ran. */
+export const EXIT_INTERRUPTED = 130;
 
 const FILE_ERROR_CODES = ['NOT_AN_OBJECT', 'INVALID_JSON'];
 
@@ -28,7 +32,9 @@ export const EXIT_IDENTIFIERS = {
   [EXIT_TARGET_UNAVAILABLE]: 'target_unavailable',
   [EXIT_VERSION_SKEW]: 'version_skew',
   [EXIT_LOCK_TIMEOUT]: 'lock_timeout',
-  [EXIT_FILE]: 'file'
+  [EXIT_FILE]: 'file',
+  [EXIT_NPM]: 'npm',
+  [EXIT_INTERRUPTED]: 'interrupted'
 };
 
 /**
@@ -134,14 +140,46 @@ export class FileError extends CliError {
 }
 
 /**
+ * npm is missing, or an npm call failed (exit `8`). Carries the last
+ * lines of npm's captured stderr, printed after the error in human mode.
+ */
+export class NpmError extends CliError {
+  /**
+   * @param {string} message - what npm call failed and why.
+   * @param {object} [options] - extra details.
+   * @param {(string|null)} [options.hint] - an optional hint.
+   * @param {(string|null)} [options.npmOutput] - npm's last stderr lines.
+   */
+  constructor(message, { hint = null, npmOutput = null } = {}) {
+    super(message, { exit: EXIT_NPM, code: 'NPM', hint });
+    this.name = 'NpmError';
+    this.npmOutput = npmOutput;
+  }
+}
+
+/** Interrupted by Ctrl-C while a child process ran (exit `130`). */
+export class InterruptedError extends CliError {
+  /**
+   * @param {string} message - what was interrupted.
+   * @param {object} [options] - extra details.
+   * @param {(string|null)} [options.hint] - an optional hint.
+   */
+  constructor(message, { hint = null } = {}) {
+    super(message, { exit: EXIT_INTERRUPTED, code: 'INTERRUPTED', hint });
+    this.name = 'InterruptedError';
+  }
+}
+
+/**
  * Maps any error thrown while running a command to the CLI's exit code.
  * This is the single mapping point (see
  * docs/agents/architecture/shared-lib.md#configerror):
  * the CLI's own refusals carry their code (usage `2`, validation `3`,
- * target `4`, skew `5`, lock `6`, file `7`); `node:util` `parseArgs`
- * errors → `2`; `LOCK_TIMEOUT` → `6`; `NOT_AN_OBJECT`, `INVALID_JSON`
- * and any Node errno error → `7`; anything else, `UNREGISTERED_KEY`
- * included → `1`.
+ * target `4`, skew `5`, lock `6`, file `7`, npm `8`, interrupted
+ * `130`); `node:util` `parseArgs` errors → `2`; `LOCK_TIMEOUT` → `6`;
+ * `NOT_AN_OBJECT`, `INVALID_JSON` and any Node errno error → `7`;
+ * anything else, `UNREGISTERED_KEY` included → `1`. An `NpmError`
+ * wrapping a spawn `ENOENT` therefore maps to `8`, not `7`.
  * @param {unknown} error - the thrown value.
  * @returns {number} the exit code.
  */

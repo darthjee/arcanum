@@ -20,7 +20,8 @@ export function errorMessage(error) {
 /**
  * Prints an error on stderr and returns its exit code: in human mode,
  * `arcanum: <message>`, then an optional `hint: ` line (a usage error
- * without a hint points at `--help`), plus the stack under
+ * without a hint points at `--help`), then npm's captured stderr lines
+ * for an `NpmError`, plus the stack under
  * `ARCANUM_DEBUG=1`; in `--json` mode, the stable error object.
  * @param {{stderr: {write: (text: string) => void}}} io - output streams.
  * @param {unknown} error - the thrown value.
@@ -43,6 +44,12 @@ export function reportError(io, error, { json = false, env = {} } = {}) {
       io.stderr.write(`hint: ${hint}\n`);
     } else if (exit === EXIT_USAGE) {
       io.stderr.write('Run \'arcanum --help\' for usage.\n');
+    }
+
+    const npmOutput = error && typeof error === 'object' && typeof error.npmOutput === 'string' ? error.npmOutput : '';
+
+    if (npmOutput !== '') {
+      io.stderr.write(npmOutput.endsWith('\n') ? npmOutput : `${npmOutput}\n`);
     }
   }
 

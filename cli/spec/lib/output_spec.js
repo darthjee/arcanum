@@ -1,4 +1,4 @@
-import { FileError, TargetUnavailableError, UsageError } from '../../lib/exitCodes.js';
+import { FileError, NpmError, TargetUnavailableError, UsageError } from '../../lib/exitCodes.js';
 import { createOutput, errorMessage, formatValue, reportError, wantsJson } from '../../lib/output.js';
 import { fakeIo } from '../support/fakeIo.js';
 
@@ -42,6 +42,21 @@ describe('output', () => {
       reportError(io, new Error('boom'), { json: true });
 
       expect(JSON.parse(io.err()).error).toEqual({ code: 'error', exit: 1, message: 'arcanum: boom', hint: null });
+    });
+
+    it('prints an NpmError\'s captured npm lines after the hint', () => {
+      const error = new NpmError('npm i -g failed (exit 1)', { hint: 'try again', npmOutput: 'npm error code E1\nnpm error boom' });
+
+      expect(reportError(io, error)).toBe(8);
+      expect(io.err()).toBe('arcanum: npm i -g failed (exit 1)\nhint: try again\nnpm error code E1\nnpm error boom\n');
+    });
+
+    it('keeps npm lines out of the JSON error object', () => {
+      reportError(io, new NpmError('npm i -g failed (exit 1)', { npmOutput: 'npm error boom' }), { json: true });
+
+      expect(JSON.parse(io.err())).toEqual({
+        error: { code: 'npm', exit: 8, message: 'arcanum: npm i -g failed (exit 1)', hint: null }
+      });
     });
 
     it('prints no stack trace by default', () => {
