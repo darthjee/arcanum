@@ -77,7 +77,8 @@ export function classifyNpmError(args, error) {
     });
   }
 
-  if (error.signal === 'SIGINT') {
+  // npm traps SIGINT and exits 130 itself; an untrapped child dies by the signal.
+  if (error.signal === 'SIGINT' || error.code === 130) {
     return new InterruptedError(`${command} was interrupted`);
   }
 

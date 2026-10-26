@@ -1,6 +1,7 @@
 import { parseArgs } from 'node:util';
 import { extractRepoTarget, firstPositional, valueOptionNames } from './args.js';
 import configCommand from './commands/config.js';
+import selfUpdateCommand from './commands/selfUpdate.js';
 import { EXIT_OK, EXIT_USAGE, UsageError } from './exitCodes.js';
 import { topLevelUsage } from './help.js';
 import { createOutput, reportError, wantsJson } from './output.js';
@@ -8,7 +9,8 @@ import { resolveTargets } from './target.js';
 
 /** The CLI's command registry: top-level command name → module. */
 export const COMMANDS = {
-  config: configCommand
+  config: configCommand,
+  'self-update': selfUpdateCommand
 };
 
 /** Flags accepted everywhere, before or after the command. */

@@ -64,6 +64,12 @@ describe('npm', () => {
       expect(exitCodeForError(error)).toBe(130);
     });
 
+    it('maps npm\'s own exit 130 to an InterruptedError', async () => {
+      const error = await rejection(runNpm(['i', '-g'], { execFileAsync: failing({ code: 130, stderr: '' }) }));
+
+      expect(error).toBeInstanceOf(InterruptedError);
+    });
+
     [
       ['npm error code EACCES', 'permission'],
       ['npm ERR! code EPERM', 'permission'],

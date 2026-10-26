@@ -10,7 +10,10 @@ export function topLevelUsage() {
     'Usage: arcanum <command> [options]',
     '',
     'Commands:',
-    formatRows([['config', 'Read and write arcanum configuration']]),
+    formatRows([
+      ['config', 'Read and write arcanum configuration'],
+      ['self-update', 'Update this CLI to the latest release']
+    ]),
     '',
     'Options:',
     formatRows([
@@ -20,6 +23,29 @@ export function topLevelUsage() {
     ]),
     '',
     'Run \'arcanum <command> --help\' for a command\'s usage.',
+    ''
+  ].join('\n');
+}
+
+/**
+ * @returns {string} the `arcanum self-update` usage text, newline-terminated.
+ */
+export function selfUpdateUsage() {
+  return [
+    'Usage: arcanum self-update [--json]',
+    '',
+    'Update the global arcanum-cli to the latest release: looks up the latest',
+    'version on the configured npm registry and, when this CLI is older, runs',
+    '\'npm i -g --ignore-scripts arcanum-cli@<version>\'. No prompt; never sudo.',
+    'Refuses (exit 4) a linked checkout (npm link) and a copy other than the',
+    'global install (npx, a project\'s node_modules, a source run). npm failures',
+    'exit 8.',
+    '',
+    'Options:',
+    formatRows([
+      ['--json', 'Machine-readable output'],
+      ['-h, --help', 'Show this help']
+    ]),
     ''
   ].join('\n');
 }

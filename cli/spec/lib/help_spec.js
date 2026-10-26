@@ -1,6 +1,7 @@
 import { SHORTCUTS } from '../../lib/commands/config/shortcuts/index.js';
 import {
-  SHORTCUT_HELP, SUBCOMMAND_HELP, configUsage, formatRows, shortcutUsage, subcommandUsage, topLevelUsage
+  SHORTCUT_HELP, SUBCOMMAND_HELP, configUsage, formatRows, selfUpdateUsage, shortcutUsage, subcommandUsage,
+  topLevelUsage
 } from '../../lib/help.js';
 
 describe('help', () => {
@@ -26,6 +27,23 @@ describe('help', () => {
       expect(usage).toContain('config');
       expect(usage).toContain('--help');
       expect(usage).toContain('--version');
+      expect(usage.endsWith('\n')).toBeTrue();
+    });
+
+    it('lists the self-update command', () => {
+      expect(topLevelUsage()).toContain('  self-update  Update this CLI to the latest release\n');
+    });
+  });
+
+  describe('selfUpdateUsage', () => {
+    it('prints the synopsis, what it refuses, and its options', () => {
+      const usage = selfUpdateUsage();
+
+      expect(usage).toMatch(/^Usage: arcanum self-update \[--json\]\n/);
+      expect(usage).toContain('linked checkout');
+      expect(usage).toContain('--json');
+      expect(usage).toContain('-h, --help');
+      expect(usage).not.toContain('--claude-config-dir');
       expect(usage.endsWith('\n')).toBeTrue();
     });
   });

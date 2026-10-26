@@ -51,6 +51,12 @@ describe('output', () => {
       expect(io.err()).toBe('arcanum: npm i -g failed (exit 1)\nhint: try again\nnpm error code E1\nnpm error boom\n');
     });
 
+    it('does not double a trailing newline on the npm lines', () => {
+      reportError(io, new NpmError('x', { npmOutput: 'npm error boom\n' }));
+
+      expect(io.err()).toBe('arcanum: x\nnpm error boom\n');
+    });
+
     it('keeps npm lines out of the JSON error object', () => {
       reportError(io, new NpmError('npm i -g failed (exit 1)', { npmOutput: 'npm error boom' }), { json: true });
 

@@ -61,6 +61,39 @@ describe('main', () => {
       expect(io.out()).toContain('Usage: arcanum config');
     });
 
+    it('dispatches to the self-update command', async () => {
+      const spy = spyOn(COMMANDS['self-update'], 'run').and.resolveTo(0);
+
+      expect(await run(['self-update', '--json'], { io, version: '2.2.3' })).toBe(0);
+
+      const context = spy.calls.mostRecent().args[0];
+
+      expect(context.positionals).toEqual([]);
+      expect(context.values.json).toBeTrue();
+      expect(context.version).toBe('2.2.3');
+    });
+
+    it('prints the self-update usage for self-update --help', async () => {
+      expect(await run(['self-update', '--help'], { io })).toBe(0);
+      expect(io.out()).toMatch(/^Usage: arcanum self-update \[--json\]/);
+    });
+
+    it('refuses an extra self-update argument (exit 2)', async () => {
+      expect(await run(['self-update', 'x'], { io, deps: { platform: 'linux' } })).toBe(2);
+      expect(io.err()).toContain('arcanum: self-update: unexpected argument \'x\'');
+    });
+
+    it('refuses targeting flags on self-update (exit 2)', async () => {
+      expect(await run(['self-update', '--repo', '.'], { io, deps: { platform: 'linux' } })).toBe(2);
+      expect(io.err()).toContain('arcanum: --repo is not accepted by self-update');
+    });
+
+    it('lists self-update in the top-level usage', async () => {
+      await run(['--help'], { io });
+
+      expect(io.out()).toContain('self-update');
+    });
+
     it('maps an error thrown by a command to its exit code', async () => {
       const error = Object.assign(new Error('timed out'), { code: 'LOCK_TIMEOUT' });
 
