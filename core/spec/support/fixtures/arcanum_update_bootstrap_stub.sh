@@ -18,6 +18,13 @@
 #     (trimmed) contents via jq, then exits 0 — simulating a real
 #     version bump. Absent -> exits 0 without touching arcanum.json,
 #     simulating a no-op "already up to date" run.
+#   - <root>/.fixture-cli-fallback present (and no .fixture-fail) ->
+#     after the version bump above (if any), prints FALLBACK=chat,
+#     CLI_VERSION=<arcanum.json's version> and
+#     CLI_PROMPT=<the ARCANUM_CLI_PROMPT value it saw, or "<unset>">,
+#     then exits 4 — simulating the client step handing the CLI install
+#     question back to the chat (issue #871). Recording CLI_PROMPT proves
+#     both engines pass ARCANUM_CLI_PROMPT=chat through.
 
 set -euo pipefail
 
@@ -36,6 +43,13 @@ if [[ -f "${ROOT}/.fixture-new-version" ]]; then
   NEW_VERSION="$(cat "${ROOT}/.fixture-new-version")"
   jq --arg v "$NEW_VERSION" '.version = $v' "${ROOT}/arcanum.json" > "${ROOT}/arcanum.json.tmp"
   mv "${ROOT}/arcanum.json.tmp" "${ROOT}/arcanum.json"
+fi
+
+if [[ -f "${ROOT}/.fixture-cli-fallback" ]]; then
+  echo "FALLBACK=chat"
+  echo "CLI_VERSION=$(jq -r '.version' "${ROOT}/arcanum.json")"
+  echo "CLI_PROMPT=${ARCANUM_CLI_PROMPT-<unset>}"
+  exit 4
 fi
 
 echo "bootstrap: done"

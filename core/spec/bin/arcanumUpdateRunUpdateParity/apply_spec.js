@@ -81,6 +81,38 @@ describe('arcanum-update-run-update-check/-apply parity (shell vs. native) — a
   );
 
   itMatchesParity(
+    'matches shell output (streamed fallback lines, then RESULT=updated, exit 4) when bootstrap.sh hands the CLI prompt to the chat',
+    async () => {
+      const shellDir = await createZipFixture('arcanum-core-aurru-parity-apply-shell-cli-', { version: '1.0.0' });
+      const nativeDir = await createZipFixture('arcanum-core-aurru-parity-apply-native-cli-', { version: '1.0.0' });
+
+      for (const dir of [shellDir, nativeDir]) {
+        await writeFile(path.join(dir, '.fixture-new-version'), '1.1.0');
+        await writeFile(path.join(dir, '.fixture-cli-fallback'), '');
+      }
+
+      const shell = await runCommand([SHELL_SCRIPTS.apply, shellDir], shellDir);
+      const native = await runCommand(
+        [process.execPath, NATIVE_BIN, NATIVE_COMMANDS.apply, nativeDir],
+        nativeDir
+      );
+
+      return {
+        shell,
+        native,
+        cleanup: async () => {
+          await removeTempDir(shellDir);
+          await removeTempDir(nativeDir);
+        }
+      };
+    },
+    {
+      code: 4,
+      stdout: 'bootstrap: starting\nFALLBACK=chat\nCLI_VERSION=1.1.0\nCLI_PROMPT=chat\nRESULT=updated FROM=1.0.0 TO=1.1.0\n'
+    }
+  );
+
+  itMatchesParity(
     'matches shell output and exit code when bootstrap.sh fails, printing nothing further',
     async () => {
       const shellDir = await createZipFixture('arcanum-core-aurru-parity-apply-shell-fail-', { version: '1.0.0' });

@@ -36,6 +36,7 @@ describe('ArcanumUpdateRunUpdate#apply', () => {
     expect(spawnArgs).toEqual([]);
     expect(options.stdio).toEqual('inherit');
     expect(options.env.ARCANUM_ASSUME_YES).toEqual('1');
+    expect(options.env.ARCANUM_CLI_PROMPT).toEqual('chat');
   });
 
   it('resolves RESULT=noop when the version is unchanged after bootstrap.sh runs', async () => {
@@ -49,6 +50,44 @@ describe('ArcanumUpdateRunUpdate#apply', () => {
     );
 
     await expectAsync(runUpdate.apply()).toBeResolvedTo('RESULT=noop VERSION=1.0.0\n');
+  });
+
+  it('rejects with a DispatchFailure carrying the RESULT=updated line and exit 4 when bootstrap.sh exits 4', async () => {
+    const runUpdate = new ArcanumUpdateRunUpdate(
+      claudeContext(),
+      stubDeps({
+        existsSync: fakeExistsSync([BOOTSTRAP_PATH, ARCANUM_JSON_PATH]),
+        readFile: fakeReadFile([
+          JSON.stringify({ repo: 'darthjee/arcanum', version: '1.0.0' }),
+          JSON.stringify({ repo: 'darthjee/arcanum', version: '1.0.0' }),
+          JSON.stringify({ repo: 'darthjee/arcanum', version: '1.1.0' })
+        ]),
+        spawnFn: fakeSpawn(4)
+      })
+    );
+
+    const thrown = await captureRejection(runUpdate.apply());
+
+    expect(thrown).toBeInstanceOf(DispatchFailure);
+    expect(thrown.stdout).toEqual('RESULT=updated FROM=1.0.0 TO=1.1.0\n');
+    expect(thrown.exitCode).toEqual(4);
+  });
+
+  it('rejects with a DispatchFailure carrying the RESULT=noop line and exit 4 when bootstrap.sh exits 4 without a version change', async () => {
+    const runUpdate = new ArcanumUpdateRunUpdate(
+      claudeContext(),
+      stubDeps({
+        existsSync: fakeExistsSync([BOOTSTRAP_PATH, ARCANUM_JSON_PATH]),
+        readFile: fakeReadFile([JSON.stringify({ repo: 'darthjee/arcanum', version: '1.0.0' })]),
+        spawnFn: fakeSpawn(4)
+      })
+    );
+
+    const thrown = await captureRejection(runUpdate.apply());
+
+    expect(thrown).toBeInstanceOf(DispatchFailure);
+    expect(thrown.stdout).toEqual('RESULT=noop VERSION=1.0.0\n');
+    expect(thrown.exitCode).toEqual(4);
   });
 
   it('rejects with a DispatchFailure (empty stdout, bootstrap.sh\'s exit code) when bootstrap.sh exits nonzero', async () => {
