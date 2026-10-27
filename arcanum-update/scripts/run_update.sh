@@ -10,6 +10,7 @@
 #
 # Usage: run_update.sh check
 #        run_update.sh apply
+#        run_update.sh install-cli <version>
 #
 # Both subcommands resolve TARGET/METHOD/REPO relative to this script's
 # own location (<script_dir>/../.. — the install this skill lives
@@ -21,15 +22,29 @@
 # on the caller's side): METHOD=zip|git, REPO=<repo>, CURRENT=<version-or
 # -ref>, TARGET=<path>. Exits 0.
 #
-# `apply` sets ARCANUM_ASSUME_YES=1 and runs arcanum/update/bootstrap.sh
+# `apply` sets ARCANUM_ASSUME_YES=1 and ARCANUM_CLI_PROMPT=chat (opts in
+# to the client step's chat fallback) and runs arcanum/update/bootstrap.sh
 # directly, streaming its stdout/stderr live (not captured/suppressed).
-# On nonzero exit, propagates that same exit code with no further output
-# (the caller relays the already-streamed error). On exit 0, re-resolves
-# the current version/ref and prints one final line:
+# On exit 0, re-resolves the current version/ref and prints one final
+# line:
 #   RESULT=updated FROM=<old> TO=<new>   (something changed)
 #   RESULT=noop VERSION=<current>        (already up to date)
+# On exit 4 (the client step wants the chat install question; the
+# arcanum update itself is complete), prints the same RESULT= line after
+# the FALLBACK=chat / CLI_VERSION= / CLI_INSTALLED= lines bootstrap.sh
+# already streamed, and exits 4. On any other nonzero exit, propagates
+# that same exit code with no further output (the caller relays the
+# already-streamed error).
 #
-# Both subcommands: if arcanum/update/bootstrap.sh is missing entirely,
+# `install-cli <version>` resumes only the client step after the
+# /arcanum-update chat answer: runs arcanum/_lib/install_cli.sh <version>
+# --no-confirm (the user already answered in the chat) and exits with its
+# code — 0 for every install outcome, 1 on wrong usage. Deliberately not a
+# migrated entrypoint (no engine_dispatch, no _shell.sh twin, no native
+# command): like install_cli.sh itself it is plain bash and uses the
+# host's npm.
+#
+# `check` and `apply`: if arcanum/update/bootstrap.sh is missing entirely,
 # or neither arcanum.json nor .git is present at TARGET_PATH, prints
 # "STATUS=missing_arcanum" to stdout and exits 1.
 #
@@ -51,9 +66,17 @@ case "${1:-}" in
   apply)
     engine_dispatch "$TARGET_PATH" arcanum-update-run-update-apply "${SCRIPT_DIR}/run_update_apply_shell.sh" HOME -- "$TARGET_PATH"
     ;;
+  install-cli)
+    if [[ $# -ne 2 ]]; then
+      echo "Usage: $0 install-cli <version>" >&2
+      exit 1
+    fi
+    exec "${TARGET_PATH}/arcanum/_lib/install_cli.sh" "$2" --no-confirm
+    ;;
   *)
     echo "Usage: $0 check" >&2
     echo "       $0 apply" >&2
+    echo "       $0 install-cli <version>" >&2
     exit 1
     ;;
 esac

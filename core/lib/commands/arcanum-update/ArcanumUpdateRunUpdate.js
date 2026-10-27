@@ -8,6 +8,9 @@ import InstallVersion from '../../utils/file/InstallVersion.js';
 const defaultExecFileAsync = promisify(execFile);
 const GIT_SSH_PREFIX = 'git@github.com:';
 const GIT_HTTPS_PREFIX = 'https://github.com/';
+// bootstrap.sh's exit code when the update succeeded but the CLI install
+// question was handed back to the caller (`ARCANUM_CLI_PROMPT=chat`).
+const CLI_FALLBACK_EXIT_CODE = 4;
 
 /**
  * Native equivalent of `arcanum-update/scripts/run_update_check_shell.sh`
@@ -72,8 +75,11 @@ class ArcanumUpdateRunUpdate {
    * @returns {Promise<string>} `RESULT=updated FROM=<old> TO=<new>\n`
    *   when the version/ref changed, else `RESULT=noop VERSION=<current>\n`.
    * @throws {DispatchFailure} `STATUS=missing_arcanum\n` (exit 1) on the
-   *   same missing-arcanum condition as `check`; or an empty stdout
-   *   payload with `bootstrap.sh`'s own exit code when it exits nonzero.
+   *   same missing-arcanum condition as `check`; the same `RESULT=` line
+   *   with exit `4` when `bootstrap.sh` exits `4` (the update finished but
+   *   the CLI install question was handed to the chat — see
+   *   `ARCANUM_CLI_PROMPT=chat` in `_runBootstrap`); or an empty stdout
+   *   payload with `bootstrap.sh`'s own exit code on any other nonzero exit.
    */
   async apply() {
     const { method } = await this._resolveTarget();
@@ -81,10 +87,28 @@ class ArcanumUpdateRunUpdate {
     const bootstrap = this._claudeContext.bootstrapPath();
     const code = await this._runBootstrap(bootstrap);
 
-    if (code !== 0) {
+    if (code !== 0 && code !== CLI_FALLBACK_EXIT_CODE) {
       throw new DispatchFailure('', code);
     }
 
+    const result = await this._resultLine(method, before);
+
+    if (code === CLI_FALLBACK_EXIT_CODE) {
+      throw new DispatchFailure(result, CLI_FALLBACK_EXIT_CODE);
+    }
+
+    return result;
+  }
+
+  /**
+   * Builds `apply`'s `RESULT=` line by comparing `before` against the
+   * install's current version/ref, mirroring `run_update_apply_shell.sh`.
+   * @param {string} method - `'zip'` or `'git'`.
+   * @param {string} before - the version/ref read before `bootstrap.sh` ran.
+   * @returns {Promise<string>} `RESULT=updated FROM=<old> TO=<new>\n`
+   *   when the version/ref changed, else `RESULT=noop VERSION=<current>\n`.
+   */
+  async _resultLine(method, before) {
     const after = await this._currentVersion(method);
 
     if (after !== before) {
@@ -211,7 +235,10 @@ class ArcanumUpdateRunUpdate {
 
   /**
    * Runs `bootstrap` with its stdout/stderr streamed live (not
-   * captured/suppressed) and `ARCANUM_ASSUME_YES=1` set.
+   * captured/suppressed), `ARCANUM_ASSUME_YES=1` set and
+   * `ARCANUM_CLI_PROMPT=chat` set, so the client step prints the CLI
+   * install question's data (`FALLBACK=chat`, `CLI_VERSION=`, ...) and
+   * exits `4` instead of prompting on the terminal.
    * @param {string} bootstrap - `arcanum/update/bootstrap.sh`'s path.
    * @returns {Promise<number>} the child process's exit code.
    */
@@ -219,7 +246,7 @@ class ArcanumUpdateRunUpdate {
     return new Promise((resolve, reject) => {
       const child = this._spawn(bootstrap, [], {
         stdio: 'inherit',
-        env: { ...process.env, ARCANUM_ASSUME_YES: '1' }
+        env: { ...process.env, ARCANUM_ASSUME_YES: '1', ARCANUM_CLI_PROMPT: 'chat' }
       });
 
       child.on('error', reject);
