@@ -7,7 +7,7 @@ The user-facing `arcanum` command (`cli/`, published as the optional npm package
 ## Goal and distribution
 
 - **Configuration, plus updating itself.** Every configuration command lives under `arcanum config ...`, so the top-level `arcanum <command>` namespace stays free for later features. The only other command, [`arcanum self-update`](#self-update), updates the CLI itself. The CLI does not install, update or remove Arcanum itself.
-- **Optional, installed separately.** `npm i -g arcanum-cli` installs the `arcanum` command. No per-repo migration installs it or nudges the user towards it; the README and the guide explain how to install it.
+- **Optional, offered with Arcanum.** `npm i -g arcanum-cli` installs the `arcanum` command. The installer and updater offer it, and the skippable global migration `arcanum/migrations/repos/next/001.sh` offers it once per machine or account (see [Install & Release Pipeline](install-and-release.md)); the README and the guide explain how to install it by hand.
 - **One install per machine.** A single global install serves every Arcanum install and every Claude account on the machine (see [Targeting](#targeting)), so users with several `CLAUDE_CONFIG_DIR`s never end up with competing clients.
 - **Host Node.js, no Docker fallback.** Node is already a prerequisite of Arcanum's native engine. The floor is in [Runtime path](#runtime-path).
 - **Lockstep with Arcanum.** `arcanum-cli` is published on every Arcanum release with the same version. How it is built, packaged and published is in [Install & Release → npm package](install-and-release.md#npm-package-arcanum-cli).

@@ -74,7 +74,8 @@ The list is data inside the bundle: the CLI never reads `arcanum/migrations/` at
 
 - `npm i -g arcanum-cli`. npm handles PATH, updates and uninstall, so there is no custom installer.
 - `npx arcanum-cli config info` works with no global install, as a one-off way to inspect an environment.
-- The CLI is optional. No per-repo migration installs it or nudges the user to.
+- The CLI is optional, and the installer and updater offer it.
+- The global migration `arcanum/migrations/repos/next/001.sh` offers it once per machine or account. It is skippable, pins the client to the installed arcanum version, and calls the shared client step with `--no-confirm` (choosing `[R]un` is the consent). On any failure it warns and continues (exit `0`). See [CLI Install → update.md](../specs/cli-install/update.md#global-migration-next001).
 
 ### Version lockstep
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. The shared client-step script, `arcanum/_lib/install_cli.sh`, exists (#868), and so do its installer caller (#869), its updater callers (#870: the zip `updater.sh` and the `bootstrap.sh` git path), `/arcanum-update` (#871) and `arcanum self-update` (#867); only the migration (#872) is still pending.
+Proposed. The shared client-step script, `arcanum/_lib/install_cli.sh`, exists (#868), and so do its installer caller (#869), its updater callers (#870: the zip `updater.sh` and the `bootstrap.sh` git path), `/arcanum-update` (#871) and `arcanum self-update` (#867), and so does the global migration (#872), `arcanum/migrations/repos/next/001.sh`. Every implementation part now exists.
 
 ## Origin
 
@@ -73,11 +73,11 @@ The feature only adds behavior. No config shape changes, and existing installs k
 
 A migration is needed.
 
-- A `next/` entry in `arcanum/migrations/repos/` with `applies_to: "global"` and `skippable: true`. It installs or updates `arcanum-cli@<version>` with the same rules as the installer and updater: version pinning, warn-and-continue on failure, never downgrade.
+- `arcanum/migrations/repos/next/001.sh`, a `next/` entry with `applies_to: "global"` and `skippable: true`. It installs or updates `arcanum-cli@<version>` with the same rules as the installer and updater: version pinning, warn-and-continue on failure, never downgrade.
 - The scope is global because the client is installed machine-wide. It runs once per machine or account through `/arcanum-migrate`, not once per repo.
 - It also covers existing installs that update before the new client step reaches them, such as the `git clone` first-update gap.
-- It reverses the current rule in [Install & Release Pipeline](../architecture/install-and-release.md) ("No per-repo migration installs it or nudges the user to"). That doc changes with the migration, not with this spec.
-- The migration is `next/001`; see [update.md](cli-install/update.md#global-migration-next001). Until #872 creates the file, docs cite it as `next/001`, without the `repos/` prefix, because `scripts/bump-version.sh` aborts on a `repos/next/NNN` reference with no matching file. #872 then switches them to the full path, following [Per-Repo Migrations](../architecture/per-repo-migrations.md)' "Referencing pending migrations" rule.
+- It reverses the current rule in [Install & Release Pipeline](../architecture/install-and-release.md) ("No per-repo migration installs it or nudges the user to"). That doc changed with the migration (#872).
+- The migration is `arcanum/migrations/repos/next/001.sh`; see [update.md](cli-install/update.md#global-migration-next001). Docs cite it by that full path, following [Per-Repo Migrations](../architecture/per-repo-migrations.md)' "Referencing pending migrations" rule, so `scripts/bump-version.sh` rewrites it on release.
 
 ## Parts
 

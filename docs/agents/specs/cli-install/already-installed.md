@@ -107,7 +107,7 @@ Every case exits `0` and prints one line on stderr, following [install.md's Outc
 | Updater, zip (`updater.sh`) | TTY prompt | Same | Same |
 | Updater, git (`bootstrap.sh`, running the script from the checked-out tree) | TTY prompt | Same | Same |
 | `/arcanum-update` (`ARCANUM_CLI_PROMPT=chat`, no TTY) | Exit `4` with `FALLBACK=chat`, `CLI_VERSION`, `CLI_INSTALLED`, then `AskUserQuestion`, then `install-cli <v>` with `--no-confirm` | The skill asks `current → target` | Exit `0`, no chat question; the line reaches the user through inherited stdio |
-| Migration `next/001` (`--no-confirm`; `[R]un` is the consent) | None | Updated directly | Same rules: never downgrade, `linked` left alone, `unknown` skipped |
+| Migration `arcanum/migrations/repos/next/001.sh` (`--no-confirm`; `[R]un` is the consent) | None | Updated directly | Same rules: never downgrade, `linked` left alone, `unknown` skipped |
 
 ## Edge cases
 

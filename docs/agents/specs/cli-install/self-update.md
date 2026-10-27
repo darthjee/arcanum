@@ -204,7 +204,7 @@ For the implementation issue:
 ## Backward compatibility
 
 - Purely additive: a new command, and a new exit code `8` that changes no existing code.
-- No migration: no config shape changes. The `next/001` global migration (#872) covers the client install, not this command.
+- No migration: no config shape changes. The global migration `arcanum/migrations/repos/next/001.sh` (#872) covers the client install, not this command.
 
 ## Alternatives considered
 
