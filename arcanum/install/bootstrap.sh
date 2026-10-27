@@ -18,6 +18,10 @@
 #                      prompt below, e.g. for unattended/CI use. Meant as a
 #                      one-off command prefix (ARCANUM_ASSUME_YES=1 bash
 #                      bootstrap.sh), not something to export permanently.
+#                      It does not answer the installer's arcanum-cli [Y/n]
+#                      client prompt.
+#   ARCANUM_SKIP_CLI   Set (any non-empty value) to skip the arcanum-cli client
+#                      step the installer runs last.
 
 set -euo pipefail
 

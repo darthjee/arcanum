@@ -15,7 +15,8 @@ Make the `curl | bash` installer (`arcanum/install/`) install `arcanum-cli@<vers
 - **Unpublished version.** Before installing, the step runs `npm view arcanum-cli@<version> version`:
   - an `E404` error, or empty output, means the version is not published: warn and skip;
   - any other `npm view` failure is treated as a network error: warn and skip.
-- **Exit code.** The install exits `0` whatever the client outcome: installed, skipped, declined, or failed with a warning.
+- **Exit code.** The install exits `0` whatever the client outcome: installed, skipped, declined, or failed with a warning. The call is guarded with `|| true`, so even a usage error of the shared script cannot fail the install.
+- **No chat fallback.** The installer clears `ARCANUM_CLI_PROMPT` for the call, since it has no chat to fall back to. An exported `ARCANUM_CLI_PROMPT=chat` therefore never makes it exit `4` or print `FALLBACK=chat`.
 - **Already installed.** `installer.sh` already refuses an existing arcanum install, so the only double install it can meet is a client that is already installed globally. That case follows [already-installed.md](already-installed.md) and is not repeated here.
 - **Git clone.** Running `installer.sh` directly from a git clone still needs `REPO` and `VERSION` set in the environment, as today. The client step adds no new requirement.
 
@@ -64,12 +65,16 @@ Every outcome exits `0`. Each outcome prints one line on stderr, prefixed `arcan
 
 For #869 and #868:
 
-- Standalone shell tests (`arcanum/_lib/test_install_cli.sh`, in the style of `arcanum/_lib/test_lock.sh`; running them in CI is #882), with stub `node` and `npm` executables placed first on `PATH`. The stubs record their calls and return canned output and exit codes.
-- One test per row of the [Outcomes](#outcomes) table. Each asserts the output line and exit `0`.
-- A test that `ARCANUM_SKIP_CLI=1` and the no-TTY case never call `npm`.
-- A test that `ARCANUM_ASSUME_YES` does not answer the client prompt.
-- A test that the client step runs after `arcanum.json` is written, so a client failure leaves a complete arcanum install.
-- The installer has no tests today. The prompt is driven through a test-only TTY device override, following the `ARCANUM_TTY_DEVICE` seam that `arcanum/_lib/next_step_prompt_shell.sh` already uses.
+- Per-outcome tests live in `arcanum/_lib/test_install_cli.sh` (standalone, in the style of `arcanum/_lib/test_lock.sh`; running them in CI is #882), with stub `node` and `npm` executables placed first on `PATH`. The stubs record their calls and return canned output and exit codes.
+  - One test per row of the [Outcomes](#outcomes) table. Each asserts the output line and exit `0`.
+  - A test that `ARCANUM_SKIP_CLI=1` and the no-TTY case never call `npm`.
+- Installer-level tests live in `arcanum/install/test_installer.sh` (standalone too, CI is #882). It runs the real `installer.sh` from a minimal fake release tree, with the same stubs, and drives the prompts through the test-only `ARCANUM_TTY_DEVICE` seam that `installer.sh` shares with `install_cli.sh`. It covers:
+  - the client step runs after `arcanum.json` is written, so a client failure leaves a complete arcanum install;
+  - `ARCANUM_SKIP_CLI=1` makes no `node`/`npm` call and exits `0`;
+  - a client failure (`EACCES`) still exits `0`;
+  - `ARCANUM_ASSUME_YES` does not answer the client prompt;
+  - an exported `ARCANUM_CLI_PROMPT=chat` never yields exit `4` or stdout, with or without a TTY;
+  - an existing arcanum install and an aborted target confirmation still exit `1`, with no client call.
 
 ## Alternatives considered
 
