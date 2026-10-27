@@ -40,6 +40,17 @@
 #                      prompt below, e.g. for unattended/CI use. Meant as a
 #                      one-off command prefix (ARCANUM_ASSUME_YES=1 bash
 #                      bootstrap.sh), not something to export permanently.
+#   ARCANUM_SKIP_CLI   Set (any non-empty value) to skip the arcanum-cli
+#                      client step (both the git path here and updater.sh).
+#   ARCANUM_CLI_PROMPT Set to "chat" by /arcanum-update only. With no TTY, the
+#                      client step then exits 4 with FALLBACK=chat (and
+#                      CLI_VERSION=/CLI_INSTALLED= lines) on stdout instead
+#                      of skipping.
+#
+# Exit codes: 0 (updated, or already on the version), 1 (aborted, dirty
+# tree, failed lookup/download, ...), and 4 when the client step falls
+# back to chat as above (this script on the git path, updater.sh on the
+# zip path); the arcanum update itself is already complete then.
 
 set -euo pipefail
 
@@ -157,6 +168,22 @@ if [[ "$METHOD" == "git" ]]; then
   git -C "$TARGET" checkout "$VERSION"
 
   echo "arcanum updated to ${VERSION} at ${TARGET}" >&2
+
+  # Client step (docs/agents/specs/cli-install/update.md), run from the
+  # checked-out tree so every later update uses the new copy. Skipped
+  # silently when this version predates the script. Only the opt-in exit
+  # 4 is propagated. Keep this inside the `if` block: `git checkout` just
+  # rewrote this file on disk, and bash has already parsed the whole
+  # compound command, so code here is safe. A top-level command after
+  # the block would be read from the new file at an arbitrary offset.
+  CLI_SCRIPT="${TARGET}/arcanum/_lib/install_cli.sh"
+  if [[ -f "$CLI_SCRIPT" ]]; then
+    cli_status=0
+    bash "$CLI_SCRIPT" "$VERSION" || cli_status=$?
+    if [[ "$cli_status" -eq 4 ]]; then
+      exit 4
+    fi
+  fi
   exit 0
 fi
 
