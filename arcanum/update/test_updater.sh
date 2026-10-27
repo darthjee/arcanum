@@ -76,6 +76,7 @@ CASE_N=0
 OUT=""
 ERR=""
 RC=0
+ENTRY=""
 
 # new_case <arcanum.json version> — a fresh release tree and TARGET.
 new_case() {
@@ -88,10 +89,12 @@ new_case() {
   chmod +x "${RELEASE}/arcanum/update/updater.sh" "${RELEASE}/arcanum/_lib/install_cli.sh"
   printf '%s\n' "arcanum/update/updater.sh" "arcanum/_lib/install_cli.sh" > "${RELEASE}/MANIFEST"
   printf '{"version":"%s","repo":"x/y","manifest":[]}\n' "$1" > "${TARGET}/arcanum.json"
+  ENTRY="${RELEASE}/arcanum/update/updater.sh"
 }
 
 # run <case name> [VAR=value ...]
-# Runs the case's release updater.sh in a clean env (no inherited
+# Runs $ENTRY (the case's release updater.sh unless the case overrides it)
+# in a clean env (no inherited
 # ARCANUM_* vars), capturing stdout in OUT, stderr in ERR and the exit code
 # in RC. The stub probe records arcanum.json's version and whether the
 # release tree still exists.
@@ -104,7 +107,7 @@ run() {
   env -i HOME="$TMP_DIR" TMPDIR="$TMP_DIR" PATH="$PATH" \
     TARGET="$TARGET" REPO=x/y VERSION="$V" \
     STUB_LOG="$STUB_LOG" STUB_PROBE="$probe" \
-    "$@" "$BASH_BIN" "${RELEASE}/arcanum/update/updater.sh" >"$OUT_FILE" 2>"$ERR_FILE"
+    "$@" "$BASH_BIN" "$ENTRY" >"$OUT_FILE" 2>"$ERR_FILE"
   RC=$?
   OUT="$(cat "$OUT_FILE")"
   ERR="$(cat "$ERR_FILE")"
@@ -198,5 +201,43 @@ new_case "$OLD_V"
 run "prompt flag unset"
 assert_rc 0
 assert_record "|ARCANUM_CLI_PROMPT=<unset>|"
+
+
+# ---------------------------------------------------------------------------
+# 6. A script running from the install while the release replaces it keeps
+#    reading its old content: the running running.sh (old) starts
+#    updater.sh as a child; the release ships a longer running.sh with an
+#    extra case branch and a different trailing command. Overwriting in
+#    place would make bash resume the new file at the old offset.
+new_case "$OLD_V"
+cat > "${TARGET}/running.sh" <<'OLD'
+#!/usr/bin/env bash
+rc=0
+case "${1:-run}" in
+  run) "$BASH" "$UPDATER" || rc=$? ;;
+esac
+echo "OLD TAIL rc=${rc}" >&2
+exit "$rc"
+OLD
+cat > "${RELEASE}/running.sh" <<'NEW'
+#!/usr/bin/env bash
+rc=0
+case "${1:-run}" in
+  run) "$BASH" "$UPDATER" || rc=$? ;;
+  extra) echo "an extra branch that makes this release copy longer than the old one" ;;
+esac
+echo "NEW TAIL rc=${rc}" >&2
+exit "$rc"
+NEW
+echo "running.sh" >> "${RELEASE}/MANIFEST"
+new_content="$(cat "${RELEASE}/running.sh")"
+ENTRY="${TARGET}/running.sh"
+run "running script replaced" UPDATER="${RELEASE}/arcanum/update/updater.sh"
+assert_rc 0
+assert_err "OLD TAIL rc=0"
+[[ "$ERR" != *"NEW TAIL"* ]] || fail "[$CASE] running script executed the new file's trailing command"
+[[ "$(cat "${TARGET}/running.sh")" == "$new_content" ]] \
+  || fail "[$CASE] target running.sh does not have the release content"
+assert_version "$V"
 
 echo "ok"

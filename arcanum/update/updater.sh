@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Updater stage — ships inside the release zip (and alongside
 # bootstrap.sh in a full git clone). Reconciles an existing arcanum
-# install with this release: adds new files, overwrites changed ones,
-# deletes files no longer part of the release, updates arcanum.json to
-# record the new version/repo/manifest, and ends with the client step:
+# install with this release: adds new files, replaces changed ones
+# (unlinking the old file first, so scripts still running from the
+# install keep their old inode), deletes files no longer part of the
+# release, updates arcanum.json to record the new version/repo/manifest,
+# and ends with the client step:
 # installs or updates arcanum-cli@$VERSION through the installed copy of
 # arcanum/_lib/install_cli.sh (docs/agents/specs/cli-install/update.md).
 # ARCANUM_CLI_PROMPT and ARCANUM_SKIP_CLI reach that step unchanged.
@@ -110,6 +112,19 @@ fi
 LOCK_DIR="${TARGET}/.arcanum-update.lock"
 
 # --- Add/update: same one-shot copy install uses ---------------------------
+#
+# Unlink files the release replaces before copying: cp rewrites an
+# existing file in place (same inode), so a script still running from the
+# install (e.g. arcanum-update/scripts/run_update.sh) would read the new
+# content at its stale byte offset. Removed first, the copy gets a new
+# inode and the running bash keeps reading the old, unlinked one.
+
+while IFS= read -r -d '' rel_path; do
+  rel_path="${rel_path#./}"
+  if [[ -f "${TARGET}/${rel_path}" || -L "${TARGET}/${rel_path}" ]]; then
+    rm -f "${TARGET}/${rel_path}"
+  fi
+done < <(cd "$RELEASE_ROOT" && find . \( -type f -o -type l \) -print0)
 
 cp -R "${RELEASE_ROOT}/." "${TARGET}/"
 
