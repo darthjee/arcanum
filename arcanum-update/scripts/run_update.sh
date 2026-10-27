@@ -10,6 +10,7 @@
 #
 # Usage: run_update.sh check
 #        run_update.sh apply
+#        run_update.sh install-cli <version>
 #
 # Both subcommands resolve TARGET/METHOD/REPO relative to this script's
 # own location (<script_dir>/../.. — the install this skill lives
@@ -35,7 +36,15 @@
 # that same exit code with no further output (the caller relays the
 # already-streamed error).
 #
-# Both subcommands: if arcanum/update/bootstrap.sh is missing entirely,
+# `install-cli <version>` resumes only the client step after the
+# /arcanum-update chat answer: runs arcanum/_lib/install_cli.sh <version>
+# --no-confirm (the user already answered in the chat) and exits with its
+# code — 0 for every install outcome, 1 on wrong usage. Deliberately not a
+# migrated entrypoint (no engine_dispatch, no _shell.sh twin, no native
+# command): like install_cli.sh itself it is plain bash and uses the
+# host's npm.
+#
+# `check` and `apply`: if arcanum/update/bootstrap.sh is missing entirely,
 # or neither arcanum.json nor .git is present at TARGET_PATH, prints
 # "STATUS=missing_arcanum" to stdout and exits 1.
 #
@@ -57,9 +66,17 @@ case "${1:-}" in
   apply)
     engine_dispatch "$TARGET_PATH" arcanum-update-run-update-apply "${SCRIPT_DIR}/run_update_apply_shell.sh" HOME -- "$TARGET_PATH"
     ;;
+  install-cli)
+    if [[ $# -ne 2 ]]; then
+      echo "Usage: $0 install-cli <version>" >&2
+      exit 1
+    fi
+    exec "${TARGET_PATH}/arcanum/_lib/install_cli.sh" "$2" --no-confirm
+    ;;
   *)
     echo "Usage: $0 check" >&2
     echo "       $0 apply" >&2
+    echo "       $0 install-cli <version>" >&2
     exit 1
     ;;
 esac
