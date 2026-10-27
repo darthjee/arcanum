@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. The shared client-step script, `arcanum/_lib/install_cli.sh`, exists (#868); its callers (installer, updater, `/arcanum-update`, migration) and `arcanum self-update` are still pending.
+Proposed. The shared client-step script, `arcanum/_lib/install_cli.sh`, exists (#868), and so do its installer caller (#869) and `arcanum self-update` (#867); the other callers (updater, `/arcanum-update`, migration) are still pending.
 
 ## Origin
 
