@@ -18,6 +18,7 @@ Make every update path install or update `arcanum-cli@<version>`: the updater (`
 ### `git clone` path (`arcanum/update/bootstrap.sh`)
 
 - **Placement.** After `git checkout <version>` and the `arcanum updated to ...` line, `bootstrap.sh` calls the shared client-step script **from the checked-out tree** (`$TARGET/arcanum/_lib/...`), so every later update runs the new copy.
+- **Inside the git `if` block.** The call stays inside `bootstrap.sh`'s `if [[ "$METHOD" == "git" ]]; then ... fi` block, before its `exit`. `git checkout` rewrites the running `bootstrap.sh` on disk, and bash has already parsed that whole compound command; a top-level command after the block would be read from the new file at an arbitrary offset.
 - **No extra script.** The shared script from #868 is the client-step script the index refers to. The git path needs no script of its own.
 - **Old checkout.** If the checked-out tree has no such script (an `ARCANUM_VERSION` pin older than the feature), the step is skipped silently.
 - **Already on the version.** `Already on <v>.` stays a no-op, as in the zip path.
@@ -62,9 +63,9 @@ The update exits `0` whatever the client outcome, except the opt-in exit `4` of 
 
 ### `git clone` path
 
-1. `bootstrap.sh` detects the git clone and runs `git fetch`.
+1. `bootstrap.sh` detects the git clone.
 2. It exits `0` with `Already on <v>.` if the checkout is already on the version. No client step runs.
-3. It runs `git checkout <version>` and prints `arcanum updated to ...`.
+3. It runs `git fetch` and `git checkout <version>`, and prints `arcanum updated to ...`.
 4. If `$TARGET/arcanum/_lib/<shared script>` exists in the checked-out tree, it runs it for `arcanum-cli@$VERSION`, and propagates an exit `4`. Otherwise it skips silently.
 5. It exits `0` (or `4`).
 
@@ -112,7 +113,7 @@ The update exits `0` whatever the client outcome, except the opt-in exit `4` of 
 
 For #870, #871 and #872:
 
-- bats tests for `updater.sh` and the `bootstrap.sh` git path, with stub `node` and `npm` executables (as in [install.md's Testing strategy](install.md#testing-strategy)) and a stub shared script that records its calls. They assert that it is called last, from `$TARGET`, with `$VERSION`; that it is not called on `Already on <v>.`; that the git path skips silently when the script is missing; and that exit `4` propagates.
+- Updater-level tests live in two standalone scripts, in the style of `arcanum/install/test_installer.sh` (running them in CI is #882): `arcanum/update/test_updater.sh` (zip path) and `arcanum/update/test_update_bootstrap.sh` (`bootstrap.sh` git path). Both replace the shared script with a stub that records its path, arguments, the `ARCANUM_CLI_PROMPT` it saw and the install state at call time, and whose exit code is configurable; the real script's outcomes are covered by `arcanum/_lib/test_install_cli.sh`. `test_updater.sh` runs the real `updater.sh` from a fresh fake release tree per case; `test_update_bootstrap.sh` runs the real `bootstrap.sh` from a clone of a local origin repo, with `ARCANUM_ASSUME_YES`, `ARCANUM_VERSION` and `ARCANUM_REPO` set. They assert that the stub is called last, from `$TARGET` (the installed or checked-out tree), with `$VERSION`; that it is not called on `Already on <v>.`; that the git path skips silently when the script is missing; that exit `4` propagates with its stdout lines (and, on the zip path, that `cleanup` still removes the release tree and the lock); that a usage-error exit `1` from the client step is ignored (exit `0`); and that `ARCANUM_CLI_PROMPT` reaches the client step unchanged.
 - `run_update_apply`: shell and native spec tests that the flag is set, that `FALLBACK=chat`, `CLI_VERSION=` and `RESULT=` are printed on exit `4`, and for the new `install-cli` subcommand.
 - The migration: bats tests for version resolution (zip, tag, untagged) and for the `--no-confirm` pre-answer.
 - `/arcanum-update` skill: the exit `4` branch is reviewed by `skill-reviewer` (TTY-first with an `AskUserQuestion` fallback).
