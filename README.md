@@ -58,6 +58,20 @@ ARCANUM_REPO=your-fork/arcanum ARCANUM_VERSION=0.8.1 curl -fsSL https://raw.gith
 
 Before downloading anything, the script prints the resolved repo/version/URL and asks for an explicit y/N confirmation (reads from `/dev/tty`). Set `ARCANUM_ASSUME_YES=1` to skip that prompt for unattended/CI use — meant as a one-off prefix on the command itself, not something to `export` permanently.
 
+Once arcanum is installed, a separate prompt offers the [Arcanum CLI](#arcanum-cli), pinned to the arcanum version just installed:
+
+```text
+Install arcanum-cli@<version> globally (npm i -g)? [Y/n]
+```
+
+It defaults to yes and also reads from `/dev/tty`. `ARCANUM_ASSUME_YES` does **not** answer it: it only skips the arcanum confirmation above. To skip the client step entirely, without asking and without calling `node` or `npm`, set `ARCANUM_SKIP_CLI=1`, again as a one-off prefix on the command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/darthjee/arcanum/main/arcanum/install/bootstrap.sh | ARCANUM_SKIP_CLI=1 bash
+```
+
+The client step needs Node.js 22.13.0 or newer and npm. It never fails the arcanum install: with no TTY, if you answer no, or if anything goes wrong (no Node or npm, Node too old, the version not published on npm, `EACCES` on the npm global prefix, a network error), it prints a warning naming the manual `npm i -g arcanum-cli` command and the install still succeeds. It never retries with `sudo`. If `arcanum-cli` is already installed globally, an older copy is offered an update to the target version (`Update arcanum-cli <old> → <version> (npm i -g)? [Y/n]`), while the same version, a newer one, or an `npm link`ed checkout is left as is.
+
 ### Option 2 — `git clone`
 
 Clone this repository into your Claude Code skills directory:
@@ -65,6 +79,8 @@ Clone this repository into your Claude Code skills directory:
 ```bash
 git clone git@github.com:darthjee/arcanum.git ~/.claude/skills
 ```
+
+A clone does not install the [Arcanum CLI](#arcanum-cli). Install it with `npm i -g arcanum-cli`, or accept the global migration the next time you run `/arcanum-migrate` (see the one-time note under [Updating](#updating)).
 
 Both options lay down the same skill folders. Claude Code automatically discovers skills from that directory.
 
@@ -96,6 +112,10 @@ ARCANUM_REPO=your-fork/arcanum ARCANUM_VERSION=0.9.0 ARCANUM_TARGET=~/.claude/sk
 Before doing anything, the script prints the resolved repo/version/method (release-zip download vs. `git fetch`/`git checkout`, detected automatically) and asks for an explicit y/N confirmation (reads from `/dev/tty`). Set `ARCANUM_ASSUME_YES=1` to skip that prompt for unattended/CI use — a one-off prefix on the command itself, not something to `export` permanently.
 
 A `git clone` install with uncommitted local changes fails fast with a message to commit/stash/discard first — no auto-stash, no checkout over local work.
+
+After the update, both methods (release zip and `git fetch`/`git checkout`) run the same client step as the installer: a `[Y/n]` prompt to install or update `arcanum-cli` to the version you just updated to, with the same rules — `ARCANUM_SKIP_CLI=1` skips it, `ARCANUM_ASSUME_YES` does not answer it, and with no TTY or on any failure it warns with the manual command while the update still succeeds. An older installed client is updated to the target version; a newer or `npm link`ed one is left as is. When arcanum is already on the target version, the update is a no-op and the client step does not run. `/arcanum-update` asks the same question in chat, since a Claude Code session has no TTY.
+
+**One-time note for `git clone` installs.** The first update after the release that added the client step still runs your old `bootstrap.sh`, which has no client step, so that update does not offer the CLI. Run `npm i -g arcanum-cli` once, or accept the global migration `arcanum/migrations/repos/next/001.sh` in `/arcanum-migrate`: choosing `[R]un` there is the consent to install or update the client, and `[S]kip` is remembered. Later updates offer the CLI as described above.
 
 ## The `arcanum-next-step` mod
 
@@ -201,11 +221,13 @@ The `next_step.auto.<skill>` keys can be set through `/init-claude` (writes repo
 
 ## Arcanum CLI
 
-The `arcanum` CLI reads and writes these settings from a terminal, without hand-editing the JSON files. Values of known keys are validated, and writes take the same lock as the skills' own writes. Install it from npm (it needs Node.js 22.13.0 or newer):
+The `arcanum` CLI reads and writes these settings from a terminal, without hand-editing the JSON files. Values of known keys are validated, and writes take the same lock as the skills' own writes. It needs Node.js 22.13.0 or newer. The arcanum [installer](#installation) and [updater](#updating) offer to install or update it at the matching version; to install it on its own, use npm:
 
 ```bash
 npm i -g arcanum-cli
 ```
+
+`arcanum self-update` updates it later to the latest release.
 
 A few examples:
 

@@ -2,9 +2,15 @@
 
 The `arcanum` command lets you inspect and change Arcanum's configuration from a terminal, without hand-editing JSON or opening a Claude session. It reads and writes the same three files the skills use, with the same rules and the same lock.
 
-It is optional, and it is installed separately from Arcanum. It is not the internal `core/bin/arcanum` dispatcher that the skills call, which is never on your `PATH`.
+It is optional: the Arcanum installer and updater offer to install it, and it can also be installed on its own. It is not the internal `core/bin/arcanum` dispatcher that the skills call, which is never on your `PATH`.
 
 ## Setup
+
+Installing or updating Arcanum asks whether to install or update the CLI, at the same version as Arcanum (`Install arcanum-cli@<version> globally (npm i -g)? [Y/n]`). `ARCANUM_SKIP_CLI=1` skips that question without calling `node` or `npm`. If you answer no, if there is no TTY, or if the install fails, Arcanum still installs or updates, and a warning prints the manual command. `/arcanum-update` asks the same question in chat. See the [README's Installation and Updating sections](../../README.md#installation) for the details.
+
+A `git clone` install of Arcanum does not get the CLI from the clone, and its first update after the release that added this step does not offer it either. Run `npm i -g arcanum-cli` once, or accept the global migration `arcanum/migrations/repos/next/001.sh` in `/arcanum-migrate`. See the README's [one-time note for `git clone` installs](../../README.md#updating).
+
+To install it on its own:
 
 ```bash
 npm i -g arcanum-cli
@@ -14,6 +20,8 @@ arcanum --version
 You need Node.js 22.13.0 or newer. One install serves every Arcanum install and every Claude account on the machine.
 
 ### Updating the CLI
+
+Updating Arcanum also offers to update the CLI, to the version matching Arcanum. `arcanum self-update` instead updates it to the latest release, at any time:
 
 ```console
 $ arcanum self-update
