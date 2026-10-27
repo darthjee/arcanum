@@ -2,8 +2,11 @@
 # Updater stage — ships inside the release zip (and alongside
 # bootstrap.sh in a full git clone). Reconciles an existing arcanum
 # install with this release: adds new files, overwrites changed ones,
-# deletes files no longer part of the release, then updates
-# arcanum.json to record the new version/repo/manifest.
+# deletes files no longer part of the release, updates arcanum.json to
+# record the new version/repo/manifest, and ends with the client step:
+# installs or updates arcanum-cli@$VERSION through the installed copy of
+# arcanum/_lib/install_cli.sh (docs/agents/specs/cli-install/update.md).
+# ARCANUM_CLI_PROMPT and ARCANUM_SKIP_CLI reach that step unchanged.
 #
 # Not meant to be curl | bash'd directly: bootstrap.sh execs this from
 # inside the unzipped release tree, so relative paths resolve correctly.
@@ -15,6 +18,13 @@
 # a safe no-op if unset (e.g. this script invoked directly).
 #
 # Usage: arcanum/update/updater.sh   (no arguments)
+#
+# Exit codes:
+#   0  updated, or already on the version (no client step then)
+#   1  aborted target, missing install, or lock held
+#   4  opt-in chat fallback from the client step (ARCANUM_CLI_PROMPT=chat):
+#      FALLBACK=chat / CLI_VERSION= / CLI_INSTALLED= lines on stdout; the
+#      arcanum update itself is already complete
 
 set -euo pipefail
 
@@ -147,3 +157,14 @@ jq -n --arg version "$VERSION" --arg repo "$REPO" --argjson manifest "$MANIFEST_
   '{version: $version, repo: $repo, manifest: $manifest}' > "${TARGET}/arcanum.json"
 
 echo "arcanum updated to ${VERSION} at ${TARGET}" >&2
+
+# Client step (docs/agents/specs/cli-install/update.md): installs or
+# updates arcanum-cli@$VERSION from the installed tree, so the script
+# outlives cleanup. Never fails the update: only the opt-in exit 4
+# (ARCANUM_CLI_PROMPT=chat, set by /arcanum-update) is propagated, with
+# its FALLBACK=chat stdout lines; any other status is ignored.
+cli_status=0
+"${TARGET}/arcanum/_lib/install_cli.sh" "$VERSION" || cli_status=$?
+if [[ "$cli_status" -eq 4 ]]; then
+  exit 4
+fi
