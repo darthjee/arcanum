@@ -11,7 +11,7 @@ arcanum --version
 
 It needs Node.js 22.13.0 or newer and has no runtime dependencies. For a one-off look without a global install, use `npx arcanum-cli --help`.
 
-`arcanum self-update` updates it later to the latest release.
+The [Arcanum](https://github.com/darthjee/arcanum) installer and updater also offer to install or update it, at the matching version. `arcanum self-update` updates it later to the latest release.
 
 Releases are published from CI (CircleCI) through npm trusted publishing, with no long-lived npm token. npm does not attach provenance to CircleCI publishes, so `npm audit signatures` verifies the registry signatures but has no provenance attestation to check.
 
