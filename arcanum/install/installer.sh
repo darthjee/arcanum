@@ -10,6 +10,15 @@
 # Requires REPO/VERSION to be set in the environment (bootstrap.sh
 # exports both before exec'ing here) and jq to be installed.
 #
+# As its last step, once arcanum.json is written, it runs the arcanum-cli
+# client step through arcanum/_lib/install_cli.sh, pinned to VERSION (see
+# docs/agents/specs/cli-install/install.md). That step asks a [Y/n] prompt
+# on the TTY and never fails the arcanum install.
+#
+# Environment:
+#   ARCANUM_SKIP_CLI    — any non-empty value skips the client step.
+#   ARCANUM_TTY_DEVICE  — TEST-ONLY: device/file read instead of /dev/tty.
+#
 # Usage: arcanum/install/installer.sh   (no arguments)
 
 set -euo pipefail
@@ -22,8 +31,14 @@ RELEASE_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 DEFAULT_TARGET="${HOME}/.claude/skills"
 
+# TEST-ONLY override of the TTY device (same seam as arcanum/_lib/install_cli.sh).
+TTY_DEVICE="${ARCANUM_TTY_DEVICE:-/dev/tty}"
+
 expand_path() {
   local path="$1"
+  # The literal "~" / "~/" prefixes are matched on purpose (read does not
+  # tilde-expand user input).
+  # shellcheck disable=SC2088
   case "$path" in
     "~") echo "$HOME" ;;
     "~/"*) echo "${HOME}/${path#\~/}" ;;
@@ -35,7 +50,7 @@ echo "Where should arcanum be installed?" >&2
 echo "  Press Enter to use the default (${DEFAULT_TARGET})," >&2
 echo "  or type '.' for the current folder, or a custom path." >&2
 printf "Target directory [%s]: " "$DEFAULT_TARGET" >&2
-read -r input < /dev/tty
+read -r input < "$TTY_DEVICE"
 
 if [[ -z "$input" ]]; then
   TARGET="$DEFAULT_TARGET"
@@ -46,7 +61,7 @@ fi
 if [[ "$TARGET" != "$DEFAULT_TARGET" ]]; then
   echo "You chose: ${TARGET}" >&2
   printf "Press Enter to confirm, or anything else to abort: " >&2
-  read -r confirm < /dev/tty
+  read -r confirm < "$TTY_DEVICE"
   if [[ -n "$confirm" ]]; then
     echo "Aborted: installation not confirmed." >&2
     exit 1
@@ -67,3 +82,10 @@ jq -n --arg version "$VERSION" --arg repo "$REPO" --argjson manifest "$MANIFEST_
   '{version: $version, repo: $repo, manifest: $manifest}' > "${TARGET}/arcanum.json"
 
 echo "arcanum installed to ${TARGET}" >&2
+
+# Client step (docs/agents/specs/cli-install/install.md): installs or
+# updates arcanum-cli@$VERSION. Never fails the install: install_cli.sh
+# exits 0 on every outcome, `|| true` covers a usage error, and
+# ARCANUM_CLI_PROMPT is cleared because the installer has no chat to
+# fall back to (no exit 4 / FALLBACK=chat).
+ARCANUM_CLI_PROMPT='' "${SCRIPT_DIR}/../_lib/install_cli.sh" "$VERSION" || true
