@@ -21,13 +21,19 @@
 # on the caller's side): METHOD=zip|git, REPO=<repo>, CURRENT=<version-or
 # -ref>, TARGET=<path>. Exits 0.
 #
-# `apply` sets ARCANUM_ASSUME_YES=1 and runs arcanum/update/bootstrap.sh
+# `apply` sets ARCANUM_ASSUME_YES=1 and ARCANUM_CLI_PROMPT=chat (opts in
+# to the client step's chat fallback) and runs arcanum/update/bootstrap.sh
 # directly, streaming its stdout/stderr live (not captured/suppressed).
-# On nonzero exit, propagates that same exit code with no further output
-# (the caller relays the already-streamed error). On exit 0, re-resolves
-# the current version/ref and prints one final line:
+# On exit 0, re-resolves the current version/ref and prints one final
+# line:
 #   RESULT=updated FROM=<old> TO=<new>   (something changed)
 #   RESULT=noop VERSION=<current>        (already up to date)
+# On exit 4 (the client step wants the chat install question; the
+# arcanum update itself is complete), prints the same RESULT= line after
+# the FALLBACK=chat / CLI_VERSION= / CLI_INSTALLED= lines bootstrap.sh
+# already streamed, and exits 4. On any other nonzero exit, propagates
+# that same exit code with no further output (the caller relays the
+# already-streamed error).
 #
 # Both subcommands: if arcanum/update/bootstrap.sh is missing entirely,
 # or neither arcanum.json nor .git is present at TARGET_PATH, prints

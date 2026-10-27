@@ -10,13 +10,19 @@
 #     arcanum/update/bootstrap.sh missing entirely (partial/manual
 #     install) -> prints "STATUS=missing_arcanum" to stdout and exits 1.
 #
-# Sets ARCANUM_ASSUME_YES=1 and runs <target_path>/arcanum/update/bootstrap.sh
-# directly, streaming its stdout/stderr live (not captured/suppressed).
-# On nonzero exit, propagates that same exit code with no further output
-# (the caller relays the already-streamed error). On exit 0, re-resolves
+# Sets ARCANUM_ASSUME_YES=1 and ARCANUM_CLI_PROMPT=chat (opts in to the
+# client step's chat fallback) and runs
+# <target_path>/arcanum/update/bootstrap.sh directly, streaming its
+# stdout/stderr live (not captured/suppressed). On exit 0, re-resolves
 # the current version/ref and prints one final line:
 #   RESULT=updated FROM=<old> TO=<new>   (something changed)
 #   RESULT=noop VERSION=<current>        (already up to date)
+# On exit 4 (the client step wants the chat install question; the
+# arcanum update itself is complete), prints the same RESULT= line after
+# the FALLBACK=chat / CLI_VERSION= / CLI_INSTALLED= lines bootstrap.sh
+# already streamed, and exits 4. On any other nonzero exit, propagates
+# that same exit code with no further output (the caller relays the
+# already-streamed error).
 #
 # Requires jq (zip-path case only) and git (git-path case only) — both
 # already hard dependencies of the scripts this wraps.
@@ -40,10 +46,11 @@ BOOTSTRAP="${TARGET_PATH}/arcanum/update/bootstrap.sh"
 BEFORE="$(current_version)"
 
 export ARCANUM_ASSUME_YES=1
+export ARCANUM_CLI_PROMPT=chat
 
 RC=0
 "$BOOTSTRAP" || RC=$?
-if [[ "$RC" -ne 0 ]]; then
+if [[ "$RC" -ne 0 && "$RC" -ne 4 ]]; then
   exit "$RC"
 fi
 
@@ -54,3 +61,5 @@ if [[ "$AFTER" != "$BEFORE" ]]; then
 else
   echo "RESULT=noop VERSION=${AFTER}"
 fi
+
+exit "$RC"
