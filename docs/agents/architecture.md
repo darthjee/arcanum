@@ -6,6 +6,7 @@ This is a hub into arcanum's internals, split by topic into `docs/agents/archite
 | --- | --- |
 | [Overview and Source Code Layout](architecture/overview-and-layout.md) | What this repo is (a set of markdown-driven skills, no runtime), and how a skill folder is laid out. |
 | [Install & Release Pipeline](architecture/install-and-release.md) | The `curl \| bash` bootstrap/installer two-stage install flow, the release zip, the `arcanum-cli` npm package (layout, manifest, build output, version lockstep, trusted publishing and recovery), and the `update` flow that brings an existing install current. |
+| [CLI Install](architecture/cli-install.md) | The shared `arcanum-cli` client step (`arcanum/_lib/install_cli.sh`): its shared rules, version pinning, already-installed handling and exact outcome wording, and how the installer, the updater, `/arcanum-update` and the global migration call it. |
 | [Script Preference](architecture/script-preference.md) | Why deterministic logic belongs in `<skill>/scripts/`, not in markdown prose. |
 | [Agent Roster and Architect Delegation](architecture/agent-roster-and-delegation.md) | The specialist agents, their boundaries and commit identities, and the coordinator/architect-subagent split used by autonomous `auto-*` skills. |
 | [Repo Path Threading](architecture/repo-path-threading.md) | How `REPO_PATH`/`repo_path` is resolved once and threaded explicitly through every script call and nested agent spawn. |

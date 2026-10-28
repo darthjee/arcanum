@@ -9,4 +9,4 @@ Index of every spec under [`docs/agents/specs/`](specs/). A spec is a forward-lo
 | Spec | Summary | Status |
 | --- | --- | --- |
 | [Shell Engine Removal](specs/shell-engine-removal.md) | Remove `engine.mode=shell` and every `*_shell.sh` implementation once every entrypoint has a native counterpart. | Proposed |
-| [CLI Install](specs/cli-install.md) | Install and update `arcanum-cli` together with arcanum, plus `arcanum self-update`. | Proposed |
+| [CLI Install](specs/cli-install.md) | Install and update `arcanum-cli` together with arcanum, plus `arcanum self-update`. | Implemented; promoted to [CLI Install](architecture/cli-install.md) (removal: #875) |

@@ -74,8 +74,8 @@ The list is data inside the bundle: the CLI never reads `arcanum/migrations/` at
 
 - `npm i -g arcanum-cli`. npm handles PATH, updates and uninstall, so there is no custom installer.
 - `npx arcanum-cli config info` works with no global install, as a one-off way to inspect an environment.
-- The CLI is optional, and the installer and updater offer it.
-- The global migration `arcanum/migrations/repos/next/001.sh` offers it once per machine or account. It is skippable, pins the client to the installed arcanum version, and calls the shared client step with `--no-confirm` (choosing `[R]un` is the consent). On any failure it warns and continues (exit `0`). See [CLI Install → update.md](../specs/cli-install/update.md#global-migration-next001).
+- The CLI is optional, and the installer and updater offer it: see [CLI Install](cli-install.md).
+- The global migration `arcanum/migrations/repos/next/001.sh` offers it once per machine or account. It is skippable, pins the client to the installed arcanum version, and calls the shared client step with `--no-confirm` (choosing `[R]un` is the consent). On any failure it warns and continues (exit `0`). See [CLI Install → Global migration](cli-install.md#global-migration).
 
 ### Version lockstep
 
@@ -167,6 +167,8 @@ Complementing `install`, `arcanum/update/{bootstrap.sh,updater.sh}` brings an al
 
 Installations via `git clone` (with no `arcanum.json`) have their own flow inside `bootstrap.sh`, never going through `updater.sh`: before any `fetch`, it compares the resolved `VERSION` against the target's current tag (`git describe --tags --exact-match`) and exits early if already up to date; checks `git status --porcelain --untracked-files=no` and refuses to proceed (no auto-stash/auto-discard) if there are uncommitted changes to **tracked** files — untracked files (e.g. a host-written `synced/` folder) don't block the update, and `git checkout` still refuses to overwrite any untracked file it would clobber; confirms (same prompt mechanism above, with wording specific to the git method); and then runs `git fetch --tags --prune && git checkout <VERSION>` directly on the target, leaving it in detached HEAD at the resolved tag. It doesn't need the zip flow's concurrency lock — `git checkout`'s own internal lock files already make a second concurrent run fail cleanly.
 
+Both update paths, the zip `updater.sh` and the `git clone` flow in `bootstrap.sh`, end with the same `arcanum-cli` client step as the installer, run from the updated tree; see [CLI Install](cli-install.md#callers).
+
 `installer.sh` redirects to `update` instead of refusing with no alternative when an installation already exists — see above.
 
-The `/arcanum-update` skill (`arcanum-update/SKILL.md` + `arcanum-update/scripts/run_update.sh`) exposes this flow from inside a Claude Code session, with no shell required: `run_update.sh check` resolves the method/repo/current version (same detection logic above, anchored to the skill's own on-disk location); the skill asks for confirmation in conversation before running `run_update.sh apply`, which sets `ARCANUM_ASSUME_YES=1` and runs `bootstrap.sh` directly, streaming its output live.
+The `/arcanum-update` skill (`arcanum-update/SKILL.md` + `arcanum-update/scripts/run_update.sh`) exposes this flow from inside a Claude Code session, with no shell required: `run_update.sh check` resolves the method/repo/current version (same detection logic above, anchored to the skill's own on-disk location); the skill asks for confirmation in conversation before running `run_update.sh apply`, which sets `ARCANUM_ASSUME_YES=1` and runs `bootstrap.sh` directly, streaming its output live. `apply` also sets the opt-in `ARCANUM_CLI_PROMPT=chat`, so with no TTY the client step exits `4` with `FALLBACK=chat` and the skill asks the client question with `AskUserQuestion`, resuming through `run_update.sh install-cli <version>`; see [CLI Install → `/arcanum-update`](cli-install.md#arcanum-update).
