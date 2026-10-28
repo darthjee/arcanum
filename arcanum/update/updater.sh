@@ -7,7 +7,8 @@
 # release, updates arcanum.json to record the new version/repo/manifest,
 # and ends with the client step:
 # installs or updates arcanum-cli@$VERSION through the installed copy of
-# arcanum/_lib/install_cli.sh (docs/agents/specs/cli-install/update.md).
+# arcanum/_lib/install_cli.sh (docs/agents/architecture/cli-install.md,
+# "Callers" -> "Zip updater").
 # ARCANUM_CLI_PROMPT and ARCANUM_SKIP_CLI reach that step unchanged.
 #
 # Not meant to be curl | bash'd directly: bootstrap.sh execs this from
@@ -173,9 +174,9 @@ jq -n --arg version "$VERSION" --arg repo "$REPO" --argjson manifest "$MANIFEST_
 
 echo "arcanum updated to ${VERSION} at ${TARGET}" >&2
 
-# Client step (docs/agents/specs/cli-install/update.md): installs or
-# updates arcanum-cli@$VERSION from the installed tree, so the script
-# outlives cleanup. Never fails the update: only the opt-in exit 4
+# Client step (docs/agents/architecture/cli-install.md, "Callers" -> "Zip
+# updater"): installs or updates arcanum-cli@$VERSION from the installed
+# tree, so the script outlives cleanup. Never fails the update: only the opt-in exit 4
 # (ARCANUM_CLI_PROMPT=chat, set by /arcanum-update) is propagated, with
 # its FALLBACK=chat stdout lines; any other status is ignored.
 cli_status=0

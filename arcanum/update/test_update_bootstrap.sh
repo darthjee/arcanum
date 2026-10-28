@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Standalone coverage for arcanum/update/bootstrap.sh's git-path client
-# step (issue #870; spec docs/agents/specs/cli-install/update.md).
+# step (issue #870; see docs/agents/architecture/cli-install.md, "Callers"
+# -> "`git clone` path").
 #
 # Builds a local "origin" repo whose every commit holds the repo's real
 # bootstrap.sh, tagged:

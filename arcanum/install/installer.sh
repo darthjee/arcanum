@@ -12,8 +12,8 @@
 #
 # As its last step, once arcanum.json is written, it runs the arcanum-cli
 # client step through arcanum/_lib/install_cli.sh, pinned to VERSION (see
-# docs/agents/specs/cli-install/install.md). That step asks a [Y/n] prompt
-# on the TTY and never fails the arcanum install.
+# docs/agents/architecture/cli-install.md, "Callers" -> "Installer"). That
+# step asks a [Y/n] prompt on the TTY and never fails the arcanum install.
 #
 # Environment:
 #   ARCANUM_SKIP_CLI    — any non-empty value skips the client step.
@@ -83,8 +83,8 @@ jq -n --arg version "$VERSION" --arg repo "$REPO" --argjson manifest "$MANIFEST_
 
 echo "arcanum installed to ${TARGET}" >&2
 
-# Client step (docs/agents/specs/cli-install/install.md): installs or
-# updates arcanum-cli@$VERSION. Never fails the install: install_cli.sh
+# Client step (docs/agents/architecture/cli-install.md, "Callers" ->
+# "Installer"): installs or updates arcanum-cli@$VERSION. Never fails the install: install_cli.sh
 # exits 0 on every outcome, `|| true` covers a usage error, and
 # ARCANUM_CLI_PROMPT is cleared because the installer has no chat to
 # fall back to (no exit 4 / FALLBACK=chat).

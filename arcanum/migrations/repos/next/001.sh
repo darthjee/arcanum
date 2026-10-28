@@ -5,7 +5,7 @@
 # migration prompt is the consent, so the shared client step is called
 # with --no-confirm (no second prompt, no /dev/tty). Always exits 0
 # (warn and continue), so the global pointer advances either way.
-# Spec: docs/agents/specs/cli-install/update.md, "Global migration".
+# See docs/agents/architecture/cli-install.md, "Callers" -> "Global migration".
 # See 001.md for a human-readable summary.
 #
 # Usage: 001.sh config
