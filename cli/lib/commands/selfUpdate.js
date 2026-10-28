@@ -1,6 +1,5 @@
 // `arcanum self-update`: updates the global arcanum-cli to the latest
-// release (see docs/agents/specs/cli-install/self-update.md and
-// docs/agents/architecture/arcanum-cli.md#self-update).
+// release (see docs/agents/architecture/arcanum-cli.md#self-update).
 //
 // Every module this command needs is imported statically: `npm i -g` may
 // replace the running bundle mid-run, so nothing is loaded after it.
