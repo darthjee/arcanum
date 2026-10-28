@@ -423,13 +423,7 @@ Each command prints one stable object. Fields may be added; existing ones are no
 
 `info`: see [`config info`](#config-info). `--version`: `{"version":"2.4.0"}`.
 
-`self-update`:
-
-```json
-{"status":"updated","from":"2.2.3","to":"2.3.0","latest":"2.3.0"}
-```
-
-- `status` is a closed enum: `updated`, `up_to_date`, `newer`. `from` is the running version, `to` the global version after the command (equal to `from` on a no-op), `latest` the resolved `npm view` result.
+`self-update`: see its [Outcomes](#outcomes) (`{"status":"updated","from":"2.2.3","to":"2.3.0","latest":"2.3.0"}`).
 
 Errors, on stderr in `--json` mode:
 
@@ -668,22 +662,147 @@ summary
 
 ## `self-update`
 
-`arcanum self-update [--json]` updates the global `arcanum-cli` to the exact `latest` version. The [self-update spec](../specs/cli-install/self-update.md) is the source of truth for its messages, outcomes and failures; this section records how `cli/lib/commands/selfUpdate.js` implements it.
+`arcanum self-update [--json]` updates the global `arcanum-cli` to the exact `latest` version. This section is the source of truth for the command: its contract (messages, outcomes, failures) and how `cli/lib/commands/selfUpdate.js` implements it. The name avoids confusion with updating the Arcanum install itself (`/arcanum-update`, `arcanum/update/`). The shared installer and updater rules are in [CLI Install → Shared rules](cli-install.md#shared-rules); unlike the installer and updater, `self-update` does not use the Arcanum version pin (see [CLI Install → Version pinning](cli-install.md#version-pinning)).
+
+### What it runs
+
+The command resolves `latest` first, then installs that exact version. It never runs a blind `npm i -g arcanum-cli@latest`: that way the output names the exact version installed, the exact-pin and `--ignore-scripts` rules hold, and an up-to-date client costs one lookup and changes nothing.
 
 1. `--help` prints the usage. On `win32` it errors before any npm call (exit `1`). A positional, `--repo <path>` or `--claude-config-dir` is a usage error (exit `2`). `ARCANUM_SKIP_CLI` is ignored, and there is no prompt.
 2. **Global-copy check, local calls only.** The running package is the nearest `package.json` named `arcanum-cli` above `import.meta.url` (`deps.packageDir` in specs), through `realpath`. `npm root -g` (15 s timeout) gives `<root>/arcanum-cli`: a symlink is a linked checkout, and a missing copy, a non-directory or a different real path is "not the global install". Both refuse with exit `4` before any network call.
 3. **Lookup.** `npm view arcanum-cli@latest version --json --fetch-retries=0 --fetch-timeout=15000`, with a 30 s process timeout. The result must be a plain `MAJOR.MINOR.PATCH[-prerelease]`, or nothing is installed. On `E404` a best-effort `npm config get registry` (5 s timeout) names the registry.
-4. **Comparison** with the running `CLI_VERSION` through `compareVersions`: equal is `up_to_date`, newer is `newer`, both exit `0` with no install.
+4. **Comparison** with the running `CLI_VERSION` (embedded in the bundle, no npm call) through `compareVersions`, whose semver precedence ranks a prerelease below its release: equal is `up_to_date`, newer is `newer`, both exit `0` with no install. A running copy newer than `latest` (a prerelease or a local build) is never downgraded.
 5. **Install.** A progress note on stderr, then `npm i -g --ignore-scripts arcanum-cli@<v>`, the package as one argument and no timeout. A no-op `SIGINT` listener keeps the CLI alive while npm runs, so a Ctrl-C (which reaches npm too) is reported as exit `130` with the `npm i -g arcanum-cli@latest` fallback. `EACCES`/`EPERM` names the prefix (two `dirname`s above `npm root -g`); arcanum never retries with `sudo`.
 6. **Verification.** `<root>/arcanum-cli/package.json` must be at `<v>`, so `to` is a fact.
 
 npm's output is always captured: dropped on success (written to stderr under `ARCANUM_DEBUG=1`), and its last 10 stderr lines printed after the `arcanum: ...` and `hint:` lines on failure (`NpmError#npmOutput`, kept out of the JSON error object). The whole command path is imported statically: `npm i -g` may replace the bundle mid-run, so nothing is loaded lazily after it. Every collaborator (`runNpm` or `execFileAsync`, `realpath`, `lstat`, `readFile`, `platform`, `packageDir`, `signals`) comes through `deps`, so no spec touches the real npm or the network. There is no real-install smoke test in CI, since it would mutate the global prefix; before a release, check it by hand with `npm i -g arcanum-cli@<old>`, then `arcanum self-update`.
+
+### Running copy vs global install
+
+"Current" means the running copy, never whatever `npm` on `PATH` sees. The check runs before `npm view`, so a refusal never costs a network call.
+
+| Case | Recognized by | Outcome |
+| --- | --- | --- |
+| Global install | `<root>/arcanum-cli` is a plain directory whose real path is the running package's. | Proceed with [What it runs](#what-it-runs). |
+| Linked dev checkout (`npm link`) | `<root>/arcanum-cli` is a symlink. | Refused: the checkout is updated with `git pull` and a rebuild. Never `npm i -g`, which would silently replace the link. |
+| Not the global copy: `npx`, a project-local `node_modules/.bin/arcanum`, a source run (`0.0.0-dev`) | No running `arcanum-cli` package is found, there is no global `arcanum-cli`, it is not a directory, or the real paths differ. | Refused, with a hint to run `npm i -g arcanum-cli@latest` or to update through the project's package manager. Never installs a global copy the user did not ask for. |
+| `npm root -g` fails or times out | Non-zero exit or timeout. | Error: npm is unusable (exit `8`). |
+
+Both refusals exit `4` (`target_unavailable`): the user asked for an update and did not get one, so `arcanum self-update && …` must not continue. The no-op outcomes (`up_to_date`, `newer`) exit `0` because the client is in a good state. This differs from the installer and updater, where a linked client is only an info line, because there the Arcanum install itself succeeded.
+
+### No confirmation
+
+No prompt, no `--yes` flag, no TTY handling. Typing `arcanum self-update` is the consent:
+
+- The shared `[Y/n]` prompt exists because the installer and updater install the client as a side effect. Here the update is the whole request.
+- The change is narrow: it only replaces the already-global `arcanum-cli` with a newer version of itself. The risky cases are refused above.
+- It matches `rustup self update`, `gh extension upgrade`, `npm update -g` and `pipx upgrade`.
+- It keeps the command scriptable (`--json`, no TTY, an agent's Bash call), with no `FALLBACK=chat` path.
+
+### Shared rules it follows or overrides
+
+How each of the [shared rules](cli-install.md#shared-rules) applies:
+
+| Shared rule | In `self-update` |
+| --- | --- |
+| Version pinning (Arcanum version) | Does not apply: the target is `latest`, resolved to an exact version. |
+| Exact pin, one argument, `--ignore-scripts` | Applies: `npm i -g --ignore-scripts arcanum-cli@<v>`, through `execFile` (no shell). |
+| Validated version | Applies, to the `npm view` result. |
+| Bounded `npm view` | Applies (see [Failures](#failures)). |
+| npm config honored, no registry override | Applies. The registry is only named in the `E404` message. |
+| Forks: always `arcanum-cli` | Applies. |
+| `ARCANUM_SKIP_CLI` | **Ignored.** It skips the client step that installs and updates run as a side effect. An explicit `arcanum self-update` is not a side effect, and silently doing nothing would confuse. |
+| Prompt, `ARCANUM_ASSUME_YES`, `--no-confirm`, `ARCANUM_CLI_PROMPT`, `FALLBACK=chat`, no-TTY skip | Do not apply: there is no prompt. |
+| Warn and continue | **Does not apply.** The update is the command itself, so its failures are errors (exit `8`). |
+| Node floor (`22.13.0`) | Already enforced by `cli/bin/arcanum` before any command runs (see [Runtime path](#runtime-path)). |
+
+### Usage
+
+- Top-level usage: a Commands row, `self-update   Update this CLI to the latest release`.
+- `arcanum self-update --help` (`selfUpdateUsage` in `cli/lib/help.js`): the synopsis `Usage: arcanum self-update [--json]`, one paragraph on what it does and what it refuses, and the options `--json` and `-h, --help`. It makes no npm call.
+- No positionals. An extra argument is a usage error (`self-update: unexpected argument 'x'`, exit `2`). That is where a version argument would plug in later.
+- The targeting flags mean nothing here and are usage errors (`--repo is not accepted by self-update`, `--claude-config-dir is not accepted by self-update`), in the style of `info` rejecting tier flags. A tier flag is an unknown option (exit `2`).
+
+The exit codes it uses (`0`, `1`, `2`, `4`, `8`, `130`) are in [Exit codes](#exit-codes). `exitCodeForError` would map a bare Node errno error, such as a spawn `ENOENT` for a missing npm, to `7`, so every npm failure is wrapped in an `NpmError` (exit `8`).
+
+### Outcomes
+
+The command follows the [Output](#output) conventions: stdout carries only the result, notes go to stderr as plain text in both modes, and refusals and errors go through `reportError`.
+
+| Outcome | stderr | stdout (human) | `--json` | Exit |
+| --- | --- | --- | --- | --- |
+| Updated | `arcanum: note: updating arcanum-cli <from> → <to>...` (before `npm i -g`) | `Updated arcanum-cli <from> → <to>` | `status: "updated"` | `0` |
+| Up to date | Nothing. | `arcanum-cli is up to date (<v>)` | `status: "up_to_date"` | `0` |
+| Newer than latest | Nothing. | `arcanum-cli <v> is newer than the latest release (<latest>); nothing to do` | `status: "newer"` | `0` |
+| Linked checkout | `arcanum: running from a linked checkout (<path>); update it with git pull and a rebuild` | Nothing. | error `target_unavailable` | `4` |
+| Not the global copy | `arcanum: this arcanum-cli (<path>) is not the global install`, hint `run npm i -g arcanum-cli@latest, or update it through the project's package manager (a different Node/npm on PATH? e.g. nvm)` | Nothing. | error `target_unavailable` | `4` |
+| Any [failure](#failures) | `arcanum: <message>` and `hint: <hint>`, then npm's last stderr lines | Nothing. | error `npm` | `8` |
+
+In the linked-checkout message, `<path>` is the link's real target; in the not-global one, it is the running package's real path.
+
+Under `--json`, stdout is exactly one object; the progress note stays on stderr as plain text:
+
+```json
+{"status":"updated","from":"2.2.3","to":"2.3.0","latest":"2.3.0"}
+{"status":"up_to_date","from":"2.3.0","to":"2.3.0","latest":"2.3.0"}
+{"status":"newer","from":"2.4.0-rc.1","to":"2.4.0-rc.1","latest":"2.3.0"}
+```
+
+- `from` is the version running before the command, `to` the global version after it (equal to `from` on a no-op), `latest` the resolved `npm view` result.
+- `status` is a closed enum: `updated`, `up_to_date`, `newer`.
+- Refusals and errors use the stable error object on stderr (see [JSON output](#json-output)), with `code` `target_unavailable`, `npm`, `interrupted`, `usage` or `error`.
+- No restart message: the next `arcanum` call runs the new version.
+
+### Failures
+
+All exit `8` (`npm`). The command never retries with `sudo`. `cli/lib/npm.js` (`runNpm`) classifies each npm failure into a category, and `selfUpdate.js` words it per call.
+
+| Failure | Message / hint |
+| --- | --- |
+| npm not on `PATH` (`ENOENT`), at any call | `npm not found on PATH` / `install Node.js and npm, then run it again` |
+| `npm root -g` fails or times out | `could not locate the npm global install (npm root -g failed)`, plus npm's last lines |
+| `npm view`: network error or timeout | `could not reach the npm registry` / `check your network or npm proxy/registry config` |
+| `npm view`: `E404` (for example a custom registry without the package) | `arcanum-cli is not on the configured registry (<registry>)`, `<registry>` falling back to `the configured registry` when `npm config get registry` fails or prints nothing |
+| `npm view`: any other failure | `npm view arcanum-cli@latest version --json --fetch-retries=0 --fetch-timeout=15000 failed (exit <n>)`, plus npm's last lines |
+| `npm view` returns something that is not a plain semver | `npm returned an invalid version '<x>'`; no install runs |
+| `npm i -g`: `EACCES` / `EPERM` | `the npm global prefix (<prefix>) is not writable` / `fix its permissions or use a user-owned prefix (npm config set prefix ~/.npm-global); arcanum never retries with sudo` |
+| `npm i -g`: any other failure | `npm i -g failed (exit <n>)` (`exit unknown` without a numeric code), plus npm's last stderr lines |
+| Verification: the installed `package.json` is not at `<v>` | `npm i -g reported success but arcanum-cli is at <x>` (`at an unreadable version` when it cannot be read) |
+
+- **Timeouts.** `npm root -g` 15 s. `npm view` runs with `--fetch-retries=0 --fetch-timeout=15000` and a 30 s process timeout as a backstop. `npm i -g` has none: the user asked and is waiting.
+- **npm error codes** are read from npm's captured stderr (`npm error code X`, or `npm ERR! code X` before npm 9): `EACCES`/`EPERM` is a permission failure, `E404` not found, `ECONNREFUSED`, `ENOTFOUND`, `EAI_AGAIN`, `ETIMEDOUT`, `ECONNRESET` and `ERR_SOCKET*` network. Anything else falls into the generic row, so a misdetection never hides an error.
+
+### Edge cases of `self-update`
+
+| Edge case | Outcome |
+| --- | --- |
+| Running bundle replaced mid-run | Safe: the bundle is one file loaded at start, and nothing is imported lazily after `npm i -g`. |
+| nvm or another Node: the running copy belongs to Node A, `npm` on `PATH` to Node B | The real paths differ, so the "not the global install" refusal, whose hint names that case. |
+| Run through a symlinked bin (`/usr/local/bin/arcanum` → `.../node_modules/arcanum-cli/bin/arcanum`) | `realpath` resolves it; normal flow. |
+| Running a prerelease (`2.3.0-rc.1`) with `latest` at `2.3.0` | Older, so it updates (semver precedence). |
+| `latest` itself is a prerelease | Same comparison, no special case. |
+| Two `self-update`s at once | Not guarded: the tier-file lock does not apply, and npm does not lock global installs. The second may fail with an npm error (exit `8`). Documented, not handled. |
+| Ctrl-C during `npm i -g` | The signal reaches npm (same process group). Exit `130` (`interrupted`) with `the install may be incomplete; run arcanum self-update again`, hint `if arcanum no longer runs: npm i -g arcanum-cli@latest`. |
+| Windows (`npm.cmd`; `execFile` on a `.cmd` without a shell throws `EINVAL` since the CVE-2024-27980 fix) | Out of scope (Arcanum itself is POSIX). On `win32`, error before any npm call: `self-update is not supported on Windows`, hint `npm i -g arcanum-cli@latest`, exit `1`. |
+
+### Security and performance
+
+- `execFile` with no shell, a validated semver, and the package as one argument: the `npm view` output cannot inject anything.
+- `--ignore-scripts`: a compromised publish cannot run code at install time. It would still run on the next `arcanum` call. That is inherent to any self-updater and is documented, not mitigated.
+- No `sudo`, ever.
+- Cost: an up-to-date client costs one local `npm root -g` and one bounded `npm view`. A refused case makes no network call.
+
+### Backward compatibility
+
+- Purely additive: a new command, and new exit codes `8` and `130` that renumber no existing code.
+- No migration: no config shape changes. The global migration `arcanum/migrations/repos/next/001.sh` covers the client install, not this command.
 
 ## Specs
 
 - `cli/spec/support/fixtures.js` builds temp git repos and tier files; `cli/spec/support/cli.js` runs `main.run` in-process against them, with an injected env and cwd.
 - Every exit code and precedence pair, each malformed-file kind (with byte-unchanged checks on refused writes), each value-parsing row with and without `--string`, the JSON shapes, the lock cases (held by a live fake owner, `--lock-timeout 0`, acquired after release, no "seems stuck" warning) and SIGINT each have a spec.
 - `setup_spec` drives the wizard with a scripted prompter (`cli/spec/support/prompter.js`, with `EOF`/`SIGINT` answers) and `deps.isInteractive`; `fakeIo` can also fake a TTY stdin. One bundle smoke spec checks the real no-TTY refusal, another runs `self-update --help` from the bundle with no npm on `PATH`.
+- `selfUpdate_spec` injects a fake `runNpm` (or `execFileAsync`) and fakes for `realpath`, `lstat`, the `package.json` read, `platform` and `signals`, and has one spec per row of the `self-update` [Outcomes](#outcomes), [Failures](#failures) and [Edge cases](#edge-cases-of-self-update) tables, asserting stdout, stderr, the `--json` object and the exit code. Its argv specs pin `--ignore-scripts`, the package as one argument, `--fetch-retries=0 --fetch-timeout=15000`, no `--registry`, no `sudo`, and no `npm i -g` on a refusal or an invalid version. `npm_spec` covers the failure classification, and `exitCodes_spec` that a spawn `ENOENT` maps to `8`, not `7`.
 - The shortcut specs (`cli/spec/lib/commands/config/shortcuts/`) use `cli/spec/support/shortcuts.js`, which re-seeds the tiers before each run, so a shortcut and its generic equivalent run against the same files and their stdout, stderr and exit code are compared directly. `agentsEmail_spec` runs the `AgentEmail` shell/native parity table (`cli/spec/support/agentEmailFixtures.js`, a copy of `shared/spec`'s, since `cli/` never imports `shared/spec/**`).
 
 ## Alternatives considered
@@ -705,6 +824,15 @@ npm's output is always captured: dropped on success (written to stderr under `AR
 - **Every tier, or merged arrays, for `ignore-checks`.** Rejected: the runtime reads only the repo tier.
 - **Collecting every wizard answer and writing at the end.** Rejected: Ctrl-C would lose everything, and a late error would hide what applied.
 - **A hardcoded wizard key list.** Rejected: it drifts from the registry.
+- **Naming `self-update` `arcanum update` or `arcanum upgrade`.** Rejected: both read as updating the Arcanum install, not the client.
+- **A blind `npm i -g arcanum-cli@latest` in `self-update`.** Rejected: the output could not name the installed version, it breaks the exact-pin rule, and it reinstalls even when up to date.
+- **`self-update` updating the global copy when the running copy is not the global one.** Rejected: it would replace an `npm link` checkout or install a copy the user did not ask for.
+- **A `[Y/n]` prompt with `--yes` on `self-update`.** Rejected: the command is the consent. The prompt would only add TTY, no-TTY and `--json` handling.
+- **Mapping npm failures to `1`, or letting a spawn `ENOENT` fall to `7`.** Rejected: scripts need a stable "npm failed" signal, and `7` means a file error.
+- **Warn and continue on a `self-update` failure.** Rejected: the update is the command itself.
+- **`shell: true` for Windows.** Rejected: Windows is out of scope.
+- **Honoring `ARCANUM_SKIP_CLI` in `self-update`.** Rejected: it skips a side effect, not an explicit command.
+- **Shipping a `self-update` version argument** (to pin or roll back), **a `--check` dry run, or new version-skew hints.** Deferred: out of scope for the CLI install epic. The skew hints keep saying `npm i -g arcanum-cli@latest`. Windows support and a guard against concurrent runs are out of scope too.
 
 ## Future work
 
