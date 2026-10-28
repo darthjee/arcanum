@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Standalone coverage for arcanum/_lib/install_cli.sh — the shared
-# arcanum-cli client step (issue #868; spec docs/agents/specs/cli-install.md
-# and its parts install.md / already-installed.md / update.md).
+# arcanum-cli client step (issue #868; see
+# docs/agents/architecture/cli-install.md).
 #
 # Stub `npm` and `node` executables go first on a minimal PATH. The stub
 # `npm` records every call (one argument per `|`-separated field) and
