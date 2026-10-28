@@ -16,7 +16,7 @@ const SCRIPT = path.join(REPO_ROOT, 'arcanum/migrations/repos/2.2.0/001.sh');
 const NEW_STATE = path.join('.claude', 'state', 'arcanum-config.json');
 const LEGACY_STATE = path.join('.claude', 'state', 'monitor-issues-config.json');
 
-describe('monitor-issues clear_context migration (next/001)', () => {
+describe('monitor-issues clear_context migration (2.2.0/001)', () => {
   let repoPath;
 
   beforeEach(async () => {
