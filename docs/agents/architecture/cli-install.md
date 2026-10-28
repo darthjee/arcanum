@@ -165,7 +165,7 @@ The wrapper prints `CLI_STATE=<state>` (`missing`, `older`, `same`, `newer`, `li
 | Updater, zip (`updater.sh`) | TTY prompt | Same | Same |
 | Updater, git (`bootstrap.sh`, running the script from the checked-out tree) | TTY prompt | Same | Same |
 | `/arcanum-update` (`ARCANUM_CLI_PROMPT=chat`, no TTY) | Exit `4` with `FALLBACK=chat`, `CLI_VERSION`, `CLI_INSTALLED`, then `AskUserQuestion`, then `install-cli <v>` with `--no-confirm` | The skill asks `current → target` | Exit `0`, no chat question; the line reaches the user through inherited stdio |
-| Migration `arcanum/migrations/repos/next/001.sh` (`--no-confirm`; `[R]un` is the consent) | None | Updated directly | Same rules: never downgrade, `linked` left alone, `unknown` skipped |
+| Migration `arcanum/migrations/repos/2.3.0/001.sh` (`--no-confirm`; `[R]un` is the consent) | None | Updated directly | Same rules: never downgrade, `linked` left alone, `unknown` skipped |
 
 ### Edge cases
 
@@ -222,7 +222,7 @@ The wrapper prints `CLI_STATE=<state>` (`missing`, `older`, `same`, `newer`, `li
 
 ### Global migration
 
-- **Entry.** `arcanum/migrations/repos/next/001.sh`, with the manifest entry `{"id": "001", "type": "script", "file": "001.sh", "skippable": true, "applies_to": "global"}` and the summary `arcanum/migrations/repos/next/001.md`. Docs cite it by that full path, following [Per-Repo Migrations](per-repo-migrations.md)' "Referencing pending migrations" rule, so `scripts/bump-version.sh` rewrites it on release.
+- **Entry.** `arcanum/migrations/repos/2.3.0/001.sh`, with the manifest entry `{"id": "001", "type": "script", "file": "001.sh", "skippable": true, "applies_to": "global"}` and the summary `arcanum/migrations/repos/2.3.0/001.md`. Docs cite it by that full path, following [Per-Repo Migrations](per-repo-migrations.md)' "Referencing pending migrations" rule, so `scripts/bump-version.sh` rewrites it on release.
 - **Scope.** Global, because the client is installed machine-wide: it runs once per machine or account through `/arcanum-migrate`, not once per repo. It also covers installs that update before the client step reaches them, such as the `git clone` first-update gap.
 - **Paths.** They come from the script's own location, never from the cwd: the install root is four levels up, and the shared script is `arcanum/_lib/install_cli.sh` under it.
 - **Target version.** The installed arcanum version: `arcanum.json`'s `.version`, or else `git describe --tags --exact-match` for a git clone, passed as is (the shared script validates semver itself). If neither resolves (a clone on a branch or an untagged commit), the migration warns, naming `npm i -g arcanum-cli`, and exits `0` without calling the shared script.
@@ -302,7 +302,7 @@ The standalone shell tests below run by hand (`bash <file>`); wiring them into C
 - **`arcanum/update/test_updater.sh`** (zip path) and **`arcanum/update/test_update_bootstrap.sh`** (git path) replace the shared script with a recording stub: it is called last, from `$TARGET`, with `$VERSION`; not called on `Already on <v>.`; skipped silently when missing on the git path; exit `4` propagates with its stdout lines; a usage-error exit `1` is ignored; and `ARCANUM_CLI_PROMPT` reaches it unchanged.
 - **`arcanum-update/scripts/test_run_update_install_cli.sh`** covers `run_update.sh install-cli`: the call (`<version> --no-confirm`, from the install's `arcanum/_lib/`), exit-code pass-through and usage errors.
 - **`run_update_apply`**: the shell/native parity spec (`core/spec/bin/arcanumUpdateRunUpdateParity/apply_spec.js`) and the native unit spec (`core/spec/lib/commands/arcanum-update/ArcanumUpdateRunUpdateApply_spec.js`) check that the flag is set and that the `FALLBACK=chat` / `CLI_VERSION=` lines and the `RESULT=` line are printed on exit `4`.
-- **The migration**: `core/spec/bin/migrationsCliInstall_spec.js` runs the real `arcanum/migrations/repos/next/001.sh` against a stub shared script: `config`, the version from `arcanum.json` or an exact tag, the untagged-commit warning, the `<version> --no-confirm` call, and exit `0` on a stub failure.
+- **The migration**: `core/spec/bin/migrationsCliInstall_spec.js` runs the real `arcanum/migrations/repos/2.3.0/001.sh` against a stub shared script: `config`, the version from `arcanum.json` or an exact tag, the untagged-commit warning, the `<version> --no-confirm` call, and exit `0` on a stub failure.
 - **`/arcanum-update`'s exit `4` branch** is reviewed by `skill-reviewer` (TTY-first with an `AskUserQuestion` fallback).
 
 ## Alternatives considered

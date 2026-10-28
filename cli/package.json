@@ -1,6 +1,6 @@
 {
   "name": "arcanum-cli",
-  "version": "2.2.3",
+  "version": "2.3.0",
   "description": "Command-line client for Arcanum, a collection of Claude Code skills: inspect and edit Arcanum's configuration tiers.",
   "homepage": "https://github.com/darthjee/arcanum/tree/main/cli#readme",
   "repository": {

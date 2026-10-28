@@ -14,7 +14,7 @@ const execFileAsync = promisify(execFile);
 // NOT a parity spec: the migration script has no native counterpart.
 //
 // Each case builds a fake install in a temp dir: a copy of the real
-// `001.sh` at `<install>/arcanum/migrations/repos/next/001.sh` and a
+// `001.sh` at `<install>/arcanum/migrations/repos/2.3.0/001.sh` and a
 // stub `<install>/arcanum/_lib/install_cli.sh` that records its
 // arguments, writes a line to stderr (to prove the migration folds it
 // into stdout) and exits with `$STUB_EXIT` (default 0). The copy runs
@@ -22,7 +22,7 @@ const execFileAsync = promisify(execFile);
 // Neither the stub nor `run` ever opens `/dev/tty`, so no detached
 // session is needed.
 
-const SCRIPT = path.join(REPO_ROOT, 'arcanum/migrations/repos/next/001.sh');
+const SCRIPT = path.join(REPO_ROOT, 'arcanum/migrations/repos/2.3.0/001.sh');
 const MANIFEST = path.join(REPO_ROOT, 'arcanum/migrations/repos/next/migrations.json');
 const SCRIPT_RELATIVE = path.join('arcanum', 'migrations', 'repos', 'next', '001.sh');
 const STUB_RELATIVE = path.join('arcanum', '_lib', 'install_cli.sh');

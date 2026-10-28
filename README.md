@@ -8,8 +8,8 @@ A collection of Claude Code skills — reusable slash commands that extend Claud
 
 ![arcanum](https://raw.githubusercontent.com/darthjee/arcanum/master/arcanum.png)
 
-**Current Version:** [2.2.3](https://github.com/darthjee/arcanum/releases/tag/2.2.3)
-**Next Release:** [2.2.4](https://github.com/darthjee/arcanum/compare/2.2.3...main)
+**Current Version:** [2.3.0](https://github.com/darthjee/arcanum/releases/tag/2.3.0)
+**Next Release:** [2.3.1](https://github.com/darthjee/arcanum/compare/2.3.0...main)
 
 ## What are skills?
 
@@ -115,7 +115,7 @@ A `git clone` install with uncommitted local changes fails fast with a message t
 
 After the update, both methods (release zip and `git fetch`/`git checkout`) run the same client step as the installer: a `[Y/n]` prompt to install or update `arcanum-cli` to the version you just updated to, with the same rules — `ARCANUM_SKIP_CLI=1` skips it, `ARCANUM_ASSUME_YES` does not answer it, and with no TTY or on any failure it warns with the manual command while the update still succeeds. An older installed client is updated to the target version; a newer or `npm link`ed one is left as is. When arcanum is already on the target version, the update is a no-op and the client step does not run. `/arcanum-update` asks the same question in chat, since a Claude Code session has no TTY.
 
-**One-time note for `git clone` installs.** The first update after the release that added the client step still runs your old `bootstrap.sh`, which has no client step, so that update does not offer the CLI. Run `npm i -g arcanum-cli` once, or accept the global migration `arcanum/migrations/repos/next/001.sh` in `/arcanum-migrate`: choosing `[R]un` there is the consent to install or update the client, and `[S]kip` is remembered. Later updates offer the CLI as described above.
+**One-time note for `git clone` installs.** The first update after the release that added the client step still runs your old `bootstrap.sh`, which has no client step, so that update does not offer the CLI. Run `npm i -g arcanum-cli` once, or accept the global migration `arcanum/migrations/repos/2.3.0/001.sh` in `/arcanum-migrate`: choosing `[R]un` there is the consent to install or update the client, and `[S]kip` is remembered. Later updates offer the CLI as described above.
 
 ## The `arcanum-next-step` mod
 

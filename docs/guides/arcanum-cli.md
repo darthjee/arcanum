@@ -8,7 +8,7 @@ It is optional: the Arcanum installer and updater offer to install it, and it ca
 
 Installing or updating Arcanum asks whether to install or update the CLI, at the same version as Arcanum (`Install arcanum-cli@<version> globally (npm i -g)? [Y/n]`). `ARCANUM_SKIP_CLI=1` skips that question without calling `node` or `npm`. If you answer no, if there is no TTY, or if the install fails, Arcanum still installs or updates, and a warning prints the manual command. `/arcanum-update` asks the same question in chat. See the [README's Installation and Updating sections](../../README.md#installation) for the details.
 
-A `git clone` install of Arcanum does not get the CLI from the clone, and its first update after the release that added this step does not offer it either. Run `npm i -g arcanum-cli` once, or accept the global migration `arcanum/migrations/repos/next/001.sh` in `/arcanum-migrate`. See the README's [one-time note for `git clone` installs](../../README.md#updating).
+A `git clone` install of Arcanum does not get the CLI from the clone, and its first update after the release that added this step does not offer it either. Run `npm i -g arcanum-cli` once, or accept the global migration `arcanum/migrations/repos/2.3.0/001.sh` in `/arcanum-migrate`. See the README's [one-time note for `git clone` installs](../../README.md#updating).
 
 To install it on its own:
 
