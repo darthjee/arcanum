@@ -7,10 +7,11 @@ import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
 const execFileAsync = promisify(execFile);
 
-// Contract spec for the `next/001` global migration that installs the
+// Contract spec for the `2.3.0/001` global migration that installs the
 // `arcanum-cli` npm package pinned to the installed arcanum version
 // (issue #872). The migration path is one full string literal so
-// `scripts/bump-version.sh` can rewrite it on release.
+// `scripts/bump-version.sh` can rewrite it on release; `MANIFEST` and
+// `SCRIPT_RELATIVE` are both derived from `SCRIPT`, so they follow it.
 // NOT a parity spec: the migration script has no native counterpart.
 //
 // Each case builds a fake install in a temp dir: a copy of the real
@@ -23,8 +24,8 @@ const execFileAsync = promisify(execFile);
 // session is needed.
 
 const SCRIPT = path.join(REPO_ROOT, 'arcanum/migrations/repos/2.3.0/001.sh');
-const MANIFEST = path.join(REPO_ROOT, 'arcanum/migrations/repos/next/migrations.json');
-const SCRIPT_RELATIVE = path.join('arcanum', 'migrations', 'repos', 'next', '001.sh');
+const MANIFEST = path.join(path.dirname(SCRIPT), 'migrations.json');
+const SCRIPT_RELATIVE = path.relative(REPO_ROOT, SCRIPT);
 const STUB_RELATIVE = path.join('arcanum', '_lib', 'install_cli.sh');
 const STUB_STDERR_LINE = 'install_cli stub: stderr line';
 const STUB_SOURCE = [
@@ -80,7 +81,7 @@ async function initGitInstall(installRoot, tag) {
   }
 }
 
-describe('next/001 arcanum-cli install migration', () => {
+describe('2.3.0/001 arcanum-cli install migration', () => {
   let installRoot;
   let workDir;
   let recordFile;
