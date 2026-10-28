@@ -3,8 +3,8 @@
 # globally, pinned to the arcanum version being installed. Called by the
 # installer, the updater (zip and git paths), `/arcanum-update`'s
 # `install-cli` resume and the global migration, so they all follow the
-# same rules. Source of truth: docs/agents/specs/cli-install.md and its
-# parts (cli-install/install.md, already-installed.md, update.md).
+# same rules. Source of truth: docs/agents/architecture/cli-install.md
+# ("The shared script", "An already-installed client" and "Callers").
 #
 # Plain bash on purpose: no engine_dispatch shim, no `_shell.sh` twin, no
 # native command. It runs from installer.sh / bootstrap.sh outside any

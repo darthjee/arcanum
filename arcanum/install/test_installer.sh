@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Standalone coverage for arcanum/install/installer.sh's client step
-# (issue #869; spec docs/agents/specs/cli-install/install.md).
+# (issue #869; see docs/agents/architecture/cli-install.md, "Callers" ->
+# "Installer").
 #
 # Builds a minimal fake release tree in a temp dir (the real installer.sh
 # and _lib/install_cli.sh, plus a MANIFEST) and runs that copy, so the

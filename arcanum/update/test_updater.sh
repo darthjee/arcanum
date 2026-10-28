@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Standalone coverage for arcanum/update/updater.sh's client step (zip
-# path; issue #870; spec docs/agents/specs/cli-install/update.md).
+# path; issue #870; see docs/agents/architecture/cli-install.md, "Callers"
+# -> "Zip updater").
 #
 # Each case builds a FRESH fake release tree in a temp dir (updater.sh's
 # cleanup trap deletes its own release root): the repo's real updater.sh,

@@ -169,13 +169,14 @@ if [[ "$METHOD" == "git" ]]; then
 
   echo "arcanum updated to ${VERSION} at ${TARGET}" >&2
 
-  # Client step (docs/agents/specs/cli-install/update.md), run from the
-  # checked-out tree so every later update uses the new copy. Skipped
-  # silently when this version predates the script. Only the opt-in exit
-  # 4 is propagated. Keep this inside the `if` block: `git checkout` just
-  # rewrote this file on disk, and bash has already parsed the whole
-  # compound command, so code here is safe. A top-level command after
-  # the block would be read from the new file at an arbitrary offset.
+  # Client step (docs/agents/architecture/cli-install.md, "Callers" ->
+  # "`git clone` path"), run from the checked-out tree so every later
+  # update uses the new copy. Skipped silently when this version predates
+  # the script. Only the opt-in exit 4 is propagated. Keep this inside
+  # the `if` block: `git checkout` just rewrote this file on disk, and
+  # bash has already parsed the whole compound command, so code here is
+  # safe. A top-level command after the block would be read from the new
+  # file at an arbitrary offset.
   CLI_SCRIPT="${TARGET}/arcanum/_lib/install_cli.sh"
   if [[ -f "$CLI_SCRIPT" ]]; then
     cli_status=0
