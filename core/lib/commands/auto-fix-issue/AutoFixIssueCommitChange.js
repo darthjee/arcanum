@@ -1,9 +1,8 @@
-import { access } from 'node:fs/promises';
 import { execFile, spawn } from 'node:child_process';
-import path from 'node:path';
 import { promisify } from 'node:util';
 import AgentEmail from '../../../../shared/lib/config/AgentEmail.js';
 import ConfigChain from '../../../../shared/lib/config/ConfigChain.js';
+import CoauthorTrailers from '../../utils/git/CoauthorTrailers.js';
 
 const promisifiedExecFile = promisify(execFile);
 const USAGE = 'Usage: commit_change.sh <repo_path> <type> <scope> <id> <subject> <agent> <model_name> ' +
@@ -86,16 +85,21 @@ class AutoFixIssueCommitChange {
    *   `config_chain_read`) rather than re-derived.
    * @param {AgentEmail} [deps.agentEmail] - the shared agent-email
    *   resolver (defaults to one built on `configChain`).
+   * @param {CoauthorTrailers} [deps.coauthorTrailers] - the shared
+   *   `Co-Authored-By` trailer builder (defaults to one built on
+   *   `configChain`/`agentEmail`).
    */
   constructor(repoContext, {
     execFileAsync = defaultExecFileAsync,
     configChain = new ConfigChain(),
-    agentEmail = new AgentEmail({ configChain })
+    agentEmail = new AgentEmail({ configChain }),
+    coauthorTrailers = new CoauthorTrailers({ configChain, agentEmail })
   } = {}) {
     this._repoContext = repoContext;
     this._execFileAsync = execFileAsync;
     this._configChain = configChain;
     this._agentEmail = agentEmail;
+    this._coauthorTrailers = coauthorTrailers;
   }
 
   /**
@@ -147,9 +151,8 @@ class AutoFixIssueCommitChange {
    * Build the commit message exactly as `commit_change_shell.sh` does:
    * subject line, then optionally the body (blank line + body), then
    * optionally an `Addresses-Comment:` trailer (blank line + line),
-   * then a blank line, then the model's `Co-Authored-By` trailer
-   * (unless `omit_model_coauthor` is set), then the agent's own
-   * `Co-Authored-By` trailer.
+   * then — only when `CoauthorTrailers` yields any — a blank line and
+   * the `Co-Authored-By` trailer lines.
    * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} type - the commit type.
    * @param {string} scope - the commit scope.
@@ -163,12 +166,7 @@ class AutoFixIssueCommitChange {
    * @returns {Promise<string>} the assembled commit message.
    */
   async _buildMessage(repoPath, type, scope, id, subject, agent, modelName, modelEmail, body, commentUrl) {
-    const templateEngine = await this._commitTemplateEngineGet(repoPath);
-    const agentEmail = templateEngine === 'new'
-      ? await this._agentEmail.get(repoPath, agent, modelEmail)
-      : modelEmail;
-    const omitModelCoauthor = await this._modelCoauthorOmitted(repoPath);
-
+    const trailers = await this._coauthorTrailers.lines(repoPath, agent, modelName, modelEmail);
     const lines = [`${type}(${scope}): ${subject} (issue #${id})`];
 
     if (body) {
@@ -179,66 +177,11 @@ class AutoFixIssueCommitChange {
       lines.push('', `Addresses-Comment: ${commentUrl}`);
     }
 
-    lines.push('');
-
-    if (!omitModelCoauthor) {
-      lines.push(`Co-Authored-By: ${modelName} <${modelEmail}>`);
+    if (trailers.length > 0) {
+      lines.push('', ...trailers);
     }
-
-    lines.push(`Co-Authored-By: ${agent} agent <${agentEmail}>`);
 
     return lines.join('\n');
-  }
-
-  /**
-   * Native re-derivation of `arcanum/_lib/commit_template.sh`'s
-   * `commit_template_engine_get`, for this entrypoint's own use only
-   * (per `script-engine.md`'s "no standalone, wholesale `_lib`
-   * migration" rule).
-   * @param {string} repoPath - the target repo's local checkout path.
-   * @returns {Promise<'new'|'old'>} `"new"` when
-   *   `.github/commit_message_template-2.0.md` exists, `"old"` when
-   *   only `.github/commit_message_template.md` exists, `"new"` when
-   *   neither does.
-   */
-  async _commitTemplateEngineGet(repoPath) {
-    if (await this._fileExists(path.join(repoPath, '.github', 'commit_message_template-2.0.md'))) {
-      return 'new';
-    }
-
-    if (await this._fileExists(path.join(repoPath, '.github', 'commit_message_template.md'))) {
-      return 'old';
-    }
-
-    return 'new';
-  }
-
-  /**
-   * Native re-derivation of `arcanum/_lib/agent_email.sh`'s
-   * `model_coauthor_omitted`, for this entrypoint's own use only.
-   * @param {string} repoPath - the target repo's local checkout path.
-   * @returns {Promise<boolean>} `true` only when the resolved
-   *   `git.omit_model_coauthor` config value is the literal string or
-   *   boolean `true`, `false` otherwise (including absent).
-   */
-  async _modelCoauthorOmitted(repoPath) {
-    const value = await this._configChain.read(repoPath, 'git', 'omit_model_coauthor');
-
-    return value === true || value === 'true';
-  }
-
-  /**
-   * @param {string} filePath - the path to check.
-   * @returns {Promise<boolean>} whether `filePath` exists.
-   */
-  async _fileExists(filePath) {
-    try {
-      await access(filePath);
-
-      return true;
-    } catch {
-      return false;
-    }
   }
 
   /**
