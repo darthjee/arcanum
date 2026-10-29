@@ -121,11 +121,39 @@ describe('AutoNewIssueCommitIssue', () => {
           CommandClass: AutoNewIssueCommitIssue,
           repoPath,
           runArgs: [filePath, ID, MODEL_NAME, MODEL_EMAIL],
-          configChainOpts: { agentEmail: undefined, omitModelCoauthor: true },
+          configChainOpts: { agentEmail: 'architect@example.com', omitModelCoauthor: true },
           expected:
             'docs(issue): add issue file (issue #999)\n\n' +
-            'Co-Authored-By: architect agent <node@example.com>'
+            'Co-Authored-By: architect agent <architect@example.com>'
         });
+      });
+
+      it(
+        'omits every Co-Authored-By trailer, and the blank separator line, when model_coauthor_omitted ' +
+          'resolves true and the agent email falls back to the model email',
+        async () => {
+          await expectCommitMessage({
+            CommandClass: AutoNewIssueCommitIssue,
+            repoPath,
+            runArgs: [filePath, ID, MODEL_NAME, MODEL_EMAIL],
+            configChainOpts: { agentEmail: undefined, omitModelCoauthor: true },
+            expected: 'docs(issue): add issue file (issue #999)'
+          });
+        }
+      );
+
+      it('builds the trailers through an injected coauthorTrailers collaborator', async () => {
+        const execFileAsync = fakeGitExecFileAsync();
+        const configChain = fakeConfigChain({});
+        const coauthorTrailers = { lines: jasmine.createSpy('lines').and.resolveTo(['Trailer: one']) };
+        const instance = new AutoNewIssueCommitIssue({ repoPath }, { execFileAsync, configChain, coauthorTrailers });
+
+        await instance.run(...[filePath, ID, MODEL_NAME, MODEL_EMAIL]);
+
+        const commitCall = execFileAsync.calls.all().find((call) => call.args[1][0] === 'commit');
+
+        expect(coauthorTrailers.lines).toHaveBeenCalledWith(repoPath, 'architect', MODEL_NAME, MODEL_EMAIL);
+        expect(commitCall.args[2].input).toEqual('docs(issue): add issue file (issue #999)\n\nTrailer: one');
       });
 
       it('keeps the model Co-Authored-By trailer when model_coauthor_omitted resolves false', async () => {

@@ -6,7 +6,10 @@
 # is tracked, `git rm -r` it. If anything ends up staged, commit it using
 # the same commit message template style as commit_change.sh/commit_plan.sh
 # (type=chore, scope=docs, subject "remove planning artifacts", agent
-# fixed to "architect"). If nothing was staged, do nothing and exit 0
+# fixed to "architect"). Its "Co-Authored-By:" trailers follow the shared
+# attribution rules (see coauthor_trailers in arcanum/_lib/agent_email.sh:
+# git.omit_model_coauthor, the architect's configured email, and the
+# commit template engine). If nothing was staged, do nothing and exit 0
 # silently.
 
 set -euo pipefail
@@ -16,6 +19,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../arcanum/_lib/push.sh"
 # shellcheck source=../../arcanum/_lib/repo_path.sh
 source "${SCRIPT_DIR}/../../arcanum/_lib/repo_path.sh"
+# shellcheck source=../../arcanum/_lib/agent_email.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/agent_email.sh"
 
 REPO_PATH="${1:-}"
 ISSUE_FILE="${2:-}"
@@ -43,11 +48,14 @@ if git diff --cached --quiet; then
   exit 0
 fi
 
+TRAILERS="$(coauthor_trailers "architect" "$MODEL_NAME" "$MODEL_EMAIL")"
+
 {
   echo "chore(docs): remove planning artifacts (issue #${ID})"
-  echo
-  echo "Co-Authored-By: ${MODEL_NAME} <${MODEL_EMAIL}>"
-  echo "Co-Authored-By: architect agent <${MODEL_EMAIL}>"
+  if [[ -n "$TRAILERS" ]]; then
+    echo
+    echo "$TRAILERS"
+  fi
 } | git commit -F -
 
 push_current_branch

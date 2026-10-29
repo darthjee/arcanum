@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { createGitFixtureRepo } from '../support/utils/gitFixtureRepo.js';
+import { isolateGlobalConfig } from '../support/utils/isolatedGlobalConfig.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
 // Parity test for the "auto-fix-issue-commit-change" migrated
@@ -33,6 +34,10 @@ import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
 const execFileAsync = promisify(execFile);
 
+// Set inside the top-level `describe` (see `isolateGlobalConfig`), so
+// neither side reads the developer's real global config tier.
+let isolatedEnv;
+
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const SHELL_SCRIPT = path.join(REPO_ROOT, 'auto-fix-issue', 'scripts', 'commit_change_shell.sh');
 const NATIVE_BIN = path.join(REPO_ROOT, 'core', 'bin', 'arcanum');
@@ -44,6 +49,8 @@ const SUBJECT = 'fix the thing';
 const AGENT = 'backend';
 const MODEL_NAME = 'Node Agent';
 const MODEL_EMAIL = 'node@example.com';
+const AGENT_NAME = AGENT;
+const AGENT_EMAIL = `${AGENT_NAME}@example.com`;
 
 /**
  * Run a commit-change invocation (shell or native) and capture its
@@ -54,7 +61,7 @@ const MODEL_EMAIL = 'node@example.com';
  */
 async function runCommand([file, ...args], cwd) {
   try {
-    const { stdout, stderr } = await execFileAsync(file, args, { cwd });
+    const { stdout, stderr } = await execFileAsync(file, args, { cwd, env: isolatedEnv() });
 
     return { stdout, stderr, code: 0 };
   } catch (error) {
@@ -110,6 +117,8 @@ function normalizeCommitHash(text) {
 }
 
 describe('auto-fix-issue-commit-change parity (shell vs. native)', () => {
+  isolatedEnv = isolateGlobalConfig();
+
   describe('happy path with body and comment_url both present', () => {
     it('matches shell exit code and stdout, and produces the same commit message', async () => {
       const shellRepo = await createGitFixtureRepo();
@@ -183,51 +192,68 @@ describe('auto-fix-issue-commit-change parity (shell vs. native)', () => {
   });
 
   describe('model_coauthor_omitted=true (via repo-local config)', () => {
-    it('omits the model Co-Authored-By trailer identically on both sides', async () => {
-      const shellRepo = await createGitFixtureRepo();
-      const nativeRepo = await createGitFixtureRepo();
-
-      try {
-        await Promise.all([configureIdentity(shellRepo.repoPath), configureIdentity(nativeRepo.repoPath)]);
-        await Promise.all([stageChange(shellRepo.repoPath), stageChange(nativeRepo.repoPath)]);
-        await Promise.all([
-          mkdir(path.join(shellRepo.repoPath, '.claude', 'configuration'), { recursive: true }),
-          mkdir(path.join(nativeRepo.repoPath, '.claude', 'configuration'), { recursive: true })
-        ]);
-        const repoConfig = JSON.stringify({ git: { omit_model_coauthor: true } });
-
-        await Promise.all([
-          writeFile(
-            path.join(shellRepo.repoPath, '.claude', 'configuration', 'arcanum-repo-config.json'), repoConfig
-          ),
-          writeFile(
-            path.join(nativeRepo.repoPath, '.claude', 'configuration', 'arcanum-repo-config.json'), repoConfig
-          )
-        ]);
-
-        const args = [TYPE, SCOPE, ID, SUBJECT, AGENT, MODEL_NAME, MODEL_EMAIL];
-
-        const shell = await runCommand([SHELL_SCRIPT, shellRepo.repoPath, ...args], shellRepo.repoPath);
-        const native = await runCommand(
-          [process.execPath, NATIVE_BIN, 'auto-fix-issue-commit-change', nativeRepo.repoPath, ...args],
-          nativeRepo.repoPath
-        );
-
-        expect(normalizeCommitHash(native.stdout)).toEqual(normalizeCommitHash(shell.stdout));
-        expect(native.code).toEqual(shell.code);
-        expect(shell.code).toEqual(0);
-
-        const [shellLog, nativeLog] = await Promise.all([
-          git(['log', '-1', '--format=%s%n%n%b'], shellRepo.repoPath),
-          git(['log', '-1', '--format=%s%n%n%b'], nativeRepo.repoPath)
-        ]);
-
-        expect(nativeLog.stdout).toEqual(shellLog.stdout);
-        expect(shellLog.stdout).not.toContain(`Co-Authored-By: ${MODEL_NAME}`);
-        expect(shellLog.stdout).toContain(`Co-Authored-By: ${AGENT} agent`);
-      } finally {
-        await Promise.all([shellRepo.cleanup(), nativeRepo.cleanup()]);
+    [
+      {
+        title: 'omits the model Co-Authored-By trailer, keeping a configured agent trailer, identically on both sides',
+        gitConfig: { agents: { [AGENT_NAME]: AGENT_EMAIL } },
+        expectAgentTrailer: true
+      },
+      {
+        title: 'omits every Co-Authored-By trailer when the agent email falls back to the model email',
+        gitConfig: {},
+        expectAgentTrailer: false
       }
+    ].forEach(({ title, gitConfig, expectAgentTrailer }) => {
+      it(title, async () => {
+        const shellRepo = await createGitFixtureRepo();
+        const nativeRepo = await createGitFixtureRepo();
+
+        try {
+          await Promise.all([configureIdentity(shellRepo.repoPath), configureIdentity(nativeRepo.repoPath)]);
+          await Promise.all([stageChange(shellRepo.repoPath), stageChange(nativeRepo.repoPath)]);
+          await Promise.all([
+            mkdir(path.join(shellRepo.repoPath, '.claude', 'configuration'), { recursive: true }),
+            mkdir(path.join(nativeRepo.repoPath, '.claude', 'configuration'), { recursive: true })
+          ]);
+          const repoConfig = JSON.stringify({ git: { omit_model_coauthor: true, ...gitConfig } });
+
+          await Promise.all([
+            writeFile(
+              path.join(shellRepo.repoPath, '.claude', 'configuration', 'arcanum-repo-config.json'), repoConfig
+            ),
+            writeFile(
+              path.join(nativeRepo.repoPath, '.claude', 'configuration', 'arcanum-repo-config.json'), repoConfig
+            )
+          ]);
+
+          const args = [TYPE, SCOPE, ID, SUBJECT, AGENT, MODEL_NAME, MODEL_EMAIL];
+
+          const shell = await runCommand([SHELL_SCRIPT, shellRepo.repoPath, ...args], shellRepo.repoPath);
+          const native = await runCommand(
+            [process.execPath, NATIVE_BIN, 'auto-fix-issue-commit-change', nativeRepo.repoPath, ...args],
+            nativeRepo.repoPath
+          );
+
+          expect(normalizeCommitHash(native.stdout)).toEqual(normalizeCommitHash(shell.stdout));
+          expect(native.code).toEqual(shell.code);
+          expect(shell.code).toEqual(0);
+
+          const [shellLog, nativeLog] = await Promise.all([
+            git(['log', '-1', '--format=%s%n%n%b'], shellRepo.repoPath),
+            git(['log', '-1', '--format=%s%n%n%b'], nativeRepo.repoPath)
+          ]);
+
+          expect(nativeLog.stdout).toEqual(shellLog.stdout);
+          expect(shellLog.stdout).not.toContain(`Co-Authored-By: ${MODEL_NAME}`);
+          if (expectAgentTrailer) {
+            expect(shellLog.stdout).toContain(`Co-Authored-By: ${AGENT_NAME} agent <${AGENT_EMAIL}>`);
+          } else {
+            expect(shellLog.stdout).not.toContain('Co-Authored-By:');
+          }
+        } finally {
+          await Promise.all([shellRepo.cleanup(), nativeRepo.cleanup()]);
+        }
+      });
     });
   });
 

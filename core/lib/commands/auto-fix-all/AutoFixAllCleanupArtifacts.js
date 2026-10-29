@@ -1,9 +1,13 @@
 import { execFile, spawn } from 'node:child_process';
 import { stat } from 'node:fs/promises';
 import { promisify } from 'node:util';
+import AgentEmail from '../../../../shared/lib/config/AgentEmail.js';
+import ConfigChain from '../../../../shared/lib/config/ConfigChain.js';
+import CoauthorTrailers from '../../utils/git/CoauthorTrailers.js';
 
 const promisifiedExecFile = promisify(execFile);
 const USAGE = 'Usage: cleanup_artifacts.sh <repo_path> <issue_file> <plan_dir> <id> <model_name> <model_email>';
+const AGENT = 'architect';
 
 /**
  * `execFile`-compatible helper that additionally supports an
@@ -73,10 +77,22 @@ class AutoFixAllCleanupArtifacts {
    *   the target repo's context (provides `repoPath`).
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {Function} [deps.execFileAsync] - promisified `execFile`.
+   * @param {ConfigChain} [deps.configChain] - 3-tier config reader.
+   * @param {AgentEmail} [deps.agentEmail] - the shared agent-email
+   *   resolver (defaults to one built on `configChain`).
+   * @param {CoauthorTrailers} [deps.coauthorTrailers] - the shared
+   *   `Co-Authored-By` trailer builder (defaults to one built on
+   *   `configChain`/`agentEmail`).
    */
-  constructor(repoContext, { execFileAsync = defaultExecFileAsync } = {}) {
+  constructor(repoContext, {
+    execFileAsync = defaultExecFileAsync,
+    configChain = new ConfigChain(),
+    agentEmail = new AgentEmail({ configChain }),
+    coauthorTrailers = new CoauthorTrailers({ configChain, agentEmail })
+  } = {}) {
     this._repoContext = repoContext;
     this._execFileAsync = execFileAsync;
+    this._coauthorTrailers = coauthorTrailers;
   }
 
   /**
@@ -86,17 +102,19 @@ class AutoFixAllCleanupArtifacts {
    * other arguments are present (usage message on missing/empty
    * argument, propagated uncaught so the caller exits 1). Stages removal
    * of `issueFile`/`planDir` when tracked, then — only if something ends
-   * up staged — commits with a hardcoded message and pushes the current
-   * branch.
+   * up staged — commits with the planning-artifacts removal message
+   * (plus the `"architect"` agent's `CoauthorTrailers` lines) and pushes
+   * the current branch.
    * @param {string} issueFile - the issue markdown file's path (relative
    *   to `repoPath`).
    * @param {string} planDir - the plan directory's path (relative to
    *   `repoPath`).
    * @param {string} id - the issue's numeric id.
    * @param {string} modelName - the acting model's display name, used
-   *   in the commit's `Co-Authored-By` trailer.
-   * @param {string} modelEmail - the acting model's email, used in both
-   *   `Co-Authored-By` trailers.
+   *   in the model's own `Co-Authored-By` trailer.
+   * @param {string} modelEmail - the acting model's email, used in the
+   *   model's own `Co-Authored-By` trailer and as the `"architect"`
+   *   agent email fallback.
    * @returns {Promise<string>} `''` for the no-op path (nothing tracked
    *   to remove, or nothing ended up staged); otherwise `git commit`'s
    *   own stdout (its `[branch hash] subject` summary block) followed by
@@ -176,27 +194,31 @@ class AutoFixAllCleanupArtifacts {
   }
 
   /**
-   * Commits whatever is staged with the hardcoded planning-artifacts
-   * removal message, mirroring `cleanup_artifacts_shell.sh`'s inline
-   * `git commit -F -` heredoc exactly (not `arcanum/_lib/commit_template.sh`/
-   * `agent_email.sh`) — including leaving `git commit`'s own stdout
-   * (unlike the `git rm` calls above, the shell script never redirects
-   * this one to `/dev/null`) for the caller to relay.
+   * Commits whatever is staged with the planning-artifacts removal
+   * message, mirroring `cleanup_artifacts_shell.sh`: the subject line,
+   * then — only when `CoauthorTrailers` yields any — a blank line and
+   * the `"architect"` agent's `Co-Authored-By` trailer lines (honoring
+   * `git.omit_model_coauthor` and the architect's configured email,
+   * like the other commit entrypoints). `git commit`'s own stdout is
+   * left for the caller to relay (unlike the `git rm` calls above, the
+   * shell script never redirects this one to `/dev/null`).
    * @param {string} id - the issue's numeric id.
    * @param {string} modelName - the acting model's display name.
    * @param {string} modelEmail - the acting model's email.
    * @returns {Promise<string>} `git commit`'s own stdout.
    */
   async _commit(id, modelName, modelEmail) {
-    const message = [
-      `chore(docs): remove planning artifacts (issue #${id})`,
-      '',
-      `Co-Authored-By: ${modelName} <${modelEmail}>`,
-      `Co-Authored-By: architect agent <${modelEmail}>`
-    ].join('\n');
+    const repoPath = this._repoContext.repoPath;
+    const trailers = await this._coauthorTrailers.lines(repoPath, AGENT, modelName, modelEmail);
+    const lines = [`chore(docs): remove planning artifacts (issue #${id})`];
 
+    if (trailers.length > 0) {
+      lines.push('', ...trailers);
+    }
+
+    const message = lines.join('\n');
     const { stdout } = await this._execFileAsync('git', ['commit', '-F', '-'], {
-      cwd: this._repoContext.repoPath,
+      cwd: repoPath,
       input: message
     });
 

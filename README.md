@@ -162,7 +162,7 @@ Arcanum configuration keys are resolved through a 3-tier chain, in order of prec
 | Key | Description |
 | --- | --- |
 | `git.merge_body_mode` | Controls the squash-merge commit body (`empty`, `full`, or `coauthors`). |
-| `git.omit_model_coauthor` | When `true`, removes the model's email from the coauthors list during merge. |
+| `git.omit_model_coauthor` | When `true`, removes the model's email from every `Co-Authored-By` trailer arcanum's commit scripts write (issue, plan, change and planning-artifacts cleanup commits), and so from the coauthors list during merge. |
 | `git.remove_coauthors` | List of emails to remove from the coauthors list during merge. |
 | `git.agents.<agent>.email` | Commit author email per agent, supports the `{agent}` placeholder. |
 | `git.email` | Global fallback email for agents without a specific email configured. |

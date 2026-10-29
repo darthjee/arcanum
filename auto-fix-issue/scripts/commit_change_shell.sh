@@ -19,7 +19,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../arcanum/_lib/push.sh"
 source "${SCRIPT_DIR}/../../arcanum/_lib/repo_path.sh"
-source "${SCRIPT_DIR}/../../arcanum/_lib/commit_template.sh"
 source "${SCRIPT_DIR}/../../arcanum/_lib/agent_email.sh"
 
 REPO_PATH="${1:-}"
@@ -40,10 +39,7 @@ COMMENT_URL="${10:-}"
 
 repo_path_enter "$REPO_PATH"
 
-AGENT_EMAIL="$MODEL_EMAIL"
-if [[ "$(commit_template_engine_get)" == "new" ]]; then
-  AGENT_EMAIL="$(agent_email_get "$AGENT" "$MODEL_EMAIL")"
-fi
+TRAILERS="$(coauthor_trailers "$AGENT" "$MODEL_NAME" "$MODEL_EMAIL")"
 
 {
   echo "${TYPE}(${SCOPE}): ${SUBJECT} (issue #${ID})"
@@ -55,11 +51,10 @@ fi
     echo
     echo "Addresses-Comment: ${COMMENT_URL}"
   fi
-  echo
-  if [[ "$(model_coauthor_omitted)" != "true" ]]; then
-    echo "Co-Authored-By: ${MODEL_NAME} <${MODEL_EMAIL}>"
+  if [[ -n "$TRAILERS" ]]; then
+    echo
+    echo "$TRAILERS"
   fi
-  echo "Co-Authored-By: ${AGENT} agent <${AGENT_EMAIL}>"
 } | git commit -F -
 
 push_current_branch

@@ -1,9 +1,9 @@
 import { stat } from 'node:fs/promises';
 import { execFile, spawn } from 'node:child_process';
-import path from 'node:path';
 import { promisify } from 'node:util';
 import AgentEmail from '../../../../shared/lib/config/AgentEmail.js';
 import ConfigChain from '../../../../shared/lib/config/ConfigChain.js';
+import CoauthorTrailers from '../../utils/git/CoauthorTrailers.js';
 
 const promisifiedExecFile = promisify(execFile);
 const USAGE = 'Usage: commit_issue.sh <repo_path> <file_path> <id> <model_name> <model_email>';
@@ -88,16 +88,21 @@ class AutoNewIssueCommitIssue {
    *   `config_chain_read`) rather than re-derived.
    * @param {AgentEmail} [deps.agentEmail] - the shared agent-email
    *   resolver (defaults to one built on `configChain`).
+   * @param {CoauthorTrailers} [deps.coauthorTrailers] - the shared
+   *   `Co-Authored-By` trailer builder (defaults to one built on
+   *   `configChain`/`agentEmail`).
    */
   constructor(repoContext, {
     execFileAsync = defaultExecFileAsync,
     configChain = new ConfigChain(),
-    agentEmail = new AgentEmail({ configChain })
+    agentEmail = new AgentEmail({ configChain }),
+    coauthorTrailers = new CoauthorTrailers({ configChain, agentEmail })
   } = {}) {
     this._repoContext = repoContext;
     this._execFileAsync = execFileAsync;
     this._configChain = configChain;
     this._agentEmail = agentEmail;
+    this._coauthorTrailers = coauthorTrailers;
   }
 
   /**
@@ -144,9 +149,9 @@ class AutoNewIssueCommitIssue {
 
   /**
    * Build the commit message exactly as `commit_issue_shell.sh` does:
-   * subject line, blank line, then the model's `Co-Authored-By` trailer
-   * (unless `omit_model_coauthor` is set), then the fixed `"architect"`
-   * agent's own `Co-Authored-By` trailer.
+   * subject line, then — only when `CoauthorTrailers` yields any — a
+   * blank line and the fixed `"architect"` agent's `Co-Authored-By`
+   * trailer lines.
    * @param {string} repoPath - the target repo's local checkout path.
    * @param {string} id - the issue's numeric id.
    * @param {string} modelName - the acting model's display name.
@@ -154,72 +159,14 @@ class AutoNewIssueCommitIssue {
    * @returns {Promise<string>} the assembled commit message.
    */
   async _buildMessage(repoPath, id, modelName, modelEmail) {
-    const templateEngine = await this._commitTemplateEngineGet(repoPath);
-    const agentEmail = templateEngine === 'new'
-      ? await this._agentEmail.get(repoPath, AGENT, modelEmail)
-      : modelEmail;
-    const omitModelCoauthor = await this._modelCoauthorOmitted(repoPath);
+    const trailers = await this._coauthorTrailers.lines(repoPath, AGENT, modelName, modelEmail);
+    const lines = [`docs(issue): add issue file (issue #${id})`];
 
-    const lines = [`docs(issue): add issue file (issue #${id})`, ''];
-
-    if (!omitModelCoauthor) {
-      lines.push(`Co-Authored-By: ${modelName} <${modelEmail}>`);
+    if (trailers.length > 0) {
+      lines.push('', ...trailers);
     }
-
-    lines.push(`Co-Authored-By: ${AGENT} agent <${agentEmail}>`);
 
     return lines.join('\n');
-  }
-
-  /**
-   * Native re-derivation of `arcanum/_lib/commit_template.sh`'s
-   * `commit_template_engine_get`, for this entrypoint's own use only
-   * (per `script-engine.md`'s "no standalone, wholesale `_lib`
-   * migration" rule).
-   * @param {string} repoPath - the target repo's local checkout path.
-   * @returns {Promise<'new'|'old'>} `"new"` when
-   *   `.github/commit_message_template-2.0.md` exists, `"old"` when
-   *   only `.github/commit_message_template.md` exists, `"new"` when
-   *   neither does.
-   */
-  async _commitTemplateEngineGet(repoPath) {
-    if (await this._fileExists(path.join(repoPath, '.github', 'commit_message_template-2.0.md'))) {
-      return 'new';
-    }
-
-    if (await this._fileExists(path.join(repoPath, '.github', 'commit_message_template.md'))) {
-      return 'old';
-    }
-
-    return 'new';
-  }
-
-  /**
-   * Native re-derivation of `arcanum/_lib/agent_email.sh`'s
-   * `model_coauthor_omitted`, for this entrypoint's own use only.
-   * @param {string} repoPath - the target repo's local checkout path.
-   * @returns {Promise<boolean>} `true` only when the resolved
-   *   `git.omit_model_coauthor` config value is the literal string or
-   *   boolean `true`, `false` otherwise (including absent).
-   */
-  async _modelCoauthorOmitted(repoPath) {
-    const value = await this._configChain.read(repoPath, 'git', 'omit_model_coauthor');
-
-    return value === true || value === 'true';
-  }
-
-  /**
-   * @param {string} filePath - the path to check.
-   * @returns {Promise<boolean>} whether `filePath` exists.
-   */
-  async _fileExists(filePath) {
-    try {
-      await stat(filePath);
-
-      return true;
-    } catch {
-      return false;
-    }
   }
 
   /**

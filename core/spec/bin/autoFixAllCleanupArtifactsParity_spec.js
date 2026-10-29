@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { createGitFixtureRepo } from '../support/utils/gitFixtureRepo.js';
+import { isolateGlobalConfig } from '../support/utils/isolatedGlobalConfig.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
 // Parity test for the "auto-fix-all-cleanup-artifacts" migrated
@@ -16,11 +17,15 @@ import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 // so this test isn't circular) and `core/bin/arcanum
 // auto-fix-all-cleanup-artifacts` against equivalent inputs/repo state,
 // asserting byte-identical stdout and exit code for both the "nothing
-// staged" and "something staged" cases. No `HOME`/env overrides are
-// applied here — both scripts resolve the committer's identity from git
-// config the same way (matching the Notes in node.md), so each fixture
-// repo gets its identity set via `git config user.*`, same as
-// `commit.gpgsign` already is in `createGitFixtureRepo`.
+// staged" and "something staged" cases. The only env override is
+// `CLAUDE_CONFIG_DIR`, pointed at an empty temp dir (see
+// `isolateGlobalConfig`) so the commit trailers — which honor
+// `git.omit_model_coauthor` and `git.agents.architect` — never depend on
+// the developer's real global config tier. Both scripts resolve the
+// committer's identity from git config the same way (matching the Notes
+// in node.md), so each fixture repo gets its identity set via `git
+// config user.*`, same as `commit.gpgsign` already is in
+// `createGitFixtureRepo`.
 //
 // Neither cleanup_artifacts_shell.sh nor the native side redirects `git
 // commit`'s own stdout (only the `git rm` calls are silenced with
@@ -36,6 +41,9 @@ import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
 const execFileAsync = promisify(execFile);
 
+// Set inside the top-level `describe` (see `isolateGlobalConfig`).
+let isolatedEnv;
+
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const SHELL_SCRIPT = path.join(REPO_ROOT, 'auto-fix-all', 'scripts', 'cleanup_artifacts_shell.sh');
 const NATIVE_BIN = path.join(REPO_ROOT, 'core', 'bin', 'arcanum');
@@ -45,6 +53,8 @@ const PLAN_DIR = 'docs/agents/plans/999-test';
 const ID = '999';
 const MODEL_NAME = 'Node Agent';
 const MODEL_EMAIL = 'node@example.com';
+const ARCHITECT_EMAIL = 'architect@example.com';
+const MODEL_LINE = `Co-Authored-By: ${MODEL_NAME} <${MODEL_EMAIL}>`;
 
 /**
  * Run a cleanup-artifacts invocation (shell or native) and capture its
@@ -55,7 +65,7 @@ const MODEL_EMAIL = 'node@example.com';
  */
 async function runCommand([file, ...args], cwd) {
   try {
-    const { stdout, stderr } = await execFileAsync(file, args, { cwd });
+    const { stdout, stderr } = await execFileAsync(file, args, { cwd, env: isolatedEnv() });
 
     return { stdout, stderr, code: 0 };
   } catch (error) {
@@ -118,7 +128,28 @@ async function seedArtifacts(repoPath) {
   await git(['push', 'origin', 'main'], repoPath);
 }
 
+/**
+ * Write `repoPath`'s repo-tier config (left untracked, so it never ends
+ * up in the cleanup commit).
+ * @param {string} repoPath - the fixture repo's local checkout path.
+ * @param {object} [gitConfig] - the `git` namespace to write; nothing
+ *   is written when omitted.
+ * @returns {Promise<void>} resolves once written.
+ */
+async function seedRepoConfig(repoPath, gitConfig) {
+  if (!gitConfig) {
+    return;
+  }
+
+  const dir = path.join(repoPath, '.claude', 'configuration');
+
+  await mkdir(dir, { recursive: true });
+  await writeFile(path.join(dir, 'arcanum-repo-config.json'), JSON.stringify({ git: gitConfig }));
+}
+
 describe('auto-fix-all-cleanup-artifacts parity (shell vs. native)', () => {
+  isolatedEnv = isolateGlobalConfig();
+
   describe('nothing staged (issue file and plan dir untracked)', () => {
     it('matches shell exit code and stdout — both no-op silently', async () => {
       const repo = await createGitFixtureRepo();
@@ -145,45 +176,77 @@ describe('auto-fix-all-cleanup-artifacts parity (shell vs. native)', () => {
   });
 
   describe('something staged (issue file and plan dir tracked)', () => {
-    it('matches shell exit code and stdout, and produces the same commit message', async () => {
-      // Each side needs its own isolated repo — running both against a
-      // shared repo would mean the second invocation sees the first
-      // one's already-committed, already-pushed state instead of an
-      // equivalent starting point.
-      const shellRepo = await createGitFixtureRepo();
-      const nativeRepo = await createGitFixtureRepo();
-
-      try {
-        await Promise.all([configureIdentity(shellRepo.repoPath), configureIdentity(nativeRepo.repoPath)]);
-        await Promise.all([seedArtifacts(shellRepo.repoPath), seedArtifacts(nativeRepo.repoPath)]);
-
-        const args = [ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, MODEL_EMAIL];
-
-        const shell = await runCommand([SHELL_SCRIPT, shellRepo.repoPath, ...args], shellRepo.repoPath);
-        const native = await runCommand(
-          [process.execPath, NATIVE_BIN, 'auto-fix-all-cleanup-artifacts', nativeRepo.repoPath, ...args],
-          nativeRepo.repoPath
-        );
-
-        // Neither side redirects `git commit`'s own stdout (only the
-        // `git rm` calls are silenced), so both leak that summary block
-        // to stdout, byte-identical modulo the necessarily-distinct
-        // commit hash each side's separate fixture repo produces.
-        expect(normalizeCommitHash(native.stdout)).toEqual(normalizeCommitHash(shell.stdout));
-        expect(native.code).toEqual(shell.code);
-        expect(shell.code).toEqual(0);
-        expect(shell.stdout).toContain(`chore(docs): remove planning artifacts (issue #${ID})`);
-
-        const [shellLog, nativeLog] = await Promise.all([
-          git(['log', '-1', '--format=%s%n%n%b'], shellRepo.repoPath),
-          git(['log', '-1', '--format=%s%n%n%b'], nativeRepo.repoPath)
-        ]);
-
-        expect(nativeLog.stdout).toEqual(shellLog.stdout);
-        expect(shellLog.stdout).toContain(`chore(docs): remove planning artifacts (issue #${ID})`);
-      } finally {
-        await Promise.all([shellRepo.cleanup(), nativeRepo.cleanup()]);
+    [
+      {
+        title: 'with no config',
+        gitConfig: undefined,
+        trailers: [MODEL_LINE, `Co-Authored-By: architect agent <${MODEL_EMAIL}>`]
+      },
+      {
+        title: 'with omit_model_coauthor=false and an architect email',
+        gitConfig: { omit_model_coauthor: false, agents: { architect: ARCHITECT_EMAIL } },
+        trailers: [MODEL_LINE, `Co-Authored-By: architect agent <${ARCHITECT_EMAIL}>`]
+      },
+      {
+        title: 'with omit_model_coauthor=true and an architect email',
+        gitConfig: { omit_model_coauthor: true, agents: { architect: ARCHITECT_EMAIL } },
+        trailers: [`Co-Authored-By: architect agent <${ARCHITECT_EMAIL}>`]
+      },
+      {
+        title: 'with omit_model_coauthor=true and no architect email',
+        gitConfig: { omit_model_coauthor: true },
+        trailers: []
       }
+    ].forEach(({ title, gitConfig, trailers }) => {
+      it(`matches shell exit code and stdout, and produces the same commit message (${title})`, async () => {
+        // Each side needs its own isolated repo — running both against a
+        // shared repo would mean the second invocation sees the first
+        // one's already-committed, already-pushed state instead of an
+        // equivalent starting point.
+        const shellRepo = await createGitFixtureRepo();
+        const nativeRepo = await createGitFixtureRepo();
+
+        try {
+          await Promise.all([configureIdentity(shellRepo.repoPath), configureIdentity(nativeRepo.repoPath)]);
+          await Promise.all([seedArtifacts(shellRepo.repoPath), seedArtifacts(nativeRepo.repoPath)]);
+          await Promise.all([
+            seedRepoConfig(shellRepo.repoPath, gitConfig),
+            seedRepoConfig(nativeRepo.repoPath, gitConfig)
+          ]);
+
+          const args = [ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, MODEL_EMAIL];
+
+          const shell = await runCommand([SHELL_SCRIPT, shellRepo.repoPath, ...args], shellRepo.repoPath);
+          const native = await runCommand(
+            [process.execPath, NATIVE_BIN, 'auto-fix-all-cleanup-artifacts', nativeRepo.repoPath, ...args],
+            nativeRepo.repoPath
+          );
+
+          // Neither side redirects `git commit`'s own stdout (only the
+          // `git rm` calls are silenced), so both leak that summary block
+          // to stdout, byte-identical modulo the necessarily-distinct
+          // commit hash each side's separate fixture repo produces.
+          expect(normalizeCommitHash(native.stdout)).toEqual(normalizeCommitHash(shell.stdout));
+          expect(native.code).toEqual(shell.code);
+          expect(shell.code).toEqual(0);
+          expect(shell.stdout).toContain(`chore(docs): remove planning artifacts (issue #${ID})`);
+
+          const [shellLog, nativeLog] = await Promise.all([
+            git(['log', '-1', '--format=%B'], shellRepo.repoPath),
+            git(['log', '-1', '--format=%B'], nativeRepo.repoPath)
+          ]);
+          const expected = [`chore(docs): remove planning artifacts (issue #${ID})`];
+
+          if (trailers.length > 0) {
+            expected.push('', ...trailers);
+          }
+
+          expect(nativeLog.stdout).toEqual(shellLog.stdout);
+          expect(shellLog.stdout).toEqual(`${expected.join('\n')}\n\n`);
+        } finally {
+          await Promise.all([shellRepo.cleanup(), nativeRepo.cleanup()]);
+        }
+      });
     });
   });
 

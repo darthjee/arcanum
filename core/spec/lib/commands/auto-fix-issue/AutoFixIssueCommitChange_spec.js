@@ -136,11 +136,40 @@ describe('AutoFixIssueCommitChange', () => {
           repoPath,
           runArgs: [TYPE, SCOPE, ID, SUBJECT, AGENT, MODEL_NAME, MODEL_EMAIL],
           execFileAsyncOpts: EXEC_FILE_ASYNC_OPTS,
-          configChainOpts: { agentEmail: undefined, omitModelCoauthor: true },
+          configChainOpts: { agentEmail: 'backend@example.com', omitModelCoauthor: true },
           expected:
             'fix(core): fix the thing (issue #999)\n\n' +
-            'Co-Authored-By: backend agent <node@example.com>'
+            'Co-Authored-By: backend agent <backend@example.com>'
         });
+      });
+
+      it(
+        'omits every Co-Authored-By trailer, and the blank separator line, when model_coauthor_omitted ' +
+          'resolves true and the agent email falls back to the model email',
+        async () => {
+          await expectCommitMessage({
+            CommandClass: AutoFixIssueCommitChange,
+            repoPath,
+            runArgs: [TYPE, SCOPE, ID, SUBJECT, AGENT, MODEL_NAME, MODEL_EMAIL],
+            execFileAsyncOpts: EXEC_FILE_ASYNC_OPTS,
+            configChainOpts: { agentEmail: undefined, omitModelCoauthor: true },
+            expected: 'fix(core): fix the thing (issue #999)'
+          });
+        }
+      );
+
+      it('builds the trailers through an injected coauthorTrailers collaborator', async () => {
+        const execFileAsync = fakeGitExecFileAsync(EXEC_FILE_ASYNC_OPTS);
+        const configChain = fakeConfigChain({});
+        const coauthorTrailers = { lines: jasmine.createSpy('lines').and.resolveTo(['Trailer: one']) };
+        const instance = new AutoFixIssueCommitChange({ repoPath }, { execFileAsync, configChain, coauthorTrailers });
+
+        await instance.run(...[TYPE, SCOPE, ID, SUBJECT, AGENT, MODEL_NAME, MODEL_EMAIL]);
+
+        const commitCall = execFileAsync.calls.all().find((call) => call.args[1][0] === 'commit');
+
+        expect(coauthorTrailers.lines).toHaveBeenCalledWith(repoPath, AGENT, MODEL_NAME, MODEL_EMAIL);
+        expect(commitCall.args[2].input).toEqual('fix(core): fix the thing (issue #999)\n\nTrailer: one');
       });
 
       it('keeps the model Co-Authored-By trailer when model_coauthor_omitted resolves false', async () => {
