@@ -2,7 +2,9 @@
   "auto-fix-all": {
     "clear_context": true,
     "finish_on_empty_queue": true,
-    "ignored_check_patterns": ["Codacy"]
+    "ignored_check_patterns": [
+      "Codacy"
+    ]
   },
   "plan-issues": {
     "error-sleep-type": 5,
@@ -26,5 +28,5 @@
   "migrations": {
     "version": "0.16.1"
   },
-  "version": "0.18.0"
+  "version": "2.0.0"
 }
