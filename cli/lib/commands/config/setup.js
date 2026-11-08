@@ -10,7 +10,7 @@ import { SETUP_SECTIONS } from '../../../../shared/lib/config/KeyRegistry.js';
 import { lockTimeoutMs } from '../../args.js';
 import { EXIT_OK, TargetUnavailableError, UsageError } from '../../exitCodes.js';
 import { EXIT_SIGINT } from '../../writeTier.js';
-import { Interrupted, createPrompter } from '../../prompter.js';
+import { Interrupted, createPrompter, isInteractive, onceOnly } from '../../prompter.js';
 import { REPO_CONFIG_FILE } from '../../tierFiles.js';
 import { askPatterns } from './setup/ci.js';
 import { askAgents } from './setup/identity.js';
@@ -36,6 +36,8 @@ export const AGENTS_KEY = AGENTS_PATTERN;
 export const CI_SECTION = 'ci';
 
 const WILDCARD = /^<[^>]+>$/;
+
+export { isInteractive, onceOnly };
 
 /**
  * Runs the wizard: the usage checks (`--json`, the terminal, the
@@ -122,20 +124,6 @@ export function summarizingSignals(session, signals) {
       signals.exit(code);
     }
   };
-}
-
-/**
- * @param {object} io - the streams.
- * @param {object} deps - injectable collaborators (`isInteractive`).
- * @returns {boolean} whether stdin and stderr are both terminals, or the
- *   injected answer.
- */
-export function isInteractive(io, deps) {
-  if (deps.isInteractive !== undefined) {
-    return Boolean(deps.isInteractive);
-  }
-
-  return Boolean(io.stdin && io.stdin.isTTY && io.stderr && io.stderr.isTTY);
 }
 
 /**
@@ -248,23 +236,6 @@ export function availableItems(items, { repo }, output) {
   }
 
   return kept;
-}
-
-/**
- * @param {(message: string) => void} warn - prints a stderr warning.
- * @returns {(message: string) => void} the same, printing each distinct
- *   message once, so re-reading the tiers per setting does not repeat
- *   the read warnings.
- */
-export function onceOnly(warn) {
-  const seen = new Set();
-
-  return (message) => {
-    if (!seen.has(message)) {
-      seen.add(message);
-      warn(message);
-    }
-  };
 }
 
 /** Item kind → its dialogue. */

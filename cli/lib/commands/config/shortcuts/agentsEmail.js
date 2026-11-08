@@ -2,8 +2,9 @@
 // docs/agents/architecture/arcanum-cli.md#agents-email): the listing of
 // every agent's effective commit email, the per-tier matrix of every
 // agent (`--all-tiers`, in agentsEmailMatrix.js), the detail of one
-// agent, and the `set`/`unset` writes of `git.email` and
-// `git.agents.<agent>`. Resolution goes only through the shared
+// agent, the `set`/`unset` writes of `git.email` and
+// `git.agents.<agent>`, and the interactive `edit` loop (in
+// agentsEmailEdit.js). Resolution goes only through the shared
 // `AgentEmail#resolve` (built on `ConfigChain#readWithSource`), so the
 // CLI shows exactly what `arcanum/_lib/agent_email.sh` commits with.
 
@@ -11,8 +12,10 @@ import { checkKey } from '../../../args.js';
 import { EXIT_ERROR, EXIT_OK, UsageError } from '../../../exitCodes.js';
 import { lookupKey } from '../../../tierFiles.js';
 import {
-  AGENT_PATTERN, DEFAULT_TIER, EMAIL_KEY, NAME, agentKey, genericFields, readAgents, readEmailTiers, resolvedFields, shownValue
+  AGENT_PATTERN, DEFAULT_TIER, EMAIL_KEY, NAME, STRING_VALUE, agentKey, genericFields, readAgents, readEmailTiers, resolvedFields,
+  shownValue
 } from './agentsEmailRead.js';
+import { editEmails } from './agentsEmailEdit.js';
 import { showMatrix } from './agentsEmailMatrix.js';
 import { checkMaxArity, checkShortcutFlags, delegate, writeValue } from './common.js';
 
@@ -20,12 +23,10 @@ export {
   AGENTS_DIR, AGENTS_PATTERN, AGENT_PATTERN, DEFAULT_TIER, EMAIL_KEY, NAME, agentKey, repoAgents
 } from './agentsEmailRead.js';
 
-const STRING_VALUE = (raw) => ({ value: raw, jsonError: null, precisionLoss: false });
-
 /**
- * Runs `agents email`: `set` and `unset` are verbs in the first
- * position; anything else is the listing (no argument) or the detail of
- * one agent.
+ * Runs `agents email`: `set`, `unset` and `edit` are verbs in the first
+ * position; anything else is the listing (no argument, or the matrix
+ * with `--all-tiers`) or the detail of one agent.
  * @param {object} context - the `config` context.
  * @param {string[]} args - the positionals after `agents email`.
  * @returns {Promise<number>} the exit code.
@@ -40,6 +41,10 @@ export function runAgentsEmail(context, args) {
 
   if (verb === 'unset') {
     return unsetEmail(context, rest);
+  }
+
+  if (verb === 'edit') {
+    return editEmails(context, rest);
   }
 
   checkReadFlags(context.values, { listing: verb === undefined });

@@ -34,6 +34,16 @@ export const AGENT_PATTERN = /^[A-Za-z0-9_-]+$/;
 export const AGENTS_DIR = path.join('.claude', 'agents');
 
 /**
+ * The value parser of every email write: the email is stored as typed,
+ * as a plain string (never parsed as JSON, never validated).
+ * @param {string} raw - the value as typed.
+ * @returns {{value: string, jsonError: null, precisionLoss: boolean}} the parsed value.
+ */
+export function STRING_VALUE(raw) {
+  return { value: raw, jsonError: null, precisionLoss: false };
+}
+
+/**
  * A `ConfigChain` with no repo tiers, for a target that is not a repo:
  * only the global tier is read, as everywhere else in the CLI.
  */
