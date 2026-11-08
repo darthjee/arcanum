@@ -157,18 +157,22 @@ const BOOLEAN_NOTE = 'Booleans: on, off, true or false (lowercase), stored as JS
  */
 export const SHORTCUT_HELP = {
   'agents email': {
-    synopsis: 'agents email [<agent>] | set <pattern> | set <agent> <email> | unset [<agent>]',
-    summary: 'Show each agent\'s effective commit email, or set git.email / git.agents.<agent> (default: global)',
+    synopsis: 'agents email [<agent>] [--all-tiers] | set <pattern> | set <agent> <email> | unset [<agent>] | edit',
+    summary: 'Show each agent\'s commit email, per tier with --all-tiers, or set git.email / git.agents.<agent> (default: global)',
     rows: [
+      ['--all-tiers', 'listing only: one column per tier, with the resolved and shadowed values marked'],
       ['--global|--repo|--local', 'set/unset: write to that tier instead of the global one'],
-      ['--lock-timeout <seconds>', 'set/unset: wait at most this long for the lock (default 10)']
+      ['--lock-timeout <seconds>', 'set/unset/edit: wait at most this long for the lock (default 10)']
     ],
     notes: [
       'With no argument, lists the default git.email and every agent (configured, or in',
       'the repo\'s .claude/agents/*.md) with the email it commits with and where it comes from.',
+      'With --all-tiers, shows a (default) row and one row per agent, one column per tier.',
       'With <agent>, shows both keys in every tier; exits 1 when the model email would apply.',
       'set <pattern> writes git.email ({agent} is replaced by the agent name);',
-      'set <agent> <email> writes git.agents.<agent>. Default write tier: global.'
+      'set <agent> <email> writes git.agents.<agent>. Default write tier: global.',
+      'edit asks agent, email (- unsets) and tier in a loop (needs a terminal; Enter finishes).',
+      'set, unset and edit are reserved: use config get/set git.agents.<agent> for agents so named.'
     ]
   },
   engine: {
