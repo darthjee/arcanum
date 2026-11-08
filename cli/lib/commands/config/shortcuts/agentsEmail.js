@@ -1,63 +1,26 @@
 // `arcanum config agents email` (see
 // docs/agents/architecture/arcanum-cli.md#agents-email): the listing of
-// every agent's effective commit email, the per-tier detail of one
+// every agent's effective commit email, the per-tier matrix of every
+// agent (`--all-tiers`, in agentsEmailMatrix.js), the detail of one
 // agent, and the `set`/`unset` writes of `git.email` and
 // `git.agents.<agent>`. Resolution goes only through the shared
 // `AgentEmail#resolve` (built on `ConfigChain#readWithSource`), so the
 // CLI shows exactly what `arcanum/_lib/agent_email.sh` commits with.
 
-import { readdir } from 'node:fs/promises';
-import path from 'node:path';
-import AgentEmail from '../../../../../shared/lib/config/AgentEmail.js';
-import ConfigChain from '../../../../../shared/lib/config/ConfigChain.js';
 import { checkKey } from '../../../args.js';
 import { EXIT_ERROR, EXIT_OK, UsageError } from '../../../exitCodes.js';
-import { formatValue } from '../../../output.js';
 import { lookupKey } from '../../../tierFiles.js';
-import { readTiers } from '../shared.js';
-import { checkMaxArity, checkShortcutFlags, delegate, memoizeTargets, writeValue } from './common.js';
+import {
+  AGENT_PATTERN, DEFAULT_TIER, EMAIL_KEY, NAME, agentKey, genericFields, readAgents, readEmailTiers, resolvedFields, shownValue
+} from './agentsEmailRead.js';
+import { showMatrix } from './agentsEmailMatrix.js';
+import { checkMaxArity, checkShortcutFlags, delegate, writeValue } from './common.js';
 
-/** The shortcut's name, as typed. */
-export const NAME = 'agents email';
-
-/** The default write tier of `set` and `unset`. */
-export const DEFAULT_TIER = 'global';
-
-/** The generic email key. */
-export const EMAIL_KEY = 'git.email';
-
-/** The per-agent email key, as the registry names it. */
-export const AGENTS_PATTERN = 'git.agents.<agent>';
-
-/** A well-formed agent name: one registry wildcard segment. */
-export const AGENT_PATTERN = /^[A-Za-z0-9_-]+$/;
-
-/** The repo's agents folder, relative to its root. */
-export const AGENTS_DIR = path.join('.claude', 'agents');
+export {
+  AGENTS_DIR, AGENTS_PATTERN, AGENT_PATTERN, DEFAULT_TIER, EMAIL_KEY, NAME, agentKey, repoAgents
+} from './agentsEmailRead.js';
 
 const STRING_VALUE = (raw) => ({ value: raw, jsonError: null, precisionLoss: false });
-
-/**
- * A `ConfigChain` with no repo tiers, for a target that is not a repo:
- * only the global tier is read, as everywhere else in the CLI.
- */
-class GlobalOnlyConfigChain extends ConfigChain {
-  /**
-   * @returns {Array<(string|null)>} no local and repo files, then the
-   *   global file.
-   */
-  _tierFiles() {
-    return [null, null, this._globalConfigFile()];
-  }
-}
-
-/**
- * @param {string} agent - an agent name.
- * @returns {string} its key, `git.agents.<agent>`.
- */
-export function agentKey(agent) {
-  return `git.agents.${agent}`;
-}
 
 /**
  * Runs `agents email`: `set` and `unset` are verbs in the first
@@ -79,10 +42,14 @@ export function runAgentsEmail(context, args) {
     return unsetEmail(context, rest);
   }
 
-  checkReadFlags(context.values);
+  checkReadFlags(context.values, { listing: verb === undefined });
   checkMaxArity(NAME, args, 1);
 
-  return verb === undefined ? listEmails(context) : showAgent(context, checkAgent(verb));
+  if (verb !== undefined) {
+    return showAgent(context, checkAgent(verb));
+  }
+
+  return context.values['all-tiers'] ? showMatrix(context) : listEmails(context);
 }
 
 /**
@@ -138,18 +105,20 @@ function checkWriteFlags(values, verb) {
 }
 
 /**
- * The listing and the detail show every tier: they take no tier flag,
- * no `--all-tiers` and no `--unset`.
+ * The listing and the detail show every tier: they take no tier flag
+ * and no `--unset`; only the listing takes `--all-tiers` (the matrix).
  * @param {object} values - the parsed flags.
+ * @param {object} form - the read form.
+ * @param {boolean} form.listing - whether it is the listing.
  * @throws {UsageError} on any of those flags.
  */
-function checkReadFlags(values) {
+function checkReadFlags(values, { listing }) {
   if (values.unset) {
     throw new UsageError(`--unset is not accepted by ${NAME}; use ${NAME} unset [<agent>]`);
   }
 
   const tier = checkShortcutFlags(NAME, values, { write: false });
-  const flag = tier === undefined ? (values['all-tiers'] ? 'all-tiers' : undefined) : tier;
+  const flag = tier === undefined ? (values['all-tiers'] && !listing ? 'all-tiers' : undefined) : tier;
 
   if (flag !== undefined) {
     throw new UsageError(`--${flag} is not accepted by ${NAME}: it always shows every tier`);
@@ -170,103 +139,17 @@ function checkAgent(agent) {
 }
 
 /**
- * Reads what the listing and the detail need: the tiers (with the
- * generic read warnings), and an `AgentEmail` reading the same targets.
- * @param {object} context - the `config` context.
- * @returns {Promise<{targets: object, tiers: object[], agentEmail: AgentEmail, configChain: ConfigChain, repoPath: string}>}
- *   the targets, the tiers (each with its `file`, `null` when it has no
- *   target), the resolver, its chain and the repo path to resolve against.
- */
-async function readEmailTiers(context) {
-  const resolveTargets = memoizeTargets(context.resolveTargets);
-  const { targets, tiers } = await readTiers({ ...context, resolveTargets, tier: undefined }, { allTiers: true });
-  const env = targets.account.dir === null ? {} : { CLAUDE_CONFIG_DIR: targets.account.dir };
-  const configChain = targets.repo.root === null ? new GlobalOnlyConfigChain({ env }) : new ConfigChain({ env });
-
-  return {
-    targets,
-    tiers,
-    agentEmail: new AgentEmail({ configChain }),
-    configChain,
-    repoPath: targets.repo.root === null ? targets.repo.path : targets.repo.root
-  };
-}
-
-/**
- * @param {string} root - the repo root.
- * @returns {Promise<Set<string>>} the basenames of its
- *   `.claude/agents/*.md` files (anything else is ignored).
- */
-export async function repoAgents(root) {
-  let entries;
-
-  try {
-    entries = await readdir(path.join(root, AGENTS_DIR), { withFileTypes: true });
-  } catch {
-    return new Set();
-  }
-
-  return new Set(entries
-    .filter((entry) => !entry.isDirectory() && entry.name.endsWith('.md'))
-    .map((entry) => entry.name.slice(0, -'.md'.length))
-    .filter((name) => AGENT_PATTERN.test(name)));
-}
-
-/**
- * @param {object[]} tiers - the tiers read.
- * @returns {Set<string>} every agent with a non-null `git.agents.<agent>`
- *   in any tier.
- */
-function configuredAgents(tiers) {
-  const agents = new Set();
-
-  for (const { read } of tiers) {
-    const section = lookupKey(read.data, 'git.agents');
-
-    if (section.set && typeof section.value === 'object' && !Array.isArray(section.value)) {
-      for (const [agent, value] of Object.entries(section.value)) {
-        if (value !== null && AGENT_PATTERN.test(agent)) {
-          agents.add(agent);
-        }
-      }
-    }
-  }
-
-  return agents;
-}
-
-/**
- * @param {(object|undefined)} resolution - an `AgentEmail#resolve` result.
- * @returns {{email: (string|null), source: (string|null), key: (string|null)}}
- *   the effective email and where it came from; an explicit `""` keeps
- *   its source and key with a `null` email.
- */
-function resolvedFields(resolution) {
-  if (resolution === undefined) {
-    return { email: null, source: null, key: null };
-  }
-
-  return { email: resolution.email === undefined ? null : resolution.email, source: resolution.tier, key: resolution.key };
-}
-
-/**
  * The listing: the resolved raw `git.email` and every agent's effective
  * email. Always exits `0`.
  * @param {object} context - the `config` context.
  * @returns {Promise<number>} the exit code.
  */
 async function listEmails(context) {
-  const { targets, tiers, agentEmail, configChain, repoPath } = await readEmailTiers(context);
-  const inRepo = targets.repo.root === null ? null : await repoAgents(targets.repo.root);
-  const names = new Set([...configuredAgents(tiers), ...(inRepo || [])]);
-  const sorted = [...names].sort((a, b) => (a < b ? -1 : Number(a > b)));
-  const generic = await configChain.readWithSource(repoPath, 'git', 'email');
-  const fallback = generic === undefined
-    ? { set: false, value: null, source: null }
-    : { set: true, value: generic.value, source: generic.tier };
+  const { agentEmail, configChain, repoPath, inRepo, agents: names } = await readAgents(context);
+  const fallback = genericFields(await configChain.readWithSource(repoPath, 'git', 'email'));
   const agents = [];
 
-  for (const agent of sorted) {
+  for (const agent of names) {
     agents.push({
       agent,
       ...resolvedFields(await agentEmail.resolve(repoPath, agent)),
@@ -277,14 +160,6 @@ async function listEmails(context) {
   context.output.result(listText(fallback, agents), { default: fallback, agents });
 
   return EXIT_OK;
-}
-
-/**
- * @param {unknown} value - a stored value.
- * @returns {string} its human form (`""` for an empty string).
- */
-function shownValue(value) {
-  return value === '' ? '""' : formatValue(value);
 }
 
 /**
