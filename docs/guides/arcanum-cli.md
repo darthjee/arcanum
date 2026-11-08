@@ -119,9 +119,15 @@ arcanum config agents email node                        # one agent, tier by tie
 arcanum config agents email set 'you+{agent}@example.com'   # the default, {agent} = the agent name
 arcanum config agents email set node node-bot@example.com   # one agent
 arcanum config agents email unset node
+arcanum config agents email --all-tiers                 # every agent x every tier: where each email is set, and which one wins
+arcanum config agents email edit                        # fill in or clear emails interactively
 ```
 
 Writes go to your global config unless you pass a tier flag. `(model default)` means the commit will use the model's email.
+
+- **`--all-tiers`** shows one row for the default (`git.email`) and one per agent, with one column per tier (local, repo, global). `<- repo` marks where the email comes from, `(default: you+node@example.com)` says the agent falls back to the default pattern, and `(shadowed: global)` flags a value that is set but loses, so you never mistake a set cell for the one commits use. Outside a repo the local and repo columns show `(no target)`.
+- **`edit`** shows the same table and asks, in a loop: which agent (one of those listed, or `default` for the generic pattern), the email (`-` removes it), the tier (global unless you pick another; outside a repo only global), then asks you to confirm. Press Enter at the agent question to finish. It needs a terminal; in scripts use `set`/`unset`. To add an agent that is not listed, use `arcanum config agents email set <agent> <email>`.
+- **Reserved names.** `set`, `unset` and `edit` are commands here, so an agent literally named `set`, `unset` or `edit` is managed with `arcanum config get/set git.agents.<agent>` instead.
 
 **CI checks to ignore.** `auto-fix-all ignore-checks` edits the list of checks `/auto-fix-all` ignores in this repo. The list lives only in the committed repo config:
 

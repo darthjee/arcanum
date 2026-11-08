@@ -43,12 +43,13 @@ Separate entrypoint, shared logic:
 | `lib/commands/config/{get,set,unset,list,info}.js` | One module per subcommand, each exporting `options`, `positionals`, `acceptsTier` and `run`. |
 | `lib/commands/config/shortcuts/index.js` | The shortcut namespaces (`engine`, `git`, `auto-fix-all`, `monitor-issues`, `next-step`, `agents`): namespace → runner, or → shortcut name → runner. `config.js` dispatches to it before the generic subcommands. |
 | `lib/commands/config/shortcuts/common.js` | What every shortcut shares: the strict flag set (`--force`/`--string` refused, `--all-tiers` reads only, `--lock-timeout` writes only), `delegate` to the generic `get`/`set`/`unset`, `writeValue` and the shadowed-tier note. |
-| `lib/commands/config/shortcuts/{singleValue,nextStep,agentsEmail,ignoreChecks}.js` | The single-value table and runner, `next-step auto`, `agents email`, `auto-fix-all ignore-checks`. |
+| `lib/commands/config/shortcuts/{singleValue,nextStep,agentsEmail,ignoreChecks}.js` | The single-value table and runner, `next-step auto`, `agents email` (the dispatcher, listing, detail and writes), `auto-fix-all ignore-checks`. |
+| `lib/commands/config/shortcuts/{agentsEmailRead,agentsEmailMatrix,agentsEmailEdit}.js` | `agents email`'s shared reads (keys, tiers, repo and configured agents, `AgentEmail`), its per-tier matrix (`--all-tiers`, also rendered by `edit`) and its interactive `edit` loop. |
 | `lib/commands/config/shortcuts/defaultTier.js` | The default write tier of each key a shortcut covers (`defaultTier(key)`), shared by the shortcuts' tables and the setup wizard. |
 | `lib/booleanToken.js` | The shortcuts' `on`/`off`/`true`/`false` tokens, with the exit-`3` hint. |
 | `lib/commands/config/setup.js` | `config setup`: the `--json`/TTY/section usage checks, the item list built from the registry's `setup` fields, the no-repo skipping, the session and the per-item loop. |
 | `lib/commands/config/setup/{setting,identity,ci,summary}.js` | The wizard's scalar per-setting dialogue, the per-agent email overrides, the `ci` add/remove loop, and the stderr summary. |
-| `lib/prompter.js` | The wizard's line prompter over `node:readline` (questions to stderr, queued answers), rejecting with `Interrupted` on EOF or Ctrl-C; it owns `SIGINT` only while a question is open. |
+| `lib/prompter.js` | The line prompter of the wizard and `agents email edit` over `node:readline` (questions to stderr, queued answers), rejecting with `Interrupted` on EOF or Ctrl-C; it owns `SIGINT` only while a question is open. Also `isInteractive` (the terminal check) and `onceOnly` (each read warning printed once per session), shared by both. |
 | `lib/commands/config/shared.js` | Read-side helpers: `readTiers` (targets, account/repo read rules, tolerant reads, skew warnings), file display, registry defaults. |
 | `lib/commands/selfUpdate.js` | `arcanum self-update`: the platform, arity and targeting checks, the global-copy check, the `latest` lookup and validation, the comparison, `npm i -g` and the post-install verification (see [`self-update`](#self-update)). |
 | `lib/npm.js` | `runNpm(args, { timeout, execFileAsync })`: npm through `execFile` with an argument array and captured output, never a shell. Failures become an `NpmError` with a `category` (`not_installed`, `timeout`, `permission`, `not_found`, `network`, `failed`), npm's exit code and its last 10 stderr lines, or an `InterruptedError` on `SIGINT`. |
@@ -478,6 +479,8 @@ arcanum config agents email <agent>               # per-tier breakdown for one a
 arcanum config agents email set <pattern>         # git.email, e.g. you+{agent}@example.com
 arcanum config agents email set <agent> <email>   # git.agents.<agent>
 arcanum config agents email unset [<agent>]       # git.email, or git.agents.<agent>
+arcanum config agents email --all-tiers           # every agent x every tier
+arcanum config agents email edit                  # interactive set/unset loop
 arcanum config engine [shell|native|docker | --unset]                 # engine.mode
 arcanum config next-step auto [<skill> [on|off | --unset]]            # next_step.auto.<skill>
 arcanum config git safe-branch [<ref> | --unset]                      # git.safe_branch
@@ -505,7 +508,7 @@ arcanum config monitor-issues clear-context [on|off | --unset]        # monitor-
 ### Design rules
 
 - **Thin front-ends.** Each shortcut covers registry keys and adds nothing the generic `get`/`set`/`unset` lack, except the `agents email` resolution view and `ignore-checks`' array add/remove. Namespaces mirror the config namespaces; `agents email` stays under `agents` to leave room for more per-agent settings.
-- **Single-value shortcuts** take the value positionally: no value reads, a value writes, and `--unset` removes (like `git config --unset`), so the positional slot is only ever a value and a ref named `unset` cannot collide. `--unset` with a value is a usage error. Verb shortcuts exist only where needed: `agents email [set|unset]` (two keys, `set <pattern>` and `set <agent> <email>` told apart by arity) and `ignore-checks [list|add|remove]`.
+- **Single-value shortcuts** take the value positionally: no value reads, a value writes, and `--unset` removes (like `git config --unset`), so the positional slot is only ever a value and a ref named `unset` cannot collide. `--unset` with a value is a usage error. Verb shortcuts exist only where needed: `agents email [set|unset|edit]` (two keys, `set <pattern>` and `set <agent> <email>` told apart by arity) and `ignore-checks [list|add|remove]`.
 - **Writes** go to the default tier; `--global`, `--repo` or `--local` overrides it within the tiers the registry allows (`git safe-branch --repo x` is `git.safe_branch is local-only`, exit `3`).
 - **Reads ignore the default tier.** Without a tier flag a read resolves like `config get`; with one it reads only that tier; `--all-tiers` works on reads.
 - **Boolean tokens** are `on`/`off`/`true`/`false`, lowercase only, always stored as JSON booleans. Anything else is exit `3`, `<key> must be on or off, got "ON"`, `hint: accepted: on, off, true, false (lowercase)`. `off` stores `false` rather than removing the key, so it can shadow a lower tier's `on`; removing is `--unset`.
@@ -571,11 +574,49 @@ global  git.agents.node  -
 
 JSON: `{"agent":"node","resolved":{"email":…,"source":…,"key":…},"tiers":{"local":{"agents":{"set":…,"value":…},"email":{…},"file":…},…}}`, with `"file": null` for a tier with no target and every `resolved` field `null` when nothing resolves.
 
-The listing and the detail always show every tier, so they refuse tier flags, `--all-tiers` and `--unset`.
+**Matrix** (`agents email --all-tiers`, always exit `0`): a `(default)` row and one row per listed agent (same set and order as the listing), one column per tier. A cell shows the raw value stored at that tier (`git.email` on the `(default)` row, `git.agents.<agent>` on an agent row): `-` when absent or `null`, `""` for an explicit empty string, `(no target)` for a tier with no target (local and repo outside a repo). The last column holds the row's marks:
 
-**Writes.** `set` and `unset` default to the global tier; a tier flag overrides it. Their output is `config set`/`config unset`'s, with the shadowed-tier note on `set`. Because `set` and `unset` are verbs in that position, an agent literally named `set` or `unset` can only be read and written through the generic `config get/set git.agents.<agent>`.
+- `<- <tier>`: where the row resolves. An agent resolving from `git.email` shows the substituted email, `<- global (default: you+mod@example.com)`.
+- `(shadowed: <tier>, …)`: cells that are set but lose. On an agent row that includes every set `git.agents.<agent>` cell when a higher-tier `git.email` wins.
+- `(model default)` when nothing resolves; `<- <tier> (empty: model default)` when an explicit `""` wins (`(empty default: model default)` when that `""` is a `git.email`); `(unset)` on the `(default)` row with no `git.email`.
+- `(not in this repo)` for a configured agent with no `.claude/agents/<agent>.md`.
 
-How it is built: resolution goes through `AgentEmail#resolve` (`ConfigChain#readWithSource`), never through its own loop. `ConfigChain` gets `CLAUDE_CONFIG_DIR` from the resolved account. Outside a repo, a small `ConfigChain` subclass drops the repo and local files, so nothing is read from a non-repo cwd. The per-tier detail and the agent discovery read the tiers with `readTiers` (`allTiers: true`, so `file: null` marks a tier with no target).
+```text
+agent      local  repo        global
+(default)  -      -           you+{agent}@x.com   <- global
+client     -      -           -                   <- global (default: you+client@x.com)
+mod        -      -           mod@x.com           (not in this repo) <- global
+node       -      node@x.com  -                   <- repo
+```
+
+```json
+{"files":{"local":"…/state/arcanum-config.json","repo":"…/arcanum-repo-config.json","global":"…"},
+ "default":{"tiers":{"local":{"set":false,"value":null},"repo":{"set":false,"value":null},"global":{"set":true,"value":"you+{agent}@x.com"}},
+            "resolved":{"set":true,"value":"you+{agent}@x.com","source":"global"}},
+ "agents":[{"agent":"node","in_repo":true,
+            "tiers":{"local":{"set":false,"value":null},"repo":{"set":true,"value":"node@x.com"},"global":{"set":false,"value":null}},
+            "resolved":{"email":"node@x.com","source":"repo","key":"git.agents.node"}}]}
+```
+
+`files.<tier>` is `null` for a tier with no target, `in_repo` is `null` outside a repo, and `resolved` has the listing's fields and nulls. The marks are human-only; the JSON carries the raw facts they derive from.
+
+**Read flags.** The listing, the matrix and the detail refuse tier flags and `--unset`; `--all-tiers` is accepted only on the listing (where it selects the matrix) and refused on the detail, which already shows every tier.
+
+**Writes.** `set` and `unset` default to the global tier; a tier flag overrides it. Their output is `config set`/`config unset`'s, with the shadowed-tier note on `set`.
+
+**Editor** (`agents email edit`): a loop over the matrix, for filling in or clearing emails without the whole [setup wizard](#setup-wizard).
+
+1. Prints the matrix on stderr.
+2. `agent [<a>/<b>/…/default] (Enter to finish): `: only the agents shown, or `default` for `git.email`; another name is reported with `hint: use arcanum config agents email set <agent> <email> for other agents` and asked again. An empty answer ends the loop with exit `0`.
+3. `  email (- unsets): `: stored as typed (no format check, never `""`); `-` unsets; an empty answer asks again.
+4. The tier, with the wizard's `askTier` (default `global`); outside a repo only `global` has a target, so it is not asked.
+5. `  write <key> = <email> to <tier> (<file>)? [Y/n] ` (or `  unset <key> at <tier> (<file>)? [Y/n] `). Yes writes through `writeValue` (`set`, with the shadowed-tier note) or `delegate(…, 'unset', …)`, the same path as `agents email set`/`unset`, so stdout gets the generic result; no writes nothing. A failed write is reported and the loop goes on. Then back to 1.
+
+It takes no positional and refuses `--json` (it is interactive), `--all-tiers`, `--unset`, `--force`, `--string` and tier flags; `--lock-timeout` applies to each write. Without a terminal (`isInteractive`, injectable as `deps.isInteractive`) it is exit `2`: `config agents email edit needs an interactive terminal`, `hint: use arcanum config agents email set/unset instead`. No lock is held while a question is open: each confirmed answer is one independent write. Ctrl-C or Ctrl-D at a prompt ends the loop with exit `130`, keeping what was already written; a Ctrl-C during a write is the write's own `SIGINT` handling. Read warnings are printed once per session (`onceOnly`), not on every re-render.
+
+**Reserved verbs.** `set`, `unset` and `edit` are verbs in the first position, so an agent literally named `set`, `unset` or `edit` still appears in the listing and the matrix, but can only be read and written through the generic `config get/set git.agents.<agent>`.
+
+How it is built: resolution goes through `AgentEmail#resolve` (`ConfigChain#readWithSource`), never through its own loop. `ConfigChain` gets `CLAUDE_CONFIG_DIR` from the resolved account. Outside a repo, a small `ConfigChain` subclass drops the repo and local files, so nothing is read from a non-repo cwd. The per-tier detail, the matrix and the agent discovery read the tiers with `readTiers` (`allTiers: true`, so `file: null` marks a tier with no target), through `agentsEmailRead.js`; the matrix generalises the detail's marking to every agent from the same `AgentEmail#resolve` result.
 
 ### `ignore-checks`
 
@@ -803,7 +844,7 @@ All exit `8` (`npm`). The command never retries with `sudo`. `cli/lib/npm.js` (`
 - Every exit code and precedence pair, each malformed-file kind (with byte-unchanged checks on refused writes), each value-parsing row with and without `--string`, the JSON shapes, the lock cases (held by a live fake owner, `--lock-timeout 0`, acquired after release, no "seems stuck" warning) and SIGINT each have a spec.
 - `setup_spec` drives the wizard with a scripted prompter (`cli/spec/support/prompter.js`, with `EOF`/`SIGINT` answers) and `deps.isInteractive`; `fakeIo` can also fake a TTY stdin. One bundle smoke spec checks the real no-TTY refusal, another runs `self-update --help` from the bundle with no npm on `PATH`.
 - `selfUpdate_spec` injects a fake `runNpm` (or `execFileAsync`) and fakes for `realpath`, `lstat`, the `package.json` read, `platform` and `signals`, and has one spec per row of the `self-update` [Outcomes](#outcomes), [Failures](#failures) and [Edge cases](#edge-cases-of-self-update) tables, asserting stdout, stderr, the `--json` object and the exit code. Its argv specs pin `--ignore-scripts`, the package as one argument, `--fetch-retries=0 --fetch-timeout=15000`, no `--registry`, no `sudo`, and no `npm i -g` on a refusal or an invalid version. `npm_spec` covers the failure classification, and `exitCodes_spec` that a spawn `ENOENT` maps to `8`, not `7`.
-- The shortcut specs (`cli/spec/lib/commands/config/shortcuts/`) use `cli/spec/support/shortcuts.js`, which re-seeds the tiers before each run, so a shortcut and its generic equivalent run against the same files and their stdout, stderr and exit code are compared directly. `agentsEmail_spec` runs the `AgentEmail` shell/native parity table (`cli/spec/support/agentEmailFixtures.js`, a copy of `shared/spec`'s, since `cli/` never imports `shared/spec/**`).
+- The shortcut specs (`cli/spec/lib/commands/config/shortcuts/`) use `cli/spec/support/shortcuts.js`, which re-seeds the tiers before each run, so a shortcut and its generic equivalent run against the same files and their stdout, stderr and exit code are compared directly. `agentsEmailEdit_spec` drives the editor with a scripted prompter (`cli/spec/support/prompter.js`) and `deps.isInteractive`. `agentsEmail_spec` runs the `AgentEmail` shell/native parity table (`cli/spec/support/agentEmailFixtures.js`, a copy of `shared/spec`'s, since `cli/` never imports `shared/spec/**`).
 
 ## Alternatives considered
 

@@ -143,6 +143,154 @@ describe('config shortcuts: agents email', () => {
     });
   });
 
+  describe('the per-tier matrix (--all-tiers)', () => {
+    const matrix = (options) => harness.run(config('agents', 'email', '--all-tiers'), options);
+    const matrixJson = async (options) => (await harness.run(config('agents', 'email', '--all-tiers', '--json'), options)).json();
+    const absent = { set: false, value: null };
+    const present = (value) => ({ set: true, value });
+
+    it('prints one column per tier, marking the resolved, defaulted and not-in-repo rows', async () => {
+      await seedGit({
+        repo: { agents: { node: 'node@x.com' } },
+        global: { email: 'you+{agent}@x.com', agents: { mod: 'mod@x.com' } }
+      });
+      await addAgents('node.md', 'client.md');
+
+      const result = await matrix();
+
+      expect(result.code).toBe(0);
+      expect(result.out).toBe([
+        'agent      local  repo        global',
+        '(default)  -      -           you+{agent}@x.com   <- global',
+        'client     -      -           -                   <- global (default: you+client@x.com)',
+        'mod        -      -           mod@x.com           (not in this repo) <- global',
+        'node       -      node@x.com  -                   <- repo',
+        ''
+      ].join('\n'));
+    });
+
+    it('prints the documented JSON', async () => {
+      await seedGit({ repo: { agents: { node: 'node@x.com' } }, global: { email: 'you+{agent}@x.com' } });
+      await addAgents('node.md');
+
+      const result = await harness.run(config('agents', 'email', '--all-tiers', '--json'));
+
+      expect(result.code).toBe(0);
+      expect(result.json()).toEqual({
+        files: { local: harness.localFile, repo: harness.repoFile, global: harness.globalFile },
+        default: {
+          tiers: { local: absent, repo: absent, global: present('you+{agent}@x.com') },
+          resolved: { set: true, value: 'you+{agent}@x.com', source: 'global' }
+        },
+        agents: [{
+          agent: 'node',
+          in_repo: true,
+          tiers: { local: absent, repo: present('node@x.com'), global: absent },
+          resolved: { email: 'node@x.com', source: 'repo', key: 'git.agents.node' }
+        }]
+      });
+    });
+
+    it('lets a higher-tier git.email beat a lower-tier git.agents.<agent>, marking it shadowed', async () => {
+      await seedGit({
+        repo: { email: 'team+{agent}@x.com' },
+        global: { email: 'you+{agent}@x.com', agents: { node: 'node@x.com' } }
+      });
+      await addAgents('node.md');
+
+      const result = await matrix();
+      const json = await matrixJson();
+
+      expect(result.out).toContain('(default)  -      team+{agent}@x.com  you+{agent}@x.com   <- repo (shadowed: global)');
+      expect(result.out).toContain('node       -      -                   node@x.com          <- repo (default: team+node@x.com) (shadowed: global)');
+      expect(json.agents[0].resolved).toEqual({ email: 'team+node@x.com', source: 'repo', key: 'git.email' });
+    });
+
+    it('marks the model default, an explicit "" as forcing it, and treats null as absent', async () => {
+      await seedGit({ local: { agents: { scripter: '' } }, global: { agents: { node: null, scripter: 's@x.com' } } });
+      await addAgents('scripter.md', 'node.md');
+
+      const result = await matrix();
+      const json = await matrixJson();
+
+      expect(result.out).toBe([
+        'agent      local  repo  global',
+        '(default)  -      -     -         (unset)',
+        'node       -      -     -         (model default)',
+        'scripter   ""     -     s@x.com   <- local (empty: model default) (shadowed: global)',
+        ''
+      ].join('\n'));
+      expect(json.agents[0].tiers.global).toEqual(absent);
+      expect(json.agents[1].tiers.local).toEqual(present(''));
+      expect(json.agents[1].resolved).toEqual({ email: null, source: 'local', key: 'git.agents.scripter' });
+    });
+
+    it('marks an explicit "" git.email as forcing the model default for agents resolving from it', async () => {
+      await seedGit({ repo: { email: '' } });
+      await addAgents('node.md');
+
+      const result = await matrix();
+
+      expect(result.out).toContain('(default)  -      ""    -        <- repo (empty: model default)');
+      expect(result.out).toContain('node       -      -     -        <- repo (empty default: model default)');
+    });
+
+    it('shows only the default row when nothing is configured', async () => {
+      await harness.seed();
+
+      const result = await matrix();
+
+      expect(result.code).toBe(0);
+      expect(result.out).toBe('agent      local  repo  global\n(default)  -      -     -        (unset)\n');
+      expect((await matrixJson()).agents).toEqual([]);
+    });
+
+    it('shows (no target) outside a repo, listing only the global agents, with in_repo null', async () => {
+      await writeTier(harness.globalFile, git({ email: 'g@x.com', agents: { node: 'n@x.com' } }));
+
+      const result = await matrix({ cwd: harness.account });
+      const json = await matrixJson({ cwd: harness.account });
+
+      expect(result.code).toBe(0);
+      expect(result.out).toBe([
+        'agent      local        repo         global',
+        '(default)  (no target)  (no target)  g@x.com   <- global',
+        'node       (no target)  (no target)  n@x.com   <- global',
+        ''
+      ].join('\n'));
+      expect(json.files).toEqual({ local: null, repo: null, global: harness.globalFile });
+      expect(json.agents[0].in_repo).toBeNull();
+    });
+
+    it('never reads repo-like files from a non-repo cwd', async () => {
+      const cwd = path.join(harness.tmp, 'plain');
+
+      await writeTier(path.join(cwd, '.claude', 'state', 'arcanum-config.json'), git({ email: 'stray@x.com', agents: { a: 'a@x.com' } }));
+
+      const json = await matrixJson({ cwd });
+
+      expect(json.default.resolved.set).toBeFalse();
+      expect(json.agents).toEqual([]);
+    });
+
+    it('warns about a malformed tier and still renders the readable ones', async () => {
+      await seedGit({ local: {}, global: { email: 'g@x.com' } });
+      await writeFile(harness.localFile, '{ nope');
+
+      const result = await matrix();
+
+      expect(result.code).toBe(0);
+      expect(result.err).toContain('arcanum: warning:');
+      expect(result.out).toContain('(default)  -      -     g@x.com   <- global');
+    });
+
+    it('leaves the plain listing unchanged', async () => {
+      await seedGit({ global: { email: 'g@x.com' } });
+
+      expect((await harness.run(config('agents', 'email'))).out).toBe('default  g@x.com   (global: git.email)\n');
+    });
+  });
+
   describe('the detail', () => {
     it('prints the per-tier breakdown, marking the resolved and shadowed keys', async () => {
       await seedGit({ repo: { agents: { node: 'node-bot@example.com' } }, global: { email: 'you+{agent}@example.com' } });
@@ -272,6 +420,8 @@ describe('config shortcuts: agents email', () => {
       ['a tier flag on the listing', ['--global']],
       ['a tier flag on the detail', ['node', '--repo']],
       ['--all-tiers on the detail', ['node', '--all-tiers']],
+      ['a tier flag on the matrix', ['--all-tiers', '--local']],
+      ['--unset on the matrix', ['--all-tiers', '--unset']],
       ['--force on set', ['set', 'x@example.com', '--force']],
       ['--string on set', ['set', 'x@example.com', '--string']],
       ['--lock-timeout on the listing', ['--lock-timeout', '1']]

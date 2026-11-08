@@ -116,7 +116,7 @@ Curated shortcuts over the most common keys. Each one is a thin front-end over g
 
 | Shortcut | Key(s) | Default write tier |
 | --- | --- | --- |
-| `agents email [<agent>]`, `agents email set <pattern>`, `agents email set <agent> <email>`, `agents email unset [<agent>]` | `git.email`, `git.agents.<agent>` | global |
+| `agents email [<agent>]`, `agents email --all-tiers`, `agents email set <pattern>`, `agents email set <agent> <email>`, `agents email unset [<agent>]`, `agents email edit` | `git.email`, `git.agents.<agent>` | global |
 | `engine [shell\|native\|docker \| --unset]` | `engine.mode` | local |
 | `next-step auto [<skill> [on\|off \| --unset]]` | `next_step.auto.<skill>` | local |
 | `git safe-branch [<ref> \| --unset]` | `git.safe_branch` | local (local only) |
@@ -161,9 +161,26 @@ $ arcanum config agents email node               # both keys in every tier; exit
 $ arcanum config agents email set 'you+{agent}@example.com'   # git.email, global
 $ arcanum config agents email set node node-bot@example.com --repo
 $ arcanum config agents email unset node         # git.agents.node, global
+
+$ arcanum config agents email --all-tiers        # every agent x every tier
+agent      local  repo                  global
+(default)  -      -                     you+{agent}@example.com   <- global
+architect  -      -                     -                         <- global (default: you+architect@example.com)
+node       -      node-bot@example.com  -                         <- repo
+reviewer   -      -                     rev@example.com           (not in this repo) <- global
+
+$ arcanum config agents email edit               # interactive: agent, email (- unsets), tier, confirm; Enter finishes
+agent [architect/node/reviewer/default] (Enter to finish): architect
+  email (- unsets): arch-bot@example.com
+  tier [local/repo/global] (global): repo
+  write git.agents.architect = arch-bot@example.com to repo (/path/to/repo/.claude/configuration/arcanum-repo-config.json)? [Y/n]
 ```
 
 The emails are resolved exactly like the commit helpers do (local, then repo, then global; within a tier `git.agents.<agent>` before `git.email`; `{agent}` substituted; an explicit `""` means the model email). The agents listed are the configured ones plus the repo's `.claude/agents/*.md`.
+
+- **`--all-tiers`** (listing only) shows the stored value of each tier: `git.email` on the `(default)` row, `git.agents.<agent>` on the others (`-` when absent, `""` for an explicit empty string). The marks say which tier wins (`<- repo`; `(default: …)` when the agent falls back to `git.email`), which set values lose (`(shadowed: global)`), and when the model email applies (`(model default)`, or `(empty: model default)` for a `""`). Outside a repo the local and repo columns show `(no target)`. `--json` returns `{"files":…,"default":{"tiers":…,"resolved":…},"agents":[{"agent":…,"in_repo":…,"tiers":…,"resolved":…}]}`.
+- **`edit`** needs a terminal (otherwise exit `2`; use `set`/`unset`). It offers only the agents shown plus `default` (for `git.email`); outside a repo it writes to global only. Each confirmed answer is written at once, like `set`/`unset`; Ctrl-C or Ctrl-D stops it (exit `130`), keeping what was already written.
+- **Reserved names.** `set`, `unset` and `edit` are verbs: an agent with one of those names is still listed, but is read and written through `config get/set git.agents.<agent>`.
 
 ### auto-fix-all ignore-checks
 

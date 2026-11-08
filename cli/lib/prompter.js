@@ -1,8 +1,10 @@
-// The line-based prompter of `arcanum config setup` (see
+// The line-based prompter of `arcanum config setup` and
+// `arcanum config agents email edit` (see
 // docs/agents/architecture/arcanum-cli.md#terminal and
 // docs/agents/architecture/arcanum-cli.md#errors-interrupts-and-summary):
 // questions go to stderr, answers are read line by line from stdin, and
-// EOF (Ctrl-D) or Ctrl-C at a prompt rejects with `Interrupted`.
+// EOF (Ctrl-D) or Ctrl-C at a prompt rejects with `Interrupted`. Also
+// the interactive-terminal check and the once-only warnings they share.
 
 import readline from 'node:readline';
 
@@ -113,5 +115,36 @@ function processSignals() {
   return {
     on: (signal, handler) => process.on(signal, handler),
     off: (signal, handler) => process.off(signal, handler)
+  };
+}
+
+/**
+ * @param {object} io - the streams.
+ * @param {object} deps - injectable collaborators (`isInteractive`).
+ * @returns {boolean} whether stdin and stderr are both terminals, or the
+ *   injected answer.
+ */
+export function isInteractive(io, deps) {
+  if (deps.isInteractive !== undefined) {
+    return Boolean(deps.isInteractive);
+  }
+
+  return Boolean(io.stdin && io.stdin.isTTY && io.stderr && io.stderr.isTTY);
+}
+
+/**
+ * @param {(message: string) => void} warn - prints a stderr warning.
+ * @returns {(message: string) => void} the same, printing each distinct
+ *   message once, so re-reading the tiers per setting does not repeat
+ *   the read warnings.
+ */
+export function onceOnly(warn) {
+  const seen = new Set();
+
+  return (message) => {
+    if (!seen.has(message)) {
+      seen.add(message);
+      warn(message);
+    }
   };
 }
