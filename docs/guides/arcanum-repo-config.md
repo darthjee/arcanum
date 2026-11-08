@@ -68,6 +68,8 @@ The top-level `.version` field on `arcanum-repo-config.json` (committed, shared 
 
 ## Documented keys
 
+Full list of keys and where each is read from: [Config Keys](../agents/architecture/config-keys.md).
+
 A few `git`-namespaced keys, read through this config pair (and, for
 some of them, the global tier described below), control commit
 behavior directly:

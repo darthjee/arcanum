@@ -56,6 +56,8 @@ there.
 
 ## Which keys use it
 
+Full list of keys and where each is read from: [Config Keys](../agents/architecture/config-keys.md).
+
 `git.email` — the per-agent commit-author email pattern used by
 `commit_change.sh`/`commit_issue.sh`/`commit_plan.sh` (see
 `arcanum/_lib/agent_email.sh`) — is wired into the global chain, along
