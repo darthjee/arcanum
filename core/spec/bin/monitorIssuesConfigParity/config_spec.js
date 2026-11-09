@@ -85,6 +85,32 @@ describe('monitor-issues-config-* parity (shell vs. native)', () => {
     expect(shell.stdout).toEqual('false\n');
   });
 
+  it('get / is-enabled: ignore clear_context set only in the repo config, a tier keys.json disallows', async () => {
+    await seed(CONFIG, { 'monitor-issues': { clear_context: true } });
+
+    const get = await run('get', ['clear_context']);
+    const isEnabled = await run('is-enabled', ['clear_context']);
+
+    expectParity(get.shell, get.native);
+    expect(get.shell.code).toEqual(0);
+    expect(get.shell.stdout).toEqual('false\n');
+    expectParity(isEnabled.shell, isEnabled.native);
+    expect(isEnabled.shell.code).toEqual(1);
+  });
+
+  it('get / is-enabled: treat a null clear_context in the local state file as unset', async () => {
+    await seed(STATE, { 'monitor-issues': { clear_context: null } });
+
+    const get = await run('get', ['clear_context']);
+    const isEnabled = await run('is-enabled', ['clear_context']);
+
+    expectParity(get.shell, get.native);
+    expect(get.shell.code).toEqual(0);
+    expect(get.shell.stdout).toEqual('false\n');
+    expectParity(isEnabled.shell, isEnabled.native);
+    expect(isEnabled.shell.code).toEqual(1);
+  });
+
   it('is-enabled: matches for true (exit 0) and false (exit 1)', async () => {
     await seed(CONFIG, { 'monitor-issues': { on: true, off: false } });
 

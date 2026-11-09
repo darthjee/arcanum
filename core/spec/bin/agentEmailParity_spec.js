@@ -1,6 +1,8 @@
 import { execFile } from 'node:child_process';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import AgentEmail from '../../../shared/lib/config/AgentEmail.js';
+import ConfigChain from '../../../shared/lib/config/ConfigChain.js';
 import {
   AGENT_EMAIL_FIXTURES,
   MODEL_EMAIL,
@@ -55,5 +57,18 @@ describe('agent_email_get shell parity', () => {
 
       await expectAsync(shellAgentEmail(repoPath, globalDir, agent)).toBeResolvedTo(`${expected}\n`);
     });
+  });
+
+  // Positive control for the registry tier filter (issue #903):
+  // git.agents.<agent> allows the global tier in the real keys.json, so
+  // the filter must not drop a value that only lives there.
+  it('still resolves a git.agents.<agent> value set only in the global tier, matching native', async () => {
+    await seedAgentEmailTiers(repoPath, globalDir, { global: { agents: { reviewer: 'reviewer@example.com' } } });
+
+    const native = await new AgentEmail({ configChain: new ConfigChain({ env: { CLAUDE_CONFIG_DIR: globalDir } }) })
+      .get(repoPath, 'reviewer', MODEL_EMAIL);
+
+    expect(native).toEqual('reviewer@example.com');
+    await expectAsync(shellAgentEmail(repoPath, globalDir, 'reviewer')).toBeResolvedTo(`${native}\n`);
   });
 });

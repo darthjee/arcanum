@@ -1,6 +1,7 @@
 import {
   seedGithubLikeRepo,
   seedIgnoredCheckPatterns,
+  seedLocalIgnoredCheckPatterns,
   SHELL_SCRIPT
 } from '../../support/factories/autoFixAllWaitCiParitySetup.js';
 import { createFakeGhBin } from '../../support/utils/fakeGhBin.js';
@@ -165,6 +166,58 @@ describe('auto-fix-all-wait-ci parity (shell vs. native) — ci outcomes', () =>
         expect(native.code).toEqual(shell.code);
         expect(shell.code).toEqual(0);
         expect(shell.stdout).toEqual('passed\n');
+      } finally {
+        await Promise.all([shellRepo.cleanup(), nativeRepo.cleanup(), fakeGh.cleanup()]);
+      }
+    });
+  });
+
+  describe('ignored_check_patterns set only in the local state file (a tier keys.json disallows)', () => {
+    it('treats the pattern as not ignored on both sides, matching stdout/exit code', async () => {
+      const fakeGh = await createFakeGhBin();
+      const shellRepo = await createGitFixtureRepo();
+      const nativeRepo = await createGitFixtureRepo();
+
+      try {
+        await Promise.all([
+          seedGithubLikeRepo(shellRepo),
+          seedGithubLikeRepo(nativeRepo),
+          seedLocalIgnoredCheckPatterns(shellRepo, ['codacy']),
+          seedLocalIgnoredCheckPatterns(nativeRepo, ['codacy'])
+        ]);
+
+        const checkRuns = JSON.stringify([
+          { name: 'Codacy Static Code Analysis', status: 'completed', conclusion: 'failure' },
+          { name: 'build', status: 'completed', conclusion: 'success' }
+        ]);
+        const env = {
+          ...process.env,
+          PATH: `${fakeGh.binDir}:${process.env.PATH}`,
+          FAKE_GH_PR_NUMBER: '42',
+          FAKE_GH_HEAD_SHA: 'sha-local-ignored',
+          FAKE_GH_CHECK_RUNS_JSON: checkRuns
+        };
+
+        const shell = await runCommand([SHELL_SCRIPT, shellRepo.repoPath], shellRepo.repoPath, env);
+        const native = await runCommand(
+          [
+            process.execPath, '--import', FAKE_FETCH_PRELOAD,
+            NATIVE_BIN, 'auto-fix-all-wait-ci', nativeRepo.repoPath
+          ],
+          nativeRepo.repoPath,
+          {
+            ...env,
+            ARCANUM_TEST_FAKE_FETCH: 'wait-ci',
+            FAKE_FETCH_PR_NUMBER: '42',
+            FAKE_FETCH_HEAD_SHA: 'sha-local-ignored',
+            FAKE_FETCH_CHECK_RUNS_JSON: checkRuns
+          }
+        );
+
+        expect(native.stdout).toEqual(shell.stdout);
+        expect(native.code).toEqual(shell.code);
+        expect(shell.code).toEqual(0);
+        expect(shell.stdout).toEqual('failed\nCodacy Static Code Analysis\n');
       } finally {
         await Promise.all([shellRepo.cleanup(), nativeRepo.cleanup(), fakeGh.cleanup()]);
       }

@@ -15,6 +15,8 @@ _CONFIG_CHAIN_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${_CONFIG_CHAIN_LIB_DIR}/repo_config.sh"
 # shellcheck source=global_config.sh
 source "${_CONFIG_CHAIN_LIB_DIR}/global_config.sh"
+# shellcheck source=key_registry.sh
+source "${_CONFIG_CHAIN_LIB_DIR}/key_registry.sh"
 
 # config_chain_read <repo_path> <namespace> <key1> [<key2> ...]
 #   Reads <namespace>.<key1>[, <namespace>.<key2>, ...] across all three
@@ -41,6 +43,15 @@ source "${_CONFIG_CHAIN_LIB_DIR}/global_config.sh"
 #   explicit empty string ("") is a real value and stops the chain
 #   there.
 #
+#   Tier filter: before reading <namespace>.<key> in a tier, the key is
+#   checked against the config key registry (shared/lib/config/keys.json)
+#   with key_registry_allows_tier (see key_registry.sh, the shell mirror
+#   of KeyRegistry#allowsTier). When it prints `false` (the matching
+#   entry's `tiers` does not list that tier), the key is skipped in that
+#   tier without reading the file. `true` and `null` (an unknown or
+#   malformed key, or an unreadable registry) both read as usual. The
+#   filter never reorders: precedence stays local, repo, global.
+#
 #   Prints the raw value (same shape repo_config_read/global_config_read
 #   print — jq -c compact), or nothing if all keys in all three tiers
 #   are empty/null. Always exits 0 — callers apply their own hardcoded
@@ -53,16 +64,19 @@ config_chain_read() {
   local value key
 
   for key in "${keys[@]}"; do
+    [[ "$(key_registry_allows_tier "${namespace}.${key}" local)" == "false" ]] && continue
     value=$(repo_config_read ".claude/state/arcanum-config.json" "" "$namespace" "$key")
     [[ -n "$value" && "$value" != "null" ]] && { echo "$value"; return 0; }
   done
 
   for key in "${keys[@]}"; do
+    [[ "$(key_registry_allows_tier "${namespace}.${key}" repo)" == "false" ]] && continue
     value=$(repo_config_read ".claude/configuration/arcanum-repo-config.json" "" "$namespace" "$key")
     [[ -n "$value" && "$value" != "null" ]] && { echo "$value"; return 0; }
   done
 
   for key in "${keys[@]}"; do
+    [[ "$(key_registry_allows_tier "${namespace}.${key}" global)" == "false" ]] && continue
     value=$(global_config_read "$repo_path" "$namespace" "$key")
     [[ -n "$value" && "$value" != "null" ]] && { echo "$value"; return 0; }
   done
