@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import AutoFixAllConfig from '../../../../lib/commands/auto-fix-all/AutoFixAllConfig.js';
 import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
+import ConfigChain from '../../../../../shared/lib/config/ConfigChain.js';
 import Lock from '../../../../../shared/lib/file/Lock.js';
 import { captureRejection } from '../../../support/utils/captureRejection.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
@@ -69,6 +70,47 @@ describe('AutoFixAllConfig', () => {
       const config = newConfig();
 
       await expectAsync(config.get(dir, 'clear_context')).toBeResolvedTo('false\n');
+    });
+
+    describe('for the local-only state keys (read through ConfigChain)', () => {
+      let globalFile;
+      let config;
+
+      beforeEach(() => {
+        const home = path.join(dir, 'home');
+
+        globalFile = path.join(home, '.claude', 'arcanum-config.json');
+        config = new AutoFixAllConfig({
+          lock: new Lock({ sleepMs: 5 }),
+          configChain: new ConfigChain({ env: { ...process.env, HOME: home, CLAUDE_CONFIG_DIR: '' } })
+        });
+      });
+
+      it('ignores finish_on_empty_queue set only in the repo or global config', async () => {
+        await writeJson(newFile, { 'auto-fix-all': { finish_on_empty_queue: true } });
+        await writeJson(globalFile, { 'auto-fix-all': { finish_on_empty_queue: true } });
+
+        await expectAsync(config.get(dir, 'finish_on_empty_queue')).toBeResolvedTo('false\n');
+      });
+
+      it('reads finish_on_empty_queue set locally', async () => {
+        await writeJson(stateFile, { 'auto-fix-all': { finish_on_empty_queue: true } });
+
+        await expectAsync(config.get(dir, 'finish_on_empty_queue')).toBeResolvedTo('true\n');
+      });
+
+      it('lets an explicit local null fall through to the default', async () => {
+        await writeJson(stateFile, { 'auto-fix-all': { clear_context: null } });
+
+        await expectAsync(config.get(dir, 'clear_context')).toBeResolvedTo('false\n');
+      });
+
+      it('stops at an explicit local false', async () => {
+        await writeJson(stateFile, { 'auto-fix-all': { clear_context: false } });
+        await writeJson(newFile, { 'auto-fix-all': { clear_context: true } });
+
+        await expectAsync(config.get(dir, 'clear_context')).toBeResolvedTo('false\n');
+      });
     });
   });
 

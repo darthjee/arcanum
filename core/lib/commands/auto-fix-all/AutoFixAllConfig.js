@@ -16,13 +16,19 @@ class AutoFixAllConfig extends NamespacedBooleanKeyConfig {
    * @param {object} [deps] - injectable collaborators, for testing.
    * @param {import('../../../../shared/lib/file/Lock.js').default} [deps.lock] -
    *   the lock/mutate/release helper used to guard writes.
+   * @param {import('../../../../shared/lib/config/KeyRegistry.js').default} [deps.registry] -
+   *   the key registry deciding which keys read through `configChain`.
+   * @param {import('../../../../shared/lib/config/ConfigChain.js').default} [deps.configChain] -
+   *   the tier chain registered keys are read through.
    */
-  constructor({ lock } = {}) {
+  constructor({ lock, registry, configChain } = {}) {
     super({
       namespace: 'auto-fix-all',
       stateKeys: ['clear_context', 'finish_on_empty_queue'],
       legacyFileName: 'auto-fix-all.json',
-      lock
+      lock,
+      registry,
+      configChain
     });
   }
 }
