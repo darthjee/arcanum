@@ -19,17 +19,19 @@
 _LIB_SAFE_BRANCH_LOADED=1
 
 _SAFE_BRANCH_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=repo_config.sh
-source "${_SAFE_BRANCH_LIB_DIR}/repo_config.sh"
+# shellcheck source=config_chain.sh
+source "${_SAFE_BRANCH_LIB_DIR}/config_chain.sh"
 
 # safe_branch_get
-#   Prints the configured safe branch: the "git"."safe_branch" key from
-#   .claude/state/arcanum-config.json (no legacy fallback file — this
-#   key has no legacy predecessor), quote-stripped. Defaults to
+#   Prints the configured safe branch: the "git"."safe_branch" key read
+#   through config_chain_read, so only the tiers keys.json allows for it
+#   are consulted (today only `local`, i.e.
+#   .claude/state/arcanum-config.json). No legacy fallback file — this
+#   key has no legacy predecessor. Quote-stripped. Defaults to
 #   "origin/main" when the key is empty/absent.
 safe_branch_get() {
   local branch
-  branch=$(repo_config_read ".claude/state/arcanum-config.json" "" "git" "safe_branch")
+  branch=$(config_chain_read "." git safe_branch)
   branch="${branch//\"/}"
   [[ -n "$branch" ]] || branch="origin/main"
   echo "$branch"

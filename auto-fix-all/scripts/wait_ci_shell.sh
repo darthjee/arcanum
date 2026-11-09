@@ -16,12 +16,13 @@
 # project's configured ignored_check_patterns are excluded entirely from
 # the passed/failed/total accounting (neither blocking the PR nor required
 # to pass). Patterns are read (relative to the current working directory)
-# from the target project's own
-# .claude/configuration/arcanum-repo-config.json, namespace "auto-fix-all",
-# field "ignored_check_patterns" (an array of regex strings). No legacy
+# from the config key "auto-fix-all.ignored_check_patterns" (an array of
+# regex strings) through config_chain_read, i.e. from whichever tiers
+# shared/lib/config/keys.json allows for that key (local state, repo
+# config, global config, in that precedence order). No legacy
 # .claude/configuration/auto-fix-all.json fallback is attempted for this
-# key — see arcanum/_lib/repo_config.sh and
-# docs/guides/arcanum-repo-config.md. If the file/field is not present,
+# key — see arcanum/_lib/config_chain.sh and
+# docs/guides/arcanum-repo-config.md. If the key is not set anywhere,
 # no patterns are ignored. This exists
 # because some check-runs (e.g. Codacy) can report a "action_required"
 # conclusion that is neither success nor a failure state, which would
@@ -39,10 +40,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../arcanum/_lib/repo_path.sh"
 repo_path_enter "$REPO_PATH"
 
-# shellcheck source=../../arcanum/_lib/repo_config.sh
-source "${SCRIPT_DIR}/../../arcanum/_lib/repo_config.sh"
+# shellcheck source=../../arcanum/_lib/config_chain.sh
+source "${SCRIPT_DIR}/../../arcanum/_lib/config_chain.sh"
 
-ignored_json=$(repo_config_read ".claude/configuration/arcanum-repo-config.json" "" auto-fix-all ignored_check_patterns)
+ignored_json=$(config_chain_read "." auto-fix-all ignored_check_patterns)
 ignored_json="${ignored_json:-[]}"
 
 # shellcheck source=../../arcanum/_lib/origin.sh
