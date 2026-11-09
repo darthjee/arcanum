@@ -20,4 +20,5 @@ scripts/check_config.sh "$REPO_PATH" "<key>"
 ## Step 3 — Report
 
 - **Exit `0`:** relay stdout verbatim in a fenced `json` block, then add one sentence: "The final value comes from the `<final.source>` tier." — or, when `final.source` is `null`, "No tier sets `<key>`."
+  - Then, for each tier whose object has `"ignored": "tier not allowed"`, add one sentence: "`<tier>` sets `<key>`, but arcanum does not read it from that tier (see `shared/lib/config/keys.json`)." That key's `tiers` field in `keys.json` lists the tiers arcanum reads it from, and `final` never comes from an ignored tier.
 - **Non-zero exit:** relay stderr as-is and stop.
