@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { assertRegisteredConfigKey } from './KeyRegistry.js';
+import KeyRegistry, { assertRegisteredConfigKey } from './KeyRegistry.js';
 
 const TIER_NAMES = ['local', 'repo', 'global'];
 
@@ -11,6 +11,11 @@ const TIER_NAMES = ['local', 'repo', 'global'];
  * (`.claude/state/arcanum-config.json`), repo config
  * (`.claude/configuration/arcanum-repo-config.json`), then global
  * config (`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/arcanum-config.json`).
+ * Which tiers a key is read from comes from its `keys.json` entry's
+ * `tiers` (through `KeyRegistry#allowsTier`): a tier the entry does not
+ * list is skipped on read and flagged `allowed: false` by `#readTiers`.
+ * `tiers` only filters, it never reorders: precedence is always local,
+ * repo, global. A key with no registry entry reads every tier.
  * Extracted as a standalone, reusable module (see
  * `core/lib/utils/issue/Tags.js`/`core/lib/utils/github/GithubToken.js`
  * for the same
@@ -29,16 +34,22 @@ class ConfigChain {
    *   into the bundle); `RepoContext.js` itself still builds
    *   `ConfigChain` zero-arg internally and passes `repoPath` explicitly
    *   on every `#read` call.
+   * @param {KeyRegistry} [deps.registry] - the key registry whose
+   *   `allowsTier` decides which tiers each key is read from (defaults
+   *   to the bundled `keys.json`).
    */
-  constructor({ env = process.env, repoContext } = {}) {
+  constructor({ env = process.env, repoContext, registry = new KeyRegistry() } = {}) {
     this._env = env;
     this._repoContext = repoContext;
+    this._registry = registry;
   }
 
   /**
-   * Reads `<namespace>.<key1>[, <namespace>.<key2>, ...]` across all
-   * three config tiers, in order, returning the first present-and-
-   * non-null value found. Within each tier, `keys` are tried in order
+   * Reads `<namespace>.<key1>[, <namespace>.<key2>, ...]` across the
+   * config tiers each key's `keys.json` entry allows, in order (local,
+   * repo, global), returning the first present-and-non-null value
+   * found. A key is never tried in a tier its entry's `tiers` leaves
+   * out; a key with no registry entry is tried in every tier. Within each tier, `keys` are tried in order
    * and the first one that resolves there wins; only once every key
    * has been tried and found absent/null in the current tier does the
    * chain advance to the next tier — a tier is always fully resolved
@@ -74,6 +85,8 @@ class ConfigChain {
    * wraps), but also reports where the winning value came from: which
    * tier, which tier file, and which of `keys` resolved there. An
    * explicit empty string (`""`) is reported like any other value.
+   * Tiers are filtered per key from `keys.json`, like `#read`; a tier
+   * file is only read when at least one of `keys` allows that tier.
    * @param {string} [repoPath] - the target repo's local checkout path.
    *   Falls back to the constructor-injected `repoContext`'s `repoPath`
    *   when omitted, like `#read`.
@@ -96,7 +109,9 @@ class ConfigChain {
     const files = this._tierFiles(resolvedRepoPath);
 
     for (const [index, tier] of TIER_NAMES.entries()) {
-      if (!files[index]) {
+      const tierKeys = keys.filter((key) => this._allowsTier(namespace, key, tier) !== false);
+
+      if (!files[index] || tierKeys.length === 0) {
         continue;
       }
 
@@ -107,7 +122,7 @@ class ConfigChain {
         continue;
       }
 
-      for (const key of keys) {
+      for (const key of tierKeys) {
         const { set, value } = this._tierValue(config, namespace, key);
 
         if (set) {
@@ -126,17 +141,22 @@ class ConfigChain {
    * too. Uses the same present-and-non-null rule and the same fail-open
    * handling as `#read`: a `null`/absent value, a missing/unreadable/
    * malformed file, or an unresolvable global path is `set: false`;
-   * an explicit empty string (`""`) is `set: true`.
+   * an explicit empty string (`""`) is `set: true`. A tier the key's
+   * `keys.json` entry does not allow is still read and reported
+   * (`set`/`value` as usual) but flagged `allowed: false`; an allowed
+   * tier is flagged `allowed: true`. A key with no registry entry gets
+   * no `allowed` field at all.
    * @param {string} [repoPath] - the target repo's local checkout path.
    *   Falls back to the constructor-injected `repoContext`'s `repoPath`
    *   when omitted, like `#read`.
    * @param {string} namespace - the top-level config namespace.
    * @param {string} key - the key (possibly a dot-separated nested path)
    *   to resolve under `namespace`.
-   * @returns {Promise<Array<{tier: string, file: (string|null), set: boolean, value: unknown}>>}
+   * @returns {Promise<Array<{tier: string, file: (string|null), set: boolean, value?: unknown, allowed?: boolean}>>}
    *   one entry per tier, in precedence order. `file` is the tier's
    *   absolute path (`null` for an unresolvable global path); `value`
-   *   is only present when `set` is `true`.
+   *   is only present when `set` is `true`; `allowed` is only present
+   *   when the key matches a registry entry.
    */
   async readTiers(repoPath, namespace, key) {
     const resolvedRepoPath = repoPath ?? this._repoContext?.repoPath;
@@ -147,11 +167,24 @@ class ConfigChain {
       const file = files[index] ? path.resolve(files[index]) : null;
       const config = file ? await this._readJson(file) : null;
       const { set, value } = this._tierValue(config, namespace, key);
+      const entry = set ? { tier, file, set, value } : { tier, file, set };
+      const allowed = this._allowsTier(namespace, key, tier);
 
-      tiers.push(set ? { tier, file, set, value } : { tier, file, set });
+      tiers.push(typeof allowed === 'boolean' ? { ...entry, allowed } : entry);
     }
 
     return tiers;
+  }
+
+  /**
+   * @param {string} namespace - the top-level config namespace.
+   * @param {string} key - the key (possibly a dot-separated nested path).
+   * @param {string} tier - `local`, `repo` or `global`.
+   * @returns {boolean|null} `KeyRegistry#allowsTier` for
+   *   `<namespace>.<key>`: `null` when no registry entry matches.
+   */
+  _allowsTier(namespace, key, tier) {
+    return this._registry.allowsTier(`${namespace}.${key}`, tier);
   }
 
   /**
