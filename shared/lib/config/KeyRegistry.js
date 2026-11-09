@@ -129,6 +129,29 @@ class KeyRegistry {
   }
 
   /**
+   * Whether the registry lets `key` live in `tier`: the single tier
+   * check shared by `ConfigChain`'s reads and the CLI. It matches `key`
+   * with `lookup` (a literal entry beats a wildcard one). It only
+   * filters, never orders: read precedence stays local, repo, global
+   * whatever order the entry lists its tiers in.
+   * @param {string} key - the concrete dotted key, e.g. `git.safe_branch`.
+   * @param {string} tier - `global`, `repo` or `local`.
+   * @returns {boolean|null} `true` when the matching entry's `tiers`
+   *   includes `tier`, `false` when it does not, and `null` when no entry
+   *   matches (an unknown, non-leaf or malformed key). Callers treat
+   *   `null` as allowed.
+   */
+  allowsTier(key, tier) {
+    const entry = this.lookup(key);
+
+    if (!entry) {
+      return null;
+    }
+
+    return entry.tiers.includes(tier);
+  }
+
+  /**
    * Validates a config write or removal against the registry. Checks
    * run in a fixed order and the first failure wins: `unknown`,
    * `read_only`, `tier` (where `unset` stops), then the value checks
