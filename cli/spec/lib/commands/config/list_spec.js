@@ -2,7 +2,7 @@ import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { flatten } from '../../../../lib/commands/config/list.js';
 import { runCli } from '../../../support/cli.js';
-import { LOCAL_FILE, makeRepo, removeDir, tmpDir, writeTier } from '../../../support/fixtures.js';
+import { LOCAL_FILE, REPO_FILE, makeRepo, removeDir, tmpDir, writeTier } from '../../../support/fixtures.js';
 
 describe('config list', () => {
   let tmp;
@@ -40,17 +40,43 @@ describe('config list', () => {
   it('lists every tier, a shadowed key once per tier', async () => {
     expect((await list('--json')).json()).toEqual({
       entries: [
-        { key: 'engine.mode', tier: 'local', value: 'shell', known: true, description: jasmine.any(String) },
+        { key: 'engine.mode', tier: 'local', value: 'shell', known: true, description: jasmine.any(String), allowed: true },
         { key: 'custom.a.b', tier: 'local', value: 1, known: false, description: null },
-        { key: 'version', tier: 'repo', value: '2.1.0', known: true, description: jasmine.any(String) },
-        { key: 'engine.mode', tier: 'repo', value: 'native', known: true, description: jasmine.any(String) },
-        { key: 'git.email', tier: 'global', value: 'g@x', known: true, description: jasmine.any(String) }
+        { key: 'version', tier: 'repo', value: '2.1.0', known: true, description: jasmine.any(String), allowed: true },
+        { key: 'engine.mode', tier: 'repo', value: 'native', known: true, description: jasmine.any(String), allowed: true },
+        { key: 'git.email', tier: 'global', value: 'g@x', known: true, description: jasmine.any(String), allowed: true }
       ]
     });
   });
 
   it('prefixes the tier without a tier flag', async () => {
     expect((await list()).out).toContain('local   custom.a.b = 1\n');
+  });
+
+  describe('a key set in a tier it is not allowed in', () => {
+    beforeEach(async () => {
+      await writeTier(path.join(root, REPO_FILE), { git: { safe_branch: 'origin/dev' } });
+    });
+
+    it('marks the human line before the description', async () => {
+      expect((await list('--repo')).out).toBe(
+        'git.safe_branch = "origin/dev"   (ignored: tier not allowed)   Branch treated as the safe base for new work\n'
+      );
+    });
+
+    it('marks the line with the tier prefix too', async () => {
+      expect((await list()).out).toContain('repo    git.safe_branch = "origin/dev"   (ignored: tier not allowed)   ');
+    });
+
+    it('reports allowed: false in JSON', async () => {
+      expect((await list('--repo', '--json')).json().entries).toEqual([
+        { key: 'git.safe_branch', tier: 'repo', value: 'origin/dev', known: true, description: jasmine.any(String), allowed: false }
+      ]);
+    });
+  });
+
+  it('does not mark an allowed or unknown key', async () => {
+    expect((await list('--local')).out).not.toContain('ignored');
   });
 
   it('warns on a malformed tier and lists the others', async () => {

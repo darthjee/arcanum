@@ -13,7 +13,9 @@ export const acceptsTier = true;
 /**
  * `arcanum config list [tier]`: every key set in every tier (or only the
  * given one), flattened to dotted keys, one entry per key per tier, with
- * the registry description of known keys. Reads take no lock.
+ * the registry description of known keys. An entry in a tier the
+ * registry does not allow for its key is marked `ignored: tier not
+ * allowed`. Reads take no lock.
  * @param {object} context - the subcommand context.
  * @param {(string|undefined)} context.tier - the tier flag, if any.
  * @param {object} context.output - the output helpers.
@@ -25,8 +27,16 @@ export async function run(context) {
   const { tiers } = await readTiers(context);
   const entries = tiers.flatMap(({ tier: name, read }) => flatten(read.data).map(([key, value]) => {
     const entry = registry.lookup(key);
+    const allowed = registry.allowsTier(key, name);
 
-    return { key, tier: name, value, known: entry !== null, description: entry ? entry.description : null };
+    return {
+      key,
+      tier: name,
+      value,
+      known: entry !== null,
+      description: entry ? entry.description : null,
+      ...(typeof allowed === 'boolean' ? { allowed } : {})
+    };
   }));
 
   output.result(entries.map((entry) => entryText(entry, tier === undefined)).join('\n'), { entries });
@@ -59,7 +69,8 @@ export function flatten(data, prefix = '') {
  * @returns {string} the human line, e.g. `engine.mode = "native"   <description>`.
  */
 function entryText(entry, withTier) {
-  const line = `${withTier ? `${entry.tier.padEnd(6)}  ` : ''}${entry.key} = ${JSON.stringify(entry.value)}`;
+  const marker = entry.allowed === false ? '   (ignored: tier not allowed)' : '';
+  const line = `${withTier ? `${entry.tier.padEnd(6)}  ` : ''}${entry.key} = ${JSON.stringify(entry.value)}${marker}`;
 
   return entry.description === null ? line : `${line}   ${entry.description}`;
 }
