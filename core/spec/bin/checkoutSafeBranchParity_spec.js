@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -58,6 +58,31 @@ describe('checkout-safe-branch parity (shell vs. native)', () => {
       const repo = await createGitFixtureRepo();
 
       try {
+        const { shell, native } = await runBoth(repo.repoPath, repo.repoPath);
+
+        expect(native.stdout).toEqual(shell.stdout);
+        expect(native.code).toEqual(shell.code);
+        expect(shell.code).toEqual(0);
+        expect(shell.stdout).toEqual('BRANCH=origin/main\n');
+      } finally {
+        await repo.cleanup();
+      }
+    });
+  });
+
+  describe('git.safe_branch set only in the repo config (a tier keys.json disallows)', () => {
+    it('ignores the value on both sides and checks out origin/main', async () => {
+      const repo = await createGitFixtureRepo();
+
+      try {
+        const configDir = path.join(repo.repoPath, '.claude', 'configuration');
+
+        await mkdir(configDir, { recursive: true });
+        await writeFile(
+          path.join(configDir, 'arcanum-repo-config.json'),
+          JSON.stringify({ git: { safe_branch: 'origin/develop' } })
+        );
+
         const { shell, native } = await runBoth(repo.repoPath, repo.repoPath);
 
         expect(native.stdout).toEqual(shell.stdout);

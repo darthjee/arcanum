@@ -74,4 +74,32 @@ describe('auto-fix-all-config-* parity (shell vs. native) — get', () => {
     expect(shell.code).toEqual(0);
     expect(shell.stdout).toEqual('false\n');
   });
+
+  it('matches shell output ("false") for clear_context set only in the repo config, a tier keys.json disallows', async () => {
+    const seeded = { 'auto-fix-all': { clear_context: true } };
+
+    await seedConfig(shellRepo, { newConfig: seeded });
+    await seedConfig(nativeRepo, { newConfig: seeded });
+
+    const { shell, native } = await runPair('get', shellRepo, nativeRepo, ['clear_context']);
+
+    expect(native.stdout).toEqual(shell.stdout);
+    expect(native.code).toEqual(shell.code);
+    expect(shell.code).toEqual(0);
+    expect(shell.stdout).toEqual('false\n');
+  });
+
+  it('matches shell output ("false") for clear_context set to null in the local state file', async () => {
+    const seeded = { 'auto-fix-all': { clear_context: null } };
+
+    await seedConfig(shellRepo, { stateConfig: seeded });
+    await seedConfig(nativeRepo, { stateConfig: seeded });
+
+    const { shell, native } = await runPair('get', shellRepo, nativeRepo, ['clear_context']);
+
+    expect(native.stdout).toEqual(shell.stdout);
+    expect(native.code).toEqual(shell.code);
+    expect(shell.code).toEqual(0);
+    expect(shell.stdout).toEqual('false\n');
+  });
 });

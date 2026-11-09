@@ -36,3 +36,22 @@ export async function seedIgnoredCheckPatterns(repo, patterns) {
     JSON.stringify({ 'auto-fix-all': { ignored_check_patterns: patterns } })
   );
 }
+
+/**
+ * Seeds `.claude/state/arcanum-config.json`'s
+ * `auto-fix-all.ignored_check_patterns` under `repo.repoPath` — a tier
+ * keys.json does not allow for that key (it is repo-only), so both
+ * sides must ignore it.
+ * @param {{repoPath: string}} repo - the fixture repo.
+ * @param {Array<string>} patterns - the ignored-pattern regex strings.
+ * @returns {Promise<void>} resolves once written.
+ */
+export async function seedLocalIgnoredCheckPatterns(repo, patterns) {
+  const dir = path.join(repo.repoPath, '.claude', 'state');
+
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    path.join(dir, 'arcanum-config.json'),
+    JSON.stringify({ 'auto-fix-all': { ignored_check_patterns: patterns } })
+  );
+}
