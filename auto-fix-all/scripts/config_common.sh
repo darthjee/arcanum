@@ -15,11 +15,16 @@ NAMESPACE="auto-fix-all"
 
 # shellcheck source=../../arcanum/_lib/repo_config.sh
 source "${CONFIG_COMMON_DIR}/../../arcanum/_lib/repo_config.sh"
+# shellcheck source=../../arcanum/_lib/config_chain.sh
+source "${CONFIG_COMMON_DIR}/../../arcanum/_lib/config_chain.sh"
 
-# Returns the NEW (namespaced) file that a given key should be read
-# from/written to: clear_context and finish_on_empty_queue are personal,
-# frequently-toggled state and live in the gitignored state file; every
-# other key lives in the committed configuration file.
+# Returns the NEW (namespaced) file that a given key is written to (by
+# config_set_shell.sh/config_toggle_shell.sh). _config_read_value only
+# reads it for a key not in keys.json; a registered key resolves its
+# tiers from the registry through config_chain_read instead.
+# clear_context and finish_on_empty_queue are personal, frequently-
+# toggled state and live in the gitignored state file; every other key
+# lives in the committed configuration file.
 _new_file_for_key() {
   case "$1" in
     clear_context|finish_on_empty_queue) echo "$NEW_STATE_FILE" ;;
@@ -28,7 +33,9 @@ _new_file_for_key() {
 }
 
 # Returns the LEGACY file counterpart of _new_file_for_key, used as a
-# fallback by repo_config_read/repo_config_write. clear_context and
+# fallback by _config_read_value (for registered and unregistered keys
+# alike, once the new-config read came back empty) and by
+# repo_config_write. clear_context and
 # finish_on_empty_queue have no read-time legacy fallback (returns "",
 # which repo_config_read's [[ -f "$legacy_file" ]] check treats as "no
 # legacy file") — see docs/guides/arcanum-repo-config.md. Every other
@@ -38,4 +45,48 @@ _legacy_file_for_key() {
     clear_context|finish_on_empty_queue) echo "" ;;
     *) echo "$CONFIG_FILE" ;;
   esac
+}
+
+# _config_read_value <key>
+#   Prints the raw (jq -c) value of <key> under NAMESPACE, or nothing,
+#   mirroring NamespacedBooleanKeyConfig#_readValue/#_readNewValue
+#   (core/lib/utils/config/NamespacedBooleanKeyConfig.js):
+#     1. a key registered in shared/lib/config/keys.json is read through
+#        config_chain_read, i.e. from the tiers the registry allows for
+#        it (a `null` value resolves to empty here);
+#     2. an unregistered key gets a direct, presence-checked read of
+#        _new_file_for_key (so an explicit `null` prints `null`);
+#     3. if still empty, the flat key is read from _legacy_file_for_key's
+#        legacy file (when there is one), with the usual "config has
+#        moved" warning on stderr.
+#   Always exits 0; callers apply their own default.
+_config_read_value() {
+  local key="$1" value legacy_file new_file
+
+  if key_registry_has_key "${NAMESPACE}.${key}"; then
+    # config-key: auto-fix-all.clear_context
+    # config-key: auto-fix-all.finish_on_empty_queue
+    # config-key: auto-fix-all.ignored_check_patterns
+    value=$(config_chain_read "." "$NAMESPACE" "$key")
+  else
+    # config-key: auto-fix-all.clear_context
+    # config-key: auto-fix-all.finish_on_empty_queue
+    # config-key: auto-fix-all.ignored_check_patterns
+    value=$(repo_config_read "$(_new_file_for_key "$key")" "" "$NAMESPACE" "$key")
+  fi
+
+  if [[ -z "$value" ]]; then
+    legacy_file=$(_legacy_file_for_key "$key")
+    new_file=$(_new_file_for_key "$key")
+    # config-key: auto-fix-all.clear_context
+    # config-key: auto-fix-all.finish_on_empty_queue
+    # config-key: auto-fix-all.ignored_check_patterns
+    value=$(repo_config_read "" "$legacy_file" "$NAMESPACE" "$key" 2>/dev/null)
+    if [[ -n "$value" ]]; then
+      echo "Warning: reading '${key}' from legacy config file ${legacy_file} — this configuration has moved to ${new_file}. See docs/guides/arcanum-repo-config.md." >&2
+    fi
+  fi
+
+  [[ -n "$value" ]] && echo "$value"
+  return 0
 }

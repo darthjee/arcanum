@@ -14,7 +14,6 @@ if [[ $# -lt 1 ]]; then
   exit 1
 fi
 KEY="$1"
-# config-key: monitor-issues.clear_context
-VALUE=$(repo_config_read "$(_new_file_for_key "$KEY")" "$(_legacy_file_for_key "$KEY")" "$NAMESPACE" "$KEY")
+VALUE=$(_config_read_value "$KEY")
 VALUE="${VALUE:-false}"
 [[ "$VALUE" == "true" ]]
