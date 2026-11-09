@@ -59,6 +59,8 @@ $ arcanum config get git.safe_branch           # unset: exit 1
 (unset; default: origin/main)
 ```
 
+Each key resolves only from the tiers its registry entry allows (`git.safe_branch` is local only, for example). A value set in another tier is skipped: `--all-tiers` marks it `(ignored: tier not allowed)`, `config list` appends the same marker to its line, and reading that tier explicitly (`--repo`) still prints the raw value, with a warning on stderr. With `--json`, each tier entry of a known key carries `allowed`, and the resolved value skips `allowed: false` tiers.
+
 ### set and unset
 
 ```console

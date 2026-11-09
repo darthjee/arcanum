@@ -2,6 +2,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import BooleanKeyConfig from '../../../../lib/utils/config/BooleanKeyConfig.js';
 import NamespacedBooleanKeyConfig from '../../../../lib/utils/config/NamespacedBooleanKeyConfig.js';
+import ConfigChain from '../../../../../shared/lib/config/ConfigChain.js';
+import KeyRegistry from '../../../../../shared/lib/config/KeyRegistry.js';
 import Lock from '../../../../../shared/lib/file/Lock.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
 
@@ -80,6 +82,96 @@ describe('NamespacedBooleanKeyConfig', () => {
       await writeFile(legacyFile, 'not json');
 
       await expectAsync(config.get(dir, 'shared')).toBeResolvedTo('false\n');
+    });
+  });
+
+  describe('#get for keys registered in keys.json', () => {
+    let globalFile;
+    let registered;
+
+    beforeEach(() => {
+      const home = path.join(dir, 'home');
+      const registry = new KeyRegistry({
+        format_version: 1,
+        keys: [
+          { key: 'ns.personal', type: 'boolean', tiers: ['local'] },
+          { key: 'ns.shared', type: 'boolean', tiers: ['repo'] },
+          { key: 'ns.chained', type: 'boolean', tiers: ['local', 'repo', 'global'] }
+        ]
+      });
+
+      globalFile = path.join(home, '.claude', 'arcanum-config.json');
+      registered = new NamespacedBooleanKeyConfig({
+        namespace: 'ns',
+        stateKeys: ['personal'],
+        legacyFileName: 'legacy.json',
+        lock,
+        registry,
+        configChain: new ConfigChain({ env: { HOME: home }, registry })
+      });
+    });
+
+    it('ignores a local-only key set only in the repo or global config', async () => {
+      await writeJson(repoFile, { ns: { personal: true } });
+      await writeJson(globalFile, { ns: { personal: true } });
+
+      await expectAsync(registered.get(dir, 'personal')).toBeResolvedTo('false\n');
+    });
+
+    it('reads a local-only key set locally', async () => {
+      await writeJson(stateFile, { ns: { personal: true } });
+
+      await expectAsync(registered.get(dir, 'personal')).toBeResolvedTo('true\n');
+    });
+
+    it('lets an explicit null fall through to the default', async () => {
+      await writeJson(stateFile, { ns: { personal: null } });
+
+      await expectAsync(registered.get(dir, 'personal')).toBeResolvedTo('false\n');
+    });
+
+    it('lets an explicit null fall through to the legacy file', async () => {
+      await writeJson(repoFile, { ns: { shared: null } });
+      await writeJson(legacyFile, { shared: true });
+
+      await expectAsync(registered.get(dir, 'shared')).toBeResolvedTo('true\n');
+    });
+
+    it('stops the chain at an explicit false', async () => {
+      await writeJson(stateFile, { ns: { chained: false } });
+      await writeJson(repoFile, { ns: { chained: true } });
+      await writeJson(globalFile, { ns: { chained: true } });
+
+      await expectAsync(registered.get(dir, 'chained')).toBeResolvedTo('false\n');
+    });
+
+    it('reads a multi-tier key from a lower tier when the higher ones lack it', async () => {
+      await writeJson(globalFile, { ns: { chained: true } });
+
+      await expectAsync(registered.get(dir, 'chained')).toBeResolvedTo('true\n');
+    });
+
+    it('still falls back to the legacy file for a repo-tier key', async () => {
+      await writeJson(legacyFile, { shared: true });
+
+      await expectAsync(registered.get(dir, 'shared')).toBeResolvedTo('true\n');
+    });
+
+    it('ignores a repo-tier key set only locally, falling back to the legacy file', async () => {
+      await writeJson(stateFile, { ns: { shared: true } });
+      await writeJson(legacyFile, { shared: false });
+
+      await expectAsync(registered.get(dir, 'shared')).toBeResolvedTo('false\n');
+    });
+  });
+
+  describe('#get for keys missing from keys.json', () => {
+    it('reads the new file only, keeping an explicit null', async () => {
+      await writeJson(stateFile, { ns: { shared: true } });
+      await writeJson(repoFile, { ns: { shared: null } });
+      await writeJson(legacyFile, { shared: true });
+
+      await expectAsync(config.get(dir, 'shared')).toBeResolvedTo('null\n');
     });
   });
 

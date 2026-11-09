@@ -1,12 +1,16 @@
 import ConfigChain from '../../../../shared/lib/config/ConfigChain.js';
 
 const USAGE = 'Usage: /arcanum-check-config <namespace.key[.sub...]>';
+const IGNORED = 'tier not allowed';
 
 /**
  * Native-only implementation of `/arcanum-check-config`: reports what
  * each arcanum config tier (local state, repo config, global config)
  * holds for a dotted key, plus the final resolved value and the tier
- * it came from. There is no shell counterpart: this command is reached
+ * it came from. A tier the key's `keys.json` entry does not allow is
+ * still reported, but marked `allowed: false` /
+ * `ignored: 'tier not allowed'` and never chosen as the final value.
+ * There is no shell counterpart: this command is reached
  * through `engine_dispatch --native-only` (see
  * `docs/agents/architecture/script-engine.md`).
  */
@@ -27,9 +31,12 @@ class ArcanumCheckConfig {
   /**
    * Resolves `key` across every config tier and renders the result as
    * pretty-printed JSON (`key`, `local`, `repo`, `global`, `final`, in
-   * that order). Every tier is reported, including shadowed ones;
-   * `final` comes from the first tier holding a present, non-null value,
-   * or is `{ value: null, source: null }` when no tier does.
+   * that order). Every tier is reported, including shadowed ones and
+   * ones the key's `keys.json` entry does not allow — those gain
+   * `allowed: false` and `ignored: 'tier not allowed'` (allowed tiers
+   * and unregistered keys get no extra fields). `final` comes from the
+   * first allowed tier holding a present, non-null value, or is
+   * `{ value: null, source: null }` when no tier does.
    * @param {string} key - dotted path `namespace.key[.sub...]` (at least
    *   two non-empty segments).
    * @returns {Promise<string>} the JSON report, newline-terminated.
@@ -40,11 +47,13 @@ class ArcanumCheckConfig {
     const tiers = await this._configChain.readTiers(this._repoContext.repoPath, namespace, nestedKey);
     const result = { key };
 
-    for (const { tier, file, set, value } of tiers) {
-      result[tier] = set ? { file, set, value } : { file, set };
+    for (const { tier, file, set, value, allowed } of tiers) {
+      const entry = set ? { file, set, value } : { file, set };
+
+      result[tier] = allowed === false ? { ...entry, allowed, ignored: IGNORED } : entry;
     }
 
-    const winner = tiers.find((tier) => tier.set);
+    const winner = tiers.find((tier) => tier.set && tier.allowed !== false);
 
     result.final = winner ? { value: winner.value, source: winner.tier } : { value: null, source: null };
 

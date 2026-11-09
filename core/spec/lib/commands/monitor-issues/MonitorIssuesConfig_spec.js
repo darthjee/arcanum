@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import MonitorIssuesConfig from '../../../../lib/commands/monitor-issues/MonitorIssuesConfig.js';
 import DispatchFailure from '../../../../lib/utils/errors/DispatchFailure.js';
+import ConfigChain from '../../../../../shared/lib/config/ConfigChain.js';
 import Lock from '../../../../../shared/lib/file/Lock.js';
 import { captureRejection } from '../../../support/utils/captureRejection.js';
 import { createTempDir, removeTempDir } from '../../../support/utils/tempDir.js';
@@ -68,6 +69,40 @@ describe('MonitorIssuesConfig', () => {
       await writeJson(path.join(dir, '.claude', 'state', 'monitor-issues-config.json'), { clear_context: true });
 
       await expectAsync(config.get(dir, 'clear_context')).toBeResolvedTo('false\n');
+    });
+
+    describe('for clear_context (local-only, read through ConfigChain)', () => {
+      let globalFile;
+
+      beforeEach(() => {
+        const home = path.join(dir, 'home');
+
+        globalFile = path.join(home, '.claude', 'arcanum-config.json');
+        config = new MonitorIssuesConfig({
+          lock,
+          configChain: new ConfigChain({ env: { ...process.env, HOME: home, CLAUDE_CONFIG_DIR: '' } })
+        });
+      });
+
+      it('ignores clear_context set only in the repo or global config', async () => {
+        await writeJson(newFile, { 'monitor-issues': { clear_context: true } });
+        await writeJson(globalFile, { 'monitor-issues': { clear_context: true } });
+
+        await expectAsync(config.get(dir, 'clear_context')).toBeResolvedTo('false\n');
+      });
+
+      it('lets an explicit local null fall through to the default', async () => {
+        await writeJson(stateFile, { 'monitor-issues': { clear_context: null } });
+
+        await expectAsync(config.get(dir, 'clear_context')).toBeResolvedTo('false\n');
+      });
+
+      it('stops at an explicit local false', async () => {
+        await writeJson(stateFile, { 'monitor-issues': { clear_context: false } });
+        await writeJson(globalFile, { 'monitor-issues': { clear_context: true } });
+
+        await expectAsync(config.get(dir, 'clear_context')).toBeResolvedTo('false\n');
+      });
     });
 
     it('defaults to "false" when absent everywhere', async () => {

@@ -198,9 +198,9 @@ arcanum config info
 
 Each also accepts the [global flags](#global-flags) and `--help`.
 
-- **`get`** without a tier prints the resolved value and its source tier, resolving local → repo → global (the first present, non-`null` value wins, as in `ConfigChain`). With a tier flag it reads only that tier and prints the raw value. `--all-tiers` shows every tier's value, shadowed ones included. An unset key exits `1`, like `git config`.
+- **`get`** without a tier prints the resolved value and its source tier, resolving local → repo → global (the first present, non-`null` value wins, as in `ConfigChain`), skipping the tiers the key's registry entry does not allow (`KeyRegistry#allowsTier` returning `false`; an unknown key reads every tier). With a tier flag it reads only that tier and prints the raw value, even from a disallowed tier. `--all-tiers` shows every tier's value, shadowed and disallowed ones included. An unset key exits `1`, like `git config`.
 - **`set` / `unset`** require a tier flag. There is no default tier, so nothing is ever written by accident to the committed repo file or the shared global file.
-- **`list`** prints every key set in every tier (or only the given one), flattened to dotted keys, one line per key per tier, with the registry description of known keys.
+- **`list`** prints every key set in every tier (or only the given one), flattened to dotted keys, one line per key per tier, with the registry description of known keys. An entry in a tier its key is not allowed in is marked `(ignored: tier not allowed)`, before the description.
 - **`info`** describes the environment; see [`config info`](#config-info).
 
 ### Global flags
@@ -372,8 +372,8 @@ global  next_step.auto.enhance-issue = true   Run this skill's suggested next st
 
 - Repo and local files show repo-relative, the global file absolute.
 - `get` and `set` print strings without quotes and anything else as compact JSON; `list` prints every value as JSON (strings quoted). `list` with a tier flag drops the tier column.
-- An unset key prints `(unset)`, or `(unset; default: <value>)` when the registry has a default, and exits `1`. In `--all-tiers`, a tier with no target (no repo, unresolved account) shows `(no target)`.
-- `get` with a tier flag prints the raw value only, so `$(arcanum config get k --repo)` is usable in scripts. When the key is unset there, stdout stays empty, a stderr warning says `<key> is unset in the <tier> tier` (with the default when there is one), and the exit is `1`.
+- An unset key prints `(unset)`, or `(unset; default: <value>)` when the registry has a default, and exits `1`. In `--all-tiers`, a tier with no target (no repo, unresolved account) shows `(no target)`, and a set value in a tier the key is not allowed in shows `(ignored: tier not allowed)` instead of `<- resolved`.
+- `get` with a tier flag prints the raw value only, so `$(arcanum config get k --repo)` is usable in scripts. When the key is unset there, stdout stays empty, a stderr warning says `<key> is unset in the <tier> tier` (with the default when there is one), and the exit is `1`. When the value is set in a tier the key is not allowed in, it is still printed, and a stderr warning says `<key> is set in the <tier> tier, but arcanum does not read it from there` (human mode only).
 - `config setup` writes its prompts to stderr too, so stdout stays results-only.
 
 ### JSON output
@@ -389,6 +389,7 @@ Each command prints one stable object. Fields may be added; existing ones are no
 - Unset: `{"key":"engine.mode","set":false,"value":null,"source":null,"default":"shell"}`, exit `1`. It is not an error object.
 - `default` is the registry default, or `null` when the key has none or is unknown. It is present whether the key is set or not.
 - `source` is `local`, `repo`, `global` or `null`; with a tier flag it is that tier.
+- With a tier flag, a known key also carries `allowed`: whether arcanum reads the key from that tier.
 
 `get --all-tiers`:
 
@@ -402,6 +403,7 @@ Each command prints one stable object. Fields may be added; existing ones are no
 ```
 
 - A tier with no target has `"file": null`. Exit `1` when `resolved.set` is false.
+- Each tier of a known key also carries `allowed` (from `KeyRegistry#allowsTier`); it is absent for an unknown key. `resolved` skips the `allowed: false` tiers.
 
 `set` / `unset`:
 
@@ -420,7 +422,7 @@ Each command prints one stable object. Fields may be added; existing ones are no
 {"entries":[{"key":"engine.mode","tier":"repo","value":"native","known":true,"description":"Script engine used to run migrated skill entrypoints"}]}
 ```
 
-- One entry per key per tier, so a shadowed key appears once per tier that sets it. `description` is `null` for unknown keys. Registry defaults of unset keys are not listed; `get` reports them in `default`.
+- One entry per key per tier, so a shadowed key appears once per tier that sets it. `description` is `null` for unknown keys. A known key's entry also carries `allowed` (`false` when arcanum does not read the key from that tier); an unknown key's has none. Registry defaults of unset keys are not listed; `get` reports them in `default`.
 
 `info`: see [`config info`](#config-info). `--version`: `{"version":"2.4.0"}`.
 

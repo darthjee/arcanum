@@ -128,6 +128,72 @@ describe('KeyRegistry', () => {
     });
   });
 
+  describe('#allowsTier', () => {
+    let registry;
+
+    beforeEach(() => {
+      registry = registryOf(
+        { key: 'next_step.auto.<skill>', type: 'boolean', tiers: ['local'], description: 'wildcard' },
+        { key: 'next_step.auto.arcanum-update', type: 'boolean', tiers: ['repo'], description: 'literal' }
+      );
+    });
+
+    it('checks a wildcard match against the wildcard entry', () => {
+      expect(registry.allowsTier('next_step.auto.foo', 'local')).toBeTrue();
+      expect(registry.allowsTier('next_step.auto.foo', 'repo')).toBeFalse();
+    });
+
+    it('checks a literal entry before a matching wildcard one', () => {
+      expect(registry.allowsTier('next_step.auto.arcanum-update', 'repo')).toBeTrue();
+      expect(registry.allowsTier('next_step.auto.arcanum-update', 'local')).toBeFalse();
+    });
+
+    it('returns null for an unregistered key', () => {
+      expect(registry.allowsTier('other.key', 'local')).toBeNull();
+    });
+
+    it('returns null for a non-leaf key', () => {
+      expect(registry.allowsTier('next_step.auto', 'local')).toBeNull();
+    });
+
+    it('returns null for a malformed key', () => {
+      expect(registry.allowsTier('next_step.auto.foo bar', 'local')).toBeNull();
+      expect(registry.allowsTier(null, 'local')).toBeNull();
+    });
+
+    describe('with the real registry', () => {
+      beforeEach(() => {
+        registry = new KeyRegistry();
+      });
+
+      it('allows git.safe_branch in the local tier', () => {
+        expect(registry.allowsTier('git.safe_branch', 'local')).toBeTrue();
+      });
+
+      it('disallows git.safe_branch in the repo and global tiers', () => {
+        expect(registry.allowsTier('git.safe_branch', 'repo')).toBeFalse();
+        expect(registry.allowsTier('git.safe_branch', 'global')).toBeFalse();
+      });
+
+      it('allows a per-agent email in every tier', () => {
+        expect(['global', 'repo', 'local'].map((tier) => registry.allowsTier('git.agents.node', tier)))
+          .toEqual([true, true, true]);
+      });
+
+      it('allows a wildcard next_step.clear key in every tier', () => {
+        expect(registry.allowsTier('next_step.clear.discuss-issue', 'repo')).toBeTrue();
+      });
+
+      it('returns null for the git.agents non-leaf', () => {
+        expect(registry.allowsTier('git.agents', 'repo')).toBeNull();
+      });
+
+      it('returns null for an unknown key', () => {
+        expect(registry.allowsTier('nope.nothing', 'repo')).toBeNull();
+      });
+    });
+  });
+
   describe('#check', () => {
     let registry;
 

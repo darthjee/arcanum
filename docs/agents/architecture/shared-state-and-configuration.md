@@ -93,8 +93,9 @@ How `--force` interacts with these checks is part of the CLI's contract, in [Arc
 
 - The CLI's `config` command: the known-key list in `config --help` and `config list`, write validation, the shortcuts' defaults and the `setup` wizard's questions and order.
 - The specs that keep the registry in sync with arcanum's own reads (below).
+- `ConfigChain` (and through it `RepoConfig`, `NamespacedBooleanKeyConfig` for its registered keys, and every other JS reader): `tiers` drives JS reads, not only CLI writes. `KeyRegistry#allowsTier(key, tier)` returns `true`, `false`, or `null` for a key with no matching entry (counted as allowed). `ConfigChain#read` / `#readWithSource` skip a tier the key doesn't allow, silently, without changing the local → repo → global precedence; `#readTiers` still reports every tier and adds `allowed` (only for a known leaf key). `/arcanum-check-config` and the CLI's `config get --all-tiers` / `config list` show such a tier as `ignored: tier not allowed`. Shell readers don't consult the registry yet (#903).
 
-Skills never read it at runtime, so they behave as before and keep their hardcoded defaults (e.g. `DEFAULT_MAX_RETRY_COUNT` in `SpawnIssue.js`, `origin/main` in `safe_branch.sh`).
+Skills never read its defaults at runtime, so they keep their hardcoded defaults (e.g. `DEFAULT_MAX_RETRY_COUNT` in `SpawnIssue.js`, `origin/main` in `safe_branch.sh`).
 
 ### Keeping it in sync
 
@@ -151,4 +152,4 @@ Run `/arcanum-check-config next_step.auto.<skill>` to see which tier a value res
 
 **Clear keys.** `next_step.clear.<skill>` (same three skills, same 3-tier chain, boolean-strict, default `false`) asks for the conversation context to be cleared at an automatic hop. It only does something when the matching `next_step.auto.<skill>` is `true`: `next_step_prompt.sh --auto-key <skill>` reads it only when auto fires, and then prints `CLEAR=true` after `AUTO=true` (see [Skill Finish](skill-finish.md#auto-next)). init-claude's `setup_auto_next.md` shows it as a `Clear` column in the same table and writes edited cells to **repo config** through the native-only `init-claude/scripts/set_next_step_clear.sh <repo_path> <skill> <true|false>` (`init-claude-set-next-step-clear`, which prints `NEXT_STEP_CLEAR=<skill>=<value>`; it shares a base class with `init-claude-set-next-step-auto`). No `/arcanum-migrate` migration sets the clear keys yet. Run `/arcanum-check-config next_step.clear.<skill>` to see which tier a value resolves from.
 
-To see where a config value comes from, run `/arcanum-check-config <namespace.key>` (e.g. `/arcanum-check-config git.authors`). It prints, as JSON, what each tier (local → repo → global) holds for the key, including shadowed tiers, plus the final value and its source tier. Code-level defaults are not reported.
+To see where a config value comes from, run `/arcanum-check-config <namespace.key>` (e.g. `/arcanum-check-config git.authors`). It prints, as JSON, what each tier (local → repo → global) holds for the key, including shadowed tiers, plus the final value and its source tier. A tier the key's `keys.json` entry doesn't allow is still shown, marked `ignored: tier not allowed`, and never becomes the source. Code-level defaults are not reported.

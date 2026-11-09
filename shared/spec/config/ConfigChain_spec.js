@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import ConfigChain from '../../lib/config/ConfigChain.js';
+import KeyRegistry from '../../lib/config/KeyRegistry.js';
 import { createRepoContextMock } from '../support/factories/repoContextFactory.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
@@ -362,9 +363,9 @@ describe('ConfigChain', () => {
       await writeGlobalConfig({ git: { merge_body_mode: 'empty' } });
 
       await expectAsync(newConfigChain().readTiers(repoPath, 'git', 'merge_body_mode')).toBeResolvedTo([
-        { tier: 'local', file: localFile(), set: true, value: 'coauthors' },
-        { tier: 'repo', file: repoFile(), set: true, value: 'full' },
-        { tier: 'global', file: globalFile(), set: true, value: 'empty' }
+        { tier: 'local', file: localFile(), set: true, value: 'coauthors', allowed: true },
+        { tier: 'repo', file: repoFile(), set: true, value: 'full', allowed: true },
+        { tier: 'global', file: globalFile(), set: true, value: 'empty', allowed: true }
       ]);
     });
 
@@ -372,9 +373,9 @@ describe('ConfigChain', () => {
       await writeGlobalConfig({ git: { merge_body_mode: 'empty' } });
 
       await expectAsync(newConfigChain().readTiers(repoPath, 'git', 'merge_body_mode')).toBeResolvedTo([
-        { tier: 'local', file: localFile(), set: false },
-        { tier: 'repo', file: repoFile(), set: false },
-        { tier: 'global', file: globalFile(), set: true, value: 'empty' }
+        { tier: 'local', file: localFile(), set: false, allowed: true },
+        { tier: 'repo', file: repoFile(), set: false, allowed: true },
+        { tier: 'global', file: globalFile(), set: true, value: 'empty', allowed: true }
       ]);
     });
 
@@ -382,9 +383,9 @@ describe('ConfigChain', () => {
       const tiers = await newConfigChain().readTiers(repoPath, 'git', 'merge_body_mode');
 
       expect(tiers).toEqual([
-        { tier: 'local', file: localFile(), set: false },
-        { tier: 'repo', file: repoFile(), set: false },
-        { tier: 'global', file: globalFile(), set: false }
+        { tier: 'local', file: localFile(), set: false, allowed: true },
+        { tier: 'repo', file: repoFile(), set: false, allowed: true },
+        { tier: 'global', file: globalFile(), set: false, allowed: true }
       ]);
       tiers.forEach((tier) => expect(Object.keys(tier)).not.toContain('value'));
     });
@@ -394,7 +395,7 @@ describe('ConfigChain', () => {
 
       const [local] = await newConfigChain().readTiers(repoPath, 'git', 'merge_body_mode');
 
-      expect(local).toEqual({ tier: 'local', file: localFile(), set: false });
+      expect(local).toEqual({ tier: 'local', file: localFile(), set: false, allowed: true });
     });
 
     it('treats an empty string as set', async () => {
@@ -402,7 +403,7 @@ describe('ConfigChain', () => {
 
       const [local] = await newConfigChain().readTiers(repoPath, 'git', 'merge_body_mode');
 
-      expect(local).toEqual({ tier: 'local', file: localFile(), set: true, value: '' });
+      expect(local).toEqual({ tier: 'local', file: localFile(), set: true, value: '', allowed: true });
     });
 
     it('treats a missing file and malformed JSON as unset', async () => {
@@ -411,15 +412,15 @@ describe('ConfigChain', () => {
 
       const [local, repo] = await newConfigChain().readTiers(repoPath, 'git', 'merge_body_mode');
 
-      expect(local).toEqual({ tier: 'local', file: localFile(), set: false });
-      expect(repo).toEqual({ tier: 'repo', file: repoFile(), set: false });
+      expect(local).toEqual({ tier: 'local', file: localFile(), set: false, allowed: true });
+      expect(repo).toEqual({ tier: 'repo', file: repoFile(), set: false, allowed: true });
     });
 
     it('reports a null global file when neither HOME nor CLAUDE_CONFIG_DIR is set', async () => {
       const configChain = new ConfigChain({ env: {} });
       const [, , global] = await configChain.readTiers(repoPath, 'git', 'merge_body_mode');
 
-      expect(global).toEqual({ tier: 'global', file: null, set: false });
+      expect(global).toEqual({ tier: 'global', file: null, set: false, allowed: true });
     });
 
     it('uses CLAUDE_CONFIG_DIR over HOME when both are set', async () => {
@@ -428,7 +429,7 @@ describe('ConfigChain', () => {
       const configChain = new ConfigChain({ env: { CLAUDE_CONFIG_DIR: globalDir, HOME: repoPath } });
       const [, , global] = await configChain.readTiers(repoPath, 'git', 'merge_body_mode');
 
-      expect(global).toEqual({ tier: 'global', file: globalFile(), set: true, value: 'empty' });
+      expect(global).toEqual({ tier: 'global', file: globalFile(), set: true, value: 'empty', allowed: true });
     });
 
     it('falls back to $HOME/.claude when CLAUDE_CONFIG_DIR is unset', async () => {
@@ -465,7 +466,150 @@ describe('ConfigChain', () => {
       const configChain = new ConfigChain({ env: { CLAUDE_CONFIG_DIR: globalDir }, repoContext });
       const [local] = await configChain.readTiers(undefined, 'git', 'merge_body_mode');
 
-      expect(local).toEqual({ tier: 'local', file: localFile(), set: true, value: 'coauthors' });
+      expect(local).toEqual({ tier: 'local', file: localFile(), set: true, value: 'coauthors', allowed: true });
+    });
+  });
+
+  describe('tier filtering from keys.json', () => {
+    const ALL = ['global', 'repo', 'local'];
+
+    const localFile = () => path.join(repoPath, '.claude', 'state', 'arcanum-config.json');
+    const repoFile = () => path.join(repoPath, '.claude', 'configuration', 'arcanum-repo-config.json');
+    const globalFile = () => path.join(globalDir, 'arcanum-config.json');
+
+    function chainWith(...keys) {
+      const registry = new KeyRegistry({ format_version: 1, keys });
+
+      return new ConfigChain({ env: { CLAUDE_CONFIG_DIR: globalDir }, registry });
+    }
+
+    describe('with a local-only key (git.safe_branch)', () => {
+      it('ignores values set in the repo and global tiers', async () => {
+        await writeRepoConfig({ git: { safe_branch: 'origin/repo' } });
+        await writeGlobalConfig({ git: { safe_branch: 'origin/global' } });
+
+        await expectAsync(newConfigChain().read(repoPath, 'git', 'safe_branch')).toBeResolvedTo(undefined);
+        await expectAsync(newConfigChain().readWithSource(repoPath, 'git', 'safe_branch')).toBeResolvedTo(undefined);
+      });
+
+      it('still reports the disallowed tiers and their values in #readTiers', async () => {
+        await writeRepoConfig({ git: { safe_branch: 'origin/repo' } });
+        await writeGlobalConfig({ git: { safe_branch: 'origin/global' } });
+
+        await expectAsync(newConfigChain().readTiers(repoPath, 'git', 'safe_branch')).toBeResolvedTo([
+          { tier: 'local', file: localFile(), set: false, allowed: true },
+          { tier: 'repo', file: repoFile(), set: true, value: 'origin/repo', allowed: false },
+          { tier: 'global', file: globalFile(), set: true, value: 'origin/global', allowed: false }
+        ]);
+      });
+
+      it('resolves the local value when every tier is set', async () => {
+        await writeLocalState({ git: { safe_branch: 'origin/local' } });
+        await writeRepoConfig({ git: { safe_branch: 'origin/repo' } });
+        await writeGlobalConfig({ git: { safe_branch: 'origin/global' } });
+
+        await expectAsync(newConfigChain().readWithSource(repoPath, 'git', 'safe_branch'))
+          .toBeResolvedTo({ value: 'origin/local', tier: 'local', file: localFile(), key: 'safe_branch' });
+      });
+    });
+
+    describe('with a repo-only key (auto-fix-all.ignored_check_patterns)', () => {
+      it('ignores the local and global values', async () => {
+        await writeLocalState({ 'auto-fix-all': { ignored_check_patterns: ['local'] } });
+        await writeRepoConfig({ 'auto-fix-all': { ignored_check_patterns: ['repo'] } });
+        await writeGlobalConfig({ 'auto-fix-all': { ignored_check_patterns: ['global'] } });
+
+        await expectAsync(newConfigChain().readWithSource(repoPath, 'auto-fix-all', 'ignored_check_patterns'))
+          .toBeResolvedTo({ value: ['repo'], tier: 'repo', file: repoFile(), key: 'ignored_check_patterns' });
+      });
+
+      it('resolves nothing when only the local and global tiers are set', async () => {
+        await writeLocalState({ 'auto-fix-all': { ignored_check_patterns: ['local'] } });
+        await writeGlobalConfig({ 'auto-fix-all': { ignored_check_patterns: ['global'] } });
+
+        await expectAsync(newConfigChain().read(repoPath, 'auto-fix-all', 'ignored_check_patterns'))
+          .toBeResolvedTo(undefined);
+      });
+    });
+
+    describe('with several keys allowing different tiers', () => {
+      let configChain;
+
+      beforeEach(() => {
+        configChain = chainWith(
+          { key: 'ns.specific', type: 'string', tiers: ['repo'], description: 'd' },
+          { key: 'ns.generic', type: 'string', tiers: ALL, description: 'd' }
+        );
+      });
+
+      it('only tries the allowed keys within a tier', async () => {
+        await writeLocalState({ ns: { specific: 'specific@local', generic: 'generic@local' } });
+
+        await expectAsync(configChain.readWithSource(repoPath, 'ns', 'specific', 'generic'))
+          .toBeResolvedTo({ value: 'generic@local', tier: 'local', file: localFile(), key: 'generic' });
+      });
+
+      it('keeps the tier order, resolving a whole tier before the next one', async () => {
+        await writeLocalState({ ns: { specific: 'specific@local' } });
+        await writeRepoConfig({ ns: { specific: 'specific@repo', generic: 'generic@repo' } });
+
+        await expectAsync(configChain.readWithSource(repoPath, 'ns', 'specific', 'generic'))
+          .toBeResolvedTo({ value: 'specific@repo', tier: 'repo', file: repoFile(), key: 'specific' });
+      });
+    });
+
+    it('does not read a tier file no key allows', async () => {
+      const configChain = chainWith({ key: 'ns.only', type: 'string', tiers: ['local'], description: 'd' });
+
+      spyOn(configChain, '_readJson').and.callThrough();
+      await configChain.read(repoPath, 'ns', 'only');
+
+      expect(configChain._readJson.calls.allArgs()).toEqual([[localFile()]]);
+    });
+
+    describe('with a wildcard key (git.agents.<agent>)', () => {
+      let configChain;
+
+      beforeEach(() => {
+        configChain = chainWith({ key: 'git.agents.<agent>', type: 'string', tiers: ['global'], description: 'd' });
+      });
+
+      it('filters the tiers through the wildcard entry', async () => {
+        await writeLocalState({ git: { agents: { node: 'node@local' } } });
+        await writeGlobalConfig({ git: { agents: { node: 'node@global' } } });
+
+        await expectAsync(configChain.read(repoPath, 'git', 'agents.node')).toBeResolvedTo('node@global');
+      });
+
+      it('flags the tiers in #readTiers', async () => {
+        const tiers = await configChain.readTiers(repoPath, 'git', 'agents.node');
+
+        expect(tiers.map(({ allowed }) => allowed)).toEqual([false, false, true]);
+      });
+
+      it('reads every tier with the real registry', async () => {
+        const tiers = await newConfigChain().readTiers(repoPath, 'git', 'agents.node');
+
+        expect(tiers.map(({ allowed }) => allowed)).toEqual([true, true, true]);
+      });
+    });
+
+    describe('with an unknown key, outside strict mode', () => {
+      it('reads every tier', async () => {
+        await writeGlobalConfig({ foo: { bar: 'global' } });
+
+        await expectAsync(newConfigChain().read(repoPath, 'foo', 'bar')).toBeResolvedTo('global');
+      });
+
+      it('leaves allowed out of #readTiers', async () => {
+        await writeLocalState({ foo: { bar: 'local' } });
+
+        await expectAsync(newConfigChain().readTiers(repoPath, 'foo', 'bar')).toBeResolvedTo([
+          { tier: 'local', file: localFile(), set: true, value: 'local' },
+          { tier: 'repo', file: repoFile(), set: false },
+          { tier: 'global', file: globalFile(), set: false }
+        ]);
+      });
     });
   });
 });

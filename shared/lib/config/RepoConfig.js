@@ -1,19 +1,17 @@
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import { assertRegisteredConfigKey } from './KeyRegistry.js';
+import ConfigChain from './ConfigChain.js';
 
 /** `git.safe_branch`'s default, checked against keys.json by the defaults drift spec. */
 export const DEFAULT_SAFE_BRANCH = 'origin/main';
 
 /**
- * Reads single-tier config keys (no legacy-file fallback, no
- * repo/global-config chain) from a repo's own config files, matching
- * each field's shell original exactly: `git.safe_branch` from local
- * `.claude/state/arcanum-config.json` (mirroring
- * `arcanum/_lib/safe_branch.sh`'s `safe_branch_get`), and
- * `auto-fix-all.ignored_check_patterns` from
- * `.claude/configuration/arcanum-repo-config.json` (mirroring
- * `wait_ci.sh`'s own `repo_config_read` call).
+ * Reads two single-purpose config keys, with their defaults, through
+ * `ConfigChain`: `git.safe_branch` and
+ * `auto-fix-all.ignored_check_patterns`. Which tiers each key is read
+ * from follows its `keys.json` entry's `tiers` (today `git.safe_branch`
+ * is local-only and `ignored_check_patterns` repo-only, matching the
+ * shell originals `arcanum/_lib/safe_branch.sh`'s `safe_branch_get` and
+ * `wait_ci.sh`'s `repo_config_read` call). No legacy-file fallback is
+ * attempted for either key.
  *
  * `repoContext` is a required constructor parameter — every method reads
  * `repoPath` from it, matching `GithubIssue.js`'s dual-mode collaborators
@@ -27,84 +25,41 @@ class RepoConfig {
    *   documentation — the CLI never passes a `RepoContext`, only an
    *   object carrying `repoPath` — and pulls nothing into the bundle.
    * @param {object} [deps] - injectable collaborators, for testing.
-   * @param {object} [deps.env] - the environment the strict-keys guard
-   *   reads `ARCANUM_STRICT_CONFIG_KEYS` from (defaults to `process.env`).
+   * @param {object} [deps.env] - the environment the default
+   *   `ConfigChain` resolves the global tier and the strict-keys guard
+   *   from (defaults to `process.env`).
+   * @param {ConfigChain} [deps.configChain] - the chain every read goes
+   *   through (defaults to `new ConfigChain({ env })`).
    */
-  constructor(repoContext, { env = process.env } = {}) {
+  constructor(repoContext, { env = process.env, configChain = new ConfigChain({ env }) } = {}) {
     this._repoContext = repoContext;
-    this._env = env;
+    this._configChain = configChain;
   }
 
   /**
-   * @returns {Promise<string>} the configured safe branch, defaulting
-   *   to `"origin/main"` when absent/empty/unreadable.
+   * @returns {Promise<string>} the configured `git.safe_branch`,
+   *   defaulting to `"origin/main"` when absent, empty, unreadable or
+   *   set only in a tier `keys.json` does not allow.
    */
   async getSafeBranch() {
-    assertRegisteredConfigKey('git.safe_branch', this._env);
-
     const { repoPath } = this._repoContext;
-
-    const configPath = path.join(repoPath, '.claude', 'state', 'arcanum-config.json');
-
-    let raw;
-
-    try {
-      raw = await readFile(configPath, 'utf8');
-    } catch {
-      return DEFAULT_SAFE_BRANCH;
-    }
-
-    let config;
-
-    try {
-      config = JSON.parse(raw);
-    } catch {
-      return DEFAULT_SAFE_BRANCH;
-    }
-
-    const branch = config && config.git && config.git.safe_branch;
+    const branch = await this._configChain.read(repoPath, 'git', 'safe_branch');
 
     return typeof branch === 'string' && branch.length > 0 ? branch : DEFAULT_SAFE_BRANCH;
   }
 
   /**
-   * Reads the `auto-fix-all.ignored_check_patterns` config key from a
-   * repo's `.claude/configuration/arcanum-repo-config.json`, mirroring
-   * `wait_ci.sh`'s own read via `arcanum/_lib/repo_config.sh`'s
-   * `repo_config_read ... auto-fix-all ignored_check_patterns` — a
-   * different file and a namespaced key from `getSafeBranch` above, and
-   * (matching the shell script's documented behavior) with no legacy
-   * `.claude/configuration/auto-fix-all.json`
-   * fallback attempted for this key.
+   * Reads the `auto-fix-all.ignored_check_patterns` config key, with no
+   * legacy `.claude/configuration/auto-fix-all.json` fallback (matching
+   * `wait_ci.sh`'s documented behavior).
    * @returns {Promise<Array>} the configured array of regex-string
-   *   patterns, defaulting to `[]` when the file/namespace/field is
-   *   absent, unreadable, malformed, or not itself an array.
+   *   patterns, defaulting to `[]` when absent, unreadable, malformed,
+   *   not itself an array, or set only in a tier `keys.json` does not
+   *   allow.
    */
   async getIgnoredCheckPatterns() {
-    assertRegisteredConfigKey('auto-fix-all.ignored_check_patterns', this._env);
-
     const { repoPath } = this._repoContext;
-
-    const configPath = path.join(repoPath, '.claude', 'configuration', 'arcanum-repo-config.json');
-
-    let raw;
-
-    try {
-      raw = await readFile(configPath, 'utf8');
-    } catch {
-      return [];
-    }
-
-    let config;
-
-    try {
-      config = JSON.parse(raw);
-    } catch {
-      return [];
-    }
-
-    const namespaceSection = config && config['auto-fix-all'];
-    const patterns = namespaceSection && namespaceSection.ignored_check_patterns;
+    const patterns = await this._configChain.read(repoPath, 'auto-fix-all', 'ignored_check_patterns');
 
     return Array.isArray(patterns) ? patterns : [];
   }

@@ -154,7 +154,7 @@ describe('config get', () => {
 
     it('reports the tier as the source in JSON', async () => {
       expect((await get('engine.mode', '--repo', '--json')).json()).toEqual({
-        key: 'engine.mode', set: true, value: 'native', source: 'repo', default: 'shell'
+        key: 'engine.mode', set: true, value: 'native', source: 'repo', default: 'shell', allowed: true
       });
     });
 
@@ -216,9 +216,9 @@ describe('config get', () => {
         key: 'engine.mode',
         resolved: { set: true, value: 'native', source: 'repo', default: 'shell' },
         tiers: {
-          local: { set: false, value: null, file: path.join(root, LOCAL_FILE) },
-          repo: { set: true, value: 'native', file: path.join(root, REPO_FILE) },
-          global: { set: false, value: null, file: path.join(account, 'arcanum-config.json') }
+          local: { set: false, value: null, file: path.join(root, LOCAL_FILE), allowed: true },
+          repo: { set: true, value: 'native', file: path.join(root, REPO_FILE), allowed: true },
+          global: { set: false, value: null, file: path.join(account, 'arcanum-config.json'), allowed: true }
         }
       });
     });
@@ -228,9 +228,9 @@ describe('config get', () => {
 
       expect(result.code).toBe(1);
       expect(result.json().tiers).toEqual({
-        local: { set: false, value: null, file: null },
-        repo: { set: false, value: null, file: null },
-        global: { set: false, value: null, file: null }
+        local: { set: false, value: null, file: null, allowed: true },
+        repo: { set: false, value: null, file: null, allowed: true },
+        global: { set: false, value: null, file: null, allowed: true }
       });
     });
 
@@ -239,6 +239,108 @@ describe('config get', () => {
 
       expect(result.code).toBe(2);
       expect(result.err).toContain('--all-tiers cannot be combined with --repo');
+    });
+  });
+
+  describe('tiers not allowed for the key', () => {
+    it('skips a disallowed tier: git.safe_branch in repo only is unset, exit 1', async () => {
+      await writeTier(path.join(root, REPO_FILE), { git: { safe_branch: 'origin/dev' } });
+
+      const result = await get('git.safe_branch', '--json');
+
+      expect(result.code).toBe(1);
+      expect(result.json()).toEqual({
+        key: 'git.safe_branch', set: false, value: null, source: null, default: 'origin/main'
+      });
+    });
+
+    it('resolves the allowed tier: local wins over a disallowed repo', async () => {
+      await writeTier(path.join(root, REPO_FILE), { git: { safe_branch: 'origin/dev' } });
+      await writeTier(path.join(root, LOCAL_FILE), { git: { safe_branch: 'origin/staging' } });
+
+      expect((await get('git.safe_branch')).out).toBe(`origin/staging   (local: ${LOCAL_FILE})\n`);
+    });
+
+    it('agrees with ConfigChain#readWithSource', async () => {
+      await writeTier(path.join(root, REPO_FILE), { git: { safe_branch: 'origin/dev' } });
+      await writeTier(path.join(account, 'arcanum-config.json'), { git: { safe_branch: 'origin/global' } });
+
+      const expected = await new ConfigChain({ env }).readWithSource(root, 'git', 'safe_branch');
+
+      expect(expected).toBeUndefined();
+      expect((await get('git.safe_branch', '--json')).json().set).toBe(false);
+    });
+
+    it('marks a disallowed tier in --all-tiers', async () => {
+      await writeTier(path.join(root, REPO_FILE), { git: { safe_branch: 'origin/dev' } });
+      await writeTier(path.join(root, LOCAL_FILE), { git: { safe_branch: 'origin/staging' } });
+
+      const result = await get('git.safe_branch', '--all-tiers');
+
+      expect(result.code).toBe(0);
+      expect(result.out).toBe([
+        'local    origin/staging   <- resolved',
+        'repo     origin/dev       (ignored: tier not allowed)',
+        'global   -                (unset)',
+        ''
+      ].join('\n'));
+    });
+
+    it('adds allowed to the --all-tiers JSON and resolves past a disallowed tier', async () => {
+      await writeTier(path.join(root, REPO_FILE), { git: { safe_branch: 'origin/dev' } });
+
+      const result = await get('git.safe_branch', '--all-tiers', '--json');
+
+      expect(result.code).toBe(1);
+      expect(result.json()).toEqual({
+        key: 'git.safe_branch',
+        resolved: { set: false, value: null, source: null, default: 'origin/main' },
+        tiers: {
+          local: { set: false, value: null, file: path.join(root, LOCAL_FILE), allowed: true },
+          repo: { set: true, value: 'origin/dev', file: path.join(root, REPO_FILE), allowed: false },
+          global: { set: false, value: null, file: path.join(account, 'arcanum-config.json'), allowed: false }
+        }
+      });
+    });
+
+    it('reads a disallowed tier explicitly, with a warning', async () => {
+      await writeTier(path.join(root, REPO_FILE), { git: { safe_branch: 'origin/dev' } });
+
+      const result = await get('git.safe_branch', '--repo');
+
+      expect(result.code).toBe(0);
+      expect(result.out).toBe('origin/dev\n');
+      expect(result.err).toContain('git.safe_branch is set in the repo tier, but arcanum does not read it from there');
+    });
+
+    it('adds allowed to the explicit-tier JSON, without a warning', async () => {
+      await writeTier(path.join(root, REPO_FILE), { git: { safe_branch: 'origin/dev' } });
+
+      const result = await get('git.safe_branch', '--repo', '--json');
+
+      expect(result.json()).toEqual({
+        key: 'git.safe_branch', set: true, value: 'origin/dev', source: 'repo', default: 'origin/main', allowed: false
+      });
+      expect(result.err).toBe('');
+    });
+
+    it('does not warn on an allowed explicit tier', async () => {
+      await writeTier(path.join(root, LOCAL_FILE), { git: { safe_branch: 'origin/dev' } });
+
+      const result = await get('git.safe_branch', '--local');
+
+      expect(result.out).toBe('origin/dev\n');
+      expect(result.err).toBe('');
+    });
+
+    it('leaves an unknown key unchanged: every tier read, no allowed field', async () => {
+      await writeTier(path.join(account, 'arcanum-config.json'), { custom: { thing: 1 } });
+
+      const result = await get('custom.thing', '--all-tiers', '--json');
+
+      expect(result.json().resolved).toEqual({ set: true, value: 1, source: 'global', default: null });
+      expect(result.json().tiers.global).toEqual({ set: true, value: 1, file: path.join(account, 'arcanum-config.json') });
+      expect('allowed' in (await get('custom.thing', '--global', '--json')).json()).toBe(false);
     });
   });
 

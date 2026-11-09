@@ -1,4 +1,6 @@
 import path from 'node:path';
+import ConfigChain from '../../../../shared/lib/config/ConfigChain.js';
+import KeyRegistry from '../../../../shared/lib/config/KeyRegistry.js';
 import BooleanKeyConfig from './BooleanKeyConfig.js';
 
 /**
@@ -15,7 +17,12 @@ import BooleanKeyConfig from './BooleanKeyConfig.js';
  * with no legacy fallback) or
  * `.claude/configuration/arcanum-repo-config.json` (every other key,
  * with a read fallback to — and a write-time namespace seed from — the
- * legacy `.claude/configuration/<legacyFileName>`). Writes are guarded
+ * legacy `.claude/configuration/<legacyFileName>`). A key registered in
+ * `keys.json` is read through `ConfigChain`, so its entry's `tiers`
+ * decide which tier files are consulted (a JSON `null` there falls
+ * through, like any chain read); an unregistered key is read straight
+ * from its new file, as `repo_config_read` does. Either way the legacy
+ * file is the last resort for non-state keys. Writes are guarded
  * by `<new file>.lock`, the same lock `repo_config_write` uses. The 4
  * subcommands, validation and atomic writes come from
  * `BooleanKeyConfig`. All paths resolve under `repoPath`.
@@ -31,12 +38,22 @@ class NamespacedBooleanKeyConfig extends BooleanKeyConfig {
    *   under `.claude/configuration/` (e.g. `auto-fix-all.json`).
    * @param {import('../../../../shared/lib/file/Lock.js').default} [options.lock] - the
    *   lock/mutate/release helper used to guard writes.
+   * @param {KeyRegistry} [options.registry] - the key registry deciding
+   *   which keys read through `configChain` (defaults to the bundled
+   *   `keys.json`).
+   * @param {ConfigChain} [options.configChain] - the tier chain registered
+   *   keys are read through (defaults to one built on `registry`).
    */
-  constructor({ namespace, stateKeys, legacyFileName, lock }) {
+  constructor({
+    namespace, stateKeys, legacyFileName, lock,
+    registry = new KeyRegistry(), configChain = new ConfigChain({ registry })
+  }) {
     super({ lock });
     this._namespace = namespace;
     this._stateKeys = new Set(stateKeys);
     this._legacyFileName = legacyFileName;
+    this._registry = registry;
+    this._configChain = configChain;
   }
 
   /**
@@ -54,14 +71,17 @@ class NamespacedBooleanKeyConfig extends BooleanKeyConfig {
    * @returns {Promise<string|undefined>} the resolved value, compact
    *   JSON-stringified exactly as `repo_config_read`'s `jq -c` output
    *   would be (e.g. the stored JSON boolean `true` reads back as the
-   *   string `"true"`), or `undefined` if absent everywhere.
+   *   string `"true"`), or `undefined` if absent everywhere. A
+   *   registered key resolves through `ConfigChain` (its `keys.json`
+   *   tiers only, `null` falling through); an unregistered one through
+   *   its new file only. Non-state keys then fall back to the legacy
+   *   file.
    */
   async _readValue(repoPath, key) {
-    const newConfig = await this._readJson(this._newFileForKey(repoPath, key));
-    const namespaceSection = newConfig[this._namespace];
+    const value = await this._readNewValue(repoPath, key);
 
-    if (namespaceSection && Object.prototype.hasOwnProperty.call(namespaceSection, key)) {
-      return JSON.stringify(namespaceSection[key]);
+    if (value !== undefined) {
+      return JSON.stringify(value);
     }
 
     const legacyFile = this._legacyFileForKey(repoPath, key);
@@ -74,6 +94,27 @@ class NamespacedBooleanKeyConfig extends BooleanKeyConfig {
 
     if (Object.prototype.hasOwnProperty.call(legacyConfig, key)) {
       return JSON.stringify(legacyConfig[key]);
+    }
+
+    return undefined;
+  }
+
+  /**
+   * @param {string} repoPath - the directory the config files resolve under.
+   * @param {string} key - the config key to read.
+   * @returns {Promise<unknown>} the raw value from the namespaced (non-legacy)
+   *   config, or `undefined` when it isn't there.
+   */
+  async _readNewValue(repoPath, key) {
+    if (this._registry.lookup(`${this._namespace}.${key}`)) {
+      return this._configChain.read(repoPath, this._namespace, key);
+    }
+
+    const newConfig = await this._readJson(this._newFileForKey(repoPath, key));
+    const namespaceSection = newConfig[this._namespace];
+
+    if (namespaceSection && Object.prototype.hasOwnProperty.call(namespaceSection, key)) {
+      return namespaceSection[key];
     }
 
     return undefined;
