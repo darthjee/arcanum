@@ -15,7 +15,7 @@ if [[ $# -lt 1 ]]; then
 fi
 KEY="$1"
 # config-key: monitor-issues.clear_context
-CURRENT=$(repo_config_read "$(_new_file_for_key "$KEY")" "$(_legacy_file_for_key "$KEY")" "$NAMESPACE" "$KEY")
+CURRENT=$(repo_config_read "$(_new_file_for_key "$KEY")" "" "$NAMESPACE" "$KEY")
 CURRENT="${CURRENT:-false}"
 if [[ "$CURRENT" == "true" ]]; then
   NEW_VALUE="false"
@@ -23,5 +23,5 @@ else
   NEW_VALUE="true"
 fi
 # config-key: monitor-issues.clear_context
-repo_config_write "$(_new_file_for_key "$KEY")" "$(_legacy_file_for_key "$KEY")" "$NAMESPACE" "$KEY" "$NEW_VALUE"
+repo_config_write "$(_new_file_for_key "$KEY")" "" "$NAMESPACE" "$KEY" "$NEW_VALUE"
 echo "$NEW_VALUE"

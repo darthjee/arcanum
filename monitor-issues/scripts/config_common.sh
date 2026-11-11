@@ -7,10 +7,13 @@
 # Config lives under the "monitor-issues" namespace of the shared,
 # namespaced arcanum config files (via arcanum/_lib/repo_config.sh):
 #   - clear_context: personal, frequently-toggled state, in the gitignored
-#     .claude/state/arcanum-config.json, with no legacy fallback.
+#     .claude/state/arcanum-config.json. Its old
+#     .claude/state/monitor-issues-config.json value was carried forward
+#     once by the arcanum/migrations/repos/next/001.sh local migration.
 #   - every other key: in the committed
-#     .claude/configuration/arcanum-repo-config.json, falling back to (and
-#     seeded from) the legacy .claude/configuration/monitor-issues.json.
+#     .claude/configuration/arcanum-repo-config.json.
+# The legacy .claude/configuration/monitor-issues.json is never read nor
+# used to seed the namespace.
 # See docs/guides/arcanum-repo-config.md.
 #
 # All paths are relative to the caller's cwd (the target project's root).
@@ -18,7 +21,6 @@
 # This file is meant to be SOURCED, not executed directly.
 
 CONFIG_COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE=".claude/configuration/monitor-issues.json"
 NEW_CONFIG_FILE=".claude/configuration/arcanum-repo-config.json"
 NEW_STATE_FILE=".claude/state/arcanum-config.json"
 # shellcheck disable=SC2034 # consumed by config_{toggle,is_enabled,get,set}_shell.sh
@@ -42,21 +44,6 @@ _new_file_for_key() {
   esac
 }
 
-# Returns the LEGACY file counterpart of _new_file_for_key, used as a
-# fallback by _config_read_value (for registered and unregistered keys
-# alike, once the new-config read came back empty) and by
-# repo_config_write. clear_context has no
-# legacy fallback (returns "", which repo_config_read's
-# [[ -f "$legacy_file" ]] check treats as "no legacy file") — its old
-# .claude/state/monitor-issues-config.json value is carried forward once
-# by the arcanum/migrations/repos/next/001.sh local migration instead.
-_legacy_file_for_key() {
-  case "$1" in
-    clear_context) echo "" ;;
-    *) echo "$CONFIG_FILE" ;;
-  esac
-}
-
 # _config_read_value <key>
 #   Prints the raw (jq -c) value of <key> under NAMESPACE, or nothing,
 #   mirroring NamespacedBooleanKeyConfig#_readValue/#_readNewValue
@@ -65,13 +52,11 @@ _legacy_file_for_key() {
 #        config_chain_read, i.e. from the tiers the registry allows for
 #        it (a `null` value resolves to empty here);
 #     2. an unregistered key gets a direct, presence-checked read of
-#        _new_file_for_key (so an explicit `null` prints `null`);
-#     3. if still empty, the flat key is read from _legacy_file_for_key's
-#        legacy file (when there is one), with the usual "config has
-#        moved" warning on stderr.
+#        _new_file_for_key (so an explicit `null` prints `null`).
+#   No legacy file is ever read.
 #   Always exits 0; callers apply their own default.
 _config_read_value() {
-  local key="$1" value legacy_file new_file
+  local key="$1" value
 
   if key_registry_has_key "${NAMESPACE}.${key}"; then
     # config-key: monitor-issues.clear_context
@@ -79,16 +64,6 @@ _config_read_value() {
   else
     # config-key: monitor-issues.clear_context
     value=$(repo_config_read "$(_new_file_for_key "$key")" "" "$NAMESPACE" "$key")
-  fi
-
-  if [[ -z "$value" ]]; then
-    legacy_file=$(_legacy_file_for_key "$key")
-    new_file=$(_new_file_for_key "$key")
-    # config-key: monitor-issues.clear_context
-    value=$(repo_config_read "" "$legacy_file" "$NAMESPACE" "$key" 2>/dev/null)
-    if [[ -n "$value" ]]; then
-      echo "Warning: reading '${key}' from legacy config file ${legacy_file} — this configuration has moved to ${new_file}. See docs/guides/arcanum-repo-config.md." >&2
-    fi
   fi
 
   [[ -n "$value" ]] && echo "$value"
