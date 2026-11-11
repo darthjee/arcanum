@@ -7,7 +7,6 @@
 # This file is meant to be SOURCED, not executed directly.
 
 CONFIG_COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE=".claude/configuration/auto-fix-all.json"
 NEW_CONFIG_FILE=".claude/configuration/arcanum-repo-config.json"
 NEW_STATE_FILE=".claude/state/arcanum-config.json"
 # shellcheck disable=SC2034 # consumed by config_{toggle,is_enabled,get,set}_shell.sh
@@ -32,21 +31,6 @@ _new_file_for_key() {
   esac
 }
 
-# Returns the LEGACY file counterpart of _new_file_for_key, used as a
-# fallback by _config_read_value (for registered and unregistered keys
-# alike, once the new-config read came back empty) and by
-# repo_config_write. clear_context and
-# finish_on_empty_queue have no read-time legacy fallback (returns "",
-# which repo_config_read's [[ -f "$legacy_file" ]] check treats as "no
-# legacy file") — see docs/guides/arcanum-repo-config.md. Every other
-# key still falls back to its legacy file as before.
-_legacy_file_for_key() {
-  case "$1" in
-    clear_context|finish_on_empty_queue) echo "" ;;
-    *) echo "$CONFIG_FILE" ;;
-  esac
-}
-
 # _config_read_value <key>
 #   Prints the raw (jq -c) value of <key> under NAMESPACE, or nothing,
 #   mirroring NamespacedBooleanKeyConfig#_readValue/#_readNewValue
@@ -55,13 +39,11 @@ _legacy_file_for_key() {
 #        config_chain_read, i.e. from the tiers the registry allows for
 #        it (a `null` value resolves to empty here);
 #     2. an unregistered key gets a direct, presence-checked read of
-#        _new_file_for_key (so an explicit `null` prints `null`);
-#     3. if still empty, the flat key is read from _legacy_file_for_key's
-#        legacy file (when there is one), with the usual "config has
-#        moved" warning on stderr.
+#        _new_file_for_key (so an explicit `null` prints `null`).
+#   The legacy .claude/configuration/auto-fix-all.json is never read.
 #   Always exits 0; callers apply their own default.
 _config_read_value() {
-  local key="$1" value legacy_file new_file
+  local key="$1" value
 
   if key_registry_has_key "${NAMESPACE}.${key}"; then
     # config-key: auto-fix-all.clear_context
@@ -73,18 +55,6 @@ _config_read_value() {
     # config-key: auto-fix-all.finish_on_empty_queue
     # config-key: auto-fix-all.ignored_check_patterns
     value=$(repo_config_read "$(_new_file_for_key "$key")" "" "$NAMESPACE" "$key")
-  fi
-
-  if [[ -z "$value" ]]; then
-    legacy_file=$(_legacy_file_for_key "$key")
-    new_file=$(_new_file_for_key "$key")
-    # config-key: auto-fix-all.clear_context
-    # config-key: auto-fix-all.finish_on_empty_queue
-    # config-key: auto-fix-all.ignored_check_patterns
-    value=$(repo_config_read "" "$legacy_file" "$NAMESPACE" "$key" 2>/dev/null)
-    if [[ -n "$value" ]]; then
-      echo "Warning: reading '${key}' from legacy config file ${legacy_file} — this configuration has moved to ${new_file}. See docs/guides/arcanum-repo-config.md." >&2
-    fi
   fi
 
   [[ -n "$value" ]] && echo "$value"
