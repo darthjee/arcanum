@@ -48,6 +48,20 @@ describe('auto-fix-all-config-* parity (shell vs. native) — is-enabled', () =>
     expect(shell.stdout).toEqual('');
   });
 
+  it('matches shell output (exit 1, empty stdout), ignoring a key present only in the legacy file', async () => {
+    const seeded = { auto_merge: true };
+
+    await seedConfig(shellRepo, { legacyConfig: seeded });
+    await seedConfig(nativeRepo, { legacyConfig: seeded });
+
+    const { shell, native } = await runPair('is-enabled', shellRepo, nativeRepo, ['auto_merge']);
+
+    expect(native.stdout).toEqual(shell.stdout);
+    expect(native.code).toEqual(shell.code);
+    expect(shell.code).toEqual(1);
+    expect(shell.stdout).toEqual('');
+  });
+
   it('matches shell output (exit 1) for clear_context set only in the repo config, a tier keys.json disallows', async () => {
     const seeded = { 'auto-fix-all': { clear_context: true } };
 

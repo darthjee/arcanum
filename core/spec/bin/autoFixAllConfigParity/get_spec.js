@@ -38,8 +38,8 @@ describe('auto-fix-all-config-* parity (shell vs. native) — get', () => {
     expect(shell.stdout).toEqual('true\n');
   });
 
-  it('matches shell output for a key present only in the legacy file', async () => {
-    const seeded = { auto_merge: false };
+  it('matches shell output ("false"), ignoring a key present only in the legacy file', async () => {
+    const seeded = { auto_merge: true };
 
     await seedConfig(shellRepo, { legacyConfig: seeded });
     await seedConfig(nativeRepo, { legacyConfig: seeded });

@@ -1,4 +1,6 @@
-import { createFixtureRepo, runPair } from '../../support/factories/autoFixAllConfigParitySetup.js';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { createFixtureRepo, runPair, seedConfig } from '../../support/factories/autoFixAllConfigParitySetup.js';
 import { removeTempDir } from '../../support/utils/tempDir.js';
 
 // Parity test for the "auto-fix-all-config-set" migrated entrypoint
@@ -38,6 +40,26 @@ describe('auto-fix-all-config-* parity (shell vs. native) — set', () => {
 
     expect(getResult.shell.stdout).toEqual('true\n');
     expect(getResult.native.stdout).toEqual(getResult.shell.stdout);
+  });
+
+  it('matches shell output, not seeding the namespace from a legacy file that is present', async () => {
+    const seeded = { sibling_key: true, auto_merge: false };
+
+    await seedConfig(shellRepo, { legacyConfig: seeded });
+    await seedConfig(nativeRepo, { legacyConfig: seeded });
+
+    const { shell, native } = await runPair('set', shellRepo, nativeRepo, ['auto_merge', 'true']);
+
+    expect(native.stdout).toEqual(shell.stdout);
+    expect(native.code).toEqual(shell.code);
+    expect(shell.code).toEqual(0);
+
+    const configFile = path.join('.claude', 'configuration', 'arcanum-repo-config.json');
+    const shellConfig = JSON.parse(await readFile(path.join(shellRepo, configFile), 'utf8'));
+    const nativeConfig = JSON.parse(await readFile(path.join(nativeRepo, configFile), 'utf8'));
+
+    expect(shellConfig).toEqual({ 'auto-fix-all': { auto_merge: true } });
+    expect(nativeConfig).toEqual(shellConfig);
   });
 
   it('matches shell exit code (1) and empty stdout for missing args', async () => {
