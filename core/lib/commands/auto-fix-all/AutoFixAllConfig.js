@@ -7,9 +7,8 @@ import NamespacedBooleanKeyConfig from '../../utils/config/NamespacedBooleanKeyC
  * subcommand logic. Values live under `.auto-fix-all.<key>` of
  * `.claude/state/arcanum-config.json` (for
  * `clear_context`/`finish_on_empty_queue`) or
- * `.claude/configuration/arcanum-repo-config.json` (every other key,
- * with a read fallback to — and a write-time seed from — the legacy
- * `.claude/configuration/auto-fix-all.json`).
+ * `.claude/configuration/arcanum-repo-config.json` (every other key).
+ * The legacy `.claude/configuration/auto-fix-all.json` is never read.
  */
 class AutoFixAllConfig extends NamespacedBooleanKeyConfig {
   /**
@@ -25,7 +24,6 @@ class AutoFixAllConfig extends NamespacedBooleanKeyConfig {
     super({
       namespace: 'auto-fix-all',
       stateKeys: ['clear_context', 'finish_on_empty_queue'],
-      legacyFileName: 'auto-fix-all.json',
       lock,
       registry,
       configChain

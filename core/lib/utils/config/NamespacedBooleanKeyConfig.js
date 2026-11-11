@@ -6,26 +6,24 @@ import BooleanKeyConfig from './BooleanKeyConfig.js';
 /**
  * Shared base for the native `config.sh` equivalents that store their
  * `true`/`false` keys under a namespace of the shared, three-tier
- * config files, re-deriving `arcanum/_lib/repo_config.sh`'s new/legacy
- * file split and `repo_config_read`/`repo_config_write` logic natively
+ * config files, re-deriving `arcanum/_lib/repo_config.sh`'s
+ * `repo_config_read`/`repo_config_write` logic natively
  * (`shared/lib/config/RepoConfig.js` covers an unrelated,
  * single-tier read). Currently backs `AutoFixAllConfig` and
  * `MonitorIssuesConfig`.
  *
  * Values live under `.<namespace>.<key>` of
- * `.claude/state/arcanum-config.json` (for the namespace's state keys,
- * with no legacy fallback) or
- * `.claude/configuration/arcanum-repo-config.json` (every other key,
- * with a read fallback to — and a write-time namespace seed from — the
- * legacy `.claude/configuration/<legacyFileName>`). A key registered in
- * `keys.json` is read through `ConfigChain`, so its entry's `tiers`
- * decide which tier files are consulted (a JSON `null` there falls
- * through, like any chain read); an unregistered key is read straight
- * from its new file, as `repo_config_read` does. Either way the legacy
- * file is the last resort for non-state keys. Writes are guarded
- * by `<new file>.lock`, the same lock `repo_config_write` uses. The 4
- * subcommands, validation and atomic writes come from
- * `BooleanKeyConfig`. All paths resolve under `repoPath`.
+ * `.claude/state/arcanum-config.json` (for the namespace's state keys)
+ * or `.claude/configuration/arcanum-repo-config.json` (every other
+ * key). A key registered in `keys.json` is read through `ConfigChain`,
+ * so its entry's `tiers` decide which tier files are consulted (a JSON
+ * `null` there falls through, like any chain read); an unregistered key
+ * is read straight from its new file, as `repo_config_read` does.
+ * Legacy per-skill files (e.g. `auto-fix-all.json`) are never read nor
+ * used to seed a write. Writes are guarded by `<new file>.lock`, the
+ * same lock `repo_config_write` uses. The 4 subcommands, validation
+ * and atomic writes come from `BooleanKeyConfig`. All paths resolve
+ * under `repoPath`.
  */
 class NamespacedBooleanKeyConfig extends BooleanKeyConfig {
   /**
@@ -33,9 +31,7 @@ class NamespacedBooleanKeyConfig extends BooleanKeyConfig {
    * @param {string} options.namespace - the top-level key the values
    *   live under (e.g. `auto-fix-all`).
    * @param {Iterable<string>} options.stateKeys - the keys stored in the
-   *   personal state file, with no legacy fallback.
-   * @param {string} options.legacyFileName - the legacy file's name
-   *   under `.claude/configuration/` (e.g. `auto-fix-all.json`).
+   *   personal state file.
    * @param {import('../../../../shared/lib/file/Lock.js').default} [options.lock] - the
    *   lock/mutate/release helper used to guard writes.
    * @param {KeyRegistry} [options.registry] - the key registry deciding
@@ -45,13 +41,12 @@ class NamespacedBooleanKeyConfig extends BooleanKeyConfig {
    *   keys are read through (defaults to one built on `registry`).
    */
   constructor({
-    namespace, stateKeys, legacyFileName, lock,
+    namespace, stateKeys, lock,
     registry = new KeyRegistry(), configChain = new ConfigChain({ registry })
   }) {
     super({ lock });
     this._namespace = namespace;
     this._stateKeys = new Set(stateKeys);
-    this._legacyFileName = legacyFileName;
     this._registry = registry;
     this._configChain = configChain;
   }
@@ -71,38 +66,20 @@ class NamespacedBooleanKeyConfig extends BooleanKeyConfig {
    * @returns {Promise<string|undefined>} the resolved value, compact
    *   JSON-stringified exactly as `repo_config_read`'s `jq -c` output
    *   would be (e.g. the stored JSON boolean `true` reads back as the
-   *   string `"true"`), or `undefined` if absent everywhere. A
-   *   registered key resolves through `ConfigChain` (its `keys.json`
-   *   tiers only, `null` falling through); an unregistered one through
-   *   its new file only. Non-state keys then fall back to the legacy
-   *   file.
+   *   string `"true"`), or `undefined` if absent. A registered key
+   *   resolves through `ConfigChain` (its `keys.json` tiers only, `null`
+   *   falling through); an unregistered one through its new file only.
    */
   async _readValue(repoPath, key) {
     const value = await this._readNewValue(repoPath, key);
 
-    if (value !== undefined) {
-      return JSON.stringify(value);
-    }
-
-    const legacyFile = this._legacyFileForKey(repoPath, key);
-
-    if (legacyFile === null) {
-      return undefined;
-    }
-
-    const legacyConfig = await this._readJson(legacyFile);
-
-    if (Object.prototype.hasOwnProperty.call(legacyConfig, key)) {
-      return JSON.stringify(legacyConfig[key]);
-    }
-
-    return undefined;
+    return value === undefined ? undefined : JSON.stringify(value);
   }
 
   /**
    * @param {string} repoPath - the directory the config files resolve under.
    * @param {string} key - the config key to read.
-   * @returns {Promise<unknown>} the raw value from the namespaced (non-legacy)
+   * @returns {Promise<unknown>} the raw value from the namespaced
    *   config, or `undefined` when it isn't there.
    */
   async _readNewValue(repoPath, key) {
@@ -121,9 +98,9 @@ class NamespacedBooleanKeyConfig extends BooleanKeyConfig {
   }
 
   /**
-   * Read-seed-merge step for `set`/`toggle`: sets `.<namespace>.<key>`
-   * on the new file, seeding the namespace from the legacy file first
-   * when the new file doesn't have it yet.
+   * Read-merge step for `set`/`toggle`: sets `.<namespace>.<key>` on the
+   * new file, keeping its other namespaces and keys. A missing namespace
+   * starts as `{}`.
    * @param {string} repoPath - the directory the config files resolve under.
    * @param {string} key - the config key to write.
    * @param {boolean} value - the JSON boolean to store.
@@ -131,17 +108,11 @@ class NamespacedBooleanKeyConfig extends BooleanKeyConfig {
    */
   async _buildUpdate(repoPath, key, value) {
     const newFile = this._newFileForKey(repoPath, key);
-    const legacyFile = this._legacyFileForKey(repoPath, key);
     const base = await this._readJson(newFile);
-    let namespaceSection = base[this._namespace];
-
-    if (namespaceSection === undefined && legacyFile !== null) {
-      namespaceSection = await this._readJson(legacyFile, { requireExists: true });
-    }
 
     return {
       file: newFile,
-      content: { ...base, [this._namespace]: { ...namespaceSection, [key]: value } }
+      content: { ...base, [this._namespace]: { ...(base[this._namespace] ?? {}), [key]: value } }
     };
   }
 
@@ -157,20 +128,6 @@ class NamespacedBooleanKeyConfig extends BooleanKeyConfig {
     }
 
     return path.join(repoPath, '.claude', 'configuration', 'arcanum-repo-config.json');
-  }
-
-  /**
-   * @param {string} repoPath - the directory the config files resolve under.
-   * @param {string} key - the config key.
-   * @returns {string|null} the legacy file that `key` should fall back
-   *   to on read, or `null` when there's no legacy fallback.
-   */
-  _legacyFileForKey(repoPath, key) {
-    if (this._stateKeys.has(key)) {
-      return null;
-    }
-
-    return path.join(repoPath, '.claude', 'configuration', this._legacyFileName);
   }
 }
 
