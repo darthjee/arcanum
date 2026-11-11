@@ -20,7 +20,7 @@ fi
 KEY="$2"
 # config-key: auto-fix-all.clear_context
 # config-key: auto-fix-all.finish_on_empty_queue
-CURRENT=$(repo_config_read "$(_new_file_for_key "$KEY")" "$(_legacy_file_for_key "$KEY")" "$NAMESPACE" "$KEY")
+CURRENT=$(repo_config_read "$(_new_file_for_key "$KEY")" "" "$NAMESPACE" "$KEY")
 CURRENT="${CURRENT:-false}"
 if [[ "$CURRENT" == "true" ]]; then
   NEW_VALUE="false"
@@ -29,5 +29,5 @@ else
 fi
 # config-key: auto-fix-all.clear_context
 # config-key: auto-fix-all.finish_on_empty_queue
-repo_config_write "$(_new_file_for_key "$KEY")" "$(_legacy_file_for_key "$KEY")" "$NAMESPACE" "$KEY" "$NEW_VALUE"
+repo_config_write "$(_new_file_for_key "$KEY")" "" "$NAMESPACE" "$KEY" "$NEW_VALUE"
 echo "$NEW_VALUE"

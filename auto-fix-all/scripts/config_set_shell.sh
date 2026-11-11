@@ -25,4 +25,4 @@ if [[ "$VALUE" != "true" && "$VALUE" != "false" ]]; then
 fi
 # config-key: auto-fix-all.clear_context
 # config-key: auto-fix-all.finish_on_empty_queue
-repo_config_write "$(_new_file_for_key "$KEY")" "$(_legacy_file_for_key "$KEY")" "$NAMESPACE" "$KEY" "$VALUE"
+repo_config_write "$(_new_file_for_key "$KEY")" "" "$NAMESPACE" "$KEY" "$VALUE"

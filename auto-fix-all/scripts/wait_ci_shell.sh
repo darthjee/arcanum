@@ -19,11 +19,9 @@
 # from the config key "auto-fix-all.ignored_check_patterns" (an array of
 # regex strings) through config_chain_read, i.e. from whichever tiers
 # shared/lib/config/keys.json allows for that key (local state, repo
-# config, global config, in that precedence order). No legacy
-# .claude/configuration/auto-fix-all.json fallback is attempted for this
-# key — see arcanum/_lib/config_chain.sh and
-# docs/guides/arcanum-repo-config.md. If the key is not set anywhere,
-# no patterns are ignored. This exists
+# config, global config, in that precedence order) — see
+# arcanum/_lib/config_chain.sh and docs/guides/arcanum-repo-config.md.
+# If the key is not set anywhere, no patterns are ignored. This exists
 # because some check-runs (e.g. Codacy) can report a "action_required"
 # conclusion that is neither success nor a failure state, which would
 # otherwise hang this script forever unless ignored.

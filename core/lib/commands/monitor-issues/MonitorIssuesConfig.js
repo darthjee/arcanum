@@ -6,11 +6,10 @@ import NamespacedBooleanKeyConfig from '../../utils/config/NamespacedBooleanKeyC
  * `NamespacedBooleanKeyConfig` for the shared namespaced layout and
  * `BooleanKeyConfig` for the shared subcommand logic. Values live under
  * `.monitor-issues.<key>` of `.claude/state/arcanum-config.json` (for
- * `clear_context`, personal state, with no legacy fallback) or
- * `.claude/configuration/arcanum-repo-config.json` (every other key,
- * with a read fallback to — and a write-time seed from — the legacy
- * `.claude/configuration/monitor-issues.json`). `repoPath` is the
- * shim's `$PWD` (prepended via `--prepend-repo-path`), since
+ * `clear_context`, personal state) or
+ * `.claude/configuration/arcanum-repo-config.json` (every other key).
+ * The legacy `.claude/configuration/monitor-issues.json` is never read.
+ * `repoPath` is the shim's `$PWD` (prepended via `--prepend-repo-path`), since
  * `config.sh` resolves its files relative to the cwd.
  */
 class MonitorIssuesConfig extends NamespacedBooleanKeyConfig {
@@ -27,7 +26,6 @@ class MonitorIssuesConfig extends NamespacedBooleanKeyConfig {
     super({
       namespace: 'monitor-issues',
       stateKeys: ['clear_context'],
-      legacyFileName: 'monitor-issues.json',
       lock,
       registry,
       configChain

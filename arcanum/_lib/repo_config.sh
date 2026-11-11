@@ -1,15 +1,16 @@
 # shellcheck shell=bash
-# Shared per-repo, namespaced configuration helpers, with legacy-file
-# fallback.
+# Shared per-repo, namespaced configuration helpers, with an optional
+# legacy-file seed/fallback.
 #
 # Used by anything that reads/writes an arcanum feature's own config
 # under a shared, namespaced file (e.g.
 # `.claude/configuration/arcanum-repo-config.json` or
-# `.claude/state/arcanum-config.json`), while still supporting repos that
-# haven't migrated off a legacy, feature-specific file yet (e.g.
-# `.claude/configuration/auto-fix-all.json`). See
-# docs/guides/arcanum-repo-config.md for the end-user-facing explanation
-# of this fallback.
+# `.claude/state/arcanum-config.json`). The <legacy_file> argument every
+# function takes is an optional, flat feature-specific file to fall back
+# to on read or to seed the namespace from on write; it is used by
+# migrations (arcanum/migrations/) that carry an old file's values
+# forward. Live callers pass "" (no legacy file). See
+# docs/guides/arcanum-repo-config.md.
 #
 # This file is meant to be SOURCED, not executed directly. Every public
 # function takes explicit file paths as given by the caller (relative to

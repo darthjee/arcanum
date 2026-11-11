@@ -2,7 +2,6 @@ import path from 'node:path';
 import RepoConfigWriter from '../../../../shared/lib/config/RepoConfigWriter.js';
 
 const NEW_CONFIG_FILE = path.join('.claude', 'configuration', 'arcanum-repo-config.json');
-const LEGACY_CONFIG_FILE = path.join('.claude', 'configuration', 'auto-fix-all.json');
 const NAMESPACE = 'auto-fix-all';
 const KEY = 'ignored_check_patterns';
 
@@ -11,9 +10,9 @@ const KEY = 'ignored_check_patterns';
  * migrated entrypoint — byte-identical stdout/exit-code counterpart to
  * `init-claude/scripts/set_ci_ignored_patterns_shell.sh`. Writes
  * `auto-fix-all.ignored_check_patterns` in the target repo's
- * `.claude/configuration/arcanum-repo-config.json` (seeding the
- * namespace from the legacy `.claude/configuration/auto-fix-all.json`
- * when absent, like `repo_config_write`).
+ * `.claude/configuration/arcanum-repo-config.json`, keeping its other
+ * namespaces and keys. A missing namespace starts as `{}`; the legacy
+ * `.claude/configuration/auto-fix-all.json` is never used as a seed.
  */
 class InitClaudeSetCiIgnoredPatterns {
   /**
@@ -48,7 +47,6 @@ class InitClaudeSetCiIgnoredPatterns {
 
     await this._writer.write({
       newFile: path.join(repoPath, NEW_CONFIG_FILE),
-      legacyFile: path.join(repoPath, LEGACY_CONFIG_FILE),
       namespace: NAMESPACE,
       key: KEY,
       value: patterns

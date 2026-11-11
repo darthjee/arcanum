@@ -42,29 +42,30 @@ describe('AutoFixAllConfig', () => {
       await expectAsync(config.get(dir, 'auto_merge')).toBeResolvedTo('true\n');
     });
 
-    it('falls back to the legacy file when the new file is missing the key', async () => {
+    it('ignores a legacy auto-fix-all.json that is present when the new file is missing the key', async () => {
+      await writeJson(newFile, { 'auto-fix-all': { other: false } });
       await writeJson(legacyFile, { auto_merge: true });
 
       const config = newConfig();
 
-      await expectAsync(config.get(dir, 'auto_merge')).toBeResolvedTo('true\n');
+      await expectAsync(config.get(dir, 'auto_merge')).toBeResolvedTo('false\n');
     });
 
-    it('falls back to the legacy file when the new file is missing entirely', async () => {
-      await writeJson(legacyFile, { auto_merge: false });
+    it('ignores a legacy auto-fix-all.json that is present when the new file is missing entirely', async () => {
+      await writeJson(legacyFile, { auto_merge: true });
 
       const config = newConfig();
 
       await expectAsync(config.get(dir, 'auto_merge')).toBeResolvedTo('false\n');
     });
 
-    it('defaults to "false" when absent from both files', async () => {
+    it('defaults to "false" when absent', async () => {
       const config = newConfig();
 
       await expectAsync(config.get(dir, 'auto_merge')).toBeResolvedTo('false\n');
     });
 
-    it('never falls back to the legacy file for clear_context/finish_on_empty_queue, even when present there', async () => {
+    it('ignores a legacy auto-fix-all.json that is present for clear_context/finish_on_empty_queue', async () => {
       await writeJson(legacyFile, { clear_context: true });
 
       const config = newConfig();
@@ -142,6 +143,17 @@ describe('AutoFixAllConfig', () => {
       expect(thrown.stdout).toEqual('');
       expect(thrown.exitCode).toEqual(1);
     });
+
+    it('ignores a legacy auto-fix-all.json that is present, rejecting with a DispatchFailure', async () => {
+      await writeJson(legacyFile, { auto_merge: true });
+
+      const config = newConfig();
+      const thrown = await captureRejection(config.isEnabled(dir, 'auto_merge'));
+
+      expect(thrown).toBeInstanceOf(DispatchFailure);
+      expect(thrown.stdout).toEqual('');
+      expect(thrown.exitCode).toEqual(1);
+    });
   });
 
   describe('#set', () => {
@@ -170,7 +182,7 @@ describe('AutoFixAllConfig', () => {
       });
     });
 
-    it('seeds .auto-fix-all from the legacy file when the new file does not have that namespace yet', async () => {
+    it('ignores a legacy auto-fix-all.json that is present, starting a missing namespace as {}', async () => {
       await writeJson(legacyFile, { sibling_key: true, auto_merge: false });
 
       const config = newConfig();
@@ -179,7 +191,7 @@ describe('AutoFixAllConfig', () => {
 
       const written = JSON.parse(await readFile(newFile, 'utf8'));
 
-      expect(written).toEqual({ 'auto-fix-all': { sibling_key: true, auto_merge: true } });
+      expect(written).toEqual({ 'auto-fix-all': { auto_merge: true } });
     });
 
     it('rejects with a plain Error when the key is missing', async () => {

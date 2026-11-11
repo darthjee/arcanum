@@ -47,4 +47,18 @@ describe('auto-fix-all-config-* parity (shell vs. native) — toggle', () => {
     expect(shell.code).toEqual(0);
     expect(shell.stdout).toEqual('true\n');
   });
+
+  it('matches shell output, ignoring a legacy-only value (flipping the missing value to "true\\n")', async () => {
+    const seeded = { auto_merge: true };
+
+    await seedConfig(shellRepo, { legacyConfig: seeded });
+    await seedConfig(nativeRepo, { legacyConfig: seeded });
+
+    const { shell, native } = await runPair('toggle', shellRepo, nativeRepo, ['auto_merge']);
+
+    expect(native.stdout).toEqual(shell.stdout);
+    expect(native.code).toEqual(shell.code);
+    expect(shell.code).toEqual(0);
+    expect(shell.stdout).toEqual('true\n');
+  });
 });

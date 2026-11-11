@@ -93,13 +93,15 @@ export async function createFixtureRepo(prefix) {
 /**
  * Seed a fixture repo's `.claude/configuration/arcanum-repo-config.json`,
  * `.claude/configuration/auto-fix-all.json`, and/or
- * `.claude/state/arcanum-config.json` with the given content.
+ * `.claude/state/arcanum-config.json` with the given content. The legacy
+ * `auto-fix-all.json` is no longer read nor seeded from by either
+ * engine; `legacyConfig` exists to plant one and prove it is ignored.
  * @param {string} repoPath - the fixture repo's path.
  * @param {object} [opts] - options.
  * @param {object} [opts.newConfig] - content for the new (namespaced)
  *   config file.
  * @param {object} [opts.legacyConfig] - content for the legacy config
- *   file.
+ *   file, planted to prove both engines ignore it.
  * @param {object} [opts.stateConfig] - content for the new state file.
  * @returns {Promise<void>} resolves once every requested file is written.
  */

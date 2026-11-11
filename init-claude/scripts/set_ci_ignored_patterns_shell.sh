@@ -11,16 +11,15 @@
 # array under .claude/configuration/arcanum-repo-config.json's
 # "auto-fix-all" namespace key, "ignored_check_patterns" field — via
 # arcanum/_lib/repo_config.sh's repo_config_write (creating the file,
-# and .claude/configuration/, if needed). Never writes to the legacy
-# .claude/configuration/auto-fix-all.json file (it may still be read
-# from, as a seed, if the new file doesn't have the namespace yet —
-# see repo_config_write).
+# and .claude/configuration/, if needed). Writes the namespaced file
+# only: the legacy .claude/configuration/auto-fix-all.json is never
+# read, written, nor used to seed the namespace (a missing namespace
+# starts as {}).
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NEW_CONFIG_FILE=".claude/configuration/arcanum-repo-config.json"
-LEGACY_CONFIG_FILE=".claude/configuration/auto-fix-all.json"
 NAMESPACE="auto-fix-all"
 
 # shellcheck source=../../arcanum/_lib/repo_config.sh
@@ -36,4 +35,4 @@ else
 fi
 
 # config-key: auto-fix-all.ignored_check_patterns
-repo_config_write "$NEW_CONFIG_FILE" "$LEGACY_CONFIG_FILE" "$NAMESPACE" "ignored_check_patterns" "$PATTERNS_JSON"
+repo_config_write "$NEW_CONFIG_FILE" "" "$NAMESPACE" "ignored_check_patterns" "$PATTERNS_JSON"

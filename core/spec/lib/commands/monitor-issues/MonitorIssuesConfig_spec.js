@@ -44,13 +44,13 @@ describe('MonitorIssuesConfig', () => {
       await expectAsync(config.get(dir, 'auto_rewrite')).toBeResolvedTo('true\n');
     });
 
-    it('falls back to the legacy monitor-issues.json for non-state keys', async () => {
+    it('ignores a legacy monitor-issues.json that is present for non-state keys', async () => {
       await writeJson(legacyFile, { auto_rewrite: true });
 
-      await expectAsync(config.get(dir, 'auto_rewrite')).toBeResolvedTo('true\n');
+      await expectAsync(config.get(dir, 'auto_rewrite')).toBeResolvedTo('false\n');
     });
 
-    it('prefers the namespaced value over the legacy file', async () => {
+    it('reads the namespaced value, ignoring a legacy file that is present', async () => {
       await writeJson(newFile, { 'monitor-issues': { auto_rewrite: false } });
       await writeJson(legacyFile, { auto_rewrite: true });
 
@@ -64,7 +64,7 @@ describe('MonitorIssuesConfig', () => {
       await expectAsync(config.get(dir, 'clear_context')).toBeResolvedTo('true\n');
     });
 
-    it('never falls back to a legacy file for clear_context', async () => {
+    it('ignores a legacy file that is present for clear_context', async () => {
       await writeJson(legacyFile, { clear_context: true });
       await writeJson(path.join(dir, '.claude', 'state', 'monitor-issues-config.json'), { clear_context: true });
 
@@ -136,6 +136,16 @@ describe('MonitorIssuesConfig', () => {
       expect(thrown.exitCode).toEqual(1);
     });
 
+    it('ignores a legacy monitor-issues.json that is present, rejecting with DispatchFailure("", 1)', async () => {
+      await writeJson(legacyFile, { auto_rewrite: true });
+
+      const thrown = await captureRejection(config.isEnabled(dir, 'auto_rewrite'));
+
+      expect(thrown).toBeInstanceOf(DispatchFailure);
+      expect(thrown.stdout).toEqual('');
+      expect(thrown.exitCode).toEqual(1);
+    });
+
     it('rejects with the usage error when the key is missing', async () => {
       await expectAsync(config.isEnabled(dir)).toBeRejectedWithError('Error: is-enabled requires a key');
     });
@@ -153,15 +163,15 @@ describe('MonitorIssuesConfig', () => {
       });
     });
 
-    it('seeds the namespace from the legacy file for non-state keys', async () => {
+    it('ignores a legacy monitor-issues.json that is present for non-state keys', async () => {
       await writeJson(legacyFile, { sibling: true });
 
       await config.set(dir, 'auto_rewrite', 'false');
 
-      expect(await readJson(newFile)).toEqual({ 'monitor-issues': { sibling: true, auto_rewrite: false } });
+      expect(await readJson(newFile)).toEqual({ 'monitor-issues': { auto_rewrite: false } });
     });
 
-    it('does not seed clear_context from a legacy file', async () => {
+    it('ignores a legacy file that is present for clear_context', async () => {
       await writeJson(legacyFile, { sibling: true });
 
       await config.set(dir, 'clear_context', 'false');
@@ -202,11 +212,11 @@ describe('MonitorIssuesConfig', () => {
       expect(await readJson(stateFile)).toEqual({ 'monitor-issues': { clear_context: true } });
     });
 
-    it('flips a legacy-only non-state value, writing it to the repo config', async () => {
+    it('ignores a legacy-only non-state value, flipping the missing value to true in the repo config', async () => {
       await writeJson(legacyFile, { auto_rewrite: true });
 
-      await expectAsync(config.toggle(dir, 'auto_rewrite')).toBeResolvedTo('false\n');
-      expect(await readJson(newFile)).toEqual({ 'monitor-issues': { auto_rewrite: false } });
+      await expectAsync(config.toggle(dir, 'auto_rewrite')).toBeResolvedTo('true\n');
+      expect(await readJson(newFile)).toEqual({ 'monitor-issues': { auto_rewrite: true } });
     });
 
     it('rejects with the usage error when the key is missing', async () => {

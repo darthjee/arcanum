@@ -73,7 +73,7 @@ describe('init-claude-set-ci-ignored-patterns parity (shell vs. native)', () => 
     await expectParityFor(['lint']);
   });
 
-  it('seeds the namespace from the legacy auto-fix-all.json', async () => {
+  it('ignores the legacy auto-fix-all.json', async () => {
     await seedFiles([dirs.shellDir, dirs.nativeDir], {
       [CONFIG]: '{"version":"1.0.0"}',
       [LEGACY]: '{"auto_merge":true,"ignored_check_patterns":["old"]}'
@@ -81,7 +81,7 @@ describe('init-claude-set-ci-ignored-patterns parity (shell vs. native)', () => 
 
     const tree = await expectParityFor(['lint']);
 
-    expect(JSON.parse(tree[CONFIG])['auto-fix-all']).toEqual({ auto_merge: true, ignored_check_patterns: ['lint'] });
+    expect(JSON.parse(tree[CONFIG])['auto-fix-all']).toEqual({ ignored_check_patterns: ['lint'] });
   });
 
   it('treats an invalid-JSON config file as {}', async () => {

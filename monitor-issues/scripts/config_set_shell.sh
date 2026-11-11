@@ -20,4 +20,4 @@ if [[ "$VALUE" != "true" && "$VALUE" != "false" ]]; then
   exit 1
 fi
 # config-key: monitor-issues.clear_context
-repo_config_write "$(_new_file_for_key "$KEY")" "$(_legacy_file_for_key "$KEY")" "$NAMESPACE" "$KEY" "$VALUE"
+repo_config_write "$(_new_file_for_key "$KEY")" "" "$NAMESPACE" "$KEY" "$VALUE"

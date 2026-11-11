@@ -11,9 +11,9 @@ import { expectParity } from '../../support/utils/runCommand.js';
 // identically-seeded directories, asserting byte-identical stdout, exit
 // code and written files. Issue #776 moved the layout onto the namespaced,
 // three-tier files: `clear_context` under `.monitor-issues` of the local
-// state file (no legacy fallback), every other key under `.monitor-issues`
-// of the repo config, with the legacy monitor-issues.json as a read
-// fallback and write-time seed.
+// state file, every other key under `.monitor-issues` of the repo config.
+// Issue #904 dropped the legacy monitor-issues.json read fallback and
+// write-time seed: both engines ignore a legacy file that is present.
 const CONFIG = path.join('.claude', 'configuration', 'arcanum-repo-config.json');
 const LEGACY = path.join('.claude', 'configuration', 'monitor-issues.json');
 const STATE = path.join('.claude', 'state', 'arcanum-config.json');
@@ -66,13 +66,16 @@ describe('monitor-issues-config-* parity (shell vs. native)', () => {
     }
   });
 
-  it('get: matches for a key present only in the legacy file', async () => {
+  it('get / is-enabled: ignore a key present only in the legacy file', async () => {
     await seed(LEGACY, { auto_rewrite: true });
 
-    const { shell, native } = await run('get', ['auto_rewrite']);
+    const get = await run('get', ['auto_rewrite']);
+    const isEnabled = await run('is-enabled', ['auto_rewrite']);
 
-    expectParity(shell, native);
-    expect(shell.stdout).toEqual('true\n');
+    expectParity(get.shell, get.native);
+    expect(get.shell.stdout).toEqual('false\n');
+    expectParity(isEnabled.shell, isEnabled.native);
+    expect(isEnabled.shell.code).toEqual(1);
   });
 
   it('get: matches for clear_context, ignoring every legacy file', async () => {
@@ -139,7 +142,7 @@ describe('monitor-issues-config-* parity (shell vs. native)', () => {
     await expectSameFile(STATE);
   }, LOCKED_WRITE_TIMEOUT_MS);
 
-  it('set: matches when seeding the namespace from the legacy file', async () => {
+  it('set: matches, not seeding the namespace from a legacy file that is present', async () => {
     await seed(LEGACY, { sibling: true });
 
     const { shell, native } = await run('set', ['auto_rewrite', 'false']);
@@ -147,6 +150,7 @@ describe('monitor-issues-config-* parity (shell vs. native)', () => {
     expectParity(shell, native);
     expect(shell.code).toEqual(0);
     await expectSameFile(CONFIG);
+    expect(JSON.parse(await readOptional(dirs.shellDir, CONFIG))).toEqual({ 'monitor-issues': { auto_rewrite: false } });
   }, LOCKED_WRITE_TIMEOUT_MS);
 
   it('set: matches for an invalid value (exit 1, same stderr message)', async () => {
