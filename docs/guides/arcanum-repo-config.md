@@ -1,12 +1,6 @@
 # Guide: The Arcanum Repo Config Move
 
-If you see a warning like:
-
-```text
-Warning: reading '<key>' from legacy config file <legacy-file> — this configuration has moved to <new-file>. See docs/guides/arcanum-repo-config.md.
-```
-
-...this repo's arcanum-managed configuration is still living in the old, feature-specific files instead of the new, namespaced ones. Nothing is broken — the fallback keeps working indefinitely — but it's worth catching up.
+Arcanum's configuration used to live in feature-specific files. It now lives in two namespaced files shared by every feature. The old files are no longer read by any arcanum script, so a value that exists only in an old file has no effect. Run `/arcanum-migrate` to copy any remaining values forward; a pending migration (#906) then deletes the old files.
 
 ## What changed
 
@@ -29,19 +23,19 @@ The new files are shared across every arcanum feature, each keeping its own key 
 }
 ```
 
-`monitor-issues` follows the same layout under a top-level `"monitor-issues"` key: its `clear_context` toggle lives in `.claude/state/arcanum-config.json` as `{"monitor-issues": {"clear_context": true}}`, and any other key lives in `.claude/configuration/arcanum-repo-config.json`. `clear_context` has no legacy-file fallback — the non-skippable local migration `arcanum/migrations/repos/2.2.0/001.sh` copies an existing `.claude/state/monitor-issues-config.json` value forward instead (run `/arcanum-migrate`). Other `monitor-issues` keys still fall back to `.claude/configuration/monitor-issues.json`, with the warning above.
+`monitor-issues` follows the same layout under a top-level `"monitor-issues"` key: its `clear_context` toggle lives in `.claude/state/arcanum-config.json` as `{"monitor-issues": {"clear_context": true}}`, and any other key lives in `.claude/configuration/arcanum-repo-config.json`. `clear_context` has no legacy-file fallback — the non-skippable local migration `arcanum/migrations/repos/2.2.0/001.sh` copies an existing `.claude/state/monitor-issues-config.json` value forward instead (run `/arcanum-migrate`). Other `monitor-issues` keys are read only from `.claude/configuration/arcanum-repo-config.json`; `.claude/configuration/monitor-issues.json` is no longer read.
 
 This lets future arcanum features store their own settings (under their own key) without colliding with `auto-fix-all`'s, or inventing yet another ad-hoc file.
 
-## The fallback
+## No fallback
 
-Every script that reads this configuration (`auto-fix-all/scripts/config.sh`, `auto-fix-all/scripts/wait_ci.sh`, `monitor-issues/scripts/config.sh`, and any future reader going through `arcanum/_lib/repo_config.sh`) checks the new file first. If the key it needs isn't there, it falls back to the legacy file and prints the warning above — so nothing you had configured stops working after upgrading arcanum, you just won't see the warning go away until you migrate.
+Every script that reads this configuration (`auto-fix-all/scripts/config.sh`, `auto-fix-all/scripts/wait_ci.sh`, `monitor-issues/scripts/config.sh`, `init-claude`'s set-ci-ignored-patterns, and their `core/` counterparts) reads only the new files, through the config chain described in [`config-keys.md`](../agents/architecture/config-keys.md). The legacy `.claude/configuration/auto-fix-all.json` and `.claude/configuration/monitor-issues.json` are neither read nor used to seed a namespace on write. If one is still present it is silently ignored, with no warning; a pending migration (#906) deletes it.
 
 ## How to migrate
 
 Two ways, either is fine:
 
-1. **Run `/arcanum-migrate`** — the migration this issue shipped (`arcanum/migrations/repos/*/001.sh`) copies both legacy files' contents into the new ones under the `auto-fix-all` key, then leaves the legacy files in place (harmless — they're just no longer read once the new file has the key). This is safe to re-run.
+1. **Run `/arcanum-migrate`** — the migration this issue shipped (`arcanum/migrations/repos/*/001.sh`) copies both legacy files' contents into the new ones under the `auto-fix-all` key, then leaves the legacy files in place (harmless — they're no longer read; #906's pending migration deletes them). This is safe to re-run.
 2. **Re-run `/init-claude`** — `init-claude/setup_auto_fix_all_settings.md` already writes straight to the new files going forward, so re-running that step has the same effect for the keys it manages.
 
 You can also edit `.claude/configuration/arcanum-repo-config.json` / `.claude/state/arcanum-config.json` by hand — just nest whatever you're adding under the right feature's key.
