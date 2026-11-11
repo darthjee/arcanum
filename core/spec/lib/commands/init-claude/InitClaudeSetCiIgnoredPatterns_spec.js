@@ -61,7 +61,7 @@ describe('InitClaudeSetCiIgnoredPatterns', () => {
     expect(await writtenPatterns()).toEqual(['new']);
   });
 
-  it('seeds from the legacy auto-fix-all.json when the namespace is absent', async () => {
+  it('ignores a legacy auto-fix-all.json that is present when the namespace is absent', async () => {
     const legacy = path.join(dir, '.claude', 'configuration', 'auto-fix-all.json');
 
     await mkdir(path.dirname(legacy), { recursive: true });
@@ -70,7 +70,7 @@ describe('InitClaudeSetCiIgnoredPatterns', () => {
     await command.run('lint');
 
     expect(JSON.parse(await readFile(configFile, 'utf8'))).toEqual({
-      'auto-fix-all': { auto_merge: true, ignored_check_patterns: ['lint'] }
+      'auto-fix-all': { ignored_check_patterns: ['lint'] }
     });
   });
 
