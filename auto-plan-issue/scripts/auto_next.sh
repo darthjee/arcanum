@@ -16,7 +16,8 @@
 # config tier of next_step.auto.auto-plan-issue), ARCANUM_TTY_DEVICE
 # (test-only TTY override), and GIT_CONFIG_GLOBAL, SSH_AUTH_SOCK and
 # GIT_SSH_COMMAND so the host-side push can authenticate (SSH_AUTH_SOCK
-# lets an ssh push use the SSH agent).
+# lets an ssh push use the SSH agent), and GH_TOKEN, GH_HOST and
+# GH_ENTERPRISE_TOKEN so the in-process mark-ready can authenticate gh.
 #
 # Usage: auto_next.sh <repo_path> <id>
 #
@@ -26,9 +27,9 @@
 # identical in every mode.
 #
 # Output and exit code: see auto_next_shell.sh's own header for the full
-# contract (CHAIN=yes, optionally followed by CLEAR=true / CHAIN=no +
-# REASON=... with exit 0, exit 1 with
-# nothing on stdout on any usage error).
+# contract (CHAIN=yes [CLEAR=true] READY=, CHAIN=no + REASON=config READY= RELEASED=,
+# or CHAIN=no + REASON=push|branch, all exit 0; exit 1 with nothing on stdout
+# on any usage error).
 
 set -euo pipefail
 
@@ -43,4 +44,5 @@ SHELL_TWIN="${SCRIPT_DIR}/auto_next_shell.sh"
 # shellcheck source=../../arcanum/_lib/engine_dispatch.sh
 source "${SCRIPT_DIR}/../../arcanum/_lib/engine_dispatch.sh"
 engine_dispatch "$REPO_PATH" auto-plan-issue-auto-next "$SHELL_TWIN" \
-  CLAUDE_CONFIG_DIR HOME ARCANUM_TTY_DEVICE GIT_CONFIG_GLOBAL SSH_AUTH_SOCK GIT_SSH_COMMAND -- "$@"
+  CLAUDE_CONFIG_DIR HOME ARCANUM_TTY_DEVICE GIT_CONFIG_GLOBAL SSH_AUTH_SOCK GIT_SSH_COMMAND \
+  GH_TOKEN GH_HOST GH_ENTERPRISE_TOKEN -- "$@"
