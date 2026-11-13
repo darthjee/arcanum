@@ -67,7 +67,7 @@ native   (repo: .claude/configuration/arcanum-repo-config.json)
 
 Add a tier flag to read only that tier (the raw value, handy in scripts), or `--all-tiers` to see what each tier holds, including shadowed values. An unset key prints `(unset)`, with the registry default when there is one, and exits `1`.
 
-A key is only read from the tiers it is allowed in (`git.safe_branch`, for instance, is local only). A value left in another tier is ignored: `--all-tiers` and `config list` mark it `(ignored: tier not allowed)`, and reading that tier directly prints the value with a warning that arcanum does not read it from there.
+A key is only read from the tiers it is allowed in (`git.safe_branch`, for instance, is read from the local and global tiers, so a value in the committed repo config is ignored). A value left in another tier is ignored: `--all-tiers` and `config list` mark it `(ignored: tier not allowed)`, and reading that tier directly prints the value with a warning that arcanum does not read it from there.
 
 **Write a value.** `set` always needs a tier, so nothing lands in the committed or the shared file by accident:
 
@@ -131,12 +131,13 @@ Writes go to your global config unless you pass a tier flag. `(model default)` m
 - **`edit`** shows the same table and asks, in a loop: which agent (one of those listed, or `default` for the generic pattern), the email (`-` removes it), the tier (global unless you pick another; outside a repo only global), then asks you to confirm. Press Enter at the agent question to finish. It needs a terminal; in scripts use `set`/`unset`. To add an agent that is not listed, use `arcanum config agents email set <agent> <email>`.
 - **Reserved names.** `set`, `unset` and `edit` are commands here, so an agent literally named `set`, `unset` or `edit` is managed with `arcanum config get/set git.agents.<agent>` instead.
 
-**CI checks to ignore.** `auto-fix-all ignore-checks` edits the list of checks `/auto-fix-all` ignores in this repo. The list lives only in the committed repo config:
+**CI checks to ignore.** `auto-fix-all ignore-checks` edits the list of checks `/auto-fix-all` ignores in this repo. The list lives in the committed repo config by default; add `--local` to keep your own list in the local tier instead, which replaces the repo one for you:
 
 ```bash
 arcanum config auto-fix-all ignore-checks                  # list
 arcanum config auto-fix-all ignore-checks add '^codacy'
 arcanum config auto-fix-all ignore-checks remove '^codacy'
+arcanum config auto-fix-all ignore-checks add '^sonar' --local   # only for you
 ```
 
 The patterns are case-insensitive regular expressions, not globs: `^codacy` matches any check whose name starts with "Codacy", and `*` alone is invalid. An invalid pattern is refused and nothing is written. Put `--` before a pattern that starts with `-`.

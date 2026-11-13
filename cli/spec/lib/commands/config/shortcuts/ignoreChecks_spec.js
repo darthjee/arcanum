@@ -14,7 +14,7 @@ describe('config shortcuts: auto-fix-all ignore-checks', () => {
   const checks = (...args) => ['config', 'auto-fix-all', 'ignore-checks', ...args];
   const seedPatterns = (patterns) => harness.seed({ repo: { 'auto-fix-all': { ignored_check_patterns: patterns } } });
   const stored = async () => JSON.parse(await readFile(harness.repoFile, 'utf8'));
-  const storedPatterns = async () => (await stored())['auto-fix-all'].ignored_check_patterns;
+  const storedPatterns = async () => (await stored())['auto-fix-all']?.ignored_check_patterns;
 
   beforeEach(() => harness.setup());
   afterEach(() => harness.teardown());
@@ -64,16 +64,25 @@ describe('config shortcuts: auto-fix-all ignore-checks', () => {
       expect((await harness.run(checks('list', '--repo'))).out).toBe('^codacy\n');
     });
 
-    for (const tier of ['local', 'global']) {
-      it(`refuses --${tier} (exit 3)`, async () => {
-        await seedPatterns(['^codacy']);
-
-        const result = await harness.run(checks('list', `--${tier}`));
-
-        expect(result.code).toBe(3);
-        expect(result.err).toBe(`arcanum: ${KEY} is repo-only\n`);
+    it('lists the local tier with --local, not the repo one', async () => {
+      await harness.seed({
+        repo: { 'auto-fix-all': { ignored_check_patterns: ['^codacy'] } },
+        local: { 'auto-fix-all': { ignored_check_patterns: ['^sonar'] } }
       });
-    }
+
+      expect((await harness.run(checks('list', '--local', '--json'))).json()).toEqual({
+        key: KEY, tier: 'local', file: harness.localFile, patterns: ['^sonar']
+      });
+    });
+
+    it('refuses --global (exit 3)', async () => {
+      await seedPatterns(['^codacy']);
+
+      const result = await harness.run(checks('list', '--global'));
+
+      expect(result.code).toBe(3);
+      expect(result.err).toBe(`arcanum: ${KEY} cannot be written to the global tier (allowed: repo, local)\n`);
+    });
 
     it('refuses an extra argument (exit 2)', async () => {
       await harness.seed();
@@ -188,16 +197,26 @@ describe('config shortcuts: auto-fix-all ignore-checks', () => {
       expect(result.err).toContain('arcanum: auto-fix-all ignore-checks add needs <pattern>...');
     });
 
-    for (const tier of ['local', 'global']) {
-      it(`refuses --${tier} (exit 3), writing nothing`, async () => {
-        await harness.seed();
+    it('adds to the local tier with --local, leaving the repo tier', async () => {
+      await seedPatterns(['^codacy']);
 
-        const result = await harness.run(checks('add', 'x', `--${tier}`));
+      const result = await harness.run(checks('add', '^sonar', '--local'));
 
-        expect(result.code).toBe(3);
-        expect(result.err).toBe(`arcanum: ${KEY} is repo-only\n`);
-      });
-    }
+      expect(result.code).toBe(0);
+      expect(result.out).toBe(`added '^sonar' to ${KEY} (local: .claude/state/arcanum-config.json)\n`);
+      expect(JSON.parse(await readFile(harness.localFile, 'utf8'))).toEqual({ 'auto-fix-all': { ignored_check_patterns: ['^sonar'] } });
+      expect(await storedPatterns()).toEqual(['^codacy']);
+    });
+
+    it('refuses --global (exit 3), writing nothing', async () => {
+      await harness.seed();
+
+      const result = await harness.run(checks('add', 'x', '--global'));
+
+      expect(result.code).toBe(3);
+      expect(result.err).toBe(`arcanum: ${KEY} cannot be written to the global tier (allowed: repo, local)\n`);
+      expect(await storedPatterns()).toBeUndefined();
+    });
 
     it('refuses a malformed repo file (exit 7)', async () => {
       await writeTier(harness.repoFile, '{nope');
@@ -319,10 +338,21 @@ describe('config shortcuts: auto-fix-all ignore-checks', () => {
       expect((await harness.run(checks('remove'))).code).toBe(2);
     });
 
-    it('refuses --local (exit 3)', async () => {
+    it('removes from the local tier with --local, leaving the repo tier', async () => {
+      await harness.seed({
+        repo: { 'auto-fix-all': { ignored_check_patterns: ['a'] } },
+        local: { 'auto-fix-all': { ignored_check_patterns: ['a', 'b'] } }
+      });
+
+      expect((await harness.run(checks('remove', 'a', '--local'))).code).toBe(0);
+      expect(JSON.parse(await readFile(harness.localFile, 'utf8'))).toEqual({ 'auto-fix-all': { ignored_check_patterns: ['b'] } });
+      expect(await storedPatterns()).toEqual(['a']);
+    });
+
+    it('refuses --global (exit 3)', async () => {
       await harness.seed();
 
-      expect((await harness.run(checks('remove', 'a', '--local'))).code).toBe(3);
+      expect((await harness.run(checks('remove', 'a', '--global'))).code).toBe(3);
     });
   });
 
@@ -357,6 +387,15 @@ describe('config shortcuts: auto-fix-all ignore-checks', () => {
       expect((await harness.run(checks('list', '--json'), options())).json()).toEqual({
         key: KEY, tier: 'local', file: harness.localFile, patterns: ['^codacy']
       });
+    });
+
+    it('refuses another tier as <tier>-only (exit 3)', async () => {
+      await harness.seed();
+
+      const result = await harness.run(checks('add', 'x', '--repo'), options());
+
+      expect(result.code).toBe(3);
+      expect(result.err).toBe(`arcanum: ${KEY} is local-only\n`);
     });
 
     it('names that tier in the --unset hint', async () => {

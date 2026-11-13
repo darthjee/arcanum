@@ -107,7 +107,10 @@ describe('config unset', () => {
   });
 
   it('refuses a wrong tier (exit 3)', async () => {
-    expect((await unset(['git.safe_branch', '--global'])).err).toContain('git.safe_branch is local-only');
+    const result = await unset(['git.safe_branch', '--repo']);
+
+    expect(result.code).toBe(3);
+    expect(result.err).toContain('git.safe_branch cannot be written to the repo tier (allowed: global, local)');
   });
 
   it('refuses a tier ahead of the CLI without --force (exit 5)', async () => {

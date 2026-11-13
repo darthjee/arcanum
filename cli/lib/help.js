@@ -242,7 +242,7 @@ export const SHORTCUT_HELP = {
     synopsis: 'auto-fix-all ignore-checks [list] | add <pattern>... | remove <pattern>...',
     summary: `List or edit auto-fix-all.ignored_check_patterns${tierSuffix('auto-fix-all.ignored_check_patterns')}`,
     rows: [
-      ['--repo', 'The only tier accepted (--local and --global exit 3)'],
+      ['--repo|--local', 'List or edit that tier instead of the default; tiers the key does not allow exit 3'],
       ['--lock-timeout <seconds>', 'add/remove: wait at most this long for the lock (default 10)']
     ],
     notes: [

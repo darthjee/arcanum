@@ -244,7 +244,7 @@ Each also accepts the [global flags](#global-flags) and `--help`.
 
 - Keys are dotted paths, e.g. `next_step.auto.enhance-issue`. An empty segment (`a..b`, a leading or trailing `.`, an empty key) is a usage error: `invalid key 'a..b': a key segment may not be empty`.
 - Writes use nested `setpath` semantics: missing intermediate objects are created (a `null` intermediate is replaced by an object), siblings are kept, and a JSON object value replaces the whole subtree at its key rather than merging.
-- `set` and `unset` validate the key against the [key registry](shared-state-and-configuration.md#the-key-registry): known key, type, enum, format, tier and read-only-ness, all exit `3`. Wildcard entries (`git.agents.<agent>`, `next_step.auto.<skill>`) match any segment there. A registry tier restriction can make a key single-tier: `auto-fix-all.ignored_check_patterns` is repo-only, so writing it with `--global` or `--local` is `auto-fix-all.ignored_check_patterns is repo-only`.
+- `set` and `unset` validate the key against the [key registry](shared-state-and-configuration.md#the-key-registry): known key, type, enum, format, tier and read-only-ness, all exit `3`. Wildcard entries (`git.agents.<agent>`, `next_step.auto.<skill>`) match any segment there. A registry tier restriction refuses the other tiers: `auto-fix-all.ignored_check_patterns` allows repo and local, so writing it with `--global` is `auto-fix-all.ignored_check_patterns cannot be written to the global tier (allowed: repo, local)`. A key with a single allowed tier gets `<key> is <tier>-only` instead.
 - Reads (`get`, `list`) accept any key, known or not, including top-level keys such as `version`.
 - `unset` of a key that is not in the target tier is a no-op that exits `0` and reports `"changed": false`, like `rm -f`. `unset` of the last key of an object leaves the empty parent in place (no pruning), as the shell helpers do.
 
@@ -454,7 +454,7 @@ Errors, on stderr in `--json` mode:
 | `3` | `arcanum: next_step.auto.enhance-issue must be a boolean, got string "true"` + `hint: drop --string` |
 | `3` | `arcanum: engine.mode must be one of shell, native, docker, got "bogus"` |
 | `3` | `arcanum: version is read-only; it is managed by migrations` |
-| `3` | `arcanum: auto-fix-all.ignored_check_patterns is repo-only` |
+| `3` | `arcanum: auto-fix-all.ignored_check_patterns cannot be written to the global tier (allowed: repo, local)` |
 | `3` | `arcanum: auto-fix-all.ignored_check_patterns[2] is not a valid regex: <error>` |
 | `3` | `arcanum: git.safe_branch must be a string, got null` + `hint: use 'config unset' to remove it` |
 | `4` | `arcanum: /x/foo is not arcanum-configured (no .claude/configuration/arcanum-repo-config.json)` + `hint: run /init-claude in that repo` |
@@ -498,20 +498,20 @@ arcanum config monitor-issues clear-context [on|off | --unset]        # monitor-
 | `agents email` | `git.email`, `git.agents.<agent>` | string, as typed | global |
 | `engine` | `engine.mode` | enum | local |
 | `next-step auto <skill>` | `next_step.auto.<skill>` | boolean token | local |
-| `git safe-branch` | `git.safe_branch` | string, as typed | local (the only tier) |
+| `git safe-branch` | `git.safe_branch` | string, as typed | local (global or local) |
 | `git merge-body` | `git.merge_body_mode` | enum | local |
-| `auto-fix-all clear-context` | `auto-fix-all.clear_context` | boolean token | local (the only tier) |
-| `auto-fix-all finish-on-empty-queue` | `auto-fix-all.finish_on_empty_queue` | boolean token | local (the only tier) |
-| `auto-fix-all ignore-checks` | `auto-fix-all.ignored_check_patterns` | array of regexes | repo (the only tier) |
-| `monitor-issues clear-context` | `monitor-issues.clear_context` | boolean token | local (the only tier) |
+| `auto-fix-all clear-context` | `auto-fix-all.clear_context` | boolean token | local (global or local) |
+| `auto-fix-all finish-on-empty-queue` | `auto-fix-all.finish_on_empty_queue` | boolean token | local (global or local) |
+| `auto-fix-all ignore-checks` | `auto-fix-all.ignored_check_patterns` | array of regexes | repo (repo or local) |
+| `monitor-issues clear-context` | `monitor-issues.clear_context` | boolean token | local (global or local) |
 
-The default write tier column is not decided by the CLI: it comes from `keys.json` through `KeyRegistry#defaultTier` (see [the key registry](shared-state-and-configuration.md#the-key-registry)), the same rule the native and shell writers use. The rule is the entry's `default_tier` if set, else its only tier, else `local` when allowed, else its first tier. Only `git.email` and `git.agents.<agent>` set `default_tier` (`global`). `defaultTier.js` wraps it for the shortcuts and the [setup wizard](#setup-wizard), so changing a key's tiers or default is a `keys.json` edit only, with no CLI change. The `(<tier> tier only)` / `(default write tier: <tier>)` suffixes of the shortcut summaries in `help.js` are built from the same entries (`tierSuffix`). Tuning knobs (`plan-issues.*`, `git.omit_model_coauthor`, …) get no shortcut; they stay reachable through `config set`.
+The default write tier column is not decided by the CLI: it comes from `keys.json` through `KeyRegistry#defaultTier` (see [the key registry](shared-state-and-configuration.md#the-key-registry)), the same rule the native and shell writers use. The rule is the entry's `default_tier` if set, else its only tier, else `local` when allowed, else its first tier. Only `git.email` and `git.agents.<agent>` (`global`) and `auto-fix-all.ignored_check_patterns` (`repo`) set `default_tier`. `defaultTier.js` wraps it for the shortcuts and the [setup wizard](#setup-wizard), so changing a key's tiers or default is a `keys.json` edit only, with no CLI change. The `(<tier> tier only)` / `(default write tier: <tier>)` suffixes of the shortcut summaries in `help.js` are built from the same entries (`tierSuffix`). Tuning knobs (`plan-issues.*`, `git.omit_model_coauthor`, …) get no shortcut; they stay reachable through `config set`.
 
 ### Design rules
 
 - **Thin front-ends.** Each shortcut covers registry keys and adds nothing the generic `get`/`set`/`unset` lack, except the `agents email` resolution view and `ignore-checks`' array add/remove. Namespaces mirror the config namespaces; `agents email` stays under `agents` to leave room for more per-agent settings.
 - **Single-value shortcuts** take the value positionally: no value reads, a value writes, and `--unset` removes (like `git config --unset`), so the positional slot is only ever a value and a ref named `unset` cannot collide. `--unset` with a value is a usage error. Verb shortcuts exist only where needed: `agents email [set|unset|edit]` (two keys, `set <pattern>` and `set <agent> <email>` told apart by arity) and `ignore-checks [list|add|remove]`.
-- **Writes** go to the key's registry default tier; `--global`, `--repo` or `--local` overrides it within the tiers the registry allows (`git safe-branch --repo x` is `git.safe_branch is local-only`, exit `3`).
+- **Writes** go to the key's registry default tier; `--global`, `--repo` or `--local` overrides it within the tiers the registry allows (`git safe-branch --repo x` is `git.safe_branch cannot be written to the repo tier (allowed: global, local)`, exit `3`).
 - **Reads ignore the default tier.** Without a tier flag a read resolves like `config get`; with one it reads only that tier; `--all-tiers` works on reads.
 - **Boolean tokens** are `on`/`off`/`true`/`false`, lowercase only, always stored as JSON booleans. Anything else is exit `3`, `<key> must be on or off, got "ON"`, `hint: accepted: on, off, true, false (lowercase)`. `off` stores `false` rather than removing the key, so it can shadow a lower tier's `on`; removing is `--unset`.
 - **Flags.** Shortcuts accept the tier flags, the global flags, `--all-tiers` on reads only and `--lock-timeout` on writes only. They refuse `--force` and `--string` (`--force is not accepted by shortcuts (engine)`, `hint: use arcanum config set/unset <key> --force instead`): they only target known keys with known types.
@@ -622,9 +622,9 @@ How it is built: resolution goes through `AgentEmail#resolve` (`ConfigChain#read
 
 ### `ignore-checks`
 
-At runtime `auto-fix-all.ignored_check_patterns` is read only from the repo tier (`RepoConfig.getIgnoredCheckPatterns`), and its entries are case-insensitive regexes (`PrChecker`), not globs. The shortcut follows both:
+At runtime `auto-fix-all.ignored_check_patterns` is read from the local tier, then the repo tier (`RepoConfig.getIgnoredCheckPatterns`, following the registry's `tiers`), and its entries are case-insensitive regexes (`PrChecker`), not globs. The shortcut follows both:
 
-- **Repo tier only.** `--local` and `--global` are exit `3` (`auto-fix-all.ignored_check_patterns is repo-only`), as for the generic `config set`/`unset` of this key. `--repo` is accepted.
+- **Repo by default, local allowed.** `list`, `add` and `remove` work on one tier: the registry's default tier (repo, through `default_tier`), or the one given with `--repo` or `--local`. A local list replaces the repo one as a whole (no merge), so `list --local` shows only the local tier. `--global` is exit `3` (`auto-fix-all.ignored_check_patterns cannot be written to the global tier (allowed: repo, local)`), as for the generic `config set`/`unset` of this key. The tier is checked before anything is read.
 - **Syntax.** `ignore-checks` or `ignore-checks list` lists; `add <pattern>...` and `remove <pattern>...` edit. `add`/`remove` with no pattern is a usage error; use `--` before patterns starting with `-`. `--unset` is refused (use `config unset auto-fix-all.ignored_check_patterns --repo`), and so is `--force`, so a repo ahead of the CLI can only be edited through the generic `config set --force`.
 - **Semantics.** Patterns match by exact string. `add` appends in the order given and skips patterns already present; `remove` skips missing ones. A call that changes nothing exits `0` with `"changed": false`. An absent key counts as `[]`, and removing the last pattern leaves `[]`; `remove` on an absent key writes nothing.
 - **Validation.** Each pattern given to `add` must compile with `new RegExp(p, 'i')`; one invalid pattern is exit `3` (`auto-fix-all.ignored_check_patterns[1] is not a valid regex: Unterminated group`) and nothing is written, not even the valid ones. `remove` does not validate, so a stale invalid pattern can still be removed.
@@ -678,7 +678,7 @@ engine.mode — Script engine used to run migrated skill entrypoints
 4. If a higher-precedence tier holds a value, print `arcanum: note: <tier> still overrides this (value: …)`. Then show the exact write and ask `[Y/n]` (`y`, `yes`, `n`, `no`, Enter for yes). Declining records the setting as kept.
 5. Write at once, through the generic `set`/`unset` body.
 
-The `ci` section shows the current list and loops over `[a]dd / [r]emove / [d]one` (Enter is done). Each pattern is validated as a case-insensitive regex, checked for presence, confirmed and written like `ignore-checks add`/`remove`, then the new list is shown.
+The `ci` section works on the key's default tier (repo); a local override is edited with `ignore-checks --local`. It shows the current list and loops over `[a]dd / [r]emove / [d]one` (Enter is done). Each pattern is validated as a case-insensitive regex, checked for presence, confirmed and written like `ignore-checks add`/`remove`, then the new list is shown.
 
 ### Errors, interrupts and summary
 
@@ -864,7 +864,7 @@ All exit `8` (`npm`). The command never retries with `sudo`. `cli/lib/npm.js` (`
 - **Unsetting via `off`.** Rejected: `off` must be able to shadow a lower tier's `on`.
 - **A shortcut-specific output contract.** Rejected: two contracts to test and keep in sync.
 - **`git email` instead of `agents email`, or listing only configured agents.** Rejected: the question is what each repo agent commits as, including agents with no override.
-- **Every tier, or merged arrays, for `ignore-checks`.** Rejected: the runtime reads only the repo tier.
+- **Merged arrays, or a resolved list, for `ignore-checks`.** Rejected: the runtime takes the highest-precedence tier's list as a whole, so `list` shows one tier's list, the one `add`/`remove` would edit.
 - **Collecting every wizard answer and writing at the end.** Rejected: Ctrl-C would lose everything, and a late error would hide what applied.
 - **A hardcoded wizard key list.** Rejected: it drifts from the registry.
 - **Naming `self-update` `arcanum update` or `arcanum upgrade`.** Rejected: both read as updating the Arcanum install, not the client.

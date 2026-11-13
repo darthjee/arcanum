@@ -1,7 +1,7 @@
 // `arcanum config auto-fix-all ignore-checks [list] | add <pattern>... |
 // remove <pattern>...` (see
 // docs/agents/architecture/arcanum-cli.md#ignore-checks). The key's
-// tier comes from the registry (repo-only), its entries are
+// tiers come from the registry (repo by default, local allowed), its entries are
 // case-insensitive regex strings (not globs), and `add`/`remove` are a read-modify-write inside the lock
 // (`RepoConfigWriter#update`), so concurrent calls never lose updates.
 
@@ -101,7 +101,8 @@ export function storedPatterns(value) {
 }
 
 /**
- * `ignore-checks [list]`: the patterns, one per line (nothing for none).
+ * `ignore-checks [list]`: the patterns stored in one tier (the tier flag
+ * given, else the key's default tier), one per line (nothing for none).
  * Reads take no lock.
  * @param {object} context - the `config` context.
  * @param {(string|undefined)} tier - the tier flag given, if any.
@@ -110,11 +111,11 @@ export function storedPatterns(value) {
  *   value that is not an array.
  */
 async function listPatterns(context, tier) {
-  const readTier = defaultTier(KEY, context.registry);
+  const readTier = tier || defaultTier(KEY, context.registry);
+
+  checkTier(context.registry, readTier);
+
   const { tiers: [{ file, read }] } = await readTiers({ ...context, tier: readTier });
-
-  checkTier(context.registry, tier || readTier);
-
   const found = lookupKey(read.data, KEY);
   const patterns = storedPatterns(found.set ? found.value : undefined);
 

@@ -266,9 +266,12 @@ describe('config get', () => {
       await writeTier(path.join(account, 'arcanum-config.json'), { git: { safe_branch: 'origin/global' } });
 
       const expected = await new ConfigChain({ env }).readWithSource(root, 'git', 'safe_branch');
+      const result = (await get('git.safe_branch', '--json')).json();
 
-      expect(expected).toBeUndefined();
-      expect((await get('git.safe_branch', '--json')).json().set).toBe(false);
+      expect(expected.value).toBe('origin/global');
+      expect(expected.tier).toBe('global');
+      expect(result.value).toBe(expected.value);
+      expect(result.source).toBe(expected.tier);
     });
 
     it('marks a disallowed tier in --all-tiers', async () => {
@@ -298,7 +301,7 @@ describe('config get', () => {
         tiers: {
           local: { set: false, value: null, file: path.join(root, LOCAL_FILE), allowed: true },
           repo: { set: true, value: 'origin/dev', file: path.join(root, REPO_FILE), allowed: false },
-          global: { set: false, value: null, file: path.join(account, 'arcanum-config.json'), allowed: false }
+          global: { set: false, value: null, file: path.join(account, 'arcanum-config.json'), allowed: true }
         }
       });
     });
