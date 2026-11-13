@@ -12,7 +12,10 @@ describe('NamespacedBooleanKeyConfig', () => {
   let repoFile;
   let stateFile;
   let legacyFile;
+  let home;
+  let globalFile;
   let lock;
+  let stubRegistry;
   let config;
 
   beforeEach(async () => {
@@ -20,9 +23,22 @@ describe('NamespacedBooleanKeyConfig', () => {
     repoFile = path.join(dir, '.claude', 'configuration', 'arcanum-repo-config.json');
     stateFile = path.join(dir, '.claude', 'state', 'arcanum-config.json');
     legacyFile = path.join(dir, '.claude', 'configuration', 'legacy.json');
+    home = path.join(dir, 'home');
+    globalFile = path.join(home, '.claude', 'arcanum-config.json');
     lock = new Lock({ sleepMs: 5 });
+    stubRegistry = new KeyRegistry({
+      format_version: 1,
+      keys: [
+        { key: 'ns.personal', type: 'boolean', tiers: ['local'] },
+        { key: 'ns.team', type: 'boolean', tiers: ['repo'] },
+        { key: 'ns.everywhere', type: 'boolean', tiers: ['local', 'repo', 'global'], default_tier: 'global' }
+      ]
+    });
     config = new NamespacedBooleanKeyConfig({
-      namespace: 'ns', stateKeys: ['personal'], lock
+      namespace: 'ns',
+      lock,
+      registry: stubRegistry,
+      configChain: new ConfigChain({ env: { HOME: home }, registry: stubRegistry })
     });
   });
 
@@ -44,14 +60,43 @@ describe('NamespacedBooleanKeyConfig', () => {
   });
 
   describe('file routing', () => {
-    it('routes state keys to the local state file', () => {
+    it('routes a local default-tier key to the local state file', () => {
       expect(config._newFileForKey(dir, 'personal')).toEqual(stateFile);
       expect(config._lockFile(dir, 'personal')).toEqual(`${stateFile}.lock`);
     });
 
-    it('routes other keys to the repo config', () => {
+    it('routes a repo default-tier key to the repo config', () => {
+      expect(config._newFileForKey(dir, 'team')).toEqual(repoFile);
+      expect(config._lockFile(dir, 'team')).toEqual(`${repoFile}.lock`);
+    });
+
+    it('routes a global default-tier key to the global config', () => {
+      expect(config._newFileForKey(dir, 'everywhere')).toEqual(globalFile);
+      expect(config._lockFile(dir, 'everywhere')).toEqual(`${globalFile}.lock`);
+    });
+
+    it('routes a key missing from keys.json to the repo config', () => {
       expect(config._newFileForKey(dir, 'shared')).toEqual(repoFile);
       expect(config._lockFile(dir, 'shared')).toEqual(`${repoFile}.lock`);
+    });
+
+    it('resolves no file nor lock for a global key with no global location', () => {
+      const homeless = new NamespacedBooleanKeyConfig({
+        namespace: 'ns',
+        lock,
+        registry: stubRegistry,
+        configChain: new ConfigChain({ env: {}, registry: stubRegistry })
+      });
+
+      expect(homeless._newFileForKey(dir, 'everywhere')).toBeNull();
+      expect(homeless._lockFile(dir, 'everywhere')).toBeNull();
+    });
+
+    it('routes to the bundled keys.json default tiers when no registry is given', () => {
+      const bundled = new NamespacedBooleanKeyConfig({ namespace: 'auto-fix-all', lock });
+
+      expect(bundled._newFileForKey(dir, 'clear_context')).toEqual(stateFile);
+      expect(bundled._newFileForKey(dir, 'not_a_registered_key')).toEqual(repoFile);
     });
   });
 
@@ -84,11 +129,9 @@ describe('NamespacedBooleanKeyConfig', () => {
   });
 
   describe('#get for keys registered in keys.json', () => {
-    let globalFile;
     let registered;
 
     beforeEach(() => {
-      const home = path.join(dir, 'home');
       const registry = new KeyRegistry({
         format_version: 1,
         keys: [
@@ -98,10 +141,8 @@ describe('NamespacedBooleanKeyConfig', () => {
         ]
       });
 
-      globalFile = path.join(home, '.claude', 'arcanum-config.json');
       registered = new NamespacedBooleanKeyConfig({
         namespace: 'ns',
-        stateKeys: ['personal'],
         lock,
         registry,
         configChain: new ConfigChain({ env: { HOME: home }, registry })
@@ -208,6 +249,66 @@ describe('NamespacedBooleanKeyConfig', () => {
       await config.set(dir, 'shared', 'false');
 
       expect(await readJson(repoFile)).toEqual({ ns: { shared: false } });
+    });
+
+    it('writes a repo default-tier key to the repo config only', async () => {
+      await config.set(dir, 'team', 'true');
+
+      expect(await readJson(repoFile)).toEqual({ ns: { team: true } });
+      await expectAsync(readFile(stateFile, 'utf8')).toBeRejected();
+    });
+
+    it('writes a global default-tier key to the global config only', async () => {
+      await writeJson(globalFile, { other: 1 });
+
+      await config.set(dir, 'everywhere', 'true');
+
+      expect(await readJson(globalFile)).toEqual({ other: 1, ns: { everywhere: true } });
+      await expectAsync(readFile(stateFile, 'utf8')).toBeRejected();
+      await expectAsync(readFile(repoFile, 'utf8')).toBeRejected();
+    });
+
+    describe('when the global location cannot be resolved', () => {
+      let homeless;
+
+      beforeEach(() => {
+        homeless = new NamespacedBooleanKeyConfig({
+          namespace: 'ns',
+          lock,
+          registry: stubRegistry,
+          configChain: new ConfigChain({ env: {}, registry: stubRegistry })
+        });
+        spyOn(process.stderr, 'write');
+        spyOn(lock, 'acquire').and.callThrough();
+      });
+
+      it('warns on stderr and writes nothing, without locking', async () => {
+        await homeless.set(dir, 'everywhere', 'true');
+
+        expect(process.stderr.write).toHaveBeenCalledWith(
+          'Warning: could not resolve a global config location (no $HOME or $CLAUDE_CONFIG_DIR)'
+          + ' — \'ns.everywhere\' was not written.\n'
+        );
+        expect(lock.acquire).not.toHaveBeenCalled();
+        await expectAsync(readFile(stateFile, 'utf8')).toBeRejected();
+        await expectAsync(readFile(repoFile, 'utf8')).toBeRejected();
+      });
+
+      it('still prints the flipped value on toggle', async () => {
+        await expectAsync(homeless.toggle(dir, 'everywhere')).toBeResolvedTo('true\n');
+
+        expect(process.stderr.write).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('#toggle', () => {
+    it('flips a global default-tier key in the global config', async () => {
+      await writeJson(globalFile, { ns: { everywhere: true } });
+
+      await expectAsync(config.toggle(dir, 'everywhere')).toBeResolvedTo('false\n');
+
+      expect(await readJson(globalFile)).toEqual({ ns: { everywhere: false } });
     });
   });
 });
