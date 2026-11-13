@@ -4,7 +4,7 @@
 # monitor-issues.clear_context to the global tier, so a value for any of
 # them in the global config file, ignored until now, starts taking
 # effect. For each such value present and not null, prints one warning
-# to stderr naming it and how to remove it. Never writes any file and
+# to stdout naming it and how to remove it. Never writes any file and
 # always exits 0. See 002.md for a human-readable summary.
 #
 # Usage: 002.sh config
@@ -40,7 +40,7 @@ warn_key() {
     '($k | split(".")) as $p | (try getpath($p) catch null) | select(. != null)' \
     "$file" 2>/dev/null || true)"
   [[ -n "$value" ]] || return 0
-  echo "Warning: ${key} = ${value} in ${file} now takes effect (arcanum reads it from the ${TIER} tier). Remove it with: arcanum config unset ${key} --${TIER}" >&2
+  echo "Warning: ${key} = ${value} in ${file} now takes effect (arcanum reads it from the ${TIER} tier). Remove it with: arcanum config unset ${key} --${TIER}"
 }
 
 cmd_run() {
@@ -49,7 +49,7 @@ cmd_run() {
   [[ -n "$file" && -f "$file" ]] || return 0
 
   if ! jq -e 'type == "object"' "$file" >/dev/null 2>&1; then
-    echo "Warning: could not read ${file} (not a valid JSON object); skipped checking it for values that now take effect in the ${TIER} tier." >&2
+    echo "Warning: could not read ${file} (not a valid JSON object); skipped checking it for values that now take effect in the ${TIER} tier."
     return 0
   fi
 

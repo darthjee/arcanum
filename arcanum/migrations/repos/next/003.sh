@@ -3,7 +3,7 @@
 # auto-fix-all.ignored_check_patterns to the local tier, so a value for it
 # in the repo-local .claude/state/arcanum-config.json, ignored until now,
 # starts overriding the committed repo value. When that value is present
-# and not null, prints one warning to stderr naming it and how to remove
+# and not null, prints one warning to stdout naming it and how to remove
 # it. Never writes any file and always exits 0. See 003.md for a
 # human-readable summary.
 #
@@ -32,7 +32,7 @@ warn_key() {
     '($k | split(".")) as $p | (try getpath($p) catch null) | select(. != null)' \
     "$file" 2>/dev/null || true)"
   [[ -n "$value" ]] || return 0
-  echo "Warning: ${key} = ${value} in ${file} now overrides the repo value (arcanum reads it from the ${TIER} tier). Remove it with: arcanum config unset ${key} --${TIER}" >&2
+  echo "Warning: ${key} = ${value} in ${file} now overrides the repo value (arcanum reads it from the ${TIER} tier). Remove it with: arcanum config unset ${key} --${TIER}"
 }
 
 cmd_run() {
@@ -40,7 +40,7 @@ cmd_run() {
   [[ -f "$file" ]] || return 0
 
   if ! jq -e 'type == "object"' "$file" >/dev/null 2>&1; then
-    echo "Warning: could not read ${file} (not a valid JSON object); skipped checking it for values that now take effect in the ${TIER} tier." >&2
+    echo "Warning: could not read ${file} (not a valid JSON object); skipped checking it for values that now take effect in the ${TIER} tier."
     return 0
   fi
 
