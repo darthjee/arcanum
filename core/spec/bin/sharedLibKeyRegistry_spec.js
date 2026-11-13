@@ -7,7 +7,8 @@ import { REPO_ROOT } from '../support/utils/runCommand.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 
 // Unit and registry-parity specs for arcanum/_lib/key_registry.sh
-// (issue #903), the shell mirror of KeyRegistry#lookup / #allowsTier.
+// (issues #903, #905), the shell mirror of KeyRegistry#lookup /
+// #allowsTier / #defaultTier.
 // Lookups are batched into one bash invocation per case to keep the
 // spec fast.
 
@@ -18,6 +19,11 @@ const TIERS = ['local', 'repo', 'global'];
 const ALLOWS_TIER_SCRIPT = [
   'source "$1"; shift',
   'while [ "$#" -gt 0 ]; do key_registry_allows_tier "$1" "$2"; echo "rc=$?"; shift 2; done'
+].join('\n');
+
+const DEFAULT_TIER_SCRIPT = [
+  'source "$1"; shift',
+  'for key in "$@"; do tier="$(key_registry_default_tier "$key")"; rc=$?; printf "%s|rc=%s\\n" "$tier" "$rc"; done'
 ].join('\n');
 
 const HAS_KEY_SCRIPT = [
@@ -76,6 +82,43 @@ async function hasKey(registryFile, keys) {
   ], { env: shellEnv(registryFile) });
 
   return { codes: stdout.split('\n').filter((line) => line !== ''), stderr };
+}
+
+/**
+ * Runs `key_registry_default_tier` once per key in a single bash
+ * invocation.
+ * @param {string|undefined} registryFile - see `shellEnv`.
+ * @param {string[]} keys - the keys to look up.
+ * @returns {Promise<{results: string[], codes: string[], stderr: string}>}
+ *   one printed tier (`''` when nothing was printed) and one exit status
+ *   per key, plus stderr.
+ */
+async function defaultTier(registryFile, keys) {
+  const { stdout, stderr } = await execFileAsync('bash', [
+    '-c', DEFAULT_TIER_SCRIPT, 'key-registry-spec', KEY_REGISTRY_LIB, ...keys
+  ], { env: shellEnv(registryFile) });
+  const lines = stdout.split('\n').filter((line) => line !== '');
+
+  return {
+    results: lines.map((line) => line.replace(/\|rc=\d+$/, '')),
+    codes: lines.map((line) => line.replace(/^.*\|rc=/, '')),
+    stderr
+  };
+}
+
+/**
+ * Asserts each key printed its expected default tier, exited 0 and
+ * wrote nothing to stderr.
+ * @param {string|undefined} registryFile - see `shellEnv`.
+ * @param {Array<[string, string]>} cases - `[key, expected]`.
+ * @returns {Promise<void>} resolves once asserted.
+ */
+async function expectDefaultTier(registryFile, cases) {
+  const { results, codes, stderr } = await defaultTier(registryFile, cases.map(([key]) => key));
+
+  expect(results).toEqual(cases.map(([, expected]) => expected));
+  expect(codes).toEqual(cases.map(() => '0'));
+  expect(stderr).toEqual('');
 }
 
 /**
@@ -253,6 +296,87 @@ describe('arcanum/_lib/key_registry.sh', () => {
     });
   });
 
+  describe('key_registry_default_tier', () => {
+    describe('with the default-tier rule', () => {
+      beforeEach(async () => {
+        await writeKeys([
+          { key: 'a.explicit', tiers: ['local', 'repo', 'global'], default_tier: 'global' },
+          { key: 'a.only', tiers: ['repo'] },
+          { key: 'a.with_local', tiers: ['global', 'repo', 'local'] },
+          { key: 'a.first', tiers: ['global', 'repo'] },
+          { key: 'a.none', tiers: [] },
+          { key: 'a.<x>.c', tiers: ['repo', 'global'] }
+        ]);
+      });
+
+      it('prints default_tier, else the only tier, else local, else the first tier', async () => {
+        await expectDefaultTier(registryFile, [
+          ['a.explicit', 'global'],
+          ['a.only', 'repo'],
+          ['a.with_local', 'local'],
+          ['a.first', 'global'],
+          ['a.anything.c', 'repo']
+        ]);
+      });
+
+      it('prints nothing for an entry without tiers', async () => {
+        await expectDefaultTier(registryFile, [['a.none', '']]);
+      });
+    });
+
+    describe('with both an exact and a wildcard entry matching', () => {
+      beforeEach(async () => {
+        await writeKeys([
+          { key: 'a.<x>', tiers: ['global'] },
+          { key: 'a.b', tiers: ['repo'] }
+        ]);
+      });
+
+      it('uses the exact entry', async () => {
+        await expectDefaultTier(registryFile, [
+          ['a.b', 'repo'],
+          ['a.other', 'global']
+        ]);
+      });
+    });
+
+    describe('with unknown or malformed keys', () => {
+      beforeEach(async () => {
+        await writeKeys([{ key: 'a.b.c', tiers: ['local'] }]);
+      });
+
+      it('prints nothing', async () => {
+        await expectDefaultTier(registryFile, [
+          ['no.such.key', ''],
+          ['a.b', ''],
+          ['a..b', ''],
+          ['a.b c', ''],
+          ['', '']
+        ]);
+      });
+    });
+
+    describe('with registry problems', () => {
+      const cases = [['a.b', ''], ['a.<x>', '']];
+
+      it('prints nothing when the registry file is missing', async () => {
+        await expectDefaultTier(path.join(tempDir, 'missing.json'), cases);
+      });
+
+      it('prints nothing when the registry is not valid JSON', async () => {
+        await writeRegistry('{ not json');
+
+        await expectDefaultTier(registryFile, cases);
+      });
+
+      it('prints nothing when the registry has no keys', async () => {
+        await writeRegistry('{"format_version":1}');
+
+        await expectDefaultTier(registryFile, cases);
+      });
+    });
+  });
+
   describe('key_registry_has_key', () => {
     beforeEach(async () => {
       await writeKeys([
@@ -298,6 +422,24 @@ describe('arcanum/_lib/key_registry.sh', () => {
       expect(results.map((result, index) => `${pairs[index].join(' ')} => ${result}`))
         .toEqual(expected.map((result, index) => `${pairs[index].join(' ')} => ${result}`));
       expect(codes).toEqual(pairs.map(() => '0'));
+      expect(stderr).toEqual('');
+    });
+  });
+
+  describe('parity with KeyRegistry#defaultTier on the installed keys.json', () => {
+    const registry = new KeyRegistry();
+    const concreteKeys = registry.entries().map(
+      ({ key }) => key.split('.').map((segment) => (/^<.+>$/.test(segment) ? 'sample' : segment)).join('.')
+    );
+    const keys = [...concreteKeys, 'git.agents', 'no.such.key', 'git.bad key'];
+
+    it('prints what the JS registry returns for every entry', async () => {
+      const { results, codes, stderr } = await defaultTier(undefined, keys);
+      const expected = keys.map((key) => registry.defaultTier(key) ?? '');
+
+      expect(results.map((result, index) => `${keys[index]} => ${result}`))
+        .toEqual(expected.map((result, index) => `${keys[index]} => ${result}`));
+      expect(codes).toEqual(keys.map(() => '0'));
       expect(stderr).toEqual('');
     });
   });

@@ -1,6 +1,6 @@
 # shellcheck shell=bash
-# Shell mirror of the config key registry's lookup/tier check
-# (shared/lib/config/KeyRegistry.js's `lookup` and `allowsTier`).
+# Shell mirror of the config key registry's lookup/tier/default-tier checks
+# (shared/lib/config/KeyRegistry.js's `lookup`, `allowsTier` and `defaultTier`).
 #
 # This file is meant to be SOURCED, not executed directly — it defines
 # functions used by config_chain.sh (to skip the tiers a key is not
@@ -21,17 +21,24 @@ _KEY_REGISTRY_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _KEY_REGISTRY_DEFAULT_FILE="${_KEY_REGISTRY_LIB_DIR}/../../shared/lib/config/keys.json"
 _KEY_REGISTRY_KEY_PATTERN='^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$'
 
-# _key_registry_lookup <full_key> <tier>
+# _key_registry_lookup <full_key> <mode> [<tier>]
 #   Finds the entry matching <full_key> (a literal entry beats a
 #   wildcard one; otherwise the first entry, in registry order, with the
 #   same segment count whose every segment is equal or a `<name>`
-#   wildcard). With a non-empty <tier>, prints `true`/`false` (whether
-#   the entry's `tiers` includes it) or `null` (no match). With an empty
-#   <tier>, prints `match` or `null`. A malformed key, or a missing,
-#   unreadable or broken registry, prints `null`. Never writes to
-#   stderr; always exits 0.
+#   wildcard) and prints, by <mode>:
+#     allows        `true`/`false` (whether the entry's `tiers` includes
+#                   <tier>);
+#     match         `match`;
+#     default_tier  the entry's default write tier (KeyRegistry's
+#                   #defaultTier rule: `default_tier` if set, else the
+#                   only tier when `tiers` has one, else `local` if
+#                   `tiers` includes it, else `tiers[0]`), or `null`
+#                   when that is not one of local, repo, global.
+#   Prints `null` when no entry matches, or for a malformed key or a
+#   missing, unreadable or broken registry. Never writes to stderr;
+#   always exits 0.
 _key_registry_lookup() {
-  local key="$1" tier="$2"
+  local key="$1" mode="$2" tier="${3:-}"
   local file="${KEY_REGISTRY_FILE:-$_KEY_REGISTRY_DEFAULT_FILE}"
   local result
 
@@ -41,8 +48,17 @@ _key_registry_lookup() {
   fi
 
   # shellcheck disable=SC2016
-  result=$(jq -r --arg key "$key" --arg tier "$tier" '
+  result=$(jq -r --arg key "$key" --arg mode "$mode" --arg tier "$tier" '
     def wild: test("^<[A-Za-z0-9_-]+>$");
+    def tiers_of: (.tiers // []) | if type == "array" then . else [] end;
+    def default_tier_of:
+      tiers_of as $tiers
+      | if (.default_tier | type) == "string" then .default_tier
+        elif ($tiers | length) == 1 then $tiers[0]
+        elif ($tiers | any(. == "local")) then "local"
+        else ($tiers[0] // "null")
+        end
+      | if type == "string" and (. == "local" or . == "repo" or . == "global") then . else "null" end;
     ($key | split(".")) as $segs
     | if (.keys | type) != "array" then error("no keys array") else . end
     | [.keys[] | select(type == "object" and (.key | type) == "string")] as $entries
@@ -58,14 +74,17 @@ _key_registry_lookup() {
             ] | first)
       ) as $entry
     | if $entry == null then "null"
-      elif $tier == "" then "match"
-      elif ((($entry.tiers // []) | if type == "array" then . else [] end) | any(. == $tier)) then "true"
-      else "false"
+      elif $mode == "match" then "match"
+      elif $mode == "default_tier" then ($entry | default_tier_of)
+      elif $mode == "allows" and ($entry | tiers_of | any(. == $tier)) then "true"
+      elif $mode == "allows" then "false"
+      else "null"
       end
   ' "$file" 2>/dev/null) || result=""
 
-  case "$result" in
-    true|false|match) echo "$result" ;;
+  case "$mode:$result" in
+    allows:true|allows:false|match:match) echo "$result" ;;
+    default_tier:local|default_tier:repo|default_tier:global) echo "$result" ;;
     *) echo "null" ;;
   esac
   return 0
@@ -85,7 +104,7 @@ key_registry_allows_tier() {
     *) echo "null"; return 0 ;;
   esac
 
-  _key_registry_lookup "$key" "$tier"
+  _key_registry_lookup "$key" allows "$tier"
 }
 
 # key_registry_has_key <full_key>
@@ -93,5 +112,19 @@ key_registry_allows_tier() {
 #   key_registry_allows_tier), 1 otherwise (including a malformed key or
 #   a missing/broken registry). Prints nothing.
 key_registry_has_key() {
-  [[ "$(_key_registry_lookup "$1" "")" == "match" ]]
+  [[ "$(_key_registry_lookup "$1" match)" == "match" ]]
+}
+
+# key_registry_default_tier <full_key>
+#   Prints the default write tier (local, repo or global) of the registry
+#   entry matching <full_key> (same matching as key_registry_allows_tier;
+#   the rule is KeyRegistry#defaultTier's, see _key_registry_lookup), or
+#   nothing when no entry matches, the key is malformed or the registry
+#   is missing/broken. Callers apply their own fallback (the config
+#   writers use `repo`). Never writes to stderr; always exits 0.
+key_registry_default_tier() {
+  local tier
+  tier="$(_key_registry_lookup "$1" default_tier)"
+  [[ "$tier" != "null" ]] && echo "$tier"
+  return 0
 }
