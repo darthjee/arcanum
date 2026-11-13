@@ -5,5 +5,19 @@
     "file": "001.sh",
     "skippable": true,
     "applies_to": "repo"
+  },
+  {
+    "id": "002",
+    "type": "script",
+    "file": "002.sh",
+    "skippable": true,
+    "applies_to": "global"
+  },
+  {
+    "id": "003",
+    "type": "script",
+    "file": "003.sh",
+    "skippable": true,
+    "applies_to": "local"
   }
 ]
