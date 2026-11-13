@@ -1,5 +1,9 @@
-import { createFixtureRepo, runPair, seedConfig } from '../../support/factories/autoFixAllConfigParitySetup.js';
-import { removeTempDir } from '../../support/utils/tempDir.js';
+import { writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import {
+  createFixtureRepo, ISOLATED_ENV, runPair, seedConfig
+} from '../../support/factories/autoFixAllConfigParitySetup.js';
+import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
 
 // Parity test for the "auto-fix-all-config-get" migrated entrypoint
 // (issue #261) — see docs/agents/architecture/script-engine.md's
@@ -87,6 +91,47 @@ describe('auto-fix-all-config-* parity (shell vs. native) — get', () => {
     expect(native.code).toEqual(shell.code);
     expect(shell.code).toEqual(0);
     expect(shell.stdout).toEqual('false\n');
+  });
+
+  describe('with a global config file', () => {
+    let globalDir;
+    let env;
+
+    beforeEach(async () => {
+      globalDir = await createTempDir('arcanum-core-afac-parity-global-');
+      env = { ...ISOLATED_ENV, CLAUDE_CONFIG_DIR: globalDir };
+      await writeFile(
+        path.join(globalDir, 'arcanum-config.json'),
+        JSON.stringify({ 'auto-fix-all': { clear_context: true } })
+      );
+    });
+
+    afterEach(async () => {
+      await removeTempDir(globalDir);
+    });
+
+    it('matches shell output ("true") for clear_context set only in the global config', async () => {
+      const { shell, native } = await runPair('get', shellRepo, nativeRepo, ['clear_context'], env);
+
+      expect(native.stdout).toEqual(shell.stdout);
+      expect(native.code).toEqual(shell.code);
+      expect(shell.code).toEqual(0);
+      expect(shell.stdout).toEqual('true\n');
+    });
+
+    it('matches shell output ("false") for a local clear_context overriding the global one', async () => {
+      const seeded = { 'auto-fix-all': { clear_context: false } };
+
+      await seedConfig(shellRepo, { stateConfig: seeded });
+      await seedConfig(nativeRepo, { stateConfig: seeded });
+
+      const { shell, native } = await runPair('get', shellRepo, nativeRepo, ['clear_context'], env);
+
+      expect(native.stdout).toEqual(shell.stdout);
+      expect(native.code).toEqual(shell.code);
+      expect(shell.code).toEqual(0);
+      expect(shell.stdout).toEqual('false\n');
+    });
   });
 
   it('matches shell output ("false") for clear_context set to null in the local state file', async () => {

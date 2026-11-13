@@ -102,7 +102,7 @@ describe('ArcanumCheckConfig', () => {
       }));
     });
 
-    it('marks disallowed tiers as ignored and resolves to null when only they are set', async () => {
+    it('marks a disallowed tier as ignored and resolves from an allowed one past it', async () => {
       await writeJson(repoFile, { git: { safe_branch: 'origin/repo' } });
       await writeJson(globalFile, { git: { safe_branch: 'origin/global' } });
 
@@ -110,21 +110,32 @@ describe('ArcanumCheckConfig', () => {
         key: 'git.safe_branch',
         local: { file: localFile, set: false },
         repo: { file: repoFile, set: true, value: 'origin/repo', allowed: false, ignored: 'tier not allowed' },
-        global: { file: globalFile, set: true, value: 'origin/global', allowed: false, ignored: 'tier not allowed' },
+        global: { file: globalFile, set: true, value: 'origin/global' },
+        final: { value: 'origin/global', source: 'global' }
+      }));
+    });
+
+    it('resolves to null when only disallowed tiers are set', async () => {
+      await writeJson(repoFile, { git: { safe_branch: 'origin/repo' } });
+
+      await expectAsync(newCommand().run('git.safe_branch')).toBeResolvedTo(render({
+        key: 'git.safe_branch',
+        local: { file: localFile, set: false },
+        repo: { file: repoFile, set: true, value: 'origin/repo', allowed: false, ignored: 'tier not allowed' },
+        global: { file: globalFile, set: false },
         final: { value: null, source: null }
       }));
     });
 
     it('marks an unset disallowed tier too', async () => {
-      await writeJson(localFile, { git: { safe_branch: 'origin/local' } });
-      await writeJson(repoFile, { git: { safe_branch: 'origin/repo' } });
+      await writeJson(repoFile, { 'auto-fix-all': { ignored_check_patterns: ['^repo'] } });
 
-      await expectAsync(newCommand().run('git.safe_branch')).toBeResolvedTo(render({
-        key: 'git.safe_branch',
-        local: { file: localFile, set: true, value: 'origin/local' },
-        repo: { file: repoFile, set: true, value: 'origin/repo', allowed: false, ignored: 'tier not allowed' },
+      await expectAsync(newCommand().run('auto-fix-all.ignored_check_patterns')).toBeResolvedTo(render({
+        key: 'auto-fix-all.ignored_check_patterns',
+        local: { file: localFile, set: false },
+        repo: { file: repoFile, set: true, value: ['^repo'] },
         global: { file: globalFile, set: false, allowed: false, ignored: 'tier not allowed' },
-        final: { value: 'origin/local', source: 'local' }
+        final: { value: ['^repo'], source: 'repo' }
       }));
     });
 

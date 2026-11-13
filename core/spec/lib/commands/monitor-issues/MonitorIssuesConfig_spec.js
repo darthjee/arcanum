@@ -21,7 +21,12 @@ describe('MonitorIssuesConfig', () => {
     stateFile = path.join(dir, '.claude', 'state', 'arcanum-config.json');
     legacyFile = path.join(dir, '.claude', 'configuration', 'monitor-issues.json');
     lock = new Lock({ sleepMs: 5 });
-    config = new MonitorIssuesConfig({ lock });
+    // Isolated from the real global config file, which now takes effect
+    // for clear_context.
+    config = new MonitorIssuesConfig({
+      lock,
+      configChain: new ConfigChain({ env: { ...process.env, HOME: path.join(dir, 'home'), CLAUDE_CONFIG_DIR: '' } })
+    });
   });
 
   afterEach(async () => {
@@ -71,7 +76,7 @@ describe('MonitorIssuesConfig', () => {
       await expectAsync(config.get(dir, 'clear_context')).toBeResolvedTo('false\n');
     });
 
-    describe('for clear_context (local-only, read through ConfigChain)', () => {
+    describe('for clear_context (local/global, read through ConfigChain)', () => {
       let globalFile;
 
       beforeEach(() => {
@@ -84,11 +89,16 @@ describe('MonitorIssuesConfig', () => {
         });
       });
 
-      it('ignores clear_context set only in the repo or global config', async () => {
+      it('ignores clear_context set only in the repo config', async () => {
         await writeJson(newFile, { 'monitor-issues': { clear_context: true } });
-        await writeJson(globalFile, { 'monitor-issues': { clear_context: true } });
 
         await expectAsync(config.get(dir, 'clear_context')).toBeResolvedTo('false\n');
+      });
+
+      it('reads clear_context set only in the global config', async () => {
+        await writeJson(globalFile, { 'monitor-issues': { clear_context: true } });
+
+        await expectAsync(config.get(dir, 'clear_context')).toBeResolvedTo('true\n');
       });
 
       it('lets an explicit local null fall through to the default', async () => {

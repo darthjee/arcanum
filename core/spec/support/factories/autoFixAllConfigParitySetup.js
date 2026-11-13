@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { REPO_ROOT } from '../utils/runCommand.js';
@@ -43,14 +44,26 @@ export const NATIVE_COMMANDS = {
 };
 
 /**
+ * A `CLAUDE_CONFIG_DIR` that is never created, so both sides read no
+ * global config file — the developer's own one would otherwise leak in
+ * for the keys the global tier now serves (`clear_context`,
+ * `finish_on_empty_queue`).
+ */
+export const NO_GLOBAL_CONFIG_DIR = path.join(os.tmpdir(), 'arcanum-core-spec-no-global-config');
+
+/** The environment both sides run with unless a spec passes its own. */
+export const ISOLATED_ENV = { ...process.env, CLAUDE_CONFIG_DIR: NO_GLOBAL_CONFIG_DIR };
+
+/**
  * Run a command (shell or native) and capture its stdout/stderr/exit code.
  * @param {string[]} commandAndArgs - `[file, ...args]` to `execFile`.
  * @param {string} cwd - the directory to run the command in.
+ * @param {object} [env] - the environment; defaults to `ISOLATED_ENV`.
  * @returns {Promise<{stdout: string, stderr: string, code: number}>} the process result.
  */
-export async function runCommand([file, ...args], cwd) {
+export async function runCommand([file, ...args], cwd, env = ISOLATED_ENV) {
   try {
-    const { stdout, stderr } = await execFileAsync(file, args, { cwd });
+    const { stdout, stderr } = await execFileAsync(file, args, { cwd, env });
 
     return { stdout, stderr, code: 0 };
   } catch (error) {
@@ -64,13 +77,16 @@ export async function runCommand([file, ...args], cwd) {
  * @param {string} shellRepo - the shell side's fixture repo path.
  * @param {string} nativeRepo - the native side's fixture repo path.
  * @param {string[]} rest - the `<key> [<value>]` args, after `<repo_path>`.
+ * @param {object} [env] - both sides' environment; defaults to
+ *   `ISOLATED_ENV` (no global config file).
  * @returns {Promise<{shell: object, native: object}>} both sides' results.
  */
-export async function runPair(subcommand, shellRepo, nativeRepo, rest) {
-  const shell = await runCommand([SHELL_SCRIPTS[subcommand], shellRepo, ...rest], shellRepo);
+export async function runPair(subcommand, shellRepo, nativeRepo, rest, env = ISOLATED_ENV) {
+  const shell = await runCommand([SHELL_SCRIPTS[subcommand], shellRepo, ...rest], shellRepo, env);
   const native = await runCommand(
     [process.execPath, NATIVE_BIN, NATIVE_COMMANDS[subcommand], nativeRepo, ...rest],
-    nativeRepo
+    nativeRepo,
+    env
   );
 
   return { shell, native };
