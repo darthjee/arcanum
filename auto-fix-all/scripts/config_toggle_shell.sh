@@ -18,9 +18,10 @@ if [[ $# -lt 2 ]]; then
   exit 1
 fi
 KEY="$2"
+TIER="$(_write_tier_for_key "$KEY")"
 # config-key: auto-fix-all.clear_context
 # config-key: auto-fix-all.finish_on_empty_queue
-CURRENT=$(repo_config_read "$(_new_file_for_key "$KEY")" "" "$NAMESPACE" "$KEY")
+CURRENT=$(config_tier_read "." "$TIER" "$NAMESPACE" "$KEY")
 CURRENT="${CURRENT:-false}"
 if [[ "$CURRENT" == "true" ]]; then
   NEW_VALUE="false"
@@ -29,5 +30,5 @@ else
 fi
 # config-key: auto-fix-all.clear_context
 # config-key: auto-fix-all.finish_on_empty_queue
-repo_config_write "$(_new_file_for_key "$KEY")" "" "$NAMESPACE" "$KEY" "$NEW_VALUE"
+config_tier_write "." "$TIER" "$NAMESPACE" "$KEY" "$NEW_VALUE"
 echo "$NEW_VALUE"

@@ -14,10 +14,11 @@ if [[ $# -lt 2 ]]; then
   exit 1
 fi
 KEY="$1"
+TIER="$(_write_tier_for_key "$KEY")"
 VALUE="$2"
 if [[ "$VALUE" != "true" && "$VALUE" != "false" ]]; then
   echo "Error: value must be 'true' or 'false'" >&2
   exit 1
 fi
 # config-key: monitor-issues.clear_context
-repo_config_write "$(_new_file_for_key "$KEY")" "" "$NAMESPACE" "$KEY" "$VALUE"
+config_tier_write "." "$TIER" "$NAMESPACE" "$KEY" "$VALUE"

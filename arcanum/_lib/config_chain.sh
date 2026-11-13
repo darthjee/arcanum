@@ -18,6 +18,11 @@ source "${_CONFIG_CHAIN_LIB_DIR}/global_config.sh"
 # shellcheck source=key_registry.sh
 source "${_CONFIG_CHAIN_LIB_DIR}/key_registry.sh"
 
+# The local and repo tier files, relative to the caller's cwd (the
+# target project's root); the global one is global_config.sh's.
+_CONFIG_CHAIN_LOCAL_FILE=".claude/state/arcanum-config.json"
+_CONFIG_CHAIN_REPO_FILE=".claude/configuration/arcanum-repo-config.json"
+
 # config_chain_read <repo_path> <namespace> <key1> [<key2> ...]
 #   Reads <namespace>.<key1>[, <namespace>.<key2>, ...] across all three
 #   config tiers, in order, returning the first present-and-non-null
@@ -65,13 +70,13 @@ config_chain_read() {
 
   for key in "${keys[@]}"; do
     [[ "$(key_registry_allows_tier "${namespace}.${key}" local)" == "false" ]] && continue
-    value=$(repo_config_read ".claude/state/arcanum-config.json" "" "$namespace" "$key")
+    value=$(repo_config_read "$_CONFIG_CHAIN_LOCAL_FILE" "" "$namespace" "$key")
     [[ -n "$value" && "$value" != "null" ]] && { echo "$value"; return 0; }
   done
 
   for key in "${keys[@]}"; do
     [[ "$(key_registry_allows_tier "${namespace}.${key}" repo)" == "false" ]] && continue
-    value=$(repo_config_read ".claude/configuration/arcanum-repo-config.json" "" "$namespace" "$key")
+    value=$(repo_config_read "$_CONFIG_CHAIN_REPO_FILE" "" "$namespace" "$key")
     [[ -n "$value" && "$value" != "null" ]] && { echo "$value"; return 0; }
   done
 
@@ -82,4 +87,42 @@ config_chain_read() {
   done
 
   return 0
+}
+
+# config_tier_read <repo_path> <tier> <namespace> <key>
+#   Single-tier read of <namespace>.<key> from the file of <tier> (local,
+#   repo or global, the files config_chain_read walks), with that tier's
+#   reader's presence-checked semantics (an explicit `null` prints
+#   `null`; nothing falls through to another tier and the registry's
+#   tier filter is not applied). Prints nothing for an absent key or an
+#   unknown <tier>. Always exits 0.
+config_tier_read() {
+  local repo_path="$1" tier="$2" namespace="$3" key="$4"
+
+  case "$tier" in
+    local) repo_config_read "$_CONFIG_CHAIN_LOCAL_FILE" "" "$namespace" "$key" ;;
+    repo) repo_config_read "$_CONFIG_CHAIN_REPO_FILE" "" "$namespace" "$key" ;;
+    global) global_config_read "$repo_path" "$namespace" "$key" ;;
+  esac
+  return 0
+}
+
+# config_tier_write <repo_path> <tier> <namespace> <key> <json_value>
+#   Writes <namespace>.<key> = <json_value> (a pre-formed JSON literal)
+#   to the file of <tier> through that tier's writer: repo_config_write
+#   for local/repo, global_config_write for global (which warns and
+#   writes nothing, still exiting 0, when the global file can't be
+#   resolved). An unknown <tier> errors on stderr and exits 1.
+config_tier_write() {
+  local repo_path="$1" tier="$2" namespace="$3" key="$4" json_value="$5"
+
+  case "$tier" in
+    local) repo_config_write "$_CONFIG_CHAIN_LOCAL_FILE" "" "$namespace" "$key" "$json_value" ;;
+    repo) repo_config_write "$_CONFIG_CHAIN_REPO_FILE" "" "$namespace" "$key" "$json_value" ;;
+    global) global_config_write "$repo_path" "$namespace" "$key" "$json_value" ;;
+    *)
+      echo "Error: unknown config tier '${tier}' (expected local, repo or global)" >&2
+      return 1
+      ;;
+  esac
 }
