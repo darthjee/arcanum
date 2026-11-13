@@ -39,9 +39,8 @@ export async function seedIgnoredCheckPatterns(repo, patterns) {
 
 /**
  * Seeds `.claude/state/arcanum-config.json`'s
- * `auto-fix-all.ignored_check_patterns` under `repo.repoPath` — a tier
- * keys.json does not allow for that key (it is repo-only), so both
- * sides must ignore it.
+ * `auto-fix-all.ignored_check_patterns` under `repo.repoPath` — the
+ * local tier, which overrides the repo value on both sides.
  * @param {{repoPath: string}} repo - the fixture repo.
  * @param {Array<string>} patterns - the ignored-pattern regex strings.
  * @returns {Promise<void>} resolves once written.

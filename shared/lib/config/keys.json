@@ -35,7 +35,7 @@
     {
       "key": "git.safe_branch",
       "type": "string",
-      "tiers": ["local"],
+      "tiers": ["global", "local"],
       "default": "origin/main",
       "description": "Branch treated as the safe base for new work",
       "setup": {"section": "git", "order": 1, "prompt": "Safe base branch"}
@@ -89,7 +89,8 @@
       "type": "array",
       "items": "string",
       "format": "regex",
-      "tiers": ["repo"],
+      "tiers": ["repo", "local"],
+      "default_tier": "repo",
       "default": [],
       "description": "Case-insensitive regexes of CI checks to ignore",
       "setup": {"section": "ci", "order": 1, "prompt": "CI checks to ignore"}
@@ -97,21 +98,21 @@
     {
       "key": "auto-fix-all.clear_context",
       "type": "boolean",
-      "tiers": ["local"],
+      "tiers": ["global", "local"],
       "default": false,
       "description": "Clear the context between auto-fix-all iterations"
     },
     {
       "key": "auto-fix-all.finish_on_empty_queue",
       "type": "boolean",
-      "tiers": ["local"],
+      "tiers": ["global", "local"],
       "default": false,
       "description": "Stop auto-fix-all when its queue is empty"
     },
     {
       "key": "monitor-issues.clear_context",
       "type": "boolean",
-      "tiers": ["local"],
+      "tiers": ["global", "local"],
       "default": false,
       "description": "Clear the context between monitor-issues polling cycles"
     },
@@ -144,8 +145,8 @@
       "key": "migrations.version",
       "type": "string",
       "read_only": true,
-      "tiers": ["local"],
-      "description": "Arcanum version the local state was migrated to, managed by the migrations runner"
+      "tiers": ["global", "local"],
+      "description": "Arcanum version the local state (local tier) or the machine-wide global migrations (global tier) was migrated to, managed by the migrations runner"
     }
   ]
 }

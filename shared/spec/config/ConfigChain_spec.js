@@ -483,23 +483,30 @@ describe('ConfigChain', () => {
       return new ConfigChain({ env: { CLAUDE_CONFIG_DIR: globalDir }, registry });
     }
 
-    describe('with a local-only key (git.safe_branch)', () => {
-      it('ignores values set in the repo and global tiers', async () => {
+    describe('with a global and local key (git.safe_branch)', () => {
+      it('ignores a value set only in the repo tier', async () => {
         await writeRepoConfig({ git: { safe_branch: 'origin/repo' } });
-        await writeGlobalConfig({ git: { safe_branch: 'origin/global' } });
 
         await expectAsync(newConfigChain().read(repoPath, 'git', 'safe_branch')).toBeResolvedTo(undefined);
         await expectAsync(newConfigChain().readWithSource(repoPath, 'git', 'safe_branch')).toBeResolvedTo(undefined);
       });
 
-      it('still reports the disallowed tiers and their values in #readTiers', async () => {
+      it('skips the repo value and resolves the global one when local is unset', async () => {
+        await writeRepoConfig({ git: { safe_branch: 'origin/repo' } });
+        await writeGlobalConfig({ git: { safe_branch: 'origin/global' } });
+
+        await expectAsync(newConfigChain().readWithSource(repoPath, 'git', 'safe_branch'))
+          .toBeResolvedTo({ value: 'origin/global', tier: 'global', file: globalFile(), key: 'safe_branch' });
+      });
+
+      it('still reports the disallowed repo tier and its value in #readTiers', async () => {
         await writeRepoConfig({ git: { safe_branch: 'origin/repo' } });
         await writeGlobalConfig({ git: { safe_branch: 'origin/global' } });
 
         await expectAsync(newConfigChain().readTiers(repoPath, 'git', 'safe_branch')).toBeResolvedTo([
           { tier: 'local', file: localFile(), set: false, allowed: true },
           { tier: 'repo', file: repoFile(), set: true, value: 'origin/repo', allowed: false },
-          { tier: 'global', file: globalFile(), set: true, value: 'origin/global', allowed: false }
+          { tier: 'global', file: globalFile(), set: true, value: 'origin/global', allowed: true }
         ]);
       });
 
@@ -513,9 +520,17 @@ describe('ConfigChain', () => {
       });
     });
 
-    describe('with a repo-only key (auto-fix-all.ignored_check_patterns)', () => {
-      it('ignores the local and global values', async () => {
+    describe('with a repo and local key (auto-fix-all.ignored_check_patterns)', () => {
+      it('lets the local value override the repo one', async () => {
         await writeLocalState({ 'auto-fix-all': { ignored_check_patterns: ['local'] } });
+        await writeRepoConfig({ 'auto-fix-all': { ignored_check_patterns: ['repo'] } });
+        await writeGlobalConfig({ 'auto-fix-all': { ignored_check_patterns: ['global'] } });
+
+        await expectAsync(newConfigChain().readWithSource(repoPath, 'auto-fix-all', 'ignored_check_patterns'))
+          .toBeResolvedTo({ value: ['local'], tier: 'local', file: localFile(), key: 'ignored_check_patterns' });
+      });
+
+      it('skips the global value and resolves the repo one when local is unset', async () => {
         await writeRepoConfig({ 'auto-fix-all': { ignored_check_patterns: ['repo'] } });
         await writeGlobalConfig({ 'auto-fix-all': { ignored_check_patterns: ['global'] } });
 
@@ -523,12 +538,28 @@ describe('ConfigChain', () => {
           .toBeResolvedTo({ value: ['repo'], tier: 'repo', file: repoFile(), key: 'ignored_check_patterns' });
       });
 
-      it('resolves nothing when only the local and global tiers are set', async () => {
-        await writeLocalState({ 'auto-fix-all': { ignored_check_patterns: ['local'] } });
+      it('resolves nothing when only the global tier is set', async () => {
         await writeGlobalConfig({ 'auto-fix-all': { ignored_check_patterns: ['global'] } });
 
         await expectAsync(newConfigChain().read(repoPath, 'auto-fix-all', 'ignored_check_patterns'))
           .toBeResolvedTo(undefined);
+      });
+    });
+
+    describe('with a global and local workflow key (auto-fix-all.clear_context)', () => {
+      it('resolves the global value when local does not set it', async () => {
+        await writeGlobalConfig({ 'auto-fix-all': { clear_context: true } });
+
+        await expectAsync(newConfigChain().readWithSource(repoPath, 'auto-fix-all', 'clear_context'))
+          .toBeResolvedTo({ value: true, tier: 'global', file: globalFile(), key: 'clear_context' });
+      });
+
+      it('lets an explicit local false win over the global true', async () => {
+        await writeLocalState({ 'auto-fix-all': { clear_context: false } });
+        await writeGlobalConfig({ 'auto-fix-all': { clear_context: true } });
+
+        await expectAsync(newConfigChain().readWithSource(repoPath, 'auto-fix-all', 'clear_context'))
+          .toBeResolvedTo({ value: false, tier: 'local', file: localFile(), key: 'clear_context' });
       });
     });
 

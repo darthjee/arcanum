@@ -172,8 +172,8 @@ describe('auto-fix-all-wait-ci parity (shell vs. native) — ci outcomes', () =>
     });
   });
 
-  describe('ignored_check_patterns set only in the local state file (a tier keys.json disallows)', () => {
-    it('treats the pattern as not ignored on both sides, matching stdout/exit code', async () => {
+  describe('ignored_check_patterns set in the local state file and in the repo config', () => {
+    it('lets the local value override the repo one on both sides, matching stdout/exit code', async () => {
       const fakeGh = await createFakeGhBin();
       const shellRepo = await createGitFixtureRepo();
       const nativeRepo = await createGitFixtureRepo();
@@ -182,9 +182,14 @@ describe('auto-fix-all-wait-ci parity (shell vs. native) — ci outcomes', () =>
         await Promise.all([
           seedGithubLikeRepo(shellRepo),
           seedGithubLikeRepo(nativeRepo),
+          seedIgnoredCheckPatterns(shellRepo, ['^build$']),
+          seedIgnoredCheckPatterns(nativeRepo, ['^build$']),
           seedLocalIgnoredCheckPatterns(shellRepo, ['codacy']),
           seedLocalIgnoredCheckPatterns(nativeRepo, ['codacy'])
         ]);
+
+        // The repo value alone would ignore 'build' and report Codacy's
+        // failure; the local value overrides it, ignoring Codacy instead.
 
         const checkRuns = JSON.stringify([
           { name: 'Codacy Static Code Analysis', status: 'completed', conclusion: 'failure' },
@@ -217,7 +222,7 @@ describe('auto-fix-all-wait-ci parity (shell vs. native) — ci outcomes', () =>
         expect(native.stdout).toEqual(shell.stdout);
         expect(native.code).toEqual(shell.code);
         expect(shell.code).toEqual(0);
-        expect(shell.stdout).toEqual('failed\nCodacy Static Code Analysis\n');
+        expect(shell.stdout).toEqual('passed\n');
       } finally {
         await Promise.all([shellRepo.cleanup(), nativeRepo.cleanup(), fakeGh.cleanup()]);
       }

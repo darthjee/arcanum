@@ -155,9 +155,16 @@ describe('config setup', () => {
       expect(tierOf('next_step.auto.enhance-issue')).toBe('local');
     });
 
-    it('uses a single-tier key\'s only tier', () => {
+    it('defaults git.safe_branch, now global and local, to local', () => {
       expect(tierOf('git.safe_branch')).toBe('local');
+    });
+
+    it('keeps auto-fix-all.ignored_check_patterns, now repo and local, on repo through its default_tier', () => {
       expect(tierOf('auto-fix-all.ignored_check_patterns')).toBe('repo');
+    });
+
+    it('uses a single-tier key\'s only tier', () => {
+      expect(tierOf('version')).toBe('repo');
     });
 
     it('falls back to local, then to the first tier', () => {
@@ -329,9 +336,23 @@ describe('config setup', () => {
       expect(await tier(harness.globalFile)).toEqual({ engine: { mode: 'native' } });
     });
 
+    it('asks the tier of git.safe_branch, offering global and local', async () => {
+      await harness.seed();
+      const { code, prompter } = await wizard(['git'], ['origin/dev', 'global', '', '']);
+
+      expect(code).toBe(0);
+      expect(prompter.questions.slice(0, 3)).toEqual([
+        '  new value [Enter keeps, - unsets]: ',
+        '  tier [local/global] (local): ',
+        `  set git.safe_branch = "origin/dev" at global (${harness.globalFile})? [Y/n] `
+      ]);
+      expect(await tier(harness.globalFile)).toEqual({ git: { safe_branch: 'origin/dev' } });
+    });
+
     it('skips the tier question for a single-tier key', async () => {
       await harness.seed();
-      const { prompter } = await wizard(['git'], ['origin/dev', '', '']);
+      const registry = registryWith({ 'git.safe_branch': { tiers: ['local'] } });
+      const { prompter } = await wizard(['git'], ['origin/dev', '', ''], { deps: { registry } });
 
       expect(prompter.questions.slice(0, 2)).toEqual([
         '  new value [Enter keeps, - unsets]: ',

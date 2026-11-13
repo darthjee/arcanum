@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { FAKE_FETCH_PRELOAD, NATIVE_BIN, REPO_ROOT, runCommand } from '../utils/runCommand.js';
 import { createTempDir, removeTempDir } from '../utils/tempDir.js';
@@ -10,6 +11,17 @@ import { createTempDir, removeTempDir } from '../utils/tempDir.js';
 // implementation directly (never through its engine_dispatch shim, so
 // the comparison isn't circular); the native side runs
 // `core/bin/arcanum <command>`.
+
+/**
+ * The environment `runCwdPair` runs both sides with unless a spec passes
+ * its own: `CLAUDE_CONFIG_DIR` points at a directory that is never
+ * created, so the developer's own global config file (which the global
+ * tier now serves for `clear_context`) never leaks in.
+ */
+export const ISOLATED_ENV = {
+  ...process.env,
+  CLAUDE_CONFIG_DIR: path.join(os.tmpdir(), 'arcanum-core-spec-no-global-config')
+};
 
 /** `monitor-issues/scripts/`'s path. */
 export const SCRIPTS_DIR = path.join(REPO_ROOT, 'monitor-issues', 'scripts');
@@ -42,11 +54,15 @@ export async function createDirPair() {
  * @param {string} nativeCommand - the `core/bin/arcanum` command.
  * @param {{shellDir: string, nativeDir: string}} dirs - the fixture pair.
  * @param {string[]} args - the subcommand's arguments.
+ * @param {object} [env] - both sides' environment; defaults to
+ *   `ISOLATED_ENV` (no global config file).
  * @returns {Promise<{shell: object, native: object}>} both results.
  */
-export async function runCwdPair(shellScript, nativeCommand, { shellDir, nativeDir }, args) {
-  const shell = await runCommand(['bash', path.join(SCRIPTS_DIR, shellScript), ...args], shellDir);
-  const native = await runCommand([process.execPath, NATIVE_BIN, nativeCommand, nativeDir, ...args], nativeDir);
+export async function runCwdPair(shellScript, nativeCommand, { shellDir, nativeDir }, args, env = ISOLATED_ENV) {
+  const shell = await runCommand(['bash', path.join(SCRIPTS_DIR, shellScript), ...args], shellDir, env);
+  const native = await runCommand(
+    [process.execPath, NATIVE_BIN, nativeCommand, nativeDir, ...args], nativeDir, env
+  );
 
   return { shell, native };
 }

@@ -29,8 +29,13 @@ describe('AutoFixAllConfig', () => {
     await writeFile(file, JSON.stringify(content));
   }
 
+  // Isolated from the real global config file, which now takes effect
+  // for clear_context/finish_on_empty_queue.
   function newConfig({ lock } = {}) {
-    return new AutoFixAllConfig({ lock: lock || new Lock({ sleepMs: 5 }) });
+    return new AutoFixAllConfig({
+      lock: lock || new Lock({ sleepMs: 5 }),
+      configChain: new ConfigChain({ env: { ...process.env, HOME: path.join(dir, 'home'), CLAUDE_CONFIG_DIR: '' } })
+    });
   }
 
   describe('#get', () => {
@@ -73,7 +78,7 @@ describe('AutoFixAllConfig', () => {
       await expectAsync(config.get(dir, 'clear_context')).toBeResolvedTo('false\n');
     });
 
-    describe('for the local-only state keys (read through ConfigChain)', () => {
+    describe('for the local/global state keys (read through ConfigChain)', () => {
       let globalFile;
       let config;
 
@@ -87,8 +92,20 @@ describe('AutoFixAllConfig', () => {
         });
       });
 
-      it('ignores finish_on_empty_queue set only in the repo or global config', async () => {
+      it('ignores finish_on_empty_queue set only in the repo config', async () => {
         await writeJson(newFile, { 'auto-fix-all': { finish_on_empty_queue: true } });
+
+        await expectAsync(config.get(dir, 'finish_on_empty_queue')).toBeResolvedTo('false\n');
+      });
+
+      it('reads finish_on_empty_queue set only in the global config', async () => {
+        await writeJson(globalFile, { 'auto-fix-all': { finish_on_empty_queue: true } });
+
+        await expectAsync(config.get(dir, 'finish_on_empty_queue')).toBeResolvedTo('true\n');
+      });
+
+      it('lets a local finish_on_empty_queue override the global one', async () => {
+        await writeJson(stateFile, { 'auto-fix-all': { finish_on_empty_queue: false } });
         await writeJson(globalFile, { 'auto-fix-all': { finish_on_empty_queue: true } });
 
         await expectAsync(config.get(dir, 'finish_on_empty_queue')).toBeResolvedTo('false\n');

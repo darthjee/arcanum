@@ -59,7 +59,7 @@ $ arcanum config get git.safe_branch           # unset: exit 1
 (unset; default: origin/main)
 ```
 
-Each key resolves only from the tiers its registry entry allows (`git.safe_branch` is local only, for example). A value set in another tier is skipped: `--all-tiers` marks it `(ignored: tier not allowed)`, `config list` appends the same marker to its line, and reading that tier explicitly (`--repo`) still prints the raw value, with a warning on stderr. With `--json`, each tier entry of a known key carries `allowed`, and the resolved value skips `allowed: false` tiers.
+Each key resolves only from the tiers its registry entry allows (`git.safe_branch` is read from the local and global tiers, never the repo one, for example). A value set in another tier is skipped: `--all-tiers` marks it `(ignored: tier not allowed)`, `config list` appends the same marker to its line, and reading that tier explicitly (`--repo`) still prints the raw value, with a warning on stderr. With `--json`, each tier entry of a known key carries `allowed`, and the resolved value skips `allowed: false` tiers.
 
 ### set and unset
 
@@ -121,12 +121,12 @@ Curated shortcuts over the most common keys. Each one is a thin front-end over g
 | `agents email [<agent>]`, `agents email --all-tiers`, `agents email set <pattern>`, `agents email set <agent> <email>`, `agents email unset [<agent>]`, `agents email edit` | `git.email`, `git.agents.<agent>` | global |
 | `engine [shell\|native\|docker \| --unset]` | `engine.mode` | local |
 | `next-step auto [<skill> [on\|off \| --unset]]` | `next_step.auto.<skill>` | local |
-| `git safe-branch [<ref> \| --unset]` | `git.safe_branch` | local (local only) |
+| `git safe-branch [<ref> \| --unset]` | `git.safe_branch` | local (global or local) |
 | `git merge-body [full\|empty\|coauthors \| --unset]` | `git.merge_body_mode` | local |
-| `auto-fix-all clear-context [on\|off \| --unset]` | `auto-fix-all.clear_context` | local (local only) |
-| `auto-fix-all finish-on-empty-queue [on\|off \| --unset]` | `auto-fix-all.finish_on_empty_queue` | local (local only) |
-| `auto-fix-all ignore-checks [list]`, `add <pattern>...`, `remove <pattern>...` | `auto-fix-all.ignored_check_patterns` | repo (repo only) |
-| `monitor-issues clear-context [on\|off \| --unset]` | `monitor-issues.clear_context` | local (local only) |
+| `auto-fix-all clear-context [on\|off \| --unset]` | `auto-fix-all.clear_context` | local (global or local) |
+| `auto-fix-all finish-on-empty-queue [on\|off \| --unset]` | `auto-fix-all.finish_on_empty_queue` | local (global or local) |
+| `auto-fix-all ignore-checks [list]`, `add <pattern>...`, `remove <pattern>...` | `auto-fix-all.ignored_check_patterns` | repo (repo or local) |
+| `monitor-issues clear-context [on\|off \| --unset]` | `monitor-issues.clear_context` | local (global or local) |
 
 All of them live under `arcanum config`; `arcanum config <shortcut> --help` shows each one's flags.
 
@@ -197,7 +197,7 @@ $ arcanum config auto-fix-all ignore-checks remove '^sonar'
 $ arcanum config auto-fix-all ignore-checks add -- -flaky    # `--` before a pattern starting with -
 ```
 
-Patterns are **case-insensitive regexes**, not globs. They match by exact string, `add` skips patterns already present and `remove` skips missing ones. Every pattern given to `add` must compile, or nothing is written. The key is repo-only: `--local`/`--global` exit `3`. Each `add`/`remove` re-reads the file inside the lock, so concurrent calls never lose a pattern.
+Patterns are **case-insensitive regexes**, not globs. They match by exact string, `add` skips patterns already present and `remove` skips missing ones. Every pattern given to `add` must compile, or nothing is written. `list`, `add` and `remove` work on the repo tier by default; `--local` works on the local tier instead, whose list overrides the repo one (`--global` exits `3`). Each `add`/`remove` re-reads the file inside the lock, so concurrent calls never lose a pattern.
 
 ### setup
 

@@ -65,10 +65,15 @@ with `git.omit_model_coauthor`, `git.merge_body_mode` and the
 `next_step.auto.<skill>` keys (see
 [`arcanum-repo-config.md`](arcanum-repo-config.md)). For the latter,
 `/arcanum-migrate` offers a skippable global-tier migration that asks
-`[Y]es/[N]o/[S]kip` per key. Other
-namespaced keys (e.g. `auto-fix-all`'s `ignored_check_patterns`) still
-only read the two per-repo files; they may adopt the global chain later,
-feature by feature.
+`[Y]es/[N]o/[S]kip` per key. `git.safe_branch`,
+`auto-fix-all.clear_context`, `auto-fix-all.finish_on_empty_queue` and
+`monitor-issues.clear_context` are read from this file and the local
+state file (not from the committed repo file), so a personal default
+can be set once here. A few keys are not read from this file at all,
+e.g. `auto-fix-all.ignored_check_patterns` (repo and local only); see
+the table linked above. When a value already in this file starts
+taking effect because its key gained the global tier, a skippable
+`/arcanum-migrate` step lists it and tells you how to remove it.
 
 ## The `migrations.version` pointer
 
@@ -84,7 +89,10 @@ immediately. Read/written via `global_config_get_version`/
 `global_config_set_version` in `arcanum/_lib/global_config.sh` (reusing
 `repo_config_get_version`/`repo_config_set_version` against this file's
 resolved path), never via `config_chain_read`/`global_config_read`
-directly. See
+directly. `keys.json` registers `migrations.version` for the global and
+local tiers (still read-only for the CLI), but the two are separate
+scopes, not a fallback chain: the runner reads each pointer from its
+own file, with no local → global fallback. See
 [`docs/agents/architecture/per-repo-migrations.md`](../agents/architecture/per-repo-migrations.md)
 and
 [`docs/guides/arcanum-repo-version.md`](arcanum-repo-version.md) for

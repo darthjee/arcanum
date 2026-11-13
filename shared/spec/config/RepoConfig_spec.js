@@ -70,10 +70,17 @@ describe('RepoConfig', () => {
       await expectAsync(repoConfig.getSafeBranch()).toBeResolvedTo('origin/main');
     });
 
-    it('ignores git.safe_branch set only in the global config, a tier keys.json does not allow', async () => {
+    it('reads git.safe_branch from the global config when the local config does not set it', async () => {
       await writeJson(globalFile(), { git: { safe_branch: 'origin/global' } });
 
-      await expectAsync(repoConfig.getSafeBranch()).toBeResolvedTo('origin/main');
+      await expectAsync(repoConfig.getSafeBranch()).toBeResolvedTo('origin/global');
+    });
+
+    it('prefers the local value over the global one', async () => {
+      await writeJson(localFile(), { git: { safe_branch: 'origin/local' } });
+      await writeJson(globalFile(), { git: { safe_branch: 'origin/global' } });
+
+      await expectAsync(repoConfig.getSafeBranch()).toBeResolvedTo('origin/local');
     });
 
     it('prefers the local value over the repo and global ones', async () => {
@@ -144,10 +151,17 @@ describe('RepoConfig', () => {
       await expectAsync(repoConfig.getIgnoredCheckPatterns()).toBeResolvedTo([]);
     });
 
-    it('ignores ignored_check_patterns set only in the local config, a tier keys.json does not allow', async () => {
+    it('reads ignored_check_patterns from the local config when only it sets them', async () => {
       await writeJson(localFile(), { 'auto-fix-all': { ignored_check_patterns: ['local'] } });
 
-      await expectAsync(repoConfig.getIgnoredCheckPatterns()).toBeResolvedTo([]);
+      await expectAsync(repoConfig.getIgnoredCheckPatterns()).toBeResolvedTo(['local']);
+    });
+
+    it('lets the local value override the repo one', async () => {
+      await writeJson(localFile(), { 'auto-fix-all': { ignored_check_patterns: ['local'] } });
+      await writeJson(repoFile(), { 'auto-fix-all': { ignored_check_patterns: ['repo'] } });
+
+      await expectAsync(repoConfig.getIgnoredCheckPatterns()).toBeResolvedTo(['local']);
     });
 
     it('ignores ignored_check_patterns set only in the global config, a tier keys.json does not allow', async () => {
@@ -156,8 +170,7 @@ describe('RepoConfig', () => {
       await expectAsync(repoConfig.getIgnoredCheckPatterns()).toBeResolvedTo([]);
     });
 
-    it('reads the repo value even when the local and global configs set one too', async () => {
-      await writeJson(localFile(), { 'auto-fix-all': { ignored_check_patterns: ['local'] } });
+    it('reads the repo value over the global one when the local config does not set it', async () => {
       await writeJson(repoFile(), { 'auto-fix-all': { ignored_check_patterns: ['repo'] } });
       await writeJson(globalFile(), { 'auto-fix-all': { ignored_check_patterns: ['global'] } });
 

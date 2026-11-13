@@ -1,9 +1,10 @@
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import {
-  createDirPair, readOptional, runCwdPair, writeJson
+  createDirPair, ISOLATED_ENV, readOptional, runCwdPair, writeJson
 } from '../../support/factories/monitorIssuesParitySetup.js';
 import { expectParity } from '../../support/utils/runCommand.js';
+import { createTempDir, removeTempDir } from '../../support/utils/tempDir.js';
 
 // Parity test for the "monitor-issues-config-*" migrated entrypoints
 // (issue #586): runs monitor-issues/scripts/config_<subcommand>_shell.sh
@@ -48,11 +49,31 @@ describe('monitor-issues-config-* parity (shell vs. native)', () => {
     expect(await readOptional(dirs.nativeDir, relative)).toEqual(await readOptional(dirs.shellDir, relative));
   }
 
-  function run(subcommand, args) {
+  function run(subcommand, args, env = ISOLATED_ENV) {
     return runCwdPair(
-      `config_${subcommand.replace('-', '_')}_shell.sh`, `monitor-issues-config-${subcommand}`, dirs, args
+      `config_${subcommand.replace('-', '_')}_shell.sh`, `monitor-issues-config-${subcommand}`, dirs, args, env
     );
   }
+
+  it('get / is-enabled: honour clear_context set only in the global config', async () => {
+    const globalDir = await createTempDir('arcanum-core-mi-parity-global-');
+
+    try {
+      await writeJson(globalDir, 'arcanum-config.json', { 'monitor-issues': { clear_context: true } });
+
+      const env = { ...ISOLATED_ENV, CLAUDE_CONFIG_DIR: globalDir };
+      const get = await run('get', ['clear_context'], env);
+      const isEnabled = await run('is-enabled', ['clear_context'], env);
+
+      expectParity(get.shell, get.native);
+      expect(get.shell.code).toEqual(0);
+      expect(get.shell.stdout).toEqual('true\n');
+      expectParity(isEnabled.shell, isEnabled.native);
+      expect(isEnabled.shell.code).toEqual(0);
+    } finally {
+      await removeTempDir(globalDir);
+    }
+  });
 
   it('get: matches for a present, an absent and a clear_context key', async () => {
     await seed(CONFIG, { 'monitor-issues': { auto_rewrite: true, name: 'abc' } });

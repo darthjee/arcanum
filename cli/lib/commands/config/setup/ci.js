@@ -1,6 +1,6 @@
 // The `config setup` ci section (see
-// docs/agents/architecture/arcanum-cli.md#per-setting-flow): the repo-only
-// `auto-fix-all.ignored_check_patterns` array, edited one pattern at a
+// docs/agents/architecture/arcanum-cli.md#per-setting-flow): the
+// `auto-fix-all.ignored_check_patterns` array (at its default tier, repo), edited one pattern at a
 // time through an `[a]dd / [r]emove / [d]one` loop. Each change is
 // confirmed, then written like `ignore-checks add/remove`: an atomic
 // read-modify-write inside the lock.
