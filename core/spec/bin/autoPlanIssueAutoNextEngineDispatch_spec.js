@@ -73,7 +73,7 @@ describe('auto-plan-issue auto_next.sh engine_dispatch routing (via the real shi
       };
     },
     check: async (result, { repoPath, logFile, mode }) => {
-      expect(result.stdout).toEqual('CHAIN=yes\n');
+      expect(result.stdout).toEqual('CHAIN=yes\nREADY=false\n');
       expect(result.code).toEqual(0);
       expect(result.stderr).toContain(
         `auto-continuing: /loop /auto-resolve-issue ${ID} (next_step.auto.auto-plan-issue=true)\n`
