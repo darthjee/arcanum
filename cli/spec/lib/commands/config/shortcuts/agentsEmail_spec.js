@@ -3,6 +3,7 @@ import path from 'node:path';
 import { repoAgents } from '../../../../../lib/commands/config/shortcuts/agentsEmail.js';
 import { AGENT_EMAIL_FIXTURES, MODEL_EMAIL } from '../../../../support/agentEmailFixtures.js';
 import { writeTier } from '../../../../support/fixtures.js';
+import { registryWith } from '../../../../support/registry.js';
 import { observable, shortcutHarness } from '../../../../support/shortcuts.js';
 
 describe('config shortcuts: agents email', () => {
@@ -395,6 +396,21 @@ describe('config shortcuts: agents email', () => {
       await harness.run(config('agents', 'email', 'set', 'node', 'true'));
 
       expect(JSON.parse(await readFile(harness.globalFile, 'utf8'))).toEqual(git({ agents: { node: 'true' } }));
+    });
+
+    it('writes to the default tiers the registry gives, with no CLI change', async () => {
+      const registry = registryWith({ 'git.email': { default_tier: 'repo' }, 'git.agents.<agent>': { default_tier: 'local' } });
+      const options = { deps: { ...harness.deps, registry } };
+
+      await harness.seed();
+
+      expect((await harness.run(config('agents', 'email', 'set', 'you@example.com'), options)).code).toBe(0);
+      expect((await harness.run(config('agents', 'email', 'set', 'node', 'n@example.com'), options)).code).toBe(0);
+      expect(JSON.parse(await readFile(harness.repoFile, 'utf8')).git).toEqual({ email: 'you@example.com' });
+      expect(JSON.parse(await readFile(harness.localFile, 'utf8'))).toEqual(git({ agents: { node: 'n@example.com' } }));
+
+      expect((await harness.run(config('agents', 'email', 'unset', 'node'), options)).code).toBe(0);
+      expect(JSON.parse(await readFile(harness.localFile, 'utf8')).git.agents.node).toBeUndefined();
     });
 
     it('notes a higher tier still overriding the write', async () => {

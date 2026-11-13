@@ -3,6 +3,7 @@ import path from 'node:path';
 import KeyRegistry from '../../../../../../shared/lib/config/KeyRegistry.js';
 import { SINGLE_VALUE } from '../../../../../lib/commands/config/shortcuts/singleValue.js';
 import { writeTier } from '../../../../support/fixtures.js';
+import { registryWith } from '../../../../support/registry.js';
 import { observable, shortcutHarness } from '../../../../support/shortcuts.js';
 
 // Each single-value shortcut: its argv, its key, the tier holding a
@@ -33,8 +34,10 @@ describe('config shortcuts: single-value', () => {
   beforeEach(() => harness.setup());
   afterEach(() => harness.teardown());
 
-  it('maps every shortcut to its key and default tier', () => {
-    expect(Object.fromEntries(Object.entries(SINGLE_VALUE).map(([name, { key, tier }]) => [name, [key, tier]]))).toEqual({
+  it('maps every shortcut to its key, whose registry default tier is today\'s', () => {
+    const registry = new KeyRegistry();
+
+    expect(Object.fromEntries(Object.entries(SINGLE_VALUE).map(([name, { key }]) => [name, [key, registry.defaultTier(key)]]))).toEqual({
       engine: ['engine.mode', 'local'],
       'git safe-branch': ['git.safe_branch', 'local'],
       'git merge-body': ['git.merge_body_mode', 'local'],
@@ -154,6 +157,32 @@ describe('config shortcuts: single-value', () => {
 
     expect(human.out).toBe('(unset)\n');
     expect(json.json().default).toBeNull();
+  });
+
+  describe('with a registry giving another default tier', () => {
+    const stub = { 'engine.mode': { default_tier: 'global' }, 'git.safe_branch': { tiers: ['repo'] } };
+    const options = () => ({ deps: { ...harness.deps, registry: registryWith(stub) } });
+
+    it('writes a multi-tier key to its default_tier', async () => {
+      await harness.seed();
+
+      expect((await harness.run(config('engine', 'native'), options())).code).toBe(0);
+      expect(JSON.parse(await readFile(harness.globalFile, 'utf8'))).toEqual({ engine: { mode: 'native' } });
+    });
+
+    it('unsets a multi-tier key at its default_tier', async () => {
+      await harness.seed({ global: { engine: { mode: 'native' } } });
+
+      expect((await harness.run(config('engine', '--unset'), options())).code).toBe(0);
+      expect(JSON.parse(await readFile(harness.globalFile, 'utf8')).engine.mode).toBeUndefined();
+    });
+
+    it('writes a single-tier key to its only tier', async () => {
+      await harness.seed();
+
+      expect((await harness.run(config('git', 'safe-branch', 'origin/dev'), options())).code).toBe(0);
+      expect(JSON.parse(await readFile(harness.repoFile, 'utf8')).git).toEqual({ safe_branch: 'origin/dev' });
+    });
   });
 
   it('prints the documented unset read', async () => {

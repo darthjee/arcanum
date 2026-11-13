@@ -1,8 +1,8 @@
 // `arcanum config auto-fix-all ignore-checks [list] | add <pattern>... |
 // remove <pattern>...` (see
-// docs/agents/architecture/arcanum-cli.md#ignore-checks). The key is
-// repo-only, its entries are case-insensitive regex strings (not globs),
-// and `add`/`remove` are a read-modify-write inside the lock
+// docs/agents/architecture/arcanum-cli.md#ignore-checks). The key's
+// tier comes from the registry (repo-only), its entries are
+// case-insensitive regex strings (not globs), and `add`/`remove` are a read-modify-write inside the lock
 // (`RepoConfigWriter#update`), so concurrent calls never lose updates.
 
 import { lockTimeoutMs } from '../../../args.js';
@@ -12,6 +12,7 @@ import { lookupKey } from '../../../tierFiles.js';
 import { prepareWrite, validationError, writeKey } from '../../../writeTier.js';
 import { displayFile, readTiers } from '../shared.js';
 import { checkShortcutFlags, memoizeTargets } from './common.js';
+import { defaultTier } from './defaultTier.js';
 
 /** The shortcut's name, as typed. */
 export const NAME = 'auto-fix-all ignore-checks';
@@ -19,11 +20,8 @@ export const NAME = 'auto-fix-all ignore-checks';
 /** The key it edits. */
 export const KEY = 'auto-fix-all.ignored_check_patterns';
 
-/** Its only tier. */
-export const TIER = 'repo';
-
 /** The hint for a stored value that is not an array. */
-export const NOT_ARRAY_HINT = `fix it with: arcanum config set ${KEY} '[...]' --repo`;
+export const NOT_ARRAY_HINT = `fix it with: arcanum config set ${KEY} '[...]' --${defaultTier(KEY)}`;
 
 const VERBS = ['list', 'add', 'remove'];
 
@@ -46,7 +44,9 @@ export function runIgnoreChecks(context, args) {
   }
 
   if (context.values.unset) {
-    throw new UsageError(`--unset is not accepted by ${NAME}`, { hint: `use arcanum config unset ${KEY} --repo` });
+    throw new UsageError(`--unset is not accepted by ${NAME}`, {
+      hint: `use arcanum config unset ${KEY} --${defaultTier(KEY, context.registry)}`
+    });
   }
 
   if (verb === 'list') {
@@ -67,13 +67,13 @@ export function runIgnoreChecks(context, args) {
 
   const tier = checkShortcutFlags(`${NAME} ${verb}`, context.values, { write: true });
 
-  return editPatterns(context, { verb, patterns, tier: tier || TIER });
+  return editPatterns(context, { verb, patterns, tier: tier || defaultTier(KEY, context.registry) });
 }
 
 /**
  * @param {object} registry - the key registry.
  * @param {string} tier - the tier asked for.
- * @throws {ValidationError} (exit `3`) when it is not the repo tier.
+ * @throws {ValidationError} (exit `3`) when the key does not allow it.
  */
 function checkTier(registry, tier) {
   const result = registry.check('unset', KEY, tier);
@@ -106,18 +106,19 @@ export function storedPatterns(value) {
  * @param {object} context - the `config` context.
  * @param {(string|undefined)} tier - the tier flag given, if any.
  * @returns {Promise<number>} the exit code.
- * @throws {ValidationError} for a tier other than repo, or a stored
+ * @throws {ValidationError} for a tier the key does not allow, or a stored
  *   value that is not an array.
  */
 async function listPatterns(context, tier) {
-  const { tiers: [{ file, read }] } = await readTiers({ ...context, tier: TIER });
+  const readTier = defaultTier(KEY, context.registry);
+  const { tiers: [{ file, read }] } = await readTiers({ ...context, tier: readTier });
 
-  checkTier(context.registry, tier || TIER);
+  checkTier(context.registry, tier || readTier);
 
   const found = lookupKey(read.data, KEY);
   const patterns = storedPatterns(found.set ? found.value : undefined);
 
-  context.output.result(patterns.map(formatValue).join('\n'), { key: KEY, tier: TIER, file, patterns });
+  context.output.result(patterns.map(formatValue).join('\n'), { key: KEY, tier: readTier, file, patterns });
 
   return EXIT_OK;
 }
@@ -182,13 +183,15 @@ async function editPatterns(context, { verb, patterns, tier }) {
  * @param {object} edit - the edit.
  * @param {string} edit.verb - `add` or `remove`.
  * @param {string[]} edit.patterns - the patterns given.
- * @param {string} [edit.tier] - the target tier (default: repo).
+ * @param {string} [edit.tier] - the target tier (default: the key's
+ *   default tier, repo).
  * @returns {Promise<{targets: object, file: string, changed: boolean, previous: object, value: unknown[], changes: {added: string[], removed: string[]}}>}
  *   the outcome: the previous state and the new patterns.
  * @throws {Error} the first refusal that applies (a `CliError`).
  */
-export async function updatePatterns(context, { verb, patterns, tier = TIER }) {
+export async function updatePatterns(context, { verb, patterns, tier: given }) {
   const { values, registry, deps } = context;
+  const tier = given || defaultTier(KEY, registry);
   const timeoutMs = lockTimeoutMs(values['lock-timeout']);
   const resolveTargets = memoizeTargets(context.resolveTargets);
   const { targets, file } = await prepareWrite({ ...context, resolveTargets, tier }, false, (read) => {

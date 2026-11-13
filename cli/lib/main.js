@@ -71,7 +71,7 @@ const DEFAULT_IO = { stdout: process.stdout, stderr: process.stderr, stdin: proc
  *   versions the version-skew checks use.
  * @param {object} [options.deps] - further injectable collaborators,
  *   forwarded to the command (e.g. `execFileAsync`, `lock`,
- *   `nodeVersion`).
+ *   `nodeVersion`, and `registry`: the key registry `config` uses).
  * @returns {Promise<number>} the exit code.
  */
 export async function run(argv, {
@@ -156,6 +156,7 @@ async function dispatch(argv, invocation) {
     nodeFloor: NODE_FLOOR,
     migrationVersions,
     deps,
+    registry: deps.registry,
     output,
     warn,
     targeting,

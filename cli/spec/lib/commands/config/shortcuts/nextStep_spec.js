@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { registryWith } from '../../../../support/registry.js';
 import { observable, shortcutHarness } from '../../../../support/shortcuts.js';
 
 describe('config shortcuts: next-step auto', () => {
@@ -173,6 +174,15 @@ describe('config shortcuts: next-step auto', () => {
 
       expect((await harness.run(config('next-step', 'auto', 'no-such-skill', 'on'))).code).toBe(0);
       expect(JSON.parse(await readFile(harness.localFile, 'utf8'))).toEqual(auto({ 'no-such-skill': true }));
+    });
+
+    it('writes to the default tier the registry gives, with no CLI change', async () => {
+      const registry = registryWith({ 'next_step.auto.<skill>': { default_tier: 'repo' } });
+
+      await harness.seed();
+
+      expect((await harness.run(config('next-step', 'auto', 'enhance-issue', 'on'), { deps: { ...harness.deps, registry } })).code).toBe(0);
+      expect(JSON.parse(await readFile(harness.repoFile, 'utf8')).next_step).toEqual({ auto: { 'enhance-issue': true } });
     });
 
     it('refuses an uppercase token (exit 3)', async () => {

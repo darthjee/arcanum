@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { writeTier } from '../../../../support/fixtures.js';
 import { EOF, SIGINT, scriptedPrompter } from '../../../../support/prompter.js';
+import { registryWith } from '../../../../support/registry.js';
 import { shortcutHarness } from '../../../../support/shortcuts.js';
 
 describe('config shortcuts: agents email edit', () => {
@@ -30,7 +31,7 @@ describe('config shortcuts: agents email edit', () => {
     const prompter = scriptedPrompter(answers);
     const outcome = await harness.run(['config', 'agents', 'email', 'edit', ...args], {
       ...rest,
-      deps: { ...harness.deps, isInteractive: true, prompter }
+      deps: { ...harness.deps, isInteractive: true, prompter, ...(rest.registry ? { registry: rest.registry } : {}) }
     });
 
     return { ...outcome, prompter };
@@ -78,6 +79,19 @@ describe('config shortcuts: agents email edit', () => {
       ]);
       expect(await readJson(harness.globalFile)).toEqual(git({ agents: { node: 'node@x.com' } }));
       expect(err).toContain('node       -      -     node@x.com   <- global');
+    });
+
+    it('offers the default tier the registry gives, with no CLI change', async () => {
+      const registry = registryWith({ 'git.agents.<agent>': { default_tier: 'repo' } });
+
+      await harness.seed();
+      await addAgents('node');
+
+      const { code, prompter } = await edit(['node', 'node@x.com', '', '', ''], { registry });
+
+      expect(code).toBe(0);
+      expect(prompter.questions[2]).toBe('  tier [local/repo/global] (repo): ');
+      expect((await readJson(harness.repoFile)).git).toEqual({ agents: { node: 'node@x.com' } });
     });
 
     for (const tier of ['local', 'repo', 'global']) {

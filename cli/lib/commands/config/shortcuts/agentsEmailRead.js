@@ -18,9 +18,6 @@ import { memoizeTargets } from './common.js';
 /** The shortcut's name, as typed. */
 export const NAME = 'agents email';
 
-/** The default write tier of `set`, `unset` and `edit`. */
-export const DEFAULT_TIER = 'global';
-
 /** The generic email key. */
 export const EMAIL_KEY = 'git.email';
 

@@ -12,15 +12,16 @@ import { checkKey } from '../../../args.js';
 import { EXIT_ERROR, EXIT_OK, UsageError } from '../../../exitCodes.js';
 import { lookupKey } from '../../../tierFiles.js';
 import {
-  AGENT_PATTERN, DEFAULT_TIER, EMAIL_KEY, NAME, STRING_VALUE, agentKey, genericFields, readAgents, readEmailTiers, resolvedFields,
+  AGENT_PATTERN, EMAIL_KEY, NAME, STRING_VALUE, agentKey, genericFields, readAgents, readEmailTiers, resolvedFields,
   shownValue
 } from './agentsEmailRead.js';
 import { editEmails } from './agentsEmailEdit.js';
 import { showMatrix } from './agentsEmailMatrix.js';
 import { checkMaxArity, checkShortcutFlags, delegate, writeValue } from './common.js';
+import { defaultTier } from './defaultTier.js';
 
 export {
-  AGENTS_DIR, AGENTS_PATTERN, AGENT_PATTERN, DEFAULT_TIER, EMAIL_KEY, NAME, agentKey, repoAgents
+  AGENTS_DIR, AGENTS_PATTERN, AGENT_PATTERN, EMAIL_KEY, NAME, agentKey, repoAgents
 } from './agentsEmailRead.js';
 
 /**
@@ -59,7 +60,8 @@ export function runAgentsEmail(context, args) {
 
 /**
  * `agents email set <pattern>` (`git.email`) or `set <agent> <email>`
- * (`git.agents.<agent>`), told apart by arity; default tier global.
+ * (`git.agents.<agent>`), told apart by arity; default tier from the
+ * registry (global).
  * @param {object} context - the `config` context.
  * @param {string[]} args - the positionals after `set`.
  * @returns {Promise<number>} the exit code.
@@ -75,12 +77,12 @@ function setEmail(context, args) {
   const tier = checkWriteFlags(context.values, 'set');
   const [key, raw] = args.length === 1 ? [EMAIL_KEY, args[0]] : [checkKey(agentKey(args[0])), args[1]];
 
-  return writeValue(context, { key, raw, tier: tier || DEFAULT_TIER, parseValue: STRING_VALUE });
+  return writeValue(context, { key, raw, tier: tier || defaultTier(key, context.registry), parseValue: STRING_VALUE });
 }
 
 /**
  * `agents email unset` (`git.email`) or `unset <agent>`
- * (`git.agents.<agent>`); default tier global.
+ * (`git.agents.<agent>`); default tier from the registry (global).
  * @param {object} context - the `config` context.
  * @param {string[]} args - the positionals after `unset`.
  * @returns {Promise<number>} the exit code.
@@ -92,7 +94,7 @@ function unsetEmail(context, args) {
   const tier = checkWriteFlags(context.values, 'unset');
   const key = args.length === 0 ? EMAIL_KEY : checkKey(agentKey(args[0]));
 
-  return delegate(context, 'unset', [key], tier || DEFAULT_TIER);
+  return delegate(context, 'unset', [key], tier || defaultTier(key, context.registry));
 }
 
 /**
