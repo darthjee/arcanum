@@ -31,6 +31,7 @@ The registry is a plain JSON table, checked by a small hand-written validator (`
 - **Required fields:** `key` (dotted, may contain [wildcard segments](#wildcard-matching)), `type`, `tiers` (a non-empty, non-repeating subset of `global`, `repo`, `local`) and a non-empty `description`.
 - **Closed type vocabulary:** `string`, `boolean`, `number`; `enum`, which requires `values` (a non-empty array of strings); and `array`, which requires `items` (one of `string`, `boolean`, `number`). There is no object type: every key is a leaf.
 - **`format`** (optional): a closed vocabulary of extra checks, currently only `regex`, allowed on a `string` or an array of strings. Each value (or array element) must compile with `new RegExp(v, 'i')`. New formats are added in code, never as free-form patterns in the registry.
+- **`default_tier`** (optional): the tier a write that names no tier goes to. It must be one of the entry's own `tiers`. When absent, the default tier is the only tier, else `local` if allowed, else the first tier (`KeyRegistry#defaultTier`, see [Config Keys → Default write tier](config-keys.md#default-write-tier)).
 - **`read_only`** (optional): boolean, default `false`.
 - **`default`** (optional): absent means no default. When present it must pass the entry's own value checks. It feeds the `default` field the CLI reports for a key.
 - **Number constraints** (optional, `number` only): `integer: true`, `min`, `max` (finite, with `min <= max`).
