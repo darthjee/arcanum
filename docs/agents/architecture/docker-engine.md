@@ -312,7 +312,7 @@ Native-only commands are listed too, with `"native"`, `"docker"` or `"host-only"
 
 - `arcanum-update-run-update-apply` and `arcanum-update-run-update-check`: they update the host install itself.
 - `auto-fix-issue-run-checks`: it runs the target project's own check script, whose toolchain the image doesn't have, and its exit code passes through the child's (see [Exit codes and streams](#exit-codes-and-streams)).
-- `next-step-prompt` and `auto-plan-issue-auto-next`: `next-step-prompt` must keep prompting on the host's real `/dev/tty` (see [TTY](#tty)), and `auto-plan-issue-auto-next` calls it.
+- `next-step-prompt` and `auto-plan-issue-auto-next`: `next-step-prompt` must keep prompting on the host's real `/dev/tty` (see [TTY](#tty)), and `auto-plan-issue-auto-next` calls it. `auto-plan-issue-auto-next` also marks the issue Ready in-process, so it needs `gh` credentials on the host (`GH_TOKEN`, `GH_HOST`, `GH_ENTERPRISE_TOKEN` are in its env allowlist).
 
 **Reading rule:** `_engine_dispatch_status <command> <native_only>` prints one of `shell`, `native`, `docker`, `host-only` and always exits 0:
 
