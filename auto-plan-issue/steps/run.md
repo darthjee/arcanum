@@ -87,14 +87,22 @@ Before printing the success report, run:
 scripts/auto_next.sh "$REPO_PATH" <id>
 ```
 
-> Resolve `scripts/auto_next.sh` relative to the `auto-plan-issue` skill folder. It decides whether to chain: it checks that HEAD is `issue-<id>`, reads `next_step.auto.auto-plan-issue`, and pushes the plan commit before agreeing to chain. It prints `CHAIN=yes` (followed by `CLEAR=true` when `next_step.clear.auto-plan-issue` is also `true`), or `CHAIN=no` plus `REASON=branch|config|push`, and exits `0`. On a usage error or a failed config read it prints nothing on stdout, an error on stderr, and exits `1`. When it chains, its stderr carries the `auto-continuing: ...` notice.
+> Resolve `scripts/auto_next.sh` relative to the `auto-plan-issue` skill folder. When HEAD is `issue-<id>` it always pushes the plan commit and marks the issue `Ready` (`refined` removed, `ready` added), whether or not it chains. It then either chains or releases the working tree to the safe branch. It prints, as `key=value` lines on stdout, and exits `0`:
+>
+> - `CHAIN=yes`, then `CLEAR=true` when `next_step.clear.auto-plan-issue` is also `true`, then `READY=<true|false>`. The run stays on `issue-<id>`.
+> - `CHAIN=no`, `REASON=config`, `READY=<true|false>`, `RELEASED=<true|false>`. `next_step.auto.auto-plan-issue` is not `true`, so the run was released to the safe branch.
+> - `CHAIN=no`, `REASON=push`. The push failed, so nothing else ran and the run stays on `issue-<id>`.
+> - `CHAIN=no`, `REASON=branch`. HEAD is not `issue-<id>`, so nothing ran.
+>
+> On a usage error or a failed config read it prints nothing on stdout, an error on stderr, and exits `1`. When it chains, its stderr carries the `auto-continuing: ...` notice.
 
-Then print the success report as usual (`--next "/loop /auto-resolve-issue <id>"`), and:
+Then print the success report as usual (`--next "/loop /auto-resolve-issue <id>"`), adding `--label-change refined:ready` whenever the output has `READY=true` (see [Closing report](#closing-report)), and:
 
 - **`CHAIN=yes`**: print the `auto-continuing: ...` notice line from its stderr, then the report, then one last line, exactly `AUTO_NEXT=/loop /auto-resolve-issue <id>`. The coordinator in [SKILL.md](../SKILL.md) reads that line and runs the chain (see there). Do not invoke `/loop` or `auto-resolve-issue` yourself.
 - **`CHAIN=yes` followed by `CLEAR=true`**: same as `CHAIN=yes`, but end with two lines, in this order: `AUTO_CLEAR=true`, then `AUTO_NEXT=/loop /auto-resolve-issue <id>`. `AUTO_NEXT=` is always the last line; without `CLEAR=true` there is no `AUTO_CLEAR` line. The coordinator hands the command off per [Clearing](../../docs/agents/architecture/skill-finish.md#clearing).
-- **`CHAIN=no` with `REASON=push`**: after the report, add one line saying the plan push failed so the chain was skipped, quoting the git error from its stderr. Then end.
-- **`CHAIN=no`** (any other reason): end after the report, as without Auto-next.
+- **`CHAIN=no` with `REASON=config`**: end after the report. If `RELEASED=false`, first add one line after the report saying the release to the safe branch was refused, quoting the reason from its stderr.
+- **`CHAIN=no` with `REASON=push`**: after the report, add one line saying the plan push failed, whether or not it would have chained, so the run stays on `issue-<id>`, quoting the git error from its stderr. Then end.
+- **`CHAIN=no` with `REASON=branch`**: end after the report, as without Auto-next.
 - **exit `1`**: after the report, add one line saying the auto-next check failed, quoting its stderr. Then end.
 
 ## Closing report
@@ -106,7 +114,7 @@ Every exit of this skill ends with exactly one report printed by the shared scri
   --summary "<one line>" [--issue <id>] [--next "/loop /auto-resolve-issue <id>"] [--nested]
 ```
 
-> Resolve `../arcanum/_lib/finish_report.sh` relative to the `auto-plan-issue` skill folder, the same folder the `scripts/...` calls in these steps resolve against. This skill never asks the user anything, so there is no `declined` status. It changes no labels, so `--label-change` is never passed.
+> Resolve `../arcanum/_lib/finish_report.sh` relative to the `auto-plan-issue` skill folder, the same folder the `scripts/...` calls in these steps resolve against. This skill never asks the user anything, so there is no `declined` status. On a top-level run, pass `--label-change refined:ready` only when [Auto-next](#auto-next) printed `READY=true`; every other report, and every nested run, never passes `--label-change`.
 
 - Relay its stdout **verbatim** as the last thing you print (only the [Auto-next](#auto-next) line or note may follow it). Never hand-format, extend, or paraphrase it.
 - Pass only what actually happened: `--issue <id>` only once an id is known.
