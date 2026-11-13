@@ -18,10 +18,13 @@ class IssueTagger {
    *   the target repo's context, for `repo`/`repoRef`/`token` resolution.
    * @param {IssueClient} [deps.issueClient] - the label mutation's
    *   GitHub REST delegate.
+   * @param {{write: (chunk: string) => boolean}} [deps.stdout] - where the
+   *   stdout lines go (defaults to `process.stdout`).
    */
-  constructor({ context, issueClient = new IssueClient({ context }) } = {}) {
+  constructor({ context, issueClient = new IssueClient({ context }), stdout = process.stdout } = {}) {
     this._context = context;
     this._issueClient = issueClient;
+    this._stdout = stdout;
   }
 
   /**
@@ -111,7 +114,7 @@ class IssueTagger {
     if (action === 'add' ? present : !present) {
       const state = action === 'add' ? 'already present on' : 'not present on';
 
-      process.stdout.write(`Tag '${tag}' ${state} issue #${id} — nothing to do.\n`);
+      this._stdout.write(`Tag '${tag}' ${state} issue #${id} — nothing to do.\n`);
 
       return;
     }
@@ -132,7 +135,7 @@ class IssueTagger {
     const verb = action === 'add' ? 'Added' : 'Removed';
     const preposition = action === 'add' ? 'to' : 'from';
 
-    process.stdout.write(`${verb} tag '${tag}' ${preposition} issue #${id} on ${repoRef}\n`);
+    this._stdout.write(`${verb} tag '${tag}' ${preposition} issue #${id} on ${repoRef}\n`);
   }
 
   /**
