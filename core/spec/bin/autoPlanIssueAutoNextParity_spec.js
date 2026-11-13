@@ -20,9 +20,13 @@ import { NATIVE_BIN, REPO_ROOT, expectParity, runCommand } from '../support/util
 // The contract (docs/agents/architecture/skill-finish.md#next-step-map):
 // usage errors exit 1 with empty stdout; a HEAD other than `issue-<id>`
 // answers CHAIN=no/REASON=branch without reading config; an absent/false
-// `next_step.auto.auto-plan-issue` answers CHAIN=no/REASON=config; a true
-// key pushes the plan commit and answers CHAIN=yes (or
-// CHAIN=no/REASON=push when the push fails). When
+// `next_step.auto.auto-plan-issue` answers CHAIN=no/REASON=config. Once on
+// issue-<id> the plan commit is always pushed (CHAIN=no/REASON=push when
+// the push fails) and the issue is marked Ready (READY=<bool>); a true key
+// answers CHAIN=yes, otherwise the run is released to the safe branch
+// (RELEASED=<bool>). Mark-ready cannot reach GitHub here (the fixture's
+// origin is a local bare repo, so resolving owner/repo fails in both
+// twins), hence READY=false deterministically with no network. When
 // `next_step.clear.auto-plan-issue` is also true (issue #796), CHAIN=yes
 // is followed by CLEAR=true; CLEAR never follows CHAIN=no. stdout only
 // ever carries those key=value lines.
@@ -278,20 +282,42 @@ describe('auto-plan-issue-auto-next parity (shell vs. native)', () => {
       planShas = await inBoth((world) => world.preparePlanCommit());
     });
 
-    it('answers CHAIN=no / REASON=config when the key is absent', async () => {
-      const { shell } = await runBoth((world) => [world.repo, ID]);
+    const CONFIG_OFF = 'CHAIN=no\nREASON=config\nREADY=false\nRELEASED=true\n';
 
-      expect(shell).toEqual({ stdout: 'CHAIN=no\nREASON=config\n', stderr: '', code: 0 });
+    it('pushes, marks ready, releases and answers REASON=config when the key is absent', async () => {
+      const { shell } = await runBoth((world) => [world.repo, ID], { sameStderr: false });
+
+      expect(shell.code).toBe(0);
+      expect(shell.stdout).toBe(CONFIG_OFF);
+      expect(await shellWorld.remoteSha()).toEqual(planShas[0]);
+      expect(await nativeWorld.remoteSha()).toEqual(planShas[1]);
     });
 
-    it('answers CHAIN=no / REASON=config and does not push when the key is false', async () => {
+    it('also pushes and releases when the key is false, ending off issue-<id>', async () => {
       await inBoth((world) => world.writeAutoKey(false));
 
-      const { shell } = await runBoth((world) => [world.repo, ID]);
+      const { shell, native } = await runBoth((world) => [world.repo, ID], { sameStderr: false });
 
-      expect(shell.stdout).toBe('CHAIN=no\nREASON=config\n');
-      expect(await shellWorld.remoteSha()).not.toEqual(planShas[0]);
-      expect(await nativeWorld.remoteSha()).not.toEqual(planShas[1]);
+      expect(shell.stdout).toBe(CONFIG_OFF);
+      expect(await shellWorld.remoteSha()).toEqual(planShas[0]);
+      expect(await nativeWorld.remoteSha()).toEqual(planShas[1]);
+      expect(shell.stderr).toContain('BRANCH=');
+      expect(native.stderr).toContain('BRANCH=');
+
+      const shellHead = await shellWorld.git(['rev-parse', '--abbrev-ref', 'HEAD']);
+
+      expect(shellHead).not.toBe(BRANCH);
+      expect(await nativeWorld.git(['rev-parse', '--abbrev-ref', 'HEAD'])).toBe(shellHead);
+    });
+
+    it('answers RELEASED=false and stays on issue-<id> when the tree is dirty', async () => {
+      await inBoth((world) => writeFile(path.join(world.repo, 'docs', 'plan.md'), '# changed\n'));
+
+      const { shell } = await runBoth((world) => [world.repo, ID], { sameStderr: false });
+
+      expect(shell.stdout).toBe('CHAIN=no\nREASON=config\nREADY=false\nRELEASED=false\n');
+      expect(await shellWorld.git(['rev-parse', '--abbrev-ref', 'HEAD'])).toBe(BRANCH);
+      expect(await nativeWorld.git(['rev-parse', '--abbrev-ref', 'HEAD'])).toBe(BRANCH);
     });
   });
 
@@ -307,7 +333,7 @@ describe('auto-plan-issue-auto-next parity (shell vs. native)', () => {
       const { shell, native } = await runBoth((world) => [world.repo, ID], { sameStderr: false });
 
       expect(shell.code).toBe(0);
-      expect(shell.stdout).toBe('CHAIN=yes\n');
+      expect(shell.stdout).toBe('CHAIN=yes\nREADY=false\n');
       expect(shell.stderr).toContain(NOTICE);
       expect(native.stderr).toContain(NOTICE);
       expect(await shellWorld.remoteSha()).toEqual(planShas[0]);
@@ -338,7 +364,7 @@ describe('auto-plan-issue-auto-next parity (shell vs. native)', () => {
       const { shell, native } = await runBoth((world) => [world.repo, ID], { sameStderr: false });
 
       expect(shell.code).toBe(0);
-      expect(shell.stdout).toBe('CHAIN=yes\nCLEAR=true\n');
+      expect(shell.stdout).toBe('CHAIN=yes\nCLEAR=true\nREADY=false\n');
       expect(shell.stderr).toContain(CLEAR_NOTICE);
       expect(native.stderr).toContain(CLEAR_NOTICE);
       expect(await shellWorld.remoteSha()).toEqual(planShas[0]);
@@ -371,9 +397,9 @@ describe('auto-plan-issue-auto-next parity (shell vs. native)', () => {
     });
 
     it('answers CHAIN=no / REASON=config without CLEAR', async () => {
-      const { shell } = await runBoth((world) => [world.repo, ID]);
+      const { shell } = await runBoth((world) => [world.repo, ID], { sameStderr: false });
 
-      expect(shell).toEqual({ stdout: 'CHAIN=no\nREASON=config\n', stderr: '', code: 0 });
+      expect(shell.stdout).toBe('CHAIN=no\nREASON=config\nREADY=false\nRELEASED=true\n');
     });
   });
 
@@ -386,7 +412,7 @@ describe('auto-plan-issue-auto-next parity (shell vs. native)', () => {
     it('answers a plain CHAIN=yes with the one-key notice', async () => {
       const { shell, native } = await runBoth((world) => [world.repo, ID], { sameStderr: false });
 
-      expect(shell.stdout).toBe('CHAIN=yes\n');
+      expect(shell.stdout).toBe('CHAIN=yes\nREADY=false\n');
       expect(shell.stderr).toContain(NOTICE);
       expect(native.stderr).toContain(NOTICE);
     });

@@ -1,5 +1,8 @@
 import { execFile, spawn } from 'node:child_process';
 import { stat } from 'node:fs/promises';
+import GithubIssueMark from '../shared/GithubIssueMark.js';
+import SafeBranch from '../shared/SafeBranch.js';
+import IssueTagger from '../../utils/issue/IssueTagger.js';
 import NextStepPrompt from '../shared/NextStepPrompt.js';
 import DispatchFailure from '../../utils/errors/DispatchFailure.js';
 
@@ -45,6 +48,12 @@ function runGit(args, { capture = false } = {}) {
  * `CHAIN=no` + `REASON=branch|config|push` (never followed by `CLEAR`),
  * and exits 0; usage errors and a failed prompt exit 1 with nothing on
  * stdout. Status `host-only`, so the push uses the host's credentials.
+ *
+ * Whenever HEAD is `issue-<id>` it always pushes (`REASON=push` on
+ * failure), marks the issue `Ready` (best-effort, output to stderr) and,
+ * when not chaining, releases the tree to the safe branch (best-effort,
+ * output to stderr). Stdout then ends with `READY=<bool>` (and
+ * `RELEASED=<bool>` after `CHAIN=no`/`REASON=config`).
  */
 class AutoPlanIssueAutoNext {
   /**
@@ -56,16 +65,26 @@ class AutoPlanIssueAutoNext {
    * @param {typeof runGit} [deps.git] - the git runner.
    * @param {{write: (chunk: string) => boolean}} [deps.stderr] - where the
    *   stderr lines go.
+   * @param {GithubIssueMark} [deps.githubIssueMark] - the mark-ready
+   *   delegate (its tagger's stdout goes to stderr by default).
+   * @param {SafeBranch} [deps.safeBranch] - the release-to-safe-branch
+   *   delegate.
    */
   constructor(repoContext, {
     nextStepPrompt = new NextStepPrompt(),
     git = runGit,
-    stderr = process.stderr
+    stderr = process.stderr,
+    githubIssueMark,
+    safeBranch
   } = {}) {
     this._repoPath = repoContext.repoPath ?? '';
     this._nextStepPrompt = nextStepPrompt;
     this._git = git;
     this._stderr = stderr;
+    this._githubIssueMark = githubIssueMark ?? new GithubIssueMark(repoContext, {
+      issueTagger: new IssueTagger({ context: repoContext, stdout: stderr })
+    });
+    this._safeBranch = safeBranch ?? new SafeBranch(repoContext);
   }
 
   /**
@@ -83,18 +102,57 @@ class AutoPlanIssueAutoNext {
     }
 
     const { auto, clear } = await this.promptFlags(id);
-
-    if (!auto) {
-      return this.chainNo('config');
-    }
-
     const { code } = await this._git(['-C', this._repoPath, 'push']);
 
     if (code !== 0) {
       return this.chainNo('push');
     }
 
-    return clear ? 'CHAIN=yes\nCLEAR=true\n' : 'CHAIN=yes\n';
+    const ready = await this.markReady(id);
+
+    if (auto) {
+      return `CHAIN=yes\n${clear ? 'CLEAR=true\n' : ''}READY=${ready}\n`;
+    }
+
+    const released = await this.release();
+
+    return `${this.chainNo('config')}READY=${ready}\nRELEASED=${released}\n`;
+  }
+
+  /**
+   * Marks the issue `Ready`, best-effort (output goes to stderr).
+   * @param {string} id - the issue id.
+   * @returns {Promise<boolean>} whether it completed without error.
+   */
+  async markReady(id) {
+    try {
+      await this._githubIssueMark.markReady(id);
+
+      return true;
+    } catch (error) {
+      this._stderr.write(`${error.message}\n`);
+
+      return false;
+    }
+  }
+
+  /**
+   * Releases the working tree to the safe branch, best-effort (output
+   * goes to stderr).
+   * @returns {Promise<boolean>} whether the safe branch was checked out.
+   */
+  async release() {
+    try {
+      const branch = await this._safeBranch.checkout();
+
+      this._stderr.write(`BRANCH=${branch}\n`);
+
+      return true;
+    } catch (error) {
+      this._stderr.write(`${error.message}\n`);
+
+      return false;
+    }
   }
 
   /**

@@ -193,6 +193,8 @@ Planning runs as a **top-level** `/auto-plan-issue <id>` from a cleared context,
 
 Do not show a second offer on this path: the top-level `auto-plan-issue` makes its own chaining decision.
 
+The top-level `auto-plan-issue` now owns the plan push, the `Refined` to `Ready` swap and, when it does not chain, the release to the safe branch. Nothing more is needed here.
+
 ### `CHOICE=yes` (with or without `AUTO=true` but without `CLEAR=true`, or mapped from exit 4) — plan it
 
 1. Run `../../auto-fix-all/scripts/checkout_from_main.sh "$REPO_PATH" <id>` — a cross-skill reference to the same reuse-and-merge branch bootstrap script `auto-fix-all` uses (resolved relative to this file's directory: `../../auto-fix-all/scripts/checkout_from_main.sh`). It fetches `origin`, reuses branch `issue-<id>` merged up to date with `origin/main` if it already exists locally or remotely, or creates it fresh from `origin/main` otherwise. If it exits non-zero, **fail with** `checkout_from_main.sh` (passing the refine change). Otherwise parse `STATUS` from its output.

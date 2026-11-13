@@ -13,6 +13,8 @@ describe('AutoPlanIssueAutoNext#run', () => {
   let promptOutcome;
   let nextStepPrompt;
   let stderr;
+  let githubIssueMark;
+  let safeBranch;
 
   beforeEach(async () => {
     repoPath = await createTempDir();
@@ -24,6 +26,8 @@ describe('AutoPlanIssueAutoNext#run', () => {
     );
     nextStepPrompt = { evaluate: jasmine.createSpy('evaluate').and.callFake(() => Promise.resolve(promptOutcome)) };
     stderr = { output: '', write(chunk) { this.output += chunk; return true; } };
+    githubIssueMark = { markReady: jasmine.createSpy('markReady').and.resolveTo('') };
+    safeBranch = { checkout: jasmine.createSpy('checkout').and.resolveTo('main') };
   });
 
   afterEach(async () => {
@@ -31,7 +35,9 @@ describe('AutoPlanIssueAutoNext#run', () => {
   });
 
   function newCommand(target = repoPath) {
-    return new AutoPlanIssueAutoNext(createRepoContextMock({ repoPath: target }), { nextStepPrompt, git, stderr });
+    return new AutoPlanIssueAutoNext(createRepoContextMock({ repoPath: target }), {
+      nextStepPrompt, git, stderr, githubIssueMark, safeBranch
+    });
   }
 
   async function expectUsageFailure(promise, message) {
@@ -66,6 +72,9 @@ describe('AutoPlanIssueAutoNext#run', () => {
     expect(await newCommand().run('42')).toEqual('CHAIN=no\nREASON=branch\n');
     expect(git).toHaveBeenCalledWith(['-C', repoPath, 'rev-parse', '--abbrev-ref', 'HEAD'], { capture: true });
     expect(nextStepPrompt.evaluate).not.toHaveBeenCalled();
+    expect(git).not.toHaveBeenCalledWith(['-C', repoPath, 'push']);
+    expect(githubIssueMark.markReady).not.toHaveBeenCalled();
+    expect(safeBranch.checkout).not.toHaveBeenCalled();
   });
 
   it('answers REASON=branch when git fails', async () => {
@@ -85,12 +94,39 @@ describe('AutoPlanIssueAutoNext#run', () => {
     ]);
   });
 
-  it('answers REASON=config when auto mode is off', async () => {
-    promptOutcome = { stdout: 'CHOICE=no\n', stderr: '', exitCode: 0 };
+  describe('when auto mode is off', () => {
+    beforeEach(() => {
+      promptOutcome = { stdout: 'CHOICE=no\n', stderr: '', exitCode: 0 };
+    });
 
-    expect(await newCommand().run('42')).toEqual('CHAIN=no\nREASON=config\n');
-    expect(git).not.toHaveBeenCalledWith(['-C', repoPath, 'push']);
-    expect(stderr.output).toEqual('');
+    it('pushes, marks ready and releases to the safe branch', async () => {
+      expect(await newCommand().run('42')).toEqual('CHAIN=no\nREASON=config\nREADY=true\nRELEASED=true\n');
+      expect(git).toHaveBeenCalledWith(['-C', repoPath, 'push']);
+      expect(githubIssueMark.markReady).toHaveBeenCalledWith('42');
+      expect(stderr.output).toEqual('BRANCH=main\n');
+    });
+
+    it('answers RELEASED=false when the release throws', async () => {
+      safeBranch.checkout.and.rejectWith(new Error('Error: dirty'));
+
+      expect(await newCommand().run('42')).toEqual('CHAIN=no\nREASON=config\nREADY=true\nRELEASED=false\n');
+      expect(stderr.output).toEqual('Error: dirty\n');
+    });
+
+    it('answers READY=false but still releases when mark-ready throws', async () => {
+      githubIssueMark.markReady.and.rejectWith(new Error('boom'));
+
+      expect(await newCommand().run('42')).toEqual('CHAIN=no\nREASON=config\nREADY=false\nRELEASED=true\n');
+      expect(safeBranch.checkout).toHaveBeenCalled();
+    });
+
+    it('answers REASON=push without marking or releasing when the push fails', async () => {
+      pushCode = 1;
+
+      expect(await newCommand().run('42')).toEqual('CHAIN=no\nREASON=push\n');
+      expect(githubIssueMark.markReady).not.toHaveBeenCalled();
+      expect(safeBranch.checkout).not.toHaveBeenCalled();
+    });
   });
 
   it('fails when the prompt fails', async () => {
@@ -103,16 +139,26 @@ describe('AutoPlanIssueAutoNext#run', () => {
     expect(stderr.output).toEqual('Error: boom\nError: next_step_prompt.sh failed for auto key \'auto-plan-issue\'\n');
   });
 
-  it('pushes and answers CHAIN=yes, passing the notice through', async () => {
-    expect(await newCommand().run('42')).toEqual('CHAIN=yes\n');
+  it('pushes, marks ready and answers CHAIN=yes without releasing', async () => {
+    expect(await newCommand().run('42')).toEqual('CHAIN=yes\nREADY=true\n');
+    expect(safeBranch.checkout).not.toHaveBeenCalled();
+    expect(githubIssueMark.markReady).toHaveBeenCalledWith('42');
     expect(git).toHaveBeenCalledWith(['-C', repoPath, 'push']);
     expect(stderr.output).toEqual('auto-continuing: notice\n');
+  });
+
+  it('answers CHAIN=yes with READY=false when mark-ready throws', async () => {
+    githubIssueMark.markReady.and.rejectWith(new Error('boom'));
+
+    expect(await newCommand().run('42')).toEqual('CHAIN=yes\nREADY=false\n');
   });
 
   it('answers REASON=push when the push fails', async () => {
     pushCode = 1;
 
     expect(await newCommand().run('42')).toEqual('CHAIN=no\nREASON=push\n');
+    expect(githubIssueMark.markReady).not.toHaveBeenCalled();
+    expect(safeBranch.checkout).not.toHaveBeenCalled();
   });
 
   describe('with next_step.clear.auto-plan-issue on', () => {
@@ -126,7 +172,7 @@ describe('AutoPlanIssueAutoNext#run', () => {
     });
 
     it('pushes and forwards CLEAR=true after CHAIN=yes', async () => {
-      expect(await newCommand().run('42')).toEqual('CHAIN=yes\nCLEAR=true\n');
+      expect(await newCommand().run('42')).toEqual('CHAIN=yes\nCLEAR=true\nREADY=true\n');
       expect(git).toHaveBeenCalledWith(['-C', repoPath, 'push']);
     });
 
@@ -153,7 +199,7 @@ describe('AutoPlanIssueAutoNext#run', () => {
   it('ignores a CLEAR line that is not exactly CLEAR=true', async () => {
     promptOutcome = { stdout: 'CHOICE=yes\nAUTO=true\nCLEAR=truex\n', stderr: '', exitCode: 0 };
 
-    expect(await newCommand().run('42')).toEqual('CHAIN=yes\n');
+    expect(await newCommand().run('42')).toEqual('CHAIN=yes\nREADY=true\n');
   });
 
   describe('with the default git runner', () => {
