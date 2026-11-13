@@ -18,13 +18,10 @@ export const NAME = 'next-step auto';
 /** The key prefix the shortcut covers. */
 export const PREFIX = 'next_step.auto';
 
-/** The default write tier of `next-step auto <skill>`. */
-export const DEFAULT_TIER = 'local';
-
 /**
  * Runs `next-step auto`: the listing without a skill, else the
  * single-value shortcut over `next_step.auto.<skill>` (default tier
- * local). Any well-formed skill name is accepted.
+ * from the registry). Any well-formed skill name is accepted.
  * @param {object} context - the `config` context.
  * @param {string[]} args - the positionals after `next-step auto`.
  * @returns {Promise<number>} the exit code.
@@ -40,7 +37,7 @@ export function runNextStepAuto(context, args) {
 
   const key = checkKey(`${PREFIX}.${skill}`);
 
-  return runSingleValue(context, { name: NAME, key, tier: DEFAULT_TIER, kind: 'boolean' }, rest);
+  return runSingleValue(context, { name: NAME, key, kind: 'boolean' }, rest);
 }
 
 /**

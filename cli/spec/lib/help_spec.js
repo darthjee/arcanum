@@ -1,8 +1,9 @@
 import { SHORTCUTS } from '../../lib/commands/config/shortcuts/index.js';
 import {
-  SHORTCUT_HELP, SUBCOMMAND_HELP, configUsage, formatRows, selfUpdateUsage, shortcutUsage, subcommandUsage,
+  SHORTCUT_HELP, SUBCOMMAND_HELP, configUsage, formatRows, selfUpdateUsage, shortcutUsage, subcommandUsage, tierSuffix,
   topLevelUsage
 } from '../../lib/help.js';
+import { registryWith } from '../support/registry.js';
 
 describe('help', () => {
   describe('formatRows', () => {
@@ -129,6 +130,43 @@ describe('help', () => {
 
     it('lists the boolean tokens on boolean shortcuts', () => {
       expect(shortcutUsage('monitor-issues', 'clear-context')).toContain('on, off, true or false (lowercase)');
+    });
+  });
+
+  describe('tierSuffix', () => {
+    it('names the only tier of a single-tier key', () => {
+      expect(tierSuffix('git.safe_branch')).toBe(' (local tier only)');
+      expect(tierSuffix('auto-fix-all.ignored_check_patterns')).toBe(' (repo tier only)');
+    });
+
+    it('names the default write tier of a multi-tier key, patterns included', () => {
+      expect(tierSuffix('engine.mode')).toBe(' (default write tier: local)');
+      expect(tierSuffix('next_step.auto.<skill>')).toBe(' (default write tier: local)');
+      expect(tierSuffix('git.agents.<agent>')).toBe(' (default write tier: global)');
+    });
+
+    it('is empty for an unknown key', () => {
+      expect(tierSuffix('nope.nope')).toBe('');
+    });
+
+    it('follows a registry with other tiers, with no CLI change', () => {
+      const registry = registryWith({
+        'git.safe_branch': { tiers: ['repo', 'local'], default_tier: 'repo' },
+        'engine.mode': { tiers: ['global'] }
+      });
+
+      expect(tierSuffix('git.safe_branch', registry)).toBe(' (default write tier: repo)');
+      expect(tierSuffix('engine.mode', registry)).toBe(' (global tier only)');
+    });
+  });
+
+  describe('shortcut summaries', () => {
+    it('keep today\'s tier wording, built from the registry', () => {
+      expect(SHORTCUT_HELP['git safe-branch'].summary).toBe('Read or set git.safe_branch (local tier only)');
+      expect(SHORTCUT_HELP['auto-fix-all ignore-checks'].summary)
+        .toBe('List or edit auto-fix-all.ignored_check_patterns (repo tier only)');
+      expect(SHORTCUT_HELP.engine.summary).toBe('Read or set engine.mode (default write tier: local)');
+      expect(SHORTCUT_HELP['agents email'].summary).toContain('(default: global)');
     });
   });
 

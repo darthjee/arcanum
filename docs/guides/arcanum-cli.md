@@ -108,7 +108,7 @@ arcanum config auto-fix-all finish-on-empty-queue on   # auto-fix-all.finish_on_
 arcanum config monitor-issues clear-context off
 ```
 
-- **No value reads, a value writes.** `arcanum config engine` shows the value that wins and where it comes from, exactly like `config get engine.mode`. A write goes to the shortcut's default tier (local for all of the above); add `--global` or `--repo` to pick another one, within what the key allows. `--unset` removes the key: `arcanum config engine --unset`.
+- **No value reads, a value writes.** `arcanum config engine` shows the value that wins and where it comes from, exactly like `config get engine.mode`. A write goes to the key's default tier, set in the key registry (local for all of the above); add `--global` or `--repo` to pick another one, within what the key allows. `--unset` removes the key: `arcanum config engine --unset`.
 - **Same output as the generic commands.** Each shortcut prints what its `config get`/`set`/`unset` equivalent prints, `--json` included, so scripts can use either.
 - **On and off.** Toggles take `on`, `off`, `true` or `false` (lowercase). `off` stores `false` rather than removing the key, so turning a setting off locally beats an `on` in your global config. If a higher tier still overrides what you just wrote, a note on stderr tells you which one.
 - **`next-step auto`** with no skill lists every auto-advance you have set, and where it comes from.

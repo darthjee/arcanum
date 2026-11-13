@@ -114,7 +114,7 @@ Repo
 
 ## Shortcuts
 
-Curated shortcuts over the most common keys. Each one is a thin front-end over generic `get`/`set`/`unset`: it prints exactly what the generic command prints (human, `--json` and exit codes), with a default write tier so you don't have to name one.
+Curated shortcuts over the most common keys. Each one is a thin front-end over generic `get`/`set`/`unset`: it prints exactly what the generic command prints (human, `--json` and exit codes), with a default write tier so you don't have to name one. The default comes from the key registry (`keys.json`): a key's `default_tier`, else its only tier, else `local` when allowed.
 
 | Shortcut | Key(s) | Default write tier |
 | --- | --- | --- |
@@ -209,7 +209,7 @@ arcanum config setup identity flow    # only some sections
 `arcanum config setup [<section>...]` is an interactive wizard over the settings a new user has to decide on. The sections are `identity`, `engine`, `git`, `flow` and `ci`, and they always run in that order, whatever order you give them in. With no section, all of them run.
 
 - **Per setting**, the wizard shows the current value and its tier, then asks for a new one: Enter keeps it, `-` unsets it, and an invalid value is explained and asked again.
-- **The tier** is asked only when the key allows more than one; Enter picks the matching shortcut's default tier.
+- **The tier** is asked only when the key allows more than one; Enter picks the key's default tier from the key registry, the same one its shortcut writes to.
 - **A `[Y/n]` confirmation** shows the exact write, then the answer is written at once, with the same checks and lock as `config set`.
 - **It needs an interactive terminal.** Prompts go to stderr; without a TTY on stdin and stderr it exits `2`. `--json` is refused (exit `2`).
 - **Ctrl-C or Ctrl-D** stops it with exit `130`. Settings already written stay written, and a summary on stderr lists what was written, kept, failed and not reached.

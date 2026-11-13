@@ -8,6 +8,7 @@ import { UsageError } from '../../../../lib/exitCodes.js';
 import { run } from '../../../../lib/main.js';
 import { fakeIo } from '../../../support/fakeIo.js';
 import { makeRepo, writeTier } from '../../../support/fixtures.js';
+import { registryWith } from '../../../support/registry.js';
 import { EOF, SIGINT, scriptedPrompter } from '../../../support/prompter.js';
 import { shortcutHarness } from '../../../support/shortcuts.js';
 
@@ -143,9 +144,12 @@ describe('config setup', () => {
   describe('default tiers', () => {
     const tierOf = (key) => defaultTier(key);
 
-    it('uses the matching shortcut\'s default tier', () => {
+    it('uses the registry\'s default_tier', () => {
       expect(tierOf('git.email')).toBe('global');
       expect(tierOf('git.agents.node')).toBe('global');
+    });
+
+    it('defaults a multi-tier key to local', () => {
       expect(tierOf('engine.mode')).toBe('local');
       expect(tierOf('git.merge_body_mode')).toBe('local');
       expect(tierOf('next_step.auto.enhance-issue')).toBe('local');
@@ -156,7 +160,7 @@ describe('config setup', () => {
       expect(tierOf('auto-fix-all.ignored_check_patterns')).toBe('repo');
     });
 
-    it('falls back to local, then to the first tier, for a key with no shortcut', () => {
+    it('falls back to local, then to the first tier', () => {
       const fake = new KeyRegistry({
         format_version: 1,
         keys: [
@@ -167,6 +171,14 @@ describe('config setup', () => {
 
       expect(defaultTier('x.local', fake)).toBe('local');
       expect(defaultTier('x.global', fake)).toBe('global');
+    });
+
+    it('follows a registry with another default_tier, with no CLI change', () => {
+      const fake = registryWith({ 'engine.mode': { default_tier: 'repo' }, 'git.email': { default_tier: undefined } });
+      const items = Object.fromEntries(setupItems(fake, selectSections([])).map((item) => [item.key, item.defaultTier]));
+
+      expect(items['engine.mode']).toBe('repo');
+      expect(items['git.email']).toBe('local');
     });
 
     it('knows the registry key patterns', () => {

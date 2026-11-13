@@ -194,6 +194,86 @@ describe('KeyRegistry', () => {
     });
   });
 
+  describe('#defaultTier', () => {
+    let registry;
+
+    beforeEach(() => {
+      registry = registryOf(
+        { key: 'a.explicit', type: 'string', tiers: ALL, default_tier: 'global', description: 'explicit' },
+        { key: 'a.only', type: 'string', tiers: ['repo'], description: 'single tier' },
+        { key: 'a.local', type: 'string', tiers: ['global', 'repo', 'local'], description: 'has local' },
+        { key: 'a.first', type: 'string', tiers: ['repo', 'global'], description: 'no local' },
+        { key: 'a.agents.<agent>', type: 'string', tiers: ALL, default_tier: 'repo', description: 'wildcard' },
+        { key: 'a.agents.special', type: 'string', tiers: ['global'], description: 'literal' }
+      );
+    });
+
+    it('returns the entry\'s default_tier when set', () => {
+      expect(registry.defaultTier('a.explicit')).toBe('global');
+    });
+
+    it('returns the only tier of a single-tier entry', () => {
+      expect(registry.defaultTier('a.only')).toBe('repo');
+    });
+
+    it('returns local when the entry allows it', () => {
+      expect(registry.defaultTier('a.local')).toBe('local');
+    });
+
+    it('returns the first tier otherwise', () => {
+      expect(registry.defaultTier('a.first')).toBe('repo');
+    });
+
+    it('resolves a concrete key through its wildcard entry', () => {
+      expect(registry.defaultTier('a.agents.node')).toBe('repo');
+    });
+
+    it('resolves a registry pattern', () => {
+      expect(registry.defaultTier('a.agents.<agent>')).toBe('repo');
+      expect(registry.defaultTier('a.agents.<name>')).toBe('repo');
+    });
+
+    it('prefers a literal entry over a matching wildcard one', () => {
+      expect(registry.defaultTier('a.agents.special')).toBe('global');
+    });
+
+    it('returns null for an unknown key', () => {
+      expect(registry.defaultTier('other.key')).toBeNull();
+    });
+
+    it('returns null for a non-leaf or malformed key', () => {
+      expect(registry.defaultTier('a.agents')).toBeNull();
+      expect(registry.defaultTier('a.foo bar')).toBeNull();
+      expect(registry.defaultTier(null)).toBeNull();
+    });
+
+    describe('with the real registry', () => {
+      beforeEach(() => {
+        registry = new KeyRegistry();
+      });
+
+      it('defaults the email keys to the global tier', () => {
+        expect(registry.defaultTier('git.email')).toBe('global');
+        expect(registry.defaultTier('git.agents.node')).toBe('global');
+        expect(registry.defaultTier('git.agents.<agent>')).toBe('global');
+      });
+
+      it('defaults multi-tier shortcut keys to the local tier', () => {
+        expect(registry.defaultTier('engine.mode')).toBe('local');
+        expect(registry.defaultTier('git.merge_body_mode')).toBe('local');
+        expect(registry.defaultTier('next_step.auto.enhance-issue')).toBe('local');
+      });
+
+      it('defaults git.safe_branch to the local tier', () => {
+        expect(registry.defaultTier('git.safe_branch')).toBe('local');
+      });
+
+      it('defaults auto-fix-all.ignored_check_patterns to the repo tier', () => {
+        expect(registry.defaultTier('auto-fix-all.ignored_check_patterns')).toBe('repo');
+      });
+    });
+  });
+
   describe('#check', () => {
     let registry;
 

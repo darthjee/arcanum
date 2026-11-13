@@ -1,6 +1,28 @@
 // Help-text helpers for the CLI's usage and `--help` output.
 
-import { SETUP_SECTIONS } from '../../shared/lib/config/KeyRegistry.js';
+import KeyRegistry, { SETUP_SECTIONS } from '../../shared/lib/config/KeyRegistry.js';
+
+const bundledRegistry = new KeyRegistry();
+
+/**
+ * The tier suffix of a shortcut's summary, built from the key's
+ * registry entry so it follows `keys.json` with no CLI change.
+ * @param {string} key - a concrete key or a registry key pattern.
+ * @param {object} [registry] - the key registry (default: the bundled one).
+ * @returns {string} ` (<tier> tier only)` for a single-tier key,
+ *   ` (default write tier: <tier>)` otherwise, `''` for an unknown key.
+ */
+export function tierSuffix(key, registry = bundledRegistry) {
+  const entry = registry.lookup(key) || registry.lookupPattern(key);
+
+  if (!entry) {
+    return '';
+  }
+
+  return entry.tiers.length === 1 ? ` (${entry.tiers[0]} tier only)` : ` (default write tier: ${registry.defaultTier(key)})`;
+}
+
+const AGENTS_EMAIL_TIER = bundledRegistry.defaultTier('git.email');
 
 /**
  * @returns {string} the top-level usage text, newline-terminated.
@@ -158,10 +180,10 @@ const BOOLEAN_NOTE = 'Booleans: on, off, true or false (lowercase), stored as JS
 export const SHORTCUT_HELP = {
   'agents email': {
     synopsis: 'agents email [<agent>] [--all-tiers] | set <pattern> | set <agent> <email> | unset [<agent>] | edit',
-    summary: 'Show each agent\'s commit email, per tier with --all-tiers, or set git.email / git.agents.<agent> (default: global)',
+    summary: `Show each agent's commit email, per tier with --all-tiers, or set git.email / git.agents.<agent> (default: ${AGENTS_EMAIL_TIER})`,
     rows: [
       ['--all-tiers', 'listing only: one column per tier, with the resolved and shadowed values marked'],
-      ['--global|--repo|--local', 'set/unset: write to that tier instead of the global one'],
+      ['--global|--repo|--local', `set/unset: write to that tier instead of the ${AGENTS_EMAIL_TIER} one`],
       ['--lock-timeout <seconds>', 'set/unset/edit: wait at most this long for the lock (default 10)']
     ],
     notes: [
@@ -170,20 +192,20 @@ export const SHORTCUT_HELP = {
       'With --all-tiers, shows a (default) row and one row per agent, one column per tier.',
       'With <agent>, shows both keys in every tier; exits 1 when the model email would apply.',
       'set <pattern> writes git.email ({agent} is replaced by the agent name);',
-      'set <agent> <email> writes git.agents.<agent>. Default write tier: global.',
+      `set <agent> <email> writes git.agents.<agent>. Default write tier: ${AGENTS_EMAIL_TIER}.`,
       'edit asks agent, email (- unsets) and tier in a loop (needs a terminal; Enter finishes).',
       'set, unset and edit are reserved: use config get/set git.agents.<agent> for agents so named.'
     ]
   },
   engine: {
     synopsis: 'engine [shell|native|docker | --unset]',
-    summary: 'Read or set engine.mode (default write tier: local)',
+    summary: `Read or set engine.mode${tierSuffix('engine.mode')}`,
     rows: SINGLE_VALUE_ROWS,
     notes: SINGLE_VALUE_NOTES
   },
   'next-step auto': {
     synopsis: 'next-step auto [<skill> [on|off | --unset]]',
-    summary: 'List the next_step.auto.* keys set, or read or set one skill\'s (default write tier: local)',
+    summary: `List the next_step.auto.* keys set, or read or set one skill's${tierSuffix('next_step.auto.<skill>')}`,
     rows: SINGLE_VALUE_ROWS,
     notes: [
       'With no <skill>, lists every set next_step.auto.<skill>, resolved and sorted; always exits 0.',
@@ -194,31 +216,31 @@ export const SHORTCUT_HELP = {
   },
   'git safe-branch': {
     synopsis: 'git safe-branch [<ref> | --unset]',
-    summary: 'Read or set git.safe_branch (local tier only)',
+    summary: `Read or set git.safe_branch${tierSuffix('git.safe_branch')}`,
     rows: SINGLE_VALUE_ROWS,
     notes: [...SINGLE_VALUE_NOTES, 'The ref is stored as typed.']
   },
   'git merge-body': {
     synopsis: 'git merge-body [full|empty|coauthors | --unset]',
-    summary: 'Read or set git.merge_body_mode (default write tier: local)',
+    summary: `Read or set git.merge_body_mode${tierSuffix('git.merge_body_mode')}`,
     rows: SINGLE_VALUE_ROWS,
     notes: SINGLE_VALUE_NOTES
   },
   'auto-fix-all clear-context': {
     synopsis: 'auto-fix-all clear-context [on|off | --unset]',
-    summary: 'Read or set auto-fix-all.clear_context (local tier only)',
+    summary: `Read or set auto-fix-all.clear_context${tierSuffix('auto-fix-all.clear_context')}`,
     rows: SINGLE_VALUE_ROWS,
     notes: [...SINGLE_VALUE_NOTES, BOOLEAN_NOTE]
   },
   'auto-fix-all finish-on-empty-queue': {
     synopsis: 'auto-fix-all finish-on-empty-queue [on|off | --unset]',
-    summary: 'Read or set auto-fix-all.finish_on_empty_queue (local tier only)',
+    summary: `Read or set auto-fix-all.finish_on_empty_queue${tierSuffix('auto-fix-all.finish_on_empty_queue')}`,
     rows: SINGLE_VALUE_ROWS,
     notes: [...SINGLE_VALUE_NOTES, BOOLEAN_NOTE]
   },
   'auto-fix-all ignore-checks': {
     synopsis: 'auto-fix-all ignore-checks [list] | add <pattern>... | remove <pattern>...',
-    summary: 'List or edit auto-fix-all.ignored_check_patterns (repo tier only)',
+    summary: `List or edit auto-fix-all.ignored_check_patterns${tierSuffix('auto-fix-all.ignored_check_patterns')}`,
     rows: [
       ['--repo', 'The only tier accepted (--local and --global exit 3)'],
       ['--lock-timeout <seconds>', 'add/remove: wait at most this long for the lock (default 10)']
@@ -232,7 +254,7 @@ export const SHORTCUT_HELP = {
   },
   'monitor-issues clear-context': {
     synopsis: 'monitor-issues clear-context [on|off | --unset]',
-    summary: 'Read or set monitor-issues.clear_context (local tier only)',
+    summary: `Read or set monitor-issues.clear_context${tierSuffix('monitor-issues.clear_context')}`,
     rows: SINGLE_VALUE_ROWS,
     notes: [...SINGLE_VALUE_NOTES, BOOLEAN_NOTE]
   }

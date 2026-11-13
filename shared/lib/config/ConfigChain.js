@@ -177,6 +177,42 @@ class ConfigChain {
   }
 
   /**
+   * The absolute path of one tier's config file: local →
+   * `<repo>/.claude/state/arcanum-config.json`, repo →
+   * `<repo>/.claude/configuration/arcanum-repo-config.json`, global →
+   * `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/arcanum-config.json`. The same
+   * mapping `#read` resolves through, exposed for writers.
+   * @param {string} [repoPath] - the target repo's local checkout path.
+   *   Falls back to the constructor-injected `repoContext`'s `repoPath`
+   *   when omitted, like `#read`.
+   * @param {string} tier - `local`, `repo` or `global`.
+   * @returns {(string|null)} the tier file's absolute path, or `null`
+   *   for an unknown tier, a repo tier with no repo path, or a global
+   *   tier with neither `CLAUDE_CONFIG_DIR` nor `HOME` set.
+   */
+  tierFile(repoPath, tier) {
+    const index = TIER_NAMES.indexOf(tier);
+
+    if (index === -1) {
+      return null;
+    }
+
+    if (tier === 'global') {
+      const file = this._globalConfigFile();
+
+      return file ? path.resolve(file) : null;
+    }
+
+    const resolvedRepoPath = repoPath ?? this._repoContext?.repoPath;
+
+    if (!resolvedRepoPath) {
+      return null;
+    }
+
+    return path.resolve(this._tierFiles(resolvedRepoPath)[index]);
+  }
+
+  /**
    * @param {string} namespace - the top-level config namespace.
    * @param {string} key - the key (possibly a dot-separated nested path).
    * @param {string} tier - `local`, `repo` or `global`.

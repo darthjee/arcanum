@@ -95,6 +95,47 @@ describe('shell config key static scan', () => {
       ]);
     });
 
+    it('reads config_tier_read <repo> <tier> <ns> <key> calls', () => {
+      expect(keysOf('v=$(config_tier_read "." repo "git" "safe_branch")\n')).toEqual([['git.safe_branch']]);
+    });
+
+    it('reads config_tier_write <repo> <tier> <ns> <key> <value> calls', () => {
+      expect(keysOf('config_tier_write "." "$TIER" "git" "merge_body_mode" \'"full"\'\n')).toEqual([
+        ['git.merge_body_mode']
+      ]);
+    });
+
+    it('does not read the config_tier_* tier argument as the namespace', () => {
+      expect(keysOf('config_tier_write "." "$TIER" "$NAMESPACE" "$KEY" "$VALUE"\n')).toEqual([null]);
+    });
+
+    it('fails an unannotated config_tier_* call with a variable key', () => {
+      expect(check('config_tier_read "." repo "$NAMESPACE" "$key"\n')).toEqual([
+        'x.sh:1: config_tier_read call has no statically readable key; add a # config-key: annotation above it'
+      ]);
+    });
+
+    it('accepts an annotated config_tier_* call', () => {
+      const source = [
+        '# config-key: auto-fix-all.clear_context',
+        '# config-key: auto-fix-all.finish_on_empty_queue',
+        'config_tier_write "." "$TIER" "$NAMESPACE" "$KEY" "$NEW_VALUE"',
+        ''
+      ].join('\n');
+
+      expect(check(source)).toEqual([]);
+    });
+
+    it('fails an unregistered literal config_tier_* key', () => {
+      expect(check('config_tier_write "." local "git" "nope" true\n')).toEqual([
+        'x.sh:1: git.nope matches no keys.json entry'
+      ]);
+    });
+
+    it('skips config_tier_* helper definitions', () => {
+      expect(keysOf('config_tier_read() {\n  :\n}\nconfig_tier_write () {\n  :\n}\n')).toEqual([]);
+    });
+
     it('reads global_config_* <repo> <ns> <key> calls', () => {
       expect(keysOf('global_config_write "" "git" "merge_body_mode" \'"full"\'\n')).toEqual([['git.merge_body_mode']]);
     });

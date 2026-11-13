@@ -20,6 +20,7 @@
       "key": "git.email",
       "type": "string",
       "tiers": ["global", "repo", "local"],
+      "default_tier": "global",
       "description": "Default agent commit email, or a pattern containing {agent}",
       "setup": {"section": "identity", "order": 1, "prompt": "Default agent commit email"}
     },
@@ -27,6 +28,7 @@
       "key": "git.agents.<agent>",
       "type": "string",
       "tiers": ["global", "repo", "local"],
+      "default_tier": "global",
       "description": "Commit email for one specific agent",
       "setup": {"section": "identity", "order": 2, "prompt": "Commit email for this agent"}
     },

@@ -13,9 +13,10 @@ import { Interrupted, createPrompter, isInteractive, onceOnly } from '../../../p
 import { TIERS } from '../../../tierFiles.js';
 import { EXIT_SIGINT } from '../../../writeTier.js';
 import { UNSET_ANSWER, askTier, confirm } from '../setup/setting.js';
-import { DEFAULT_TIER, EMAIL_KEY, NAME, STRING_VALUE, agentKey } from './agentsEmailRead.js';
+import { EMAIL_KEY, NAME, STRING_VALUE, agentKey } from './agentsEmailRead.js';
 import { matrixText, readMatrix } from './agentsEmailMatrix.js';
 import { checkMaxArity, checkShortcutFlags, delegate, memoizeTargets, writeValue } from './common.js';
+import { defaultTier } from './defaultTier.js';
 
 /** The agent answer that targets `git.email`. */
 export const DEFAULT_AGENT = 'default';
@@ -185,7 +186,7 @@ async function editOne(session, matrix, agent) {
     return;
   }
 
-  const tier = await askTier(session, { entry: { tiers }, defaultTier: DEFAULT_TIER });
+  const tier = await askTier(session, { entry: { tiers }, defaultTier: defaultTier(key, session.context.registry) });
   const where = `${tier} (${matrix.files[tier]})`;
   const question = email === UNSET_ANSWER
     ? `  unset ${key} at ${where}? [Y/n] `

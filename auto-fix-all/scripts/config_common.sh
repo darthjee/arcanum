@@ -7,8 +7,6 @@
 # This file is meant to be SOURCED, not executed directly.
 
 CONFIG_COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-NEW_CONFIG_FILE=".claude/configuration/arcanum-repo-config.json"
-NEW_STATE_FILE=".claude/state/arcanum-config.json"
 # shellcheck disable=SC2034 # consumed by config_{toggle,is_enabled,get,set}_shell.sh
 NAMESPACE="auto-fix-all"
 
@@ -17,18 +15,16 @@ source "${CONFIG_COMMON_DIR}/../../arcanum/_lib/repo_config.sh"
 # shellcheck source=../../arcanum/_lib/config_chain.sh
 source "${CONFIG_COMMON_DIR}/../../arcanum/_lib/config_chain.sh"
 
-# Returns the NEW (namespaced) file that a given key is written to (by
-# config_set_shell.sh/config_toggle_shell.sh). _config_read_value only
-# reads it for a key not in keys.json; a registered key resolves its
-# tiers from the registry through config_chain_read instead.
-# clear_context and finish_on_empty_queue are personal, frequently-
-# toggled state and live in the gitignored state file; every other key
-# lives in the committed configuration file.
-_new_file_for_key() {
-  case "$1" in
-    clear_context|finish_on_empty_queue) echo "$NEW_STATE_FILE" ;;
-    *) echo "$NEW_CONFIG_FILE" ;;
-  esac
+# _write_tier_for_key <key>
+#   Prints the tier (local, repo or global) that config_set_shell.sh/
+#   config_toggle_shell.sh write <key> to: the default tier of the
+#   NAMESPACE.<key> entry in shared/lib/config/keys.json (see
+#   key_registry_default_tier), or `repo` for a key the registry doesn't
+#   know. Mirrors NamespacedBooleanKeyConfig#_newFileForKey.
+_write_tier_for_key() {
+  local tier
+  tier="$(key_registry_default_tier "${NAMESPACE}.$1")"
+  echo "${tier:-repo}"
 }
 
 # _config_read_value <key>
@@ -39,7 +35,7 @@ _new_file_for_key() {
 #        config_chain_read, i.e. from the tiers the registry allows for
 #        it (a `null` value resolves to empty here);
 #     2. an unregistered key gets a direct, presence-checked read of
-#        _new_file_for_key (so an explicit `null` prints `null`).
+#        the repo tier file (so an explicit `null` prints `null`).
 #   The legacy .claude/configuration/auto-fix-all.json is never read.
 #   Always exits 0; callers apply their own default.
 _config_read_value() {
@@ -54,7 +50,7 @@ _config_read_value() {
     # config-key: auto-fix-all.clear_context
     # config-key: auto-fix-all.finish_on_empty_queue
     # config-key: auto-fix-all.ignored_check_patterns
-    value=$(repo_config_read "$(_new_file_for_key "$key")" "" "$NAMESPACE" "$key")
+    value=$(config_tier_read "." repo "$NAMESPACE" "$key")
   fi
 
   [[ -n "$value" ]] && echo "$value"

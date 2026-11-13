@@ -11,13 +11,22 @@ import { Interrupted } from '../../../prompter.js';
 import { lookupKey, tierFile } from '../../../tierFiles.js';
 import { validationError } from '../../../writeTier.js';
 import { readTiers } from '../shared.js';
-import { KEY, TIER, storedPatterns, updatePatterns } from '../shortcuts/ignoreChecks.js';
+import { defaultTier } from '../shortcuts/defaultTier.js';
+import { KEY, storedPatterns, updatePatterns } from '../shortcuts/ignoreChecks.js';
 import { confirm, record } from './setting.js';
 
 /** The loop's question. */
 export const LOOP_QUESTION = '  [a]dd / [r]emove / [d]one: ';
 
 const VERBS = { a: 'add', add: 'add', r: 'remove', remove: 'remove', d: 'done', done: 'done', '': 'done' };
+
+/**
+ * @param {object} session - the wizard's state.
+ * @returns {string} the key's write tier, from the registry (repo).
+ */
+function tierOf(session) {
+  return defaultTier(KEY, session.registry);
+}
 
 /**
  * @param {unknown[]} patterns - the patterns.
@@ -37,7 +46,7 @@ export function patternsText(patterns) {
  * @returns {Promise<void>} resolves once done.
  */
 export async function askPatterns(session, { key, entry }) {
-  const { tiers: [{ read }] } = await readTiers({ ...session.context, tier: TIER });
+  const { tiers: [{ read }] } = await readTiers({ ...session.context, tier: tierOf(session) });
 
   session.io.stderr.write(`\n${key} — ${entry.description}\n`);
 
@@ -70,10 +79,11 @@ export async function askPatterns(session, { key, entry }) {
       continue;
     }
 
-    const file = tierFile(TIER, session.targets);
+    const tier = tierOf(session);
+    const file = tierFile(tier, session.targets);
     const question = verb === 'add'
-      ? `  add '${pattern}' to ${KEY} at ${TIER} (${file})? [Y/n] `
-      : `  remove '${pattern}' from ${KEY} at ${TIER} (${file})? [Y/n] `;
+      ? `  add '${pattern}' to ${KEY} at ${tier} (${file})? [Y/n] `
+      : `  remove '${pattern}' from ${KEY} at ${tier} (${file})? [Y/n] `;
 
     if (!await confirm(session, question)) {
       continue;
@@ -89,7 +99,7 @@ export async function askPatterns(session, { key, entry }) {
   }
 
   if (!changed) {
-    record(session, { status: 'kept', key: KEY, tier: TIER, value: patterns });
+    record(session, { status: 'kept', key: KEY, tier: tierOf(session), value: patterns });
   }
 }
 
@@ -125,10 +135,11 @@ async function askNewPattern(session, patterns) {
       return null;
     }
 
-    const result = session.registry.check('set', KEY, TIER, [pattern]);
+    const tier = tierOf(session);
+    const result = session.registry.check('set', KEY, tier, [pattern]);
 
     if (!result.ok) {
-      reportError(session.io, validationError(KEY, TIER, result, [pattern]));
+      reportError(session.io, validationError(KEY, tier, result, [pattern]));
       continue;
     }
 
@@ -176,9 +187,9 @@ async function askOldPattern(session, patterns) {
  */
 async function write(session, verb, pattern) {
   try {
-    const { previous, value } = await updatePatterns(session.context, { verb, patterns: [pattern] });
+    const { previous, value } = await updatePatterns(session.context, { verb, patterns: [pattern], tier: tierOf(session) });
 
-    record(session, { status: 'written', key: KEY, tier: TIER, previous, value });
+    record(session, { status: 'written', key: KEY, tier: tierOf(session), previous, value });
 
     return value;
   } catch (error) {
@@ -198,5 +209,5 @@ async function write(session, verb, pattern) {
  */
 function fail(session, error) {
   reportError(session.io, error);
-  record(session, { status: 'failed', key: KEY, tier: TIER, reason: errorMessage(error), exit: exitCodeForError(error) });
+  record(session, { status: 'failed', key: KEY, tier: tierOf(session), reason: errorMessage(error), exit: exitCodeForError(error) });
 }

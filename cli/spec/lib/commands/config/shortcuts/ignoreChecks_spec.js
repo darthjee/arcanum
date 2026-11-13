@@ -4,6 +4,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import Lock from '../../../../../../shared/lib/file/Lock.js';
 import { applyPatterns } from '../../../../../lib/commands/config/shortcuts/ignoreChecks.js';
 import { REPO_FILE, writeTier } from '../../../../support/fixtures.js';
+import { registryWith } from '../../../../support/registry.js';
 import { shortcutHarness } from '../../../../support/shortcuts.js';
 
 describe('config shortcuts: auto-fix-all ignore-checks', () => {
@@ -340,6 +341,27 @@ describe('config shortcuts: auto-fix-all ignore-checks', () => {
         expect((await harness.run(argv)).code).toBe(2);
       });
     }
+  });
+
+  describe('with a registry giving another tier', () => {
+    const options = () => ({ deps: { ...harness.deps, registry: registryWith({ [KEY]: { tiers: ['local'] } }) } });
+
+    it('lists and edits that tier, with no CLI change', async () => {
+      await harness.seed();
+
+      const added = await harness.run(checks('add', '^codacy'), options());
+
+      expect(added.code).toBe(0);
+      expect(added.out).toBe(`added '^codacy' to ${KEY} (local: .claude/state/arcanum-config.json)\n`);
+      expect(JSON.parse(await readFile(harness.localFile, 'utf8'))).toEqual({ 'auto-fix-all': { ignored_check_patterns: ['^codacy'] } });
+      expect((await harness.run(checks('list', '--json'), options())).json()).toEqual({
+        key: KEY, tier: 'local', file: harness.localFile, patterns: ['^codacy']
+      });
+    });
+
+    it('names that tier in the --unset hint', async () => {
+      expect((await harness.run(checks('--unset'), options())).err).toContain(`hint: use arcanum config unset ${KEY} --local`);
+    });
   });
 
   describe('applyPatterns', () => {

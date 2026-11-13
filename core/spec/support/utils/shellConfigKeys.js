@@ -1,18 +1,28 @@
 // Spec-support parser for the shell static scan (issue #777, check 3 of
 // docs/agents/architecture/shared-state-and-configuration.md#keeping-it-in-sync).
-// It finds `config_chain_read`, `repo_config_read|write` and
-// `global_config_read|write` calls in shell source, builds the dotted
+// It finds `config_chain_read`, `config_tier_read|write`,
+// `repo_config_read|write` and `global_config_read|write` calls in shell
+// source, builds the dotted
 // key(s) each one touches, and honours `# config-key: <key>`
 // annotations, following the parsing rules in
 // docs/agents/plans/777-shared-config-key-registry/plan.md's shared
 // contracts. Not shipped code.
 
-const HELPERS = ['config_chain_read', 'repo_config_read', 'repo_config_write', 'global_config_read', 'global_config_write'];
+const HELPERS = [
+  'config_chain_read',
+  'config_tier_read',
+  'config_tier_write',
+  'repo_config_read',   'repo_config_write',
+  'global_config_read',
+  'global_config_write'
+];
 
 // Index of the namespace argument and of the first key argument, per
 // helper; `config_chain_read` takes every argument from there on as a key.
 const ARG_LAYOUT = {
   config_chain_read: { ns: 1, key: 2, variadic: true },
+  config_tier_read: { ns: 2, key: 3, variadic: false },
+  config_tier_write: { ns: 2, key: 3, variadic: false },
   repo_config_read: { ns: 2, key: 3, variadic: false },
   repo_config_write: { ns: 2, key: 3, variadic: false },
   global_config_read: { ns: 1, key: 2, variadic: false },
