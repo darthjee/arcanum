@@ -54,6 +54,18 @@ describe('keys.json', () => {
       expect(flow.setup.instances).toEqual(['enhance-issue', 'discuss-issue', 'auto-plan-issue']);
     });
 
+    it('keeps every default_tier within its entry\'s tiers', () => {
+      for (const item of keys.keys.filter((candidate) => 'default_tier' in candidate)) {
+        expect(item.tiers).withContext(item.key).toContain(item.default_tier);
+      }
+    });
+
+    it('sets default_tier only on the email keys', () => {
+      const withDefault = keys.keys.filter((item) => 'default_tier' in item).map((item) => [item.key, item.default_tier]);
+
+      expect(withDefault).toEqual([['git.email', 'global'], ['git.agents.<agent>', 'global']]);
+    });
+
     it('takes git.agents.<agent> instances from the repo, not the registry', () => {
       const agents = keys.keys.find((item) => item.key === 'git.agents.<agent>');
 
@@ -110,6 +122,22 @@ describe('keys.json', () => {
 
     it('rejects a non-boolean read_only', () => {
       expect(problemsFor(entry({ read_only: 'yes' }))).toContain('a.b: read_only must be a boolean');
+    });
+
+    it('accepts a default_tier within the entry\'s tiers', () => {
+      expect(problemsFor(entry({ tiers: ['repo', 'local'], default_tier: 'repo' }))).toEqual([]);
+    });
+
+    it('rejects a default_tier missing from the entry\'s tiers', () => {
+      expect(problemsFor(entry({ tiers: ['repo', 'local'], default_tier: 'global' }))).toContain(
+        'a.b: default_tier must be one of the entry\'s tiers'
+      );
+    });
+
+    it('rejects an unknown default_tier', () => {
+      expect(problemsFor(entry({ default_tier: 'team' }))).toContain(
+        'a.b: default_tier must be one of the entry\'s tiers'
+      );
     });
 
     it('rejects a duplicate key', () => {

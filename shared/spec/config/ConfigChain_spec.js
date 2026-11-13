@@ -612,4 +612,47 @@ describe('ConfigChain', () => {
       });
     });
   });
+
+  describe('#tierFile', () => {
+    it('maps the local tier to the repo\'s state file', () => {
+      expect(newConfigChain().tierFile(repoPath, 'local'))
+        .toBe(path.resolve(repoPath, '.claude', 'state', 'arcanum-config.json'));
+    });
+
+    it('maps the repo tier to the repo\'s configuration file', () => {
+      expect(newConfigChain().tierFile(repoPath, 'repo'))
+        .toBe(path.resolve(repoPath, '.claude', 'configuration', 'arcanum-repo-config.json'));
+    });
+
+    it('maps the global tier to CLAUDE_CONFIG_DIR', () => {
+      expect(newConfigChain().tierFile(repoPath, 'global')).toBe(path.resolve(globalDir, 'arcanum-config.json'));
+    });
+
+    it('falls back to HOME/.claude for the global tier', () => {
+      const configChain = new ConfigChain({ env: { HOME: globalDir } });
+
+      expect(configChain.tierFile(repoPath, 'global'))
+        .toBe(path.resolve(globalDir, '.claude', 'arcanum-config.json'));
+    });
+
+    it('returns null for an unresolvable global tier', () => {
+      expect(new ConfigChain({ env: {} }).tierFile(repoPath, 'global')).toBeNull();
+    });
+
+    it('falls back to the injected repoContext\'s repoPath', () => {
+      const repoContext = createRepoContextMock({ repoPath });
+      const configChain = new ConfigChain({ env: { CLAUDE_CONFIG_DIR: globalDir }, repoContext });
+
+      expect(configChain.tierFile(undefined, 'local'))
+        .toBe(path.resolve(repoPath, '.claude', 'state', 'arcanum-config.json'));
+    });
+
+    it('returns null for a repo-scoped tier with no repo path', () => {
+      expect(newConfigChain().tierFile(undefined, 'repo')).toBeNull();
+    });
+
+    it('returns null for an unknown tier', () => {
+      expect(newConfigChain().tierFile(repoPath, 'team')).toBeNull();
+    });
+  });
 });

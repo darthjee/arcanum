@@ -16,7 +16,7 @@ const OPS = ['set', 'unset'];
 
 const ENTRY_FIELDS = [
   'key', 'type', 'values', 'items', 'format', 'read_only', 'default',
-  'integer', 'min', 'max', 'allow_empty', 'tiers', 'description', 'setup'
+  'integer', 'min', 'max', 'allow_empty', 'tiers', 'default_tier', 'description', 'setup'
 ];
 const SETUP_FIELDS = ['section', 'order', 'prompt', 'instances'];
 
@@ -149,6 +149,39 @@ class KeyRegistry {
     }
 
     return entry.tiers.includes(tier);
+  }
+
+  /**
+   * The tier a write of `keyOrPattern` goes to when the caller names
+   * none: the entry's `default_tier` when set, else its only tier, else
+   * `local` when its `tiers` include it, else its first tier. The single
+   * rule shared by the CLI shortcuts, the `config setup` wizard and
+   * arcanum's own writers (the shell twin is
+   * `key_registry_default_tier`).
+   * @param {string} keyOrPattern - a concrete key
+   *   (`next_step.auto.enhance-issue`) or a registry key pattern
+   *   (`git.agents.<agent>`), matched with `lookup` then `lookupPattern`.
+   * @returns {(string|null)} `global`, `repo` or `local`; `null` when no
+   *   entry matches (an unknown, non-leaf or malformed key).
+   */
+  defaultTier(keyOrPattern) {
+    const entry = this.lookup(keyOrPattern) || this.lookupPattern(keyOrPattern);
+
+    if (!entry) {
+      return null;
+    }
+
+    const { tiers } = entry;
+
+    if (typeof entry.default_tier === 'string' && tiers.includes(entry.default_tier)) {
+      return entry.default_tier;
+    }
+
+    if (tiers.length === 1) {
+      return tiers[0];
+    }
+
+    return tiers.includes('local') ? 'local' : tiers[0];
   }
 
   /**
@@ -393,6 +426,10 @@ function tierProblems(entry, add) {
 
   if (new Set(tiers).size !== tiers.length) {
     add('tiers must not repeat a tier');
+  }
+
+  if ('default_tier' in entry && !tiers.includes(entry.default_tier)) {
+    add('default_tier must be one of the entry\'s tiers');
   }
 }
 
