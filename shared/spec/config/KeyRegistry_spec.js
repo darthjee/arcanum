@@ -170,9 +170,33 @@ describe('KeyRegistry', () => {
         expect(registry.allowsTier('git.safe_branch', 'local')).toBeTrue();
       });
 
-      it('disallows git.safe_branch in the repo and global tiers', () => {
+      it('allows git.safe_branch in the global tier', () => {
+        expect(registry.allowsTier('git.safe_branch', 'global')).toBeTrue();
+      });
+
+      it('disallows git.safe_branch in the repo tier', () => {
         expect(registry.allowsTier('git.safe_branch', 'repo')).toBeFalse();
-        expect(registry.allowsTier('git.safe_branch', 'global')).toBeFalse();
+      });
+
+      it('allows the workflow keys in the global and local tiers, not the repo tier', () => {
+        const workflowKeys = [
+          'auto-fix-all.clear_context', 'auto-fix-all.finish_on_empty_queue', 'monitor-issues.clear_context'
+        ];
+
+        for (const key of workflowKeys) {
+          expect(['global', 'repo', 'local'].map((tier) => registry.allowsTier(key, tier)))
+            .withContext(key).toEqual([true, false, true]);
+        }
+      });
+
+      it('allows auto-fix-all.ignored_check_patterns in the repo and local tiers, not the global tier', () => {
+        expect(['global', 'repo', 'local'].map((tier) => registry.allowsTier('auto-fix-all.ignored_check_patterns', tier)))
+          .toEqual([false, true, true]);
+      });
+
+      it('allows migrations.version in the global and local tiers, not the repo tier', () => {
+        expect(['global', 'repo', 'local'].map((tier) => registry.allowsTier('migrations.version', tier)))
+          .toEqual([true, false, true]);
       });
 
       it('allows a per-agent email in every tier', () => {
@@ -264,11 +288,17 @@ describe('KeyRegistry', () => {
         expect(registry.defaultTier('next_step.auto.enhance-issue')).toBe('local');
       });
 
-      it('defaults git.safe_branch to the local tier', () => {
+      it('defaults git.safe_branch to the local tier, the most specific of its tiers', () => {
         expect(registry.defaultTier('git.safe_branch')).toBe('local');
       });
 
-      it('defaults auto-fix-all.ignored_check_patterns to the repo tier', () => {
+      it('defaults the workflow keys to the local tier', () => {
+        expect(registry.defaultTier('auto-fix-all.clear_context')).toBe('local');
+        expect(registry.defaultTier('auto-fix-all.finish_on_empty_queue')).toBe('local');
+        expect(registry.defaultTier('monitor-issues.clear_context')).toBe('local');
+      });
+
+      it('defaults auto-fix-all.ignored_check_patterns to the repo tier through its default_tier', () => {
         expect(registry.defaultTier('auto-fix-all.ignored_check_patterns')).toBe('repo');
       });
     });
@@ -450,8 +480,25 @@ describe('KeyRegistry', () => {
       expect(registry.check('set', 'git.agents.node', 'local', 'node@x.y').ok).toBeTrue();
     });
 
-    it('limits git.safe_branch to the local tier', () => {
+    it('refuses git.safe_branch in the repo tier', () => {
       expect(registry.check('set', 'git.safe_branch', 'repo', 'origin/main').reason).toBe('tier');
+    });
+
+    it('accepts git.safe_branch in the global tier', () => {
+      expect(registry.check('set', 'git.safe_branch', 'global', 'origin/main').ok).toBeTrue();
+    });
+
+    it('accepts auto-fix-all.ignored_check_patterns in the local tier', () => {
+      expect(registry.check('set', 'auto-fix-all.ignored_check_patterns', 'local', ['codacy']).ok).toBeTrue();
+    });
+
+    it('refuses auto-fix-all.ignored_check_patterns in the global tier', () => {
+      expect(registry.check('set', 'auto-fix-all.ignored_check_patterns', 'global', ['codacy']).reason).toBe('tier');
+    });
+
+    it('treats migrations.version as read-only in the global and local tiers', () => {
+      expect(registry.check('set', 'migrations.version', 'global', '1.0.0').reason).toBe('read_only');
+      expect(registry.check('set', 'migrations.version', 'local', '1.0.0').reason).toBe('read_only');
     });
 
     it('treats version as read-only', () => {

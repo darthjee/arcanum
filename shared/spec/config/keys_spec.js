@@ -60,10 +60,14 @@ describe('keys.json', () => {
       }
     });
 
-    it('sets default_tier only on the email keys', () => {
+    it('sets default_tier only on the email keys and auto-fix-all.ignored_check_patterns', () => {
       const withDefault = keys.keys.filter((item) => 'default_tier' in item).map((item) => [item.key, item.default_tier]);
 
-      expect(withDefault).toEqual([['git.email', 'global'], ['git.agents.<agent>', 'global']]);
+      expect(withDefault).toEqual([
+        ['git.email', 'global'],
+        ['git.agents.<agent>', 'global'],
+        ['auto-fix-all.ignored_check_patterns', 'repo']
+      ]);
     });
 
     it('takes git.agents.<agent> instances from the repo, not the registry', () => {
