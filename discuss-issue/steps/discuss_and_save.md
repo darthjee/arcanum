@@ -189,7 +189,7 @@ Planning runs as a **top-level** `/auto-plan-issue <id>` from a cleared context,
      --label-change <refine change>
    ```
 
-4. Hand off `/auto-plan-issue <id>` per [Clearing](../../docs/agents/architecture/skill-finish.md#clearing) (through `mcp__arcanum-next-step__handoff` when available). At its in-place level, invoke `/auto-plan-issue <id>` inline as a **chained** top-level run — no `NESTED=true`, not the nested plan-it path — so every level runs the same command.
+4. Hand off `/auto-plan-issue <id>` per [Clearing](../../docs/agents/architecture/skill-finish.md#clearing) applying its levels in order: level 1 (the mod's `handoff` tool, if listed); after any level-1 error other than `a handoff is already pending`, or with no tool listed, level 2 (`ScheduleWakeup`, loaded via `ToolSearch` if deferred); level 3 (in place) only if level 2 is unavailable or fails. At level 3 (in place), invoke `/auto-plan-issue <id>` inline as a **chained** top-level run — no `NESTED=true`, not the nested plan-it path — so every level runs the same command.
 
 Do not show a second offer on this path: the top-level `auto-plan-issue` makes its own chaining decision.
 
@@ -232,7 +232,7 @@ The top-level `auto-plan-issue` now owns the plan push, the `Refined` to `Ready`
 
    - **`CHOICE=yes`**: invoke `/loop /auto-resolve-issue <id>` inline, in the same session, through the `loop` skill (`Skill(loop, "/auto-resolve-issue <id>")`), as a **chained** top-level run — no `NESTED=true`. It prints its own report and next step.
    - **`CHOICE=yes` with `AUTO=true`**: relay the `auto-continuing: ...` stderr notice line to the user, then proceed exactly as on `CHOICE=yes` (a chained top-level run, never `NESTED=true`).
-   - **`CHOICE=yes` with `AUTO=true` and `CLEAR=true`**: after relaying the notice, hand off `/loop /auto-resolve-issue <id>` per [Clearing](../../docs/agents/architecture/skill-finish.md#clearing) (through `mcp__arcanum-next-step__handoff` when available) instead of invoking it inline. The working tree was already released in step 6, so nothing else changes.
+   - **`CHOICE=yes` with `AUTO=true` and `CLEAR=true`**: after relaying the notice, hand off `/loop /auto-resolve-issue <id>` per [Clearing](../../docs/agents/architecture/skill-finish.md#clearing) applying its levels in order: level 1 (the mod's `handoff` tool, if listed); after any level-1 error other than `a handoff is already pending`, or with no tool listed, level 2 (`ScheduleWakeup`, loaded via `ToolSearch` if deferred); level 3 (in place) only if level 2 is unavailable or fails instead of invoking it inline. The working tree was already released in step 6, so nothing else changes.
    - **`CHOICE=no`**: end.
    - **`CHOICE=chat`** (exit 3): return to the conversation. Do not run `/loop /auto-resolve-issue <id>` unless the user asks for it in chat.
    - **exit 1**: say in one line that the next-step prompt failed: <stderr>, then end.

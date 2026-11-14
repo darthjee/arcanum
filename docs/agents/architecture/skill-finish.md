@@ -136,8 +136,8 @@ The skill uses the first level that works:
 
 1. **Mod.** If `mcp__arcanum-next-step__handoff` is in the tool list (the `arcanum-next-step` mod is loaded), call it with `{ command: "<cmd>" }`. On a success result, end the turn with no further output; the mod runs `/clear` and then `<cmd>` once the turn ends.
    - Error `a handoff is already pending: ...`: end the turn. The first handoff is still scheduled, so falling back would fire the command twice.
-   - Any other error result (`handoff only runs arcanum skills`, `only available on the main loop`, `only available in an interactive session`): go to level 2.
-2. **Wakeup and user `/clear`.** Call `ScheduleWakeup(delaySeconds=60, prompt="<cmd>", reason="clearing context before <cmd>", noop=false)`, loading it with `ToolSearch` first if it is deferred. On success, print exactly one line, `type /clear now; <cmd> resumes in ~60s`, and end the turn. A pending wakeup survives `/clear` (spike #791), so `<cmd>` fires into the cleared context, or in place if the user did not clear in time. If the tool is missing or the call fails, go to level 3.
+   - Any other error result (`handoff only runs arcanum skills`, `only available on the main loop`, `handoff failed`): go to level 2.
+2. **Wakeup and user `/clear`.** Call `ScheduleWakeup(delaySeconds=60, prompt="<cmd>", reason="clearing context before <cmd>", noop=false)`, loading it with `ToolSearch` first if it is deferred. On success, print exactly one line, `type /clear now; <cmd> resumes in ~60s`, and end the turn. A pending wakeup survives `/clear` (spike #791), so `<cmd>` fires into the cleared context, or in place if the user did not clear in time. This level applies to every interactive skill, whether or not the run is inside `/loop`; `ScheduleWakeup` is called here only to resume `<cmd>` after the user's `/clear`. If the tool is missing or the call fails, go to level 3.
 3. **In place.** Print one line, `clear skipped: <reason>`, and run `<cmd>` inline exactly as on a plain `AUTO=true`.
 
 Notes:
