@@ -35,6 +35,7 @@ arcanum config set <key> <value> (--global|--repo|--local) [--string] [--force] 
 arcanum config unset <key> (--global|--repo|--local) [--force] [--lock-timeout <seconds>]
 arcanum config list [--global|--repo|--local]
 arcanum config info
+arcanum config doctor                      # report ignored, unknown and invalid values
 arcanum config setup [<section>...] [--lock-timeout <seconds>]   # interactive wizard
 arcanum self-update [--json]                                      # update this CLI to the latest release
 ```
@@ -59,7 +60,7 @@ $ arcanum config get git.safe_branch           # unset: exit 1
 (unset; default: origin/main)
 ```
 
-Each key resolves only from the tiers its registry entry allows (`git.safe_branch` is read from the local and global tiers, never the repo one, for example). A value set in another tier is skipped: `--all-tiers` marks it `(ignored: tier not allowed)`, `config list` appends the same marker to its line, and reading that tier explicitly (`--repo`) still prints the raw value, with a warning on stderr. With `--json`, each tier entry of a known key carries `allowed`, and the resolved value skips `allowed: false` tiers.
+Each key resolves only from the tiers its registry entry allows (`git.safe_branch` is read from the local and global tiers, never the repo one, for example). A value set in another tier is skipped: `--all-tiers` marks it `(ignored: tier not allowed)`, `config list` appends the same marker to its line, and reading that tier explicitly (`--repo`) still prints the raw value, with a warning on stderr. With `--json`, each tier entry of a known key carries `allowed`, and the resolved value skips `allowed: false` tiers. To find every ignored value at once, run `arcanum config doctor` (see below).
 
 ### set and unset
 
@@ -90,6 +91,19 @@ engine.mode = "native"   Script engine used to run migrated skill entrypoints
 ```
 
 Without a tier flag, each line is prefixed with its tier, and a shadowed key appears once per tier.
+
+### doctor
+
+`config doctor` lists every value arcanum ignores or rejects, instead of marking them among all the others: values in a tier their key does not allow, unknown keys and invalid values. It never writes.
+
+```console
+$ arcanum config doctor
+repo (.claude/configuration/arcanum-repo-config.json):
+  git.safe_branch = "origin/dev"   ignored: tier not allowed (allowed: local, global)
+    hint: arcanum config set git.safe_branch "origin/dev" --local, then arcanum config unset git.safe_branch --repo
+```
+
+It exits `0` with no problems, `3` when it found some, and `7` when a tier file is malformed. `--json` prints `problems`, `skipped` and `malformed`.
 
 ### info
 
