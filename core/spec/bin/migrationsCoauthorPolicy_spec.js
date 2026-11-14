@@ -9,7 +9,7 @@ import { POLICY_LINE } from '../../lib/commands/init-claude/InitClaudeEnsureCoau
 // path is one full string literal so `scripts/bump-version.sh` can rewrite
 // it on release. NOT a parity spec. Runs with cwd = the target repo.
 
-const SCRIPT = path.join(REPO_ROOT, 'arcanum/migrations/repos/next/004.sh');
+const SCRIPT = path.join(REPO_ROOT, 'arcanum/migrations/repos/2.4.0/004.sh');
 const MANIFEST = path.join(path.dirname(SCRIPT), 'migrations.json');
 
 describe('co-author policy migration', () => {
