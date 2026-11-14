@@ -102,3 +102,7 @@ docs/agents/specs/<topic>/<part>.md   # one file per part
 ```
 
 Every spec is listed in [`docs/agents/specs.md`](docs/agents/specs.md), the permanent specs index. Add an entry there when you create a spec, and remove it when the spec is removed.
+
+## Commit Attribution
+
+Commit co-author trailers follow arcanum's resolved `git.omit_model_coauthor` and `git.remove_coauthors` config (check them with `/arcanum-check-config`); this overrides Claude Code's own attribution reminder for every commit, including ones written by hand.
