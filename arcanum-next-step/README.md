@@ -141,3 +141,11 @@ claude plugin validate arcanum-next-step
 tsc -p arcanum-next-step
 claude plugin test arcanum-next-step
 ```
+
+### Leftover `dev-mods/` folders
+
+`<claude root>/dev-mods/<session-id>/` (for example `~/.claude/dev-mods/…`, or under
+`$CLAUDE_CONFIG_DIR`) is created by Claude Code's `plugin-authoring` skill when a mod
+is scaffolded or developed in a session; the folder name is that session's id. Arcanum
+neither creates, reads nor cleans it, and the shipped mod does not load from it. It is
+safe to delete once the session's mod work has been copied into this folder.
