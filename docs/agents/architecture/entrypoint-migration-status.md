@@ -68,6 +68,7 @@ Native-only commands (dispatched with `engine_dispatch --native-only`, e.g. `arc
 | `github-issue-mark-refined` | `docker` | #589 |
 | `github-issue-mark-split` | `docker` | #589 |
 | `github-issue-update` | `docker` | #588 |
+| `init-claude-ensure-coauthor-policy` | `docker` | - |
 | `init-claude-set-ci-ignored-patterns` | `docker` | #230 |
 | `init-claude-set-next-step-auto` | `docker` | #739 |
 | `init-claude-set-next-step-clear` | `docker` | #796 |

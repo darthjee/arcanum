@@ -387,6 +387,12 @@ export const COMMANDS = {
     context: 'repo',
     validateRepoPath: false
   },
+  'init-claude-ensure-coauthor-policy': {
+    module: 'commands/init-claude/InitClaudeEnsureCoauthorPolicy.js',
+    method: 'run',
+    context: 'repo',
+    validateRepoPath: false
+  },
   'init-claude-set-next-step-clear': {
     module: 'commands/init-claude/InitClaudeSetNextStepClear.js',
     method: 'run',
