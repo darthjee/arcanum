@@ -20,7 +20,7 @@ Never write to these files directly — always use the dedicated scripts (e.g. `
 
 ## The key registry
 
-`shared/lib/config/keys.json` is the source of truth for every arcanum config key: its type, the tiers it may live in, its default, and its `setup` wizard entry. `shared/lib/config/KeyRegistry.js` loads it, matches dotted keys against it and validates values. Both live in the [Shared Lib](shared-lib.md). The full key list is the file itself; this section describes its format and rules. For every key's tiers, default and actual reader, see [Config Keys](config-keys.md).
+`shared/lib/config/keys.json` is the source of truth for every arcanum config key: its type, the tiers it may live in, its default, and its `setup` wizard entry. `shared/lib/config/KeyRegistry.js` loads it, matches dotted keys against it and validates values. Both live in the [Shared Lib](shared-lib.md). The full key list is the file itself; this section describes its format and rules. For every key's actual reader, see [Config Keys](config-keys.md).
 
 ### Entry shape
 
