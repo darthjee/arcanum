@@ -33,7 +33,7 @@ Without the mod, hops fall back to `ScheduleWakeup` plus asking you to type `/cl
 | Name | `mcp__arcanum-next-step__handoff` (plugin `arcanum-next-step`, tool `handoff`). Registered on `session.start`, **not deferred**: visible from turn one, no `ToolSearch`. |
 | Input | `{ command: string }`, required: exactly the `COMMAND=` line `next_step_prompt.sh` printed, e.g. `/discuss-issue 797` or `/loop /auto-resolve-issue 796`. No other fields: the tool always clears. |
 | Success result | `scheduled: will /clear then run <command> once this turn ends — end your turn now without further output` |
-| Error results | `handoff only runs arcanum skills` (not allowlisted, see below); `a handoff is already pending: <command>` (a second call before the turn ends; the first stays scheduled); `handoff is only available on the main loop` (called from a subagent); `handoff is only available in an interactive session` (see [Headless](#headless-claude--p-and-sdk-hosts)). Errors schedule nothing. |
+| Error results | `handoff only runs arcanum skills` (not allowlisted, see below); `a handoff is already pending: <command>` (a second call before the turn ends; the first stays scheduled); `handoff is only available on the main loop` (called from a subagent). Errors schedule nothing. |
 | Timing | Nothing runs during the call. The mod keeps **one** pending command. When the main loop's turn ends with an answer, it runs `/clear`, then the command (`$.command.run`, outside the hook). |
 | Cancellation | The pending command is dropped, with the toast `arcanum-next-step: handoff cancelled`, when the turn ends `aborted` (Esc), in a `refusal` or an `error`, or when you submit a prompt while it is pending (your input wins). A subagent's turn end is ignored. |
 | Failure | If `/clear` or the command fails, the toast reads `arcanum-next-step: <error> — run <command> manually`, and the pending command is dropped. The context stays as it was (intact, or cleared without the next command); re-type the command. |
@@ -111,8 +111,7 @@ A headless run may exit as soon as its turn ends, before the handoff could run. 
 mod therefore offers the tool only where a person is at the prompt
 (`session.start`'s `isInteractive`). Under `claude -p` or an SDK host (which also
 covers the desktop app's local sessions), the tool is **not registered**, so skills
-see it as absent and fall back. A call that reaches the mod there anyway gets
-`handoff is only available in an interactive session`.
+see it as absent and fall back.
 
 ## Two installs
 
@@ -130,7 +129,7 @@ The mod's files, all owned by the `mod` agent:
 | `hooks/hooks.json` | Lists the hooks module. |
 | `hooks/register.ts` | The tool, the allowlist, and the turn-end scheduling. |
 | `hooks/*.test.ts`, `hooks/test-support.ts` | The `claude plugin test` suite and its fake engine. |
-| `types/index.d.ts` | The `$.state` values (`pending`, `interactive`). |
+| `types/index.d.ts` | The `$.state` values (`pending`). |
 | `tsconfig.json` | Extends the engine-laid `.claude-plugin/types/tsconfig.json`. |
 
 `.claude-plugin/types/` is written by Claude Code whenever it loads the mod from a

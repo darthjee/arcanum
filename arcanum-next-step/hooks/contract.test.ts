@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { NOT_INTERACTIVE, handoff, startSession, world } from './test-support.ts'
+import { startSession, world } from './test-support.ts'
 
 describe('contract', () => {
   test('registers handoff on session.start, not deferred, with a { command } schema', async ($, on) => {
@@ -18,11 +18,10 @@ describe('contract', () => {
     expect(tool?.description).toContain('end your turn')
   })
 
-  test('is not offered in a non-interactive session, and a call there is denied', async ($, on) => {
+  test('is not offered in a non-interactive session', async ($, on) => {
     const w = world(on)
     await startSession($, false)
 
     expect(w.registered.length).toBe(0)
-    expect(await handoff($, '/discuss-issue 797')).toEqual({ deny: NOT_INTERACTIVE })
   })
 })

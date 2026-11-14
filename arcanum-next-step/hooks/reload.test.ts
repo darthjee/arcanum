@@ -8,7 +8,6 @@ describe('reload', () => {
   test('a pending handoff survives a reload and runs at the turn end', async ($, on) => {
     const w = world(on, {
       state: {
-        interactive: true,
         pending: { command: '/discuss-issue 797', name: 'discuss-issue', args: '797' },
       },
     })
@@ -24,17 +23,29 @@ describe('reload', () => {
   })
 
   test('a call after a reload still reads the allowlist', async ($, on) => {
-    const w = world(on, { state: { interactive: true } })
+    const w = world(on, { state: {} })
 
     expect(await handoff($, '/config')).toEqual({ deny: NOT_ARCANUM })
     expect(await handoff($, '/discuss-issue 797')).toEqual({ result: scheduled('/discuss-issue 797') })
     expect(w.registered).toEqual([])
   })
 
+  test('a call with no state held is accepted and runs at the turn end', async ($, on) => {
+    const w = world(on)
+
+    expect(await handoff($, '/discuss-issue 797')).toEqual({ result: scheduled('/discuss-issue 797') })
+    await endTurn($)
+    await w.clock.settle()
+
+    expect(w.commands).toEqual([
+      { command: 'clear', args: '' },
+      { command: 'discuss-issue', args: '797' },
+    ])
+  })
+
   test('a second call after a reload is still rejected', async ($, on) => {
     world(on, {
       state: {
-        interactive: true,
         pending: { command: '/discuss-issue 797', name: 'discuss-issue', args: '797' },
       },
     })
