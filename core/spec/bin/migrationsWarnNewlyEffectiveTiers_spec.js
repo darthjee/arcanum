@@ -14,8 +14,8 @@ import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
 // derived from them.
 // NOT a parity spec: the migration scripts have no native counterpart.
 
-const GLOBAL_SCRIPT = path.join(REPO_ROOT, 'arcanum/migrations/repos/next/002.sh');
-const LOCAL_SCRIPT = path.join(REPO_ROOT, 'arcanum/migrations/repos/next/003.sh');
+const GLOBAL_SCRIPT = path.join(REPO_ROOT, 'arcanum/migrations/repos/2.4.0/002.sh');
+const LOCAL_SCRIPT = path.join(REPO_ROOT, 'arcanum/migrations/repos/2.4.0/003.sh');
 const MANIFEST = path.join(path.dirname(GLOBAL_SCRIPT), 'migrations.json');
 const LOCAL_CONFIG = '.claude/state/arcanum-config.json';
 const REPO_CONFIG = '.claude/configuration/arcanum-repo-config.json';
