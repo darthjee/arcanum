@@ -5,7 +5,6 @@ export const TOOL = 'mcp__arcanum-next-step__handoff'
 
 export const NOT_ARCANUM = 'handoff only runs arcanum skills'
 export const NOT_MAIN_LOOP = 'handoff is only available on the main loop'
-export const NOT_INTERACTIVE = 'handoff is only available in an interactive session'
 export const CANCELLED = 'arcanum-next-step: handoff cancelled'
 
 export const scheduled = (command: string) =>
@@ -46,7 +45,7 @@ export type WorldOptions = {
   state?: Partial<Record<StateKey, unknown>>
 }
 
-export type StateKey = 'pending' | 'interactive'
+export type StateKey = 'pending'
 
 /**
  * Stands for the engine beneath the mod: the install's skills folder, tool

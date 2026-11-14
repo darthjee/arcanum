@@ -15,15 +15,12 @@ const DESCRIPTION = [
 
 const NOT_ARCANUM = 'handoff only runs arcanum skills'
 const NOT_MAIN_LOOP = 'handoff is only available on the main loop'
-const NOT_INTERACTIVE = 'handoff is only available in an interactive session'
 const CANCELLED = 'arcanum-next-step: handoff cancelled'
 
 const scheduled = (command: string) =>
   `scheduled: will /clear then run ${command} once this turn ends — end your turn now without further output`
 
 const pending = { plugin: 'arcanum-next-step', key: 'pending' } as const
-
-const interactive = { plugin: 'arcanum-next-step', key: 'interactive' } as const
 
 /**
  * The arcanum skills of this install: the sibling folders of the mod's own
@@ -113,7 +110,6 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     // A headless run (`claude -p`) may exit before the turn's end runs the
     // handoff, so the tool is offered only where a person is at the prompt.
-    await $.state.set(interactive, e.isInteractive)
     if (!e.isInteractive) return next(e)
 
     skills = await listSkills($)
@@ -133,8 +129,6 @@ export const register: Register = on => {
 
   on('tool.call', { tool: TOOL }, async ($, e) => {
     if (e.agentId !== undefined) return failure(NOT_MAIN_LOOP)
-    const { value: isInteractive = false } = await $.state.get(interactive)
-    if (!isInteractive) return failure(NOT_INTERACTIVE)
 
     skills ??= await listSkills($)
     const handoff = parseHandoff(e.command, skills)
