@@ -19,5 +19,12 @@
     "file": "003.sh",
     "skippable": true,
     "applies_to": "local"
+  },
+  {
+    "id": "004",
+    "type": "script",
+    "file": "004.sh",
+    "skippable": true,
+    "applies_to": "repo"
   }
 ]
