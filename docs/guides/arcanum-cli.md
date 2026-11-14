@@ -67,7 +67,7 @@ native   (repo: .claude/configuration/arcanum-repo-config.json)
 
 Add a tier flag to read only that tier (the raw value, handy in scripts), or `--all-tiers` to see what each tier holds, including shadowed values. An unset key prints `(unset)`, with the registry default when there is one, and exits `1`.
 
-A key is only read from the tiers it is allowed in (`git.safe_branch`, for instance, is read from the local and global tiers, so a value in the committed repo config is ignored). A value left in another tier is ignored: `--all-tiers` and `config list` mark it `(ignored: tier not allowed)`, and reading that tier directly prints the value with a warning that arcanum does not read it from there.
+A key is only read from the tiers it is allowed in (`git.safe_branch`, for instance, is read from the local and global tiers, so a value in the committed repo config is ignored). A value left in another tier is ignored: `--all-tiers` and `config list` mark it `(ignored: tier not allowed)`, and reading that tier directly prints the value with a warning that arcanum does not read it from there. To list every such value (plus unknown keys and invalid values) in one go, run `arcanum config doctor`; it exits `3` when it finds any.
 
 **Write a value.** `set` always needs a tier, so nothing lands in the committed or the shared file by accident:
 

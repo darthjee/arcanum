@@ -101,6 +101,11 @@ describe('commands/config', () => {
         .toBeRejectedWithError(UsageError, /may not be empty/);
     });
 
+    it('refuses a tier flag on doctor', async () => {
+      await expectAsync(run({ positionals: ['doctor'], values: { local: true }, io }))
+        .toBeRejectedWithError(UsageError, '--local is not accepted by doctor');
+    });
+
     it('refuses a tier flag on info', async () => {
       await expectAsync(run({ positionals: ['info'], values: { repo: true }, io }))
         .toBeRejectedWithError(UsageError, '--repo is not accepted by info');

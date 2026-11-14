@@ -146,6 +146,15 @@ export const SUBCOMMAND_HELP = {
     summary: 'Describe the environment: account, repo, tier files, versions',
     rows: []
   },
+  doctor: {
+    synopsis: 'doctor',
+    summary: 'Report config values that are ignored, unknown or invalid',
+    rows: [],
+    notes: [
+      'Reads every tier and prints only the problems; never writes.',
+      'Exit codes: 0 no problems, 3 problems found, 7 a tier file is malformed.'
+    ]
+  },
   setup: {
     synopsis: 'setup [<section>...] [--lock-timeout <seconds>]',
     summary: 'Walk through the onboarding settings interactively',

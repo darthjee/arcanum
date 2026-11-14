@@ -139,6 +139,20 @@ With `--json`, one object:
 - `skew.status` is `up_to_date`, `behind` or `ahead`; `pending` counts that scope's pending migrations (`0` unless `behind`).
 - A malformed file block is `{ "file": …, "exists": true, "malformed": true, "version": null, "skew": null }`. File paths are absolute in JSON, repo-relative in the human output.
 
+## `config doctor`
+
+`arcanum config doctor` (`cli/lib/commands/config/doctor.js`) reads every tier like `list` (`readTiers` with `allTiers`) and reports only the problems. It accepts no tier flag, never writes and takes no lock. Each problem has a `kind`:
+
+- `unknown`: the key is not in the registry. Hint: `config unset <key> --<tier>`.
+- `tier`: the key's registry entry does not allow the tier (`allowed_tiers` lists the ones it does). Hint: `config set` into the key's default tier, then `config unset` from this one.
+- `invalid`: the value fails `KeyRegistry#check('set', …)` (`reason` and its details are copied from the check result). Hint: set a valid value or unset.
+
+Skipped silently: `read_only` keys (`version`, `migrations.version`; migrations manage them, only their tier is checked), `null` values (read as unset) and empty objects (empty namespaces). A tier with no target or no file is listed under `skipped`; a malformed tier is listed under `malformed` and not scanned, while the others still are.
+
+Exit codes: `7` when any tier is malformed (even with other problems), else `3` with at least one problem, else `0`. The report is printed in full before exiting non-zero.
+
+JSON: `{"problems":[{"tier","file","key","value","kind","allowed_tiers"?,"reason"?,"hint"}],"skipped":[{"tier","reason"}],"malformed":[{"tier","file","error"}]}`. Human output groups the problems by tier, with a `hint:` line under each, or prints `no problems found`.
+
 ## Version skew
 
 One CLI may face repos and accounts on different Arcanum versions. `cli/lib/skew.js` compares each tier's version pointer with the CLI's own version, which, since the CLI ships in lockstep with Arcanum, is the newest config shape it can know.
@@ -194,6 +208,7 @@ arcanum config set <key> <value> (--global|--repo|--local) [--string] [--force] 
 arcanum config unset <key> (--global|--repo|--local) [--force] [--lock-timeout <seconds>]
 arcanum config list [--global|--repo|--local]
 arcanum config info
+arcanum config doctor
 ```
 
 Each also accepts the [global flags](#global-flags) and `--help`.
@@ -202,6 +217,7 @@ Each also accepts the [global flags](#global-flags) and `--help`.
 - **`set` / `unset`** require a tier flag. There is no default tier, so nothing is ever written by accident to the committed repo file or the shared global file.
 - **`list`** prints every key set in every tier (or only the given one), flattened to dotted keys, one line per key per tier, with the registry description of known keys. An entry in a tier its key is not allowed in is marked `(ignored: tier not allowed)`, before the description.
 - **`info`** describes the environment; see [`config info`](#config-info).
+- **`doctor`** reports only the problems in the tier files; see [`config doctor`](#config-doctor).
 
 ### Global flags
 
@@ -424,7 +440,7 @@ Each command prints one stable object. Fields may be added; existing ones are no
 
 - One entry per key per tier, so a shadowed key appears once per tier that sets it. `description` is `null` for unknown keys. A known key's entry also carries `allowed` (`false` when arcanum does not read the key from that tier); an unknown key's has none. Registry defaults of unset keys are not listed; `get` reports them in `default`.
 
-`info`: see [`config info`](#config-info). `--version`: `{"version":"2.4.0"}`.
+`info`: see [`config info`](#config-info). `doctor`: see [`config doctor`](#config-doctor). `--version`: `{"version":"2.4.0"}`.
 
 `self-update`: see its [Outcomes](#outcomes) (`{"status":"updated","from":"2.2.3","to":"2.3.0","latest":"2.3.0"}`).
 
