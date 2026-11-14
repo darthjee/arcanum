@@ -59,6 +59,7 @@ describe('help', () => {
       expect(usage).toMatch(/^Usage: arcanum config/);
       expect(usage).toContain('get <key>');
       expect(usage).toContain('info');
+      expect(usage).toContain('doctor');
       expect(usage).toContain('  engine.mode  Script engine\n');
       expect(usage).toContain('  git.email    Commit email\n');
       expect(usage).toContain('--claude-config-dir <dir>');
