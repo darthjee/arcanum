@@ -3,6 +3,7 @@ import { TIER_FLAGS, checkArity, checkFlags, checkKey, selectedTier } from '../a
 import { EXIT_OK, EXIT_USAGE, UsageError } from '../exitCodes.js';
 import { configUsage, shortcutUsage, subcommandUsage } from '../help.js';
 import get from './config/get.js';
+import doctor from './config/doctor.js';
 import info from './config/info.js';
 import list from './config/list.js';
 import set from './config/set.js';
@@ -11,7 +12,7 @@ import unset from './config/unset.js';
 import { isShortcut, runShortcut } from './config/shortcuts/index.js';
 
 /** The `arcanum config` subcommands: name → module. */
-export const SUBCOMMANDS = { get, set, unset, list, info, setup };
+export const SUBCOMMANDS = { get, set, unset, list, info, doctor, setup };
 
 const TIER_OPTIONS = Object.fromEntries(TIER_FLAGS.map((tier) => [tier, { type: 'boolean' }]));
 
