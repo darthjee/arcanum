@@ -62,28 +62,28 @@ The top-level `.version` field on `arcanum-repo-config.json` (committed, shared 
 
 ## Documented keys
 
-Full list of keys and where each is read from: [Config Keys](../agents/architecture/config-keys.md).
+Full list of keys and where each is read from: [Config Keys](../agents/architecture/config-keys.md). Each key's type, allowed tiers and default are in [`keys.json`](../../shared/lib/config/keys.json) (see [Config Keys](../agents/architecture/config-keys.md)); `/arcanum-check-config <key>` shows where a value resolves from.
 
 A few `git`-namespaced keys, read through this config pair (and, for
 some of them, the global tier described below), control commit
 behavior directly:
 
-| Key | Type | Default | Chain | Notes |
-| --- | --- | --- | --- | --- |
-| `git.agents` | object (map of agent name -> email) | — | local → repo → global | Per-agent explicit `agent name -> concrete email` mapping, consulted before `git.email` at each tier (see `arcanum/_lib/agent_email.sh`). Lets multiple agent names share a single GitHub identity instead of requiring one dedicated account per agent name. See [`arcanum-global-config.md`](arcanum-global-config.md). |
-| `git.email` | string (`{agent}` template) | — | local → repo → global | Per-agent commit-author email pattern used by `commit_change.sh`/`commit_issue.sh`/`commit_plan.sh` (see `arcanum/_lib/agent_email.sh`). See [`arcanum-global-config.md`](arcanum-global-config.md). |
-| `git.safe_branch` | string | `origin/main` | local → global (repo file ignored) | The ref `arcanum/_lib/safe_branch.sh` checks out via `enhance-issue`/`discuss-issue`/`arcanum-split-issue`. See [Branch Bootstrap and Merge Conflicts](../agents/architecture/branch-bootstrap-and-merge-conflicts.md). |
-| `git.omit_model_coauthor` | boolean | `false` | local → repo → global | When `true`, `auto-fix-issue`/`auto-new-issue`/`auto-plan-issue`/`auto-fix-all`'s commit scripts (`commit_change.sh`, `commit_issue.sh`, `commit_plan.sh`, `cleanup_artifacts.sh`) skip emitting the model's `Co-Authored-By` trailer, keeping only the agent's own line. The agent's line is dropped too when its email resolves to the model's email (no `git.agents.<agent>`/`git.email` configured, or the old commit template engine), so the commit may carry no `Co-Authored-By` trailer at all. Resolved through the full 3-tier chain, same as `git.email` — see [`arcanum-global-config.md`](arcanum-global-config.md). |
-| `git.merge_body_mode` | string (`empty`/`full`/`coauthors`) | `empty` | local → repo → global | Controls the squash-merge commit body used by `auto-fix-all`'s `github.sh pr-merge` (`cmd_pr_merge`, see `arcanum/_lib/merge_body.sh`). `empty` keeps today's behavior (`--body ""`); `full` omits `--body` so GitHub/`gh` picks its own default squash body; `coauthors` builds `--body` from the deduped `Co-authored-by:` trailers found across the PR's commits (excluding the merger's own login, and the model's own line when `git.omit_model_coauthor` is `true`), falling back to `full`'s behavior if the resulting list is empty. An unrecognized value warns to stderr and falls back to `empty`. Resolved through the full 3-tier chain, same as `git.email`/`git.omit_model_coauthor` — see [`arcanum-global-config.md`](arcanum-global-config.md). Seeded, optionally, by three per-scope migrations (`arcanum/migrations/repos/0.16.1/001`–`003`, `applies_to`: `local`/`repo`/`global`). |
+| Key | Notes |
+| --- | --- |
+| `git.agents` | Per-agent explicit `agent name -> concrete email` mapping, consulted before `git.email` at each tier (see `arcanum/_lib/agent_email.sh`). Lets multiple agent names share a single GitHub identity instead of requiring one dedicated account per agent name. See [`arcanum-global-config.md`](arcanum-global-config.md). |
+| `git.email` | Per-agent commit-author email pattern used by `commit_change.sh`/`commit_issue.sh`/`commit_plan.sh` (see `arcanum/_lib/agent_email.sh`). See [`arcanum-global-config.md`](arcanum-global-config.md). |
+| `git.safe_branch` | The ref `arcanum/_lib/safe_branch.sh` checks out via `enhance-issue`/`discuss-issue`/`arcanum-split-issue`. See [Branch Bootstrap and Merge Conflicts](../agents/architecture/branch-bootstrap-and-merge-conflicts.md). |
+| `git.omit_model_coauthor` | When `true`, `auto-fix-issue`/`auto-new-issue`/`auto-plan-issue`/`auto-fix-all`'s commit scripts (`commit_change.sh`, `commit_issue.sh`, `commit_plan.sh`, `cleanup_artifacts.sh`) skip emitting the model's `Co-Authored-By` trailer, keeping only the agent's own line. The agent's line is dropped too when its email resolves to the model's email (no `git.agents.<agent>`/`git.email` configured, or the old commit template engine), so the commit may carry no `Co-Authored-By` trailer at all. See [`arcanum-global-config.md`](arcanum-global-config.md). |
+| `git.merge_body_mode` | Controls the squash-merge commit body used by `auto-fix-all`'s `github.sh pr-merge` (`cmd_pr_merge`, see `arcanum/_lib/merge_body.sh`). `empty` keeps today's behavior (`--body ""`); `full` omits `--body` so GitHub/`gh` picks its own default squash body; `coauthors` builds `--body` from the deduped `Co-authored-by:` trailers found across the PR's commits (excluding the merger's own login, and the model's own line when `git.omit_model_coauthor` is `true`), falling back to `full`'s behavior if the resulting list is empty. An unrecognized value warns to stderr and falls back to `empty`. See [`arcanum-global-config.md`](arcanum-global-config.md). Seeded, optionally, by three per-scope migrations (`arcanum/migrations/repos/0.16.1/001`–`003`, `applies_to`: `local`/`repo`/`global`). |
 
 A `next_step`-namespaced key per skill lets a next-step offer
 continue automatically instead of prompting:
 
-| Key | Type | Default | Chain | Notes |
-| --- | --- | --- | --- | --- |
-| `next_step.auto.enhance-issue` | boolean | `false` | local → repo → global | When `true`, `enhance-issue`'s `/discuss-issue <id>` offer is skipped and the command runs automatically. |
-| `next_step.auto.discuss-issue` | boolean | `false` | local → repo → global | When `true`, `discuss-issue`'s first offer (`/auto-plan-issue <id>`) is skipped and the command runs automatically. |
-| `next_step.auto.auto-plan-issue` | boolean | `false` | local → repo → global | When `true`, the `/loop /auto-resolve-issue <id>` offer made once a plan exists (`auto-plan-issue`, `discuss-issue`'s second offer, `plan-issue`) is skipped and the command runs automatically. |
+| Key | Notes |
+| --- | --- |
+| `next_step.auto.enhance-issue` | When `true`, `enhance-issue`'s `/discuss-issue <id>` offer is skipped and the command runs automatically. |
+| `next_step.auto.discuss-issue` | When `true`, `discuss-issue`'s first offer (`/auto-plan-issue <id>`) is skipped and the command runs automatically. |
+| `next_step.auto.auto-plan-issue` | When `true`, the `/loop /auto-resolve-issue <id>` offer made once a plan exists (`auto-plan-issue`, `discuss-issue`'s second offer, `plan-issue`) is skipped and the command runs automatically. |
 
 Only the JSON boolean `true` enables a key; the string `"true"` or any
 other value counts as `false`. Each key is read by
@@ -100,11 +100,11 @@ at that automatic hop. A clear key only does something when the
 matching `next_step.auto.<skill>` is `true`; with auto off it is never
 read:
 
-| Key | Type | Default | Chain | Notes |
-| --- | --- | --- | --- | --- |
-| `next_step.clear.enhance-issue` | boolean | `false` | local → repo → global | When `true` (and `next_step.auto.enhance-issue` is `true`), the automatic `/discuss-issue <id>` hop is reported with `CLEAR=true`, asking for the context to be cleared before it runs. |
-| `next_step.clear.discuss-issue` | boolean | `false` | local → repo → global | When `true` (and `next_step.auto.discuss-issue` is `true`), the automatic `/auto-plan-issue <id>` hop is reported with `CLEAR=true`. |
-| `next_step.clear.auto-plan-issue` | boolean | `false` | local → repo → global | When `true` (and `next_step.auto.auto-plan-issue` is `true`), the automatic `/loop /auto-resolve-issue <id>` hop is reported with `CLEAR=true` (also forwarded by `auto-plan-issue/scripts/auto_next.sh` with `CHAIN=yes`). |
+| Key | Notes |
+| --- | --- |
+| `next_step.clear.enhance-issue` | When `true` (and `next_step.auto.enhance-issue` is `true`), the automatic `/discuss-issue <id>` hop is reported with `CLEAR=true`, asking for the context to be cleared before it runs. |
+| `next_step.clear.discuss-issue` | When `true` (and `next_step.auto.discuss-issue` is `true`), the automatic `/auto-plan-issue <id>` hop is reported with `CLEAR=true`. |
+| `next_step.clear.auto-plan-issue` | When `true` (and `next_step.auto.auto-plan-issue` is `true`), the automatic `/loop /auto-resolve-issue <id>` hop is reported with `CLEAR=true` (also forwarded by `auto-plan-issue/scripts/auto_next.sh` with `CHAIN=yes`). |
 
 The clear keys follow the same rules as the auto keys: only the JSON
 boolean `true` enables one, and an explicit `false` shadows a `true` in

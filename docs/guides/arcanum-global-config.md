@@ -58,20 +58,13 @@ there.
 
 Full list of keys and where each is read from: [Config Keys](../agents/architecture/config-keys.md).
 
-`git.email` — the per-agent commit-author email pattern used by
-`commit_change.sh`/`commit_issue.sh`/`commit_plan.sh` (see
-`arcanum/_lib/agent_email.sh`) — is wired into the global chain, along
-with `git.omit_model_coauthor`, `git.merge_body_mode` and the
-`next_step.auto.<skill>` keys (see
-[`arcanum-repo-config.md`](arcanum-repo-config.md)). For the latter,
-`/arcanum-migrate` offers a skippable global-tier migration that asks
-`[Y]es/[N]o/[S]kip` per key. `git.safe_branch`,
-`auto-fix-all.clear_context`, `auto-fix-all.finish_on_empty_queue` and
-`monitor-issues.clear_context` are read from this file and the local
-state file (not from the committed repo file), so a personal default
-can be set once here. A few keys are not read from this file at all,
-e.g. `auto-fix-all.ignored_check_patterns` (repo and local only); see
-the table linked above. When a value already in this file starts
+A key is read from this file only if its `tiers` in
+[`keys.json`](../../shared/lib/config/keys.json) includes `global` (see
+[Config Keys](../agents/architecture/config-keys.md)). Run
+`/arcanum-check-config <key>` to see where a key resolves from; a value
+in a disallowed tier shows as `ignored: tier not allowed`. For the
+`next_step.auto.<skill>` keys, `/arcanum-migrate` offers a skippable
+global-tier migration that asks `[Y]es/[N]o/[S]kip` per key. When a value already in this file starts
 taking effect because its key gained the global tier, a skippable
 `/arcanum-migrate` step lists it and tells you how to remove it.
 
