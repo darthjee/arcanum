@@ -14,8 +14,21 @@
 #   docs/agents/flow.md                  (placeholder)
 #   docs/agents/issue-enhancement.md     (placeholder)
 #   docs/agents/arcanum-split-issue.md   (placeholder)
+#   docs/agents/specs.md                 (copied from init-claude/templates/specs.md)
+#   docs/agents/specs/.gitkeep           (only when docs/agents/specs/ is missing or empty)
 #
-# Appends the standard ## Documentation section to AGENTS.md if not already present.
+# Appends the standard ## Documentation section (a blank line followed by
+# init-claude/templates/agents-documentation-section.md) to AGENTS.md if not
+# already present. Existing files are never edited.
+#
+# Stderr (exit code stays 0), in this order:
+#   - "Note: docs/agents/specs.md already exists ..." when the specs index
+#     was skipped;
+#   - "Warning: docs/agents/specs exists and is not a directory ..." when
+#     the .gitkeep can't be created;
+#   - "Warning: AGENTS.md not found ..." when AGENTS.md is missing, or
+#     "Warning: AGENTS.md has a ## Documentation section with no link to
+#     docs/agents/specs.md ..." when the existing section lacks the specs index.
 
 set -euo pipefail
 
