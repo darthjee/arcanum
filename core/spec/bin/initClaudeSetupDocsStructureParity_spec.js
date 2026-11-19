@@ -20,8 +20,13 @@ const PATHS = [
   'docs/agents/architecture.md',
   'docs/agents/flow.md',
   'docs/agents/issue-enhancement.md',
-  'docs/agents/arcanum-split-issue.md'
+  'docs/agents/arcanum-split-issue.md',
+  'docs/agents/specs.md',
+  'docs/agents/specs/.gitkeep'
 ];
+
+const SPECS_INDEX = 'docs/agents/specs.md';
+const SPECS_GITKEEP = 'docs/agents/specs/.gitkeep';
 
 describe('init-claude-setup-docs-structure parity (shell vs. native)', () => {
   let baseDir;
@@ -82,7 +87,7 @@ describe('init-claude-setup-docs-structure parity (shell vs. native)', () => {
 
   it('completes a partially set-up repo', async () => {
     await seedFiles([dirs.shellDir, dirs.nativeDir], {
-      'AGENTS.md': '# Agents\n\n## Documentation\n\nCustom\n',
+      'AGENTS.md': '# Agents\n\n## Documentation\n\n[Specs](docs/agents/specs.md)\n',
       'docs/agents/plans/.gitkeep': '',
       'docs/agents/flow.md': 'custom flow\n'
     });
@@ -90,7 +95,7 @@ describe('init-claude-setup-docs-structure parity (shell vs. native)', () => {
     const { shell } = await runBoth();
 
     expect(shell.stdout).toEqual(
-      `Created:\n${listing([PATHS[0], PATHS[2], PATHS[4], PATHS[5]])}` +
+      `Created:\n${listing([PATHS[0], PATHS[2], PATHS[4], PATHS[5], PATHS[6], PATHS[7]])}` +
       `Already existed (skipped):\n${listing([PATHS[1], PATHS[3]])}` +
       'AGENTS.md: Documentation section already present (skipped)\n'
     );
@@ -102,5 +107,77 @@ describe('init-claude-setup-docs-structure parity (shell vs. native)', () => {
     expect(shell.code).toEqual(0);
     expect(shell.stderr).toEqual('Warning: AGENTS.md not found — skipping Documentation section append.\n');
     expect(shell.stdout).toEqual(`Created:\n${listing(PATHS)}`);
+  });
+
+  it('notes an existing specs index identically', async () => {
+    await seedFiles([dirs.shellDir, dirs.nativeDir], {
+      'AGENTS.md': '# Agents\n',
+      [SPECS_INDEX]: '# Specs\n\n| Spec | Summary | Status |\n| --- | --- | --- |\n| [a](specs/a.md) | A | Draft |\n'
+    });
+
+    const { shell } = await runBoth();
+
+    expect(shell.code).toEqual(0);
+    expect(shell.stderr).toEqual(
+      'Note: docs/agents/specs.md already exists and was left untouched; ' +
+      'compare it with init-claude/templates/specs.md if it is outdated.\n'
+    );
+    expect(shell.stdout).toEqual(
+      `Created:\n${listing(PATHS.filter((file) => file !== SPECS_INDEX))}` +
+      `Already existed (skipped):\n${listing([SPECS_INDEX])}` +
+      'AGENTS.md: appended Documentation section\n'
+    );
+  });
+
+  it('creates no .gitkeep in a non-empty specs directory', async () => {
+    await seedFiles([dirs.shellDir, dirs.nativeDir], {
+      'AGENTS.md': '# Agents\n',
+      'docs/agents/specs/auth.md': '# Auth\n'
+    });
+
+    const { shell } = await runBoth();
+
+    expect(shell.stderr).toEqual('');
+    expect(shell.stdout).toEqual(
+      `Created:\n${listing(PATHS.filter((file) => file !== SPECS_GITKEEP))}` +
+      'AGENTS.md: appended Documentation section\n'
+    );
+  });
+
+  it('warns identically when docs/agents/specs is a file', async () => {
+    await seedFiles([dirs.shellDir, dirs.nativeDir], {
+      'AGENTS.md': '# Agents\n',
+      'docs/agents/specs': 'not a dir\n'
+    });
+
+    const { shell } = await runBoth();
+
+    expect(shell.code).toEqual(0);
+    expect(shell.stderr).toEqual(
+      'Warning: docs/agents/specs exists and is not a directory — skipping docs/agents/specs/.gitkeep.\n'
+    );
+    expect(shell.stdout).toEqual(
+      `Created:\n${listing(PATHS.filter((file) => file !== SPECS_GITKEEP))}` +
+      'AGENTS.md: appended Documentation section\n'
+    );
+  });
+
+  it('warns identically when the Documentation section lacks the specs link', async () => {
+    await seedFiles([dirs.shellDir, dirs.nativeDir], {
+      'AGENTS.md': '# Agents\n\n## Documentation\n\nCustom\n'
+    });
+
+    const { shell } = await runBoth();
+
+    expect(shell.code).toEqual(0);
+    expect(shell.stderr).toEqual(
+      'Warning: AGENTS.md has a ## Documentation section with no link to docs/agents/specs.md — ' +
+      'add the Specs row and the ### Specs subsection from ' +
+      'init-claude/templates/agents-documentation-section.md.\n'
+    );
+    expect(shell.stdout).toEqual(
+      `Created:\n${listing(PATHS)}` +
+      'AGENTS.md: Documentation section already present (skipped)\n'
+    );
   });
 });

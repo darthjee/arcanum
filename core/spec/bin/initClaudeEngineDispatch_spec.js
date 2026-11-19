@@ -13,7 +13,9 @@ const DOCS_FILES = [
   'docs/agents/architecture.md',
   'docs/agents/flow.md',
   'docs/agents/issue-enhancement.md',
-  'docs/agents/arcanum-split-issue.md'
+  'docs/agents/arcanum-split-issue.md',
+  'docs/agents/specs.md',
+  'docs/agents/specs/.gitkeep'
 ];
 
 const SEMVER = /^[0-9]+\.[0-9]+\.[0-9]+$/;

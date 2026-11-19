@@ -1,5 +1,6 @@
-import { appendFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { appendFile, copyFile, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { resolveInstallPath } from '../../utils/file/InstallRoot.js';
 
 const ARCHITECTURE_CONTENT = [
   '# Architecture',
@@ -58,65 +59,63 @@ const FILES = Object.freeze([
 const AGENTS_FILE = 'AGENTS.md';
 const DOCUMENTATION_HEADING = /^## Documentation/m;
 
-const DOCUMENTATION_SECTION = [
-  '',
-  '## Documentation',
-  '',
-  'All project documentation lives under [`docs/agents/`](docs/agents/):',
-  '',
-  '| File | Contents |',
-  '|------|----------|',
-  '| [Folder Structure](docs/agents/folder-structure.md) | Top-level directory layout and the role of each folder. |',
-  '| [Architecture](docs/agents/architecture.md) | Source layout, modules, code style, and implementation guidelines. |',
-  '| [Flow](docs/agents/flow.md) | Main runtime flow of the application. |',
-  '| [Plans](docs/agents/plans/) | Implementation plans for ongoing or upcoming features. |',
-  '| [Issues](docs/agents/issues/) | Detailed specs for open issues. |',
-  '',
-  '### Issues (`docs/agents/issues/`)',
-  '',
-  'Each file documents an issue in detail. Naming convention:',
-  '',
-  '```',
-  'docs/agents/issues/<issue_id>_<issue_name>.md',
-  '```',
-  '',
-  'Example: `docs/agents/issues/5_release_docker_image.md` for issue #5.',
-  '',
-  '### Plans (`docs/agents/plans/`)',
-  '',
-  'Each plan is a directory named after the issue ID and topic, containing one or more related files:',
-  '',
-  '```',
-  'docs/agents/plans/<issue_id>_<topic>/<related_files>.md',
-  '```',
-  '',
-  'Example: `docs/agents/plans/12_add-auth/plan.md` for issue #12.',
-  ''
-].join('\n');
+const SPECS_INDEX_PATH = 'docs/agents/specs.md';
+const SPECS_DIR = 'docs/agents/specs';
+const SPECS_GITKEEP_PATH = `${SPECS_DIR}/.gitkeep`;
+
+const SPECS_INDEX_TEMPLATE = 'specs.md';
+const DOCUMENTATION_SECTION_TEMPLATE = 'agents-documentation-section.md';
+
+const SPECS_INDEX_NOTE =
+  `Note: ${SPECS_INDEX_PATH} already exists and was left untouched; ` +
+  'compare it with init-claude/templates/specs.md if it is outdated.\n';
+
+const SPECS_DIR_WARNING =
+  `Warning: ${SPECS_DIR} exists and is not a directory — skipping ${SPECS_GITKEEP_PATH}.\n`;
+
+const MISSING_SPECS_LINK_WARNING =
+  'Warning: AGENTS.md has a ## Documentation section with no link to docs/agents/specs.md — ' +
+  'add the Specs row and the ### Specs subsection from ' +
+  'init-claude/templates/agents-documentation-section.md.\n';
 
 const MISSING_AGENTS_WARNING =
   'Warning: AGENTS.md not found — skipping Documentation section append.\n';
 
 /**
  * Native implementation of the `init-claude-setup-docs-structure`
- * migrated entrypoint — byte-identical stdout/exit-code counterpart to
- * `init-claude/scripts/setup_docs_structure_shell.sh`. Creates the
+ * migrated entrypoint — byte-identical stdout/stderr/exit-code counterpart
+ * to `init-claude/scripts/setup_docs_structure_shell.sh`. Creates the
  * standard `docs/agents/` structure in the target repo (never
- * overwriting an existing path) and appends the standard
- * `## Documentation` section to its `AGENTS.md` when not already present.
+ * overwriting an existing path): the placeholder docs, the specs index
+ * copied from `init-claude/templates/specs.md`, and
+ * `docs/agents/specs/.gitkeep` (only when `docs/agents/specs/` is missing
+ * or empty). Appends a blank line plus
+ * `init-claude/templates/agents-documentation-section.md` to the repo's
+ * `AGENTS.md` when it has no `## Documentation` heading.
+ *
+ * Writes to stderr, in order: a note when the specs index already
+ * exists, a warning when `docs/agents/specs` is not a directory, then
+ * either the missing-`AGENTS.md` warning or a warning when an existing
+ * Documentation section has no link to `docs/agents/specs.md`.
  */
 class InitClaudeSetupDocsStructure {
   /**
    * @param {import('../../context/RepoContext.js').default} repoContext -
    *   the target repo's context, supplying `repoPath`.
    * @param {object} [deps] - injectable collaborators, for testing.
-   * @param {{write: function(string): boolean}} [deps.stderr] - the stream the
-   *   missing-`AGENTS.md` warning is written to (defaults to
-   *   `process.stderr`).
+   * @param {{write: function(string): boolean}} [deps.stderr] - the stream
+   *   notes and warnings are written to (defaults to `process.stderr`).
+   * @param {function(string): string} [deps.templatePath] - resolves a
+   *   template name to its source path (defaults to the install's
+   *   `init-claude/templates/<name>`).
    */
-  constructor(repoContext, { stderr = process.stderr } = {}) {
+  constructor(repoContext, {
+    stderr = process.stderr,
+    templatePath = (name) => resolveInstallPath('init-claude', 'templates', name)
+  } = {}) {
     this._repoContext = repoContext;
     this._stderr = stderr;
+    this._templatePath = templatePath;
   }
 
   /**
@@ -137,11 +136,13 @@ class InitClaudeSetupDocsStructure {
       if (await this._stat(target)) {
         skipped.push(entry.path);
       } else {
-        await mkdir(path.dirname(target), { recursive: true });
-        await writeFile(target, `${entry.content}\n`);
+        await this._writeTextFile(target, entry.content);
         created.push(entry.path);
       }
     }
+
+    await this._setupSpecsIndex(repoPath, created, skipped);
+    await this._setupSpecsGitkeep(repoPath, created, skipped);
 
     const agentsStatus = await this._updateAgents(path.join(repoPath, AGENTS_FILE));
 
@@ -149,7 +150,72 @@ class InitClaudeSetupDocsStructure {
   }
 
   /**
-   * Append the documentation section to `AGENTS.md` when missing.
+   * Write `content` plus a trailing newline to `target`, creating its
+   * parent directories.
+   * @param {string} target - absolute path to write.
+   * @param {string} content - the file body, without its trailing newline.
+   * @returns {Promise<void>}
+   */
+  async _writeTextFile(target, content) {
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, `${content}\n`);
+  }
+
+  /**
+   * Copy the specs index template, or note that it was left untouched.
+   * @param {string} repoPath - the target repo root.
+   * @param {string[]} created - relative paths created (mutated).
+   * @param {string[]} skipped - relative paths skipped (mutated).
+   * @returns {Promise<void>}
+   */
+  async _setupSpecsIndex(repoPath, created, skipped) {
+    const target = path.join(repoPath, SPECS_INDEX_PATH);
+
+    if (await this._stat(target)) {
+      skipped.push(SPECS_INDEX_PATH);
+      this._stderr.write(SPECS_INDEX_NOTE);
+      return;
+    }
+
+    await mkdir(path.dirname(target), { recursive: true });
+    await copyFile(this._templatePath(SPECS_INDEX_TEMPLATE), target);
+    created.push(SPECS_INDEX_PATH);
+  }
+
+  /**
+   * Create `docs/agents/specs/.gitkeep` only when the specs directory is
+   * missing or empty; warn when the path is not a directory.
+   * @param {string} repoPath - the target repo root.
+   * @param {string[]} created - relative paths created (mutated).
+   * @param {string[]} skipped - relative paths skipped (mutated).
+   * @returns {Promise<void>}
+   */
+  async _setupSpecsGitkeep(repoPath, created, skipped) {
+    const gitkeep = path.join(repoPath, SPECS_GITKEEP_PATH);
+
+    if (await this._stat(gitkeep)) {
+      skipped.push(SPECS_GITKEEP_PATH);
+      return;
+    }
+
+    const dirStat = await this._stat(path.join(repoPath, SPECS_DIR));
+
+    if (dirStat && !dirStat.isDirectory()) {
+      this._stderr.write(SPECS_DIR_WARNING);
+      return;
+    }
+
+    if (dirStat && (await readdir(path.join(repoPath, SPECS_DIR))).length > 0) {
+      return;
+    }
+
+    await this._writeTextFile(gitkeep, '');
+    created.push(SPECS_GITKEEP_PATH);
+  }
+
+  /**
+   * Append the documentation section to `AGENTS.md` when missing, or warn
+   * when the existing section has no link to the specs index.
    * @param {string} agentsPath - absolute path to the repo's `AGENTS.md`.
    * @returns {Promise<string|null>} `'appended'`, `'present'`, or null
    *   when `AGENTS.md` is not a regular file.
@@ -165,10 +231,15 @@ class InitClaudeSetupDocsStructure {
     const contents = await readFile(agentsPath, 'utf8');
 
     if (DOCUMENTATION_HEADING.test(contents)) {
+      if (!contents.includes(SPECS_INDEX_PATH)) {
+        this._stderr.write(MISSING_SPECS_LINK_WARNING);
+      }
       return 'present';
     }
 
-    await appendFile(agentsPath, DOCUMENTATION_SECTION);
+    const section = await readFile(this._templatePath(DOCUMENTATION_SECTION_TEMPLATE));
+
+    await appendFile(agentsPath, Buffer.concat([Buffer.from('\n'), section]));
     return 'appended';
   }
 

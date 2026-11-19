@@ -3,10 +3,13 @@
 # migrated entrypoint — see docs/agents/architecture/script-engine.md and
 # docs/agents/plans/593-migrate-init-claude-setup-docs-structure-to-native-node-js/plan.md
 # for the full design/shared contracts. Creates the standard docs/agents/
-# skeleton (issues/.gitkeep, plans/.gitkeep and the placeholder
-# architecture.md, flow.md, issue-enhancement.md, arcanum-split-issue.md),
+# skeleton (issues/.gitkeep, plans/.gitkeep, the placeholder
+# architecture.md, flow.md, issue-enhancement.md, arcanum-split-issue.md,
+# the specs index specs.md copied from init-claude/templates/specs.md, and
+# specs/.gitkeep only when docs/agents/specs/ is missing or empty),
 # skipping any path that already exists, and appends the standard
-# "## Documentation" section to AGENTS.md when not already present, via
+# "## Documentation" section (init-claude/templates/agents-documentation-section.md)
+# to AGENTS.md when not already present, via
 # either the shell implementation (setup_docs_structure_shell.sh) or the
 # native one (core/bin/arcanum), per engine.mode /
 # arcanum/_lib/migration-status.json.
@@ -32,13 +35,16 @@
 # while the shell implementation's own args stay untouched.
 #
 # No env vars are forwarded to the native path's allowlist — this
-# entrypoint only writes static placeholder content.
+# entrypoint only writes static placeholder and template content.
 #
 # Output and exit code: unchanged from before this migration — prints
 # "Created:" and/or "Already existed (skipped):" followed by one indented
 # relative path per line, then an "AGENTS.md: ..." status line (omitted,
 # with a warning on stderr, when AGENTS.md is missing); exits 0 (see
-# setup_docs_structure_shell.sh).
+# setup_docs_structure_shell.sh). Stderr also carries a note when
+# docs/agents/specs.md already exists, a warning when docs/agents/specs is
+# not a directory, and a warning when an existing ## Documentation section
+# has no link to docs/agents/specs.md.
 
 set -euo pipefail
 

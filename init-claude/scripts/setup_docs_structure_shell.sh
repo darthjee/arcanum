@@ -14,10 +14,32 @@
 #   docs/agents/flow.md                  (placeholder)
 #   docs/agents/issue-enhancement.md     (placeholder)
 #   docs/agents/arcanum-split-issue.md   (placeholder)
+#   docs/agents/specs.md                 (copied from init-claude/templates/specs.md)
+#   docs/agents/specs/.gitkeep           (only when docs/agents/specs/ is missing or empty)
 #
-# Appends the standard ## Documentation section to AGENTS.md if not already present.
+# Appends the standard ## Documentation section (a blank line followed by
+# init-claude/templates/agents-documentation-section.md) to AGENTS.md if not
+# already present. Existing files are never edited.
+#
+# Stderr (exit code stays 0), in this order:
+#   - "Note: docs/agents/specs.md already exists ..." when the specs index
+#     was skipped;
+#   - "Warning: docs/agents/specs exists and is not a directory ..." when
+#     the .gitkeep can't be created;
+#   - "Warning: AGENTS.md not found ..." when AGENTS.md is missing, or
+#     "Warning: AGENTS.md has a ## Documentation section with no link to
+#     docs/agents/specs.md ..." when the existing section lacks the specs index.
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TEMPLATES_DIR="${SCRIPT_DIR}/../templates"
+SPECS_INDEX_TEMPLATE="${TEMPLATES_DIR}/specs.md"
+DOCS_SECTION_TEMPLATE="${TEMPLATES_DIR}/agents-documentation-section.md"
+
+SPECS_INDEX_PATH="docs/agents/specs.md"
+SPECS_DIR="docs/agents/specs"
+SPECS_GITKEEP_PATH="${SPECS_DIR}/.gitkeep"
 
 CREATED=()
 SKIPPED=()
@@ -80,47 +102,42 @@ A checklist of concerns to consider when splitting a broad issue into sub-issues
 - **Sequencing** — is there a natural order sub-issues should be implemented/merged in, or can they proceed in parallel?
 - **Responsible agents** — which specialist agent(s) each sub-issue is likely to fall to."
 
+# --- Specs index (copied byte-for-byte from the canonical template) ---
+
+if [[ -e "$SPECS_INDEX_PATH" ]]; then
+  SKIPPED+=("$SPECS_INDEX_PATH")
+  echo "Note: ${SPECS_INDEX_PATH} already exists and was left untouched; compare it with init-claude/templates/specs.md if it is outdated." >&2
+else
+  mkdir -p "$(dirname "$SPECS_INDEX_PATH")"
+  cp "$SPECS_INDEX_TEMPLATE" "$SPECS_INDEX_PATH"
+  CREATED+=("$SPECS_INDEX_PATH")
+fi
+
+# --- Specs directory placeholder ---
+# Only created when docs/agents/specs/ is missing or empty (hidden entries
+# count); never created inside a non-empty directory or over a non-directory.
+
+if [[ -e "$SPECS_GITKEEP_PATH" ]]; then
+  SKIPPED+=("$SPECS_GITKEEP_PATH")
+elif [[ -e "$SPECS_DIR" && ! -d "$SPECS_DIR" ]]; then
+  echo "Warning: ${SPECS_DIR} exists and is not a directory — skipping ${SPECS_GITKEEP_PATH}." >&2
+elif [[ -d "$SPECS_DIR" && -n "$(ls -A "$SPECS_DIR" 2>/dev/null)" ]]; then
+  :
+else
+  _create_file "$SPECS_GITKEEP_PATH" ""
+fi
+
 # --- AGENTS.md documentation section ---
 
 AGENTS_UPDATED=false
 if [[ -f "AGENTS.md" ]] && ! grep -q "^## Documentation" "AGENTS.md" 2>/dev/null; then
-  cat >> "AGENTS.md" << 'DOCS_SECTION'
-
-## Documentation
-
-All project documentation lives under [`docs/agents/`](docs/agents/):
-
-| File | Contents |
-|------|----------|
-| [Folder Structure](docs/agents/folder-structure.md) | Top-level directory layout and the role of each folder. |
-| [Architecture](docs/agents/architecture.md) | Source layout, modules, code style, and implementation guidelines. |
-| [Flow](docs/agents/flow.md) | Main runtime flow of the application. |
-| [Plans](docs/agents/plans/) | Implementation plans for ongoing or upcoming features. |
-| [Issues](docs/agents/issues/) | Detailed specs for open issues. |
-
-### Issues (`docs/agents/issues/`)
-
-Each file documents an issue in detail. Naming convention:
-
-```
-docs/agents/issues/<issue_id>_<issue_name>.md
-```
-
-Example: `docs/agents/issues/5_release_docker_image.md` for issue #5.
-
-### Plans (`docs/agents/plans/`)
-
-Each plan is a directory named after the issue ID and topic, containing one or more related files:
-
-```
-docs/agents/plans/<issue_id>_<topic>/<related_files>.md
-```
-
-Example: `docs/agents/plans/12_add-auth/plan.md` for issue #12.
-DOCS_SECTION
+  printf '\n' >> "AGENTS.md"
+  cat "$DOCS_SECTION_TEMPLATE" >> "AGENTS.md"
   AGENTS_UPDATED=true
 elif [[ ! -f "AGENTS.md" ]]; then
   echo "Warning: AGENTS.md not found — skipping Documentation section append." >&2
+elif ! grep -qF "docs/agents/specs.md" "AGENTS.md" 2>/dev/null; then
+  echo "Warning: AGENTS.md has a ## Documentation section with no link to docs/agents/specs.md — add the Specs row and the ### Specs subsection from init-claude/templates/agents-documentation-section.md." >&2
 fi
 
 # --- Summary ---
