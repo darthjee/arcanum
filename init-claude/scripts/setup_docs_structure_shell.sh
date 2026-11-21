@@ -100,7 +100,8 @@ A checklist of concerns to consider when splitting a broad issue into sub-issues
 - **Standalone clarity** — does each sub-issue stand on its own, without requiring the reader to have the parent issue open to understand it?
 - **Shared contracts** — interfaces, schemas, or config keys touched by more than one sub-issue, and who owns getting them right first.
 - **Sequencing** — is there a natural order sub-issues should be implemented/merged in, or can they proceed in parallel?
-- **Responsible agents** — which specialist agent(s) each sub-issue is likely to fall to."
+- **Responsible agents** — which specialist agent(s) each sub-issue is likely to fall to.
+- **Specs** — does any part of this work need a design agreed in \`docs/agents/specs/\` first (worth its own \"write the spec\" sub-issue), and do existing specs listed in \`docs/agents/specs.md\` constrain how the sub-issues are shaped?"
 
 # --- Specs index (copied byte-for-byte from the canonical template) ---
 

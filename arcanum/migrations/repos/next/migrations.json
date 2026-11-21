@@ -13,5 +13,13 @@
     "instructions_file": "002.instructions.md",
     "skippable": true,
     "applies_to": "repo"
+  },
+  {
+    "id": "003",
+    "type": "instructions",
+    "description_file": "003.md",
+    "instructions_file": "003.instructions.md",
+    "skippable": true,
+    "applies_to": "repo"
   }
 ]

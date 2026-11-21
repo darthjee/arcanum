@@ -8,6 +8,8 @@ Read `docs/agents/arcanum-split-issue.md` in the target repo, if it exists. Degr
 
 Hold an open dialogue with the user about how to break this issue into sub-issues: propose alternatives, ask follow-up questions, surface trade-offs. One topic is always how the sub-issues should be split — if the user has no preference, decide on their behalf. Use `docs/agents/arcanum-split-issue.md`'s checklist (when present) alongside the exploration from [explore.md](explore.md) and `FILE`'s own content to guide what to cover.
 
+If a part of the work needs a design that no spec covers yet, propose a dedicated "write the spec" sub-issue (sequenced first) rather than having the split author the spec itself.
+
 As the discussion progresses, append the outcome to `FILE` (the local issue draft from [fetch.md](fetch.md)) — add or update a section capturing what was decided (e.g. a `## Split` section listing the agreed sub-issues and the rationale behind the split). Always write in English, translating if the conversation was in another language.
 
 Keep discussing until the user says they're satisfied with the split overall.
