@@ -122,7 +122,14 @@ describe('InitClaudeSetupDocsStructure', () => {
       expect(await read('docs/agents/arcanum-split-issue.md'))
         .toMatch(/^# Arcanum Split Issue\n\nA checklist .*via `\/arcanum-split-issue`\./);
       expect(await read('docs/agents/arcanum-split-issue.md'))
-        .toMatch(/each sub-issue is likely to fall to\.\n$/);
+        .toMatch(/each sub-issue is likely to fall to\.\n- \*\*Specs\*\* — /);
+      expect(await read('docs/agents/arcanum-split-issue.md')).toContain(
+        '\n- **Specs** — does any part of this work need a design agreed in `docs/agents/specs/` first ' +
+        '(worth its own "write the spec" sub-issue), and do existing specs listed in `docs/agents/specs.md` ' +
+        'constrain how the sub-issues are shaped?\n'
+      );
+      expect(await read('docs/agents/arcanum-split-issue.md'))
+        .toMatch(/constrain how the sub-issues are shaped\?\n$/);
     });
 
     it('appends the section starting with a blank line', async () => {
