@@ -7,6 +7,7 @@ This is a very light pass — lighter than `discuss-issue`'s exploration, and sc
 1. Other similar features already implemented in the codebase — precedent for how the split could shape up.
 2. Which specialist agents (`.claude/agents/*.md`, if any exist in this project) would plausibly own each likely part of the work.
 3. What parts of the code could be involved (routes, infra, specific modules, etc.).
+4. Existing specs — if `docs/agents/specs.md` exists, read it and open the specs whose topic overlaps the issue; they are agreed designs that constrain the split. Skip if missing.
 
 Do not investigate edge cases or in-depth security concerns here — if any surface during this pass, bring them up during discussion instead ([discuss.md](discuss.md)) rather than digging into them now.
 
