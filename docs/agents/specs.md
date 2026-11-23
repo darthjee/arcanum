@@ -9,6 +9,7 @@ This index remains in the repository even when no active specs exist. It is not 
 - A feature spec starts at `docs/agents/specs/<topic>.md`, where `<topic>` is a kebab-case name describing the feature.
 - The topic hub summarizes the feature, lists its status and scope, and links to the detailed part files. It may contain the full specification when the feature is small enough.
 - A growing spec is split into `docs/agents/specs/<topic>/<part>.md`. The hub remains the entry point and should link to every part.
+- A spec may instead start as a topic directory whose entry point is `docs/agents/specs/<topic>/specs.md`, with its parts in the same directory.
 - Part files may grow large and be split further using a stable, descriptive subdirectory or filename structure. Do not create a nested hierarchy unless it makes navigation clearer.
 - Keep the hub small enough to orient a reader: status, goal, scope, key decisions, open points, and links to details.
 - Keep links, filenames, status, and the index entry synchronized. A removed or completed spec must be removed from this index.
@@ -17,8 +18,11 @@ This index remains in the repository even when no active specs exist. It is not 
 
 ```text
 docs/agents/specs/<topic>.md          # topic hub; may contain the complete small spec
+docs/agents/specs/<topic>/specs.md    # topic hub in directory form; its parts sit beside it
 docs/agents/specs/<topic>/<part>.md   # detailed part of a larger spec
 ```
+
+The hub is either `<topic>.md` or `<topic>/specs.md`, and only the hub is listed in the index.
 
 ## Lifecycle
 
@@ -32,3 +36,4 @@ docs/agents/specs/<topic>/<part>.md   # detailed part of a larger spec
 | Spec | Summary | Status |
 | --- | --- | --- |
 | [Shell Engine Removal](specs/shell-engine-removal.md) | Remove `engine.mode=shell` and every `*_shell.sh` implementation once every entrypoint has a native counterpart. | Proposed |
+| [Spec-first split flow](specs/spec-first-split-flow/specs.md) | Spec-first flows for `arcanum-split-issue`: the issue-to-spec pointer, the shared resolver, dialogue and push guard, "blocked by" ordering, and the fold back into `docs/agents`. | Drafting |
