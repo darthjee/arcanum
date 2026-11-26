@@ -28,8 +28,9 @@ export function fakeReadFile(content = DEFAULT_TEMPLATE) {
 
 /**
  * Build a fake `execFileAsync` implementation answering both the
- * `resolve_pr_number.sh` shell-out and the `git branch`/`git push`
- * calls, so tests never shell out for real.
+ * `resolve_pr_number.sh` shell-out and `GitClient`'s `git branch`/`git
+ * push` calls (run with `cwd: repoPath`), so tests never shell out for
+ * real.
  * @param {object} [opts] - behavior overrides.
  * @param {string} [opts.prNumber] - the PR number `resolve_pr_number.sh`
  *   reports.
@@ -54,11 +55,11 @@ export function fakeExecFileAsync({ prNumber = '42', resolveFails = false, pushF
       return { stdout: `${prNumber}\n` };
     }
 
-    if (file === 'git' && args[2] === 'branch') {
+    if (file === 'git' && args[0] === 'branch') {
       return { stdout: `${branch}\n` };
     }
 
-    if (file === 'git' && args[2] === 'push') {
+    if (file === 'git' && args[0] === 'push') {
       if (pushFails) {
         const error = new Error('push failed');
 

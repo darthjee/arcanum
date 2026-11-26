@@ -68,7 +68,7 @@ describe('AutoNewIssueCommitIssue', () => {
         await expectAsync(instance.run(missingFilePath, ID, MODEL_NAME, MODEL_EMAIL)).toBeRejectedWithError(
           `Error: file not found: ${missingFilePath}`
         );
-        expect(execFileAsync).not.toHaveBeenCalled();
+        expect(execFileAsync.calls.allArgs().map(([, gitArgs]) => gitArgs[0])).toEqual(['branch']);
       });
 
       it('throws when file_path points at a directory rather than a file', async () => {
@@ -80,7 +80,38 @@ describe('AutoNewIssueCommitIssue', () => {
         await expectAsync(instance.run(dirPath, ID, MODEL_NAME, MODEL_EMAIL)).toBeRejectedWithError(
           `Error: file not found: ${dirPath}`
         );
+        expect(execFileAsync.calls.allArgs().map(([, gitArgs]) => gitArgs[0])).toEqual(['branch']);
+      });
+    });
+
+    describe('detached HEAD', () => {
+      it('refuses before checking file_path, staging, committing or pushing', async () => {
+        const execFileAsync = fakeGitExecFileAsync({ branch: '' });
+        const configChain = fakeConfigChain({ omitModelCoauthor: false });
+        const instance = new AutoNewIssueCommitIssue({ repoPath }, { execFileAsync, configChain });
+        const missingFilePath = path.join(repoPath, 'docs', 'agents', 'issues', 'does-not-exist.md');
+
+        await expectAsync(instance.run(missingFilePath, ID, MODEL_NAME, MODEL_EMAIL)).toBeRejectedWithError(
+          'refusing to push: no current branch (detached HEAD?)'
+        );
+        expect(execFileAsync.calls.allArgs().map(([, gitArgs]) => gitArgs[0])).toEqual(['branch']);
+      });
+
+      it('refuses through an injected gitClient without running any git command', async () => {
+        const execFileAsync = fakeGitExecFileAsync();
+        const configChain = fakeConfigChain({ omitModelCoauthor: false });
+        const gitClient = {
+          requireCurrentBranch: jasmine.createSpy('requireCurrentBranch')
+            .and.rejectWith(new Error('refusing to push: no current branch (detached HEAD?)')),
+          pushCurrentBranch: jasmine.createSpy('pushCurrentBranch')
+        };
+        const instance = new AutoNewIssueCommitIssue({ repoPath }, { execFileAsync, configChain, gitClient });
+
+        await expectAsync(instance.run(filePath, ID, MODEL_NAME, MODEL_EMAIL)).toBeRejectedWithError(
+          'refusing to push: no current branch (detached HEAD?)'
+        );
         expect(execFileAsync).not.toHaveBeenCalled();
+        expect(gitClient.pushCurrentBranch).not.toHaveBeenCalled();
       });
     });
 

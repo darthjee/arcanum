@@ -26,7 +26,7 @@ describe('AutoFixAllReplyComment (failure modes)', () => {
         ).toBeRejected();
 
         expect(deps.execFileAsync).not.toHaveBeenCalledWith(
-          'git', ['-C', repoPath, 'push', '-u', 'origin', jasmine.any(String)]
+          'git', ['push', '-u', 'origin', jasmine.any(String)], { cwd: repoPath }
         );
       });
 
@@ -39,7 +39,7 @@ describe('AutoFixAllReplyComment (failure modes)', () => {
         ).toBeRejected();
 
         expect(deps.execFileAsync).not.toHaveBeenCalledWith(
-          'git', ['-C', repoPath, 'push', '-u', 'origin', jasmine.any(String)]
+          'git', ['push', '-u', 'origin', jasmine.any(String)], { cwd: repoPath }
         );
       });
     });
@@ -54,6 +54,38 @@ describe('AutoFixAllReplyComment (failure modes)', () => {
         ).toBeRejected();
 
         expect(deps.fetchFn).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('on a detached HEAD', () => {
+      it('rejects with the refusal before resolving the PR number, posting or pushing', async () => {
+        const deps = stubDeps({ execFileAsync: fakeExecFileAsync({ branch: '' }) });
+        const instance = new AutoFixAllReplyComment(newContext(repoPath), deps);
+
+        await expectAsync(
+          instance.run(ID, AGENT, MODEL_NAME, MODEL_EMAIL, REPLY_BODY)
+        ).toBeRejectedWithError('refusing to push: no current branch (detached HEAD?)');
+
+        expect(deps.execFileAsync.calls.allArgs()).toEqual([['git', ['branch', '--show-current'], { cwd: repoPath }]]);
+        expect(deps.fetchFn).not.toHaveBeenCalled();
+      });
+
+      it('refuses through an injected gitClient without resolving the PR number or posting', async () => {
+        const gitClient = {
+          requireCurrentBranch: jasmine.createSpy('requireCurrentBranch')
+            .and.rejectWith(new Error('refusing to push: no current branch (detached HEAD?)')),
+          pushCurrentBranch: jasmine.createSpy('pushCurrentBranch')
+        };
+        const deps = stubDeps({ gitClient });
+        const instance = new AutoFixAllReplyComment(newContext(repoPath), deps);
+
+        await expectAsync(
+          instance.run(ID, AGENT, MODEL_NAME, MODEL_EMAIL, REPLY_BODY)
+        ).toBeRejectedWithError('refusing to push: no current branch (detached HEAD?)');
+
+        expect(deps.execFileAsync).not.toHaveBeenCalled();
+        expect(deps.fetchFn).not.toHaveBeenCalled();
+        expect(gitClient.pushCurrentBranch).not.toHaveBeenCalled();
       });
     });
 

@@ -118,6 +118,43 @@ describe('AutoFixAllCleanupArtifacts', () => {
       });
     });
 
+    describe('on a detached HEAD', () => {
+      it('rejects with the refusal even when there is nothing to clean up', async () => {
+        const execFileAsync = fakeGitExecFileAsync({ tracked: [], branch: '' });
+        const instance = build(execFileAsync);
+
+        await expectAsync(instance.run(ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, MODEL_EMAIL))
+          .toBeRejectedWithError('refusing to push: no current branch (detached HEAD?)');
+        expect(execFileAsync.calls.allArgs().map(([, gitArgs]) => gitArgs[0])).toEqual(['branch']);
+      });
+
+      it('rejects before any git rm, commit or push when artifacts are tracked', async () => {
+        const execFileAsync = fakeGitExecFileAsync({ tracked: [ISSUE_FILE, PLAN_DIR], branch: '' });
+        const instance = build(execFileAsync);
+
+        await expectAsync(instance.run(ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, MODEL_EMAIL))
+          .toBeRejectedWithError('refusing to push: no current branch (detached HEAD?)');
+        expect(execFileAsync.calls.allArgs().map(([, gitArgs]) => gitArgs[0])).toEqual(['branch']);
+      });
+
+      it('refuses through an injected gitClient without running any git command', async () => {
+        const execFileAsync = fakeGitExecFileAsync({ tracked: [ISSUE_FILE, PLAN_DIR] });
+        const gitClient = {
+          requireCurrentBranch: jasmine.createSpy('requireCurrentBranch')
+            .and.rejectWith(new Error('refusing to push: no current branch (detached HEAD?)')),
+          pushCurrentBranch: jasmine.createSpy('pushCurrentBranch')
+        };
+        const instance = new AutoFixAllCleanupArtifacts(
+          { repoPath }, { execFileAsync, configChain: fakeConfigChain(), gitClient }
+        );
+
+        await expectAsync(instance.run(ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, MODEL_EMAIL))
+          .toBeRejectedWithError('refusing to push: no current branch (detached HEAD?)');
+        expect(execFileAsync).not.toHaveBeenCalled();
+        expect(gitClient.pushCurrentBranch).not.toHaveBeenCalled();
+      });
+    });
+
     describe('commit message trailers', () => {
       it('keeps the model line and uses the architect email when omit_model_coauthor is false', async () => {
         expect(await commitMessageFor({ agentEmail: 'architect@example.com', omitModelCoauthor: false })).toEqual(

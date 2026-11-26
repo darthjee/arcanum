@@ -51,9 +51,9 @@ describe('AutoFixAllReplyComment (happy path)', () => {
         signal: jasmine.any(AbortSignal)
       });
 
-      expect(deps.execFileAsync).toHaveBeenCalledWith('git', ['-C', repoPath, 'branch', '--show-current']);
+      expect(deps.execFileAsync).toHaveBeenCalledWith('git', ['branch', '--show-current'], { cwd: repoPath });
       expect(deps.execFileAsync).toHaveBeenCalledWith(
-        'git', ['-C', repoPath, 'push', '-u', 'origin', 'my-branch:my-branch']
+        'git', ['push', '-u', 'origin', 'my-branch:my-branch'], { cwd: repoPath }
       );
     });
 
