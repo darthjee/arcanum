@@ -27,6 +27,7 @@ MODEL_EMAIL="${5:-}"
 }
 
 repo_path_enter "$REPO_PATH"
+require_current_branch >/dev/null
 
 [[ -d "$PLAN_DIR" ]] || { echo "Error: directory not found: $PLAN_DIR" >&2; exit 1; }
 

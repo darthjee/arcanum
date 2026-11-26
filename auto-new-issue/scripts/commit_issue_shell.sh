@@ -26,6 +26,7 @@ MODEL_EMAIL="${5:-}"
 }
 
 repo_path_enter "$REPO_PATH"
+require_current_branch >/dev/null
 
 [[ -f "$FILE_PATH" ]] || { echo "Error: file not found: $FILE_PATH" >&2; exit 1; }
 

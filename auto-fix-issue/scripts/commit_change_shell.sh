@@ -38,6 +38,7 @@ COMMENT_URL="${10:-}"
 }
 
 repo_path_enter "$REPO_PATH"
+require_current_branch >/dev/null
 
 TRAILERS="$(coauthor_trailers "$AGENT" "$MODEL_NAME" "$MODEL_EMAIL")"
 
