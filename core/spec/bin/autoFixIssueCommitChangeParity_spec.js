@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { detachHead, expectDetachedHeadRefusal, snapshotRepoState } from '../support/utils/detachedHead.js';
 import { createGitFixtureRepo } from '../support/utils/gitFixtureRepo.js';
 import { isolateGlobalConfig } from '../support/utils/isolatedGlobalConfig.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
@@ -254,6 +255,34 @@ describe('auto-fix-issue-commit-change parity (shell vs. native)', () => {
           await Promise.all([shellRepo.cleanup(), nativeRepo.cleanup()]);
         }
       });
+    });
+  });
+
+  describe('on a detached HEAD (refusal, issue #947)', () => {
+    it('refuses identically on both sides, leaving HEAD, the staged index, the working tree and the remote untouched', async () => {
+      const shellRepo = await createGitFixtureRepo();
+      const nativeRepo = await createGitFixtureRepo();
+
+      try {
+        await Promise.all([configureIdentity(shellRepo.repoPath), configureIdentity(nativeRepo.repoPath)]);
+        await Promise.all([stageChange(shellRepo.repoPath), stageChange(nativeRepo.repoPath)]);
+        await Promise.all([detachHead(shellRepo.repoPath), detachHead(nativeRepo.repoPath)]);
+        const [shellBefore, nativeBefore] = await Promise.all([
+          snapshotRepoState(shellRepo), snapshotRepoState(nativeRepo)
+        ]);
+
+        const shell = await runCommand([SHELL_SCRIPT, shellRepo.repoPath, TYPE, SCOPE, ID, SUBJECT, AGENT, MODEL_NAME, MODEL_EMAIL], shellRepo.repoPath);
+        const native = await runCommand(
+          [process.execPath, NATIVE_BIN, 'auto-fix-issue-commit-change', nativeRepo.repoPath, TYPE, SCOPE, ID, SUBJECT, AGENT, MODEL_NAME, MODEL_EMAIL],
+          nativeRepo.repoPath
+        );
+
+        expectDetachedHeadRefusal({ shell, native });
+        expect(await snapshotRepoState(shellRepo)).toEqual(shellBefore);
+        expect(await snapshotRepoState(nativeRepo)).toEqual(nativeBefore);
+      } finally {
+        await Promise.all([shellRepo.cleanup(), nativeRepo.cleanup()]);
+      }
     });
   });
 
