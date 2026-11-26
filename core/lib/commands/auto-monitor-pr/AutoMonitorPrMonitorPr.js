@@ -31,12 +31,16 @@ const DEFAULT_LAST_COMMENT_TIME = '1970-01-01T00:00:00Z';
  *     `ghUser` reproduces exactly; `getCurrentUser()` would instead
  *     resolve to whichever account `gh auth token` currently returns,
  *     diverging from the shell on that edge case.
- *   - `push_current_branch` (best-effort, `arcanum/_lib/push.sh`) is
- *     replicated via `GitClient#pushCurrentBranch` (added alongside this
- *     command) rather than omitted — this script is reachable right
- *     after `auto-fix-all` pushes a fix for previously-reported
- *     comments (see `auto-monitor-issue-pr/steps/run.md`), so the push
- *     is a genuine, not dead-weight, behavior to preserve.
+ *   - `push_current_branch` (`arcanum/_lib/push.sh`) is replicated via
+ *     `GitClient#pushCurrentBranch` rather than omitted — this script is
+ *     reachable right after `auto-fix-all` pushes a fix for
+ *     previously-reported comments (see
+ *     `auto-monitor-issue-pr/steps/run.md`), so the push is a genuine,
+ *     not dead-weight, behavior to preserve. `GitClient#pushCurrentBranch`
+ *     is strict (it rejects on a detached HEAD or a failed push), so this
+ *     command — the only best-effort caller — swallows any rejection
+ *     itself, mirroring `monitor_pr_shell.sh`'s `push_current_branch
+ *     2>/dev/null || true`.
  */
 class AutoMonitorPrMonitorPr {
   /**
@@ -50,7 +54,7 @@ class AutoMonitorPrMonitorPr {
    * @param {GithubToken} [deps.githubToken] - resolves `PR_OWNER` via
    *   `#ghUser`.
    * @param {GitClient} [deps.gitClient] - git CLI client, for the
-   *   best-effort `pushCurrentBranch` call.
+   *   `pushCurrentBranch` call (tolerated here on failure).
    * @param {IssueStatePaths} [deps.issueStatePaths] - state/lock path
    *   resolver, for both the issue-state file path and the
    *   `issueStateService` default.
@@ -98,7 +102,11 @@ class AutoMonitorPrMonitorPr {
     let state = await this._loadCommentsState(issueId, prNumber);
     state = await this._resolveProcessingToAddressed(issueId, prNumber, state);
 
-    await this._gitClient.pushCurrentBranch();
+    try {
+      await this._gitClient.pushCurrentBranch();
+    } catch {
+      // best-effort, matches monitor_pr_shell.sh's `push_current_branch 2>/dev/null || true`.
+    }
 
     const terminal = await this._prMonitor.resolveState(prNumber, owner);
 
