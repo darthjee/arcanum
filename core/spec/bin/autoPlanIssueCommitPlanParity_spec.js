@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { detachHead, expectDetachedHeadRefusal, snapshotRepoState } from '../support/utils/detachedHead.js';
 import { createGitFixtureRepo } from '../support/utils/gitFixtureRepo.js';
 import { isolateGlobalConfig } from '../support/utils/isolatedGlobalConfig.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
@@ -265,6 +266,100 @@ describe('auto-plan-issue-commit-plan parity (shell vs. native)', () => {
         await Promise.all([shellRepo.cleanup(), nativeRepo.cleanup()]);
       }
     });
+  });
+
+  describe('on a detached HEAD (refusal, issue #947)', () => {
+    it('refuses identically on both sides, leaving HEAD, the index, the working tree and the remote untouched', async () => {
+      const shellRepo = await createGitFixtureRepo();
+      const nativeRepo = await createGitFixtureRepo();
+
+      try {
+        await Promise.all([configureIdentity(shellRepo.repoPath), configureIdentity(nativeRepo.repoPath)]);
+        const [shellPlanDir, nativePlanDir] = await Promise.all([
+          createPlanDir(shellRepo.repoPath),
+          createPlanDir(nativeRepo.repoPath)
+        ]);
+        await Promise.all([detachHead(shellRepo.repoPath), detachHead(nativeRepo.repoPath)]);
+        const [shellBefore, nativeBefore] = await Promise.all([
+          snapshotRepoState(shellRepo), snapshotRepoState(nativeRepo)
+        ]);
+
+        const shell = await runCommand(
+          [SHELL_SCRIPT, shellRepo.repoPath, shellPlanDir, ID, MODEL_NAME, MODEL_EMAIL], shellRepo.repoPath
+        );
+        const native = await runCommand(
+          [
+            process.execPath, NATIVE_BIN, 'auto-plan-issue-commit-plan',
+            nativeRepo.repoPath, nativePlanDir, ID, MODEL_NAME, MODEL_EMAIL
+          ],
+          nativeRepo.repoPath
+        );
+
+        expectDetachedHeadRefusal({ shell, native });
+        expect(await snapshotRepoState(shellRepo)).toEqual(shellBefore);
+        expect(await snapshotRepoState(nativeRepo)).toEqual(nativeBefore);
+      } finally {
+        await Promise.all([shellRepo.cleanup(), nativeRepo.cleanup()]);
+      }
+    });
+
+    it(
+      'never pushes a local main that is ahead of origin/main when detached at origin/main (the incident)',
+      async () => {
+        const shellRepo = await createGitFixtureRepo();
+        const nativeRepo = await createGitFixtureRepo();
+
+        /**
+         * Commit once on local `main` without pushing, then detach at
+         * `origin/main` and write a plan dir — the exact shape that,
+         * before the fix, degraded the refspec to `:` and pushed `main`.
+         * @param {{repoPath: string}} repo - the fixture repo.
+         * @returns {Promise<string>} the created plan dir's path.
+         */
+        const seedIncident = async ({ repoPath }) => {
+          await configureIdentity(repoPath);
+          await writeFile(path.join(repoPath, 'LOCAL_ONLY.md'), 'unpushed\n');
+          await git(['add', 'LOCAL_ONLY.md'], repoPath);
+          await git(['commit', '--quiet', '-m', 'local-only commit'], repoPath);
+          await detachHead(repoPath, 'origin/main');
+
+          return createPlanDir(repoPath);
+        };
+        const commitCount = async ({ repoPath }) => (await git(['rev-list', '--all', '--count'], repoPath)).stdout;
+
+        try {
+          const [shellPlanDir, nativePlanDir] = await Promise.all([seedIncident(shellRepo), seedIncident(nativeRepo)]);
+          const [shellBefore, nativeBefore] = await Promise.all([
+            snapshotRepoState(shellRepo), snapshotRepoState(nativeRepo)
+          ]);
+          const [shellCount, nativeCount] = await Promise.all([commitCount(shellRepo), commitCount(nativeRepo)]);
+
+          const shell = await runCommand(
+            [SHELL_SCRIPT, shellRepo.repoPath, shellPlanDir, ID, MODEL_NAME, MODEL_EMAIL], shellRepo.repoPath
+          );
+          const native = await runCommand(
+            [
+              process.execPath, NATIVE_BIN, 'auto-plan-issue-commit-plan',
+              nativeRepo.repoPath, nativePlanDir, ID, MODEL_NAME, MODEL_EMAIL
+            ],
+            nativeRepo.repoPath
+          );
+
+          expectDetachedHeadRefusal({ shell, native });
+          // remoteRefs covers the remote's refs/heads/main, localRefs the
+          // local main; the commit count rules out any new commit.
+          expect(await snapshotRepoState(shellRepo)).toEqual(shellBefore);
+          expect(await snapshotRepoState(nativeRepo)).toEqual(nativeBefore);
+          expect(await commitCount(shellRepo)).toEqual(shellCount);
+          expect(await commitCount(nativeRepo)).toEqual(nativeCount);
+          expect(shellBefore.remoteRefs).not.toContain(
+            (await git(['rev-parse', 'main'], shellRepo.repoPath)).stdout.trim()
+          );
+        } finally {
+          await Promise.all([shellRepo.cleanup(), nativeRepo.cleanup()]);
+        }
+      }
+    );
   });
 
   describe('a missing required argument (hard failure)', () => {

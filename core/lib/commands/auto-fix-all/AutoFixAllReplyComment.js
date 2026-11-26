@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { readFile as defaultReadFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
+import GitClient from '../../utils/git/GitClient.js';
 import IssueClient from '../../utils/github/IssueClient.js';
 import { resolveInstallPath } from '../../utils/file/InstallRoot.js';
 import { fillTemplate } from '../../utils/template/TemplateFiller.js';
@@ -38,25 +39,31 @@ class AutoFixAllReplyComment {
    *   overridable for tests (defaults to the real 30s protocol value).
    * @param {Function} [deps.readFile] - `node:fs/promises` `readFile`-
    *   compatible implementation, used to read the reply template.
+   * @param {GitClient} [deps.gitClient] - the shared git client (branch
+   *   check and strict push; defaults to one bound to `repoContext` and
+   *   driven by `execFileAsync`).
    */
   constructor(repoContext, {
     execFileAsync = defaultExecFileAsync,
     fetchFn = fetch,
     timeoutMs = DEFAULT_TIMEOUT_MS,
-    readFile = defaultReadFile
+    readFile = defaultReadFile,
+    gitClient = new GitClient({ context: repoContext, execFileAsync })
   } = {}) {
     this._repoContext = repoContext;
     this._execFileAsync = execFileAsync;
     this._fetch = fetchFn;
     this._timeoutMs = timeoutMs;
     this._readFile = readFile;
+    this._gitClient = gitClient;
   }
 
   /**
    * Native implementation of the `auto-fix-all-reply-comment` migrated
    * entrypoint — byte-identical stdout/exit-code counterpart to
-   * `reply_comment_shell.sh`. Validates all six arguments, resolves the
-   * current branch's PR number, posts the rendered reply template as a
+   * `reply_comment_shell.sh`. Validates all six arguments, refuses a
+   * detached HEAD (before any PR-number resolution or comment post),
+   * resolves the current branch's PR number, posts the rendered reply template as a
    * PR comment over the GitHub REST API, then pushes the current
    * branch.
    * @param {string} id - the currently checked-out branch's issue id
@@ -72,8 +79,8 @@ class AutoFixAllReplyComment {
    *   transfer summary goes to stderr instead) on success: neither
    *   `push_current_branch` (`arcanum/_lib/push.sh`) nor
    *   `reply_comment_shell.sh` redirects that call's stdout, so the
-   *   native side relays it too, for byte-identical parity (mirroring
-   *   `AutoFixAllCleanupArtifacts.js`'s own `_pushCurrentBranch`). The
+   *   native side relays it too, for byte-identical parity (via
+   *   `GitClient#pushCurrentBranch`). The
    *   `gh pr comment` call's own stdout is not relayed — see this
    *   migration's plan's "Shared contracts": it isn't captured/echoed
    *   by the shell script either.
@@ -92,12 +99,14 @@ class AutoFixAllReplyComment {
       throw new Error(USAGE);
     }
 
+    await this._gitClient.requireCurrentBranch();
+
     const prNumber = await this._resolvePrNumber(cleanId);
     const content = await this._renderTemplate({ body: replyBody, agent, modelName, modelEmail });
 
     await this._postComment(prNumber, content);
 
-    return this._pushCurrentBranch();
+    return this._gitClient.pushCurrentBranch();
   }
 
   /**
@@ -165,31 +174,6 @@ class AutoFixAllReplyComment {
    */
   async _postComment(prNumber, content) {
     await this._issueClient().postComment(prNumber, content);
-  }
-
-  /**
-   * Native re-derivation of `arcanum/_lib/push.sh`'s
-   * `push_current_branch` for this entrypoint's own use only (per
-   * `script-engine.md`'s "No standalone, wholesale `_lib` migration"
-   * rule): resolves the current branch, then pushes it to `origin` with
-   * upstream tracking. `git push`'s own stdout — its `branch '<name>'
-   * set up to track 'origin/<name>'.` confirmation, printed on every
-   * successful `-u` push regardless of whether the branch was already
-   * tracked (its transfer summary goes to stderr instead) — is left
-   * unredirected by `push.sh`, so it's relayed here too.
-   * @returns {Promise<string>} `git push`'s own stdout.
-   */
-  async _pushCurrentBranch() {
-    const { stdout: branchStdout } = await this._execFileAsync(
-      'git', ['-C', this._repoContext.repoPath, 'branch', '--show-current']
-    );
-    const branch = branchStdout.trim();
-
-    const { stdout } = await this._execFileAsync(
-      'git', ['-C', this._repoContext.repoPath, 'push', '-u', 'origin', `${branch}:${branch}`]
-    );
-
-    return stdout;
   }
 }
 

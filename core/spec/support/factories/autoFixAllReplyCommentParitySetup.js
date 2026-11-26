@@ -119,13 +119,17 @@ export async function seedGithubLikeRepo(repo) {
  * @param {string[]} [options.argsTail] - the `<id> <agent> <model_name>
  *   <model_email> <reply_body>` arguments both sides are run with
  *   (defaults to `ARGS_TAIL`).
- * @param {Function} options.assert - called with `{shell, native}` once
- *   the shared parity checks pass, for the case-specific assertions.
+ * @param {Function} [options.prepareRepo] - awaited once per fixture
+ *   repo (`{repoPath, remotePath}`), after seeding and before either
+ *   side runs — e.g. to detach HEAD and snapshot the repo state.
+ * @param {Function} options.assert - called (and awaited) with
+ *   `{shell, native, shellRepo, nativeRepo}` once the shared parity
+ *   checks pass, for the case-specific assertions.
  * @returns {Promise<void>} resolves once the case has run and all
  *   fixtures have been cleaned up.
  */
 export async function runReplyCommentParityCase({
-  extraEnv = {}, useFakeFetchPreload = false, argsTail = ARGS_TAIL, assert
+  extraEnv = {}, useFakeFetchPreload = false, argsTail = ARGS_TAIL, prepareRepo = async () => {}, assert
 }) {
   const fakeGh = await createFakeGhBin();
   const shellRepo = await createGitFixtureRepo();
@@ -133,6 +137,7 @@ export async function runReplyCommentParityCase({
 
   try {
     await Promise.all([seedGithubLikeRepo(shellRepo), seedGithubLikeRepo(nativeRepo)]);
+    await Promise.all([prepareRepo(shellRepo), prepareRepo(nativeRepo)]);
 
     const env = { ...process.env, PATH: `${fakeGh.binDir}:${process.env.PATH}`, ...extraEnv };
     const nativeCommand = useFakeFetchPreload
@@ -148,7 +153,7 @@ export async function runReplyCommentParityCase({
 
     expect(native.stdout).toEqual(shell.stdout);
     expect(native.code).toEqual(shell.code);
-    assert({ shell, native });
+    await assert({ shell, native, shellRepo, nativeRepo });
   } finally {
     await Promise.all([shellRepo.cleanup(), nativeRepo.cleanup(), fakeGh.cleanup()]);
   }

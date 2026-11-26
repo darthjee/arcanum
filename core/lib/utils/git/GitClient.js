@@ -4,6 +4,12 @@ import { promisify } from 'node:util';
 const defaultExecFileAsync = promisify(execFile);
 
 /**
+ * Refusal raised when there is no current branch (detached HEAD) —
+ * byte-identical to `arcanum/_lib/push.sh`'s `require_current_branch`.
+ */
+export const DETACHED_HEAD_MESSAGE = 'refusing to push: no current branch (detached HEAD?)';
+
+/**
  * All git CLI interaction shared by PR lifecycle flows — extracted from
  * `PrOperations`'s `_currentBranch` private method. Bound to a single
  * `RepoContext` at construction, mirroring `GitHubClient`/
@@ -31,23 +37,40 @@ class GitClient {
   }
 
   /**
-   * Best-effort push of the current branch to `origin`, replacing
-   * `arcanum/_lib/push.sh`'s `push_current_branch` — every caller of the
-   * shell function tolerates any failure (`push_current_branch 2>/dev/null
-   * || true`), so this never throws either. Native's `execFile` never
-   * forwards the child's stdout to this process's own stdout (unlike the
-   * shell's own stderr-only redirect), so there is no risk of `git
-   * push`'s own output leaking into a caller's stdout contract.
-   * @returns {Promise<void>} resolves regardless of outcome.
+   * Resolves the current branch, refusing a detached HEAD — mirrors
+   * `arcanum/_lib/push.sh`'s `require_current_branch`. Commit/push
+   * entrypoints call it before their first side effect.
+   * @returns {Promise<string>} the current branch's (non-empty) name.
+   * @throws {Error} {@link DETACHED_HEAD_MESSAGE} when there is no current
+   *   branch.
+   */
+  async requireCurrentBranch() {
+    const branch = await this.currentBranch();
+
+    if (!branch) {
+      throw new Error(DETACHED_HEAD_MESSAGE);
+    }
+
+    return branch;
+  }
+
+  /**
+   * Strict push of the current branch to `origin` under the same name,
+   * replacing `arcanum/_lib/push.sh`'s `push_current_branch`. Refuses a
+   * detached HEAD (via {@link GitClient#requireCurrentBranch}) without ever
+   * running `git push` — an empty refspec would degrade to `:` and push
+   * every matching branch. Any failure rejects; best-effort callers (e.g.
+   * `AutoMonitorPrMonitorPr`) wrap the call in their own `try/catch`.
+   * @returns {Promise<string>} `git push`'s stdout.
+   * @throws {Error} on a detached HEAD or a failed `git push`.
    */
   async pushCurrentBranch() {
-    try {
-      const branch = await this.currentBranch();
+    const branch = await this.requireCurrentBranch();
+    const { stdout } = await this._execFileAsync(
+      'git', ['push', '-u', 'origin', `${branch}:${branch}`], { cwd: this._context.repoPath }
+    );
 
-      await this._execFileAsync('git', ['push', '-u', 'origin', `${branch}:${branch}`], { cwd: this._context.repoPath });
-    } catch {
-      // best-effort — tolerate any failure, matching push_current_branch's callers.
-    }
+    return stdout;
   }
 }
 

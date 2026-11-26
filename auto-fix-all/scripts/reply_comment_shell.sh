@@ -43,6 +43,7 @@ usage() {
 [[ -n "$AGENT" && -n "$MODEL_NAME" && -n "$MODEL_EMAIL" && -n "$REPLY_BODY" ]] || usage
 
 repo_path_enter "$REPO_PATH"
+require_current_branch >/dev/null
 
 PR_NUMBER=$("$RESOLVE_PR_NUMBER" "$REPO_PATH" "$ID")
 

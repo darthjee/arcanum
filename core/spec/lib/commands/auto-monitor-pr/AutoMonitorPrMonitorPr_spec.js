@@ -357,5 +357,25 @@ describe('AutoMonitorPrMonitorPr#run', () => {
 
       expect(gitClient.pushCurrentBranch).toHaveBeenCalled();
     });
+
+    it('still resolves with its normal output when the push refuses a detached HEAD', async () => {
+      const gitClient = {
+        pushCurrentBranch: jasmine.createSpy('pushCurrentBranch')
+          .and.rejectWith(new Error('refusing to push: no current branch (detached HEAD?)'))
+      };
+      const command = createCommand({ gitClient });
+
+      await expectAsync(command.run('--pr-number', PR_NUMBER)).toBeResolvedTo('pending\n');
+      expect(gitClient.pushCurrentBranch).toHaveBeenCalled();
+    });
+
+    it('still resolves with its normal output when git push fails', async () => {
+      const gitClient = {
+        pushCurrentBranch: jasmine.createSpy('pushCurrentBranch').and.rejectWith(new Error('non-fast-forward'))
+      };
+      const command = createCommand({ gitClient });
+
+      await expectAsync(command.run('--pr-number', PR_NUMBER)).toBeResolvedTo('pending\n');
+    });
   });
 });
