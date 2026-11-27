@@ -20,7 +20,7 @@ Four skills rewrite an existing issue body, and the guard binds all of them:
 Not covered:
 
 - `monitor-issues` never pushes a body. It only queues ids for `auto-rewrite-issue`.
-- `arcanum-split-issue` and `arcanum-create-issue` create bodies rather than rewrite them.
+- `arcanum-split-issue` and `arcanum-create-issue` create bodies rather than rewrite them. The exception is the spec-driven split's updates to the implementation-split issue's body, which go through the guard (see [reentrancy.md](reentrancy.md)).
 
 ## Mechanism
 

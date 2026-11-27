@@ -26,6 +26,7 @@ For `invalid`:
 - **Writing the spec.** When the user chooses to write it, the skill reports the exact path it will use. In `missing` the path comes from the issue. In `invalid` the path has to be defined.
 - **Non-persistence.** "Proceed without the spec" never mutates the issue, the pointer or any state file.
 - **Consumption.** On `ready`, the consumer reads the hub and then its parts before it discusses or plans.
+- **Spec-driven split.** It reuses this dialogue on `not_ready`, where "proceed without the spec" drops it to a normal split (see [reentrancy.md](reentrancy.md)).
 
 ## Precedence rule
 
