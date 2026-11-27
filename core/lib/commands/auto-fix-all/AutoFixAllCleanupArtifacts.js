@@ -4,6 +4,7 @@ import { promisify } from 'node:util';
 import AgentEmail from '../../../../shared/lib/config/AgentEmail.js';
 import ConfigChain from '../../../../shared/lib/config/ConfigChain.js';
 import CoauthorTrailers from '../../utils/git/CoauthorTrailers.js';
+import GitClient from '../../utils/git/GitClient.js';
 
 const promisifiedExecFile = promisify(execFile);
 const USAGE = 'Usage: cleanup_artifacts.sh <repo_path> <issue_file> <plan_dir> <id> <model_name> <model_email>';
@@ -83,16 +84,21 @@ class AutoFixAllCleanupArtifacts {
    * @param {CoauthorTrailers} [deps.coauthorTrailers] - the shared
    *   `Co-Authored-By` trailer builder (defaults to one built on
    *   `configChain`/`agentEmail`).
+   * @param {GitClient} [deps.gitClient] - the shared git client (branch
+   *   check and strict push; defaults to one bound to `repoContext` and
+   *   driven by `execFileAsync`).
    */
   constructor(repoContext, {
     execFileAsync = defaultExecFileAsync,
     configChain = new ConfigChain(),
     agentEmail = new AgentEmail({ configChain }),
-    coauthorTrailers = new CoauthorTrailers({ configChain, agentEmail })
+    coauthorTrailers = new CoauthorTrailers({ configChain, agentEmail }),
+    gitClient = new GitClient({ context: repoContext, execFileAsync })
   } = {}) {
     this._repoContext = repoContext;
     this._execFileAsync = execFileAsync;
     this._coauthorTrailers = coauthorTrailers;
+    this._gitClient = gitClient;
   }
 
   /**
@@ -100,7 +106,8 @@ class AutoFixAllCleanupArtifacts {
    * migrated entrypoint — byte-identical stdout/exit-code counterpart to
    * `cleanup_artifacts_shell.sh`. Validates that all
    * other arguments are present (usage message on missing/empty
-   * argument, propagated uncaught so the caller exits 1). Stages removal
+   * argument, propagated uncaught so the caller exits 1), then refuses a
+   * detached HEAD (even when there is nothing to clean up). Stages removal
    * of `issueFile`/`planDir` when tracked, then — only if something ends
    * up staged — commits with the planning-artifacts removal message
    * (plus the `"architect"` agent's `CoauthorTrailers` lines) and pushes
@@ -130,6 +137,8 @@ class AutoFixAllCleanupArtifacts {
       throw new Error(USAGE);
     }
 
+    await this._gitClient.requireCurrentBranch();
+
     if (await this._isTracked(issueFile)) {
       await this._execFileAsync('git', ['rm', issueFile], { cwd: repoPath });
     }
@@ -143,7 +152,7 @@ class AutoFixAllCleanupArtifacts {
     }
 
     const commitStdout = await this._commit(id, modelName, modelEmail);
-    const pushStdout = await this._pushCurrentBranch();
+    const pushStdout = await this._gitClient.pushCurrentBranch();
 
     return commitStdout + pushStdout;
   }
@@ -220,30 +229,6 @@ class AutoFixAllCleanupArtifacts {
     const { stdout } = await this._execFileAsync('git', ['commit', '-F', '-'], {
       cwd: repoPath,
       input: message
-    });
-
-    return stdout;
-  }
-
-  /**
-   * Native re-derivation of `arcanum/_lib/push.sh`'s `push_current_branch`
-   * for this entrypoint's own use only (per `script-engine.md`'s "No
-   * standalone, wholesale `_lib` migration" rule): resolves the current
-   * branch, then pushes it to `origin` with upstream tracking. `git push
-   * -u`'s own stdout (its `branch '<name>' set up to track
-   * 'origin/<name>'.` confirmation — its transfer summary goes to
-   * stderr instead) is left unredirected in the shell script, so it's
-   * relayed here too, same as `#_commit`'s.
-   * @returns {Promise<string>} `git push`'s own stdout.
-   */
-  async _pushCurrentBranch() {
-    const { stdout: branchStdout } = await this._execFileAsync('git', ['branch', '--show-current'], {
-      cwd: this._repoContext.repoPath
-    });
-    const branch = branchStdout.trim();
-
-    const { stdout } = await this._execFileAsync('git', ['push', '-u', 'origin', `${branch}:${branch}`], {
-      cwd: this._repoContext.repoPath
     });
 
     return stdout;

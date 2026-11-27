@@ -68,7 +68,38 @@ describe('AutoPlanIssueCommitPlan', () => {
         await expectAsync(instance.run(missingPlanDir, ID, MODEL_NAME, MODEL_EMAIL)).toBeRejectedWithError(
           `Error: directory not found: ${missingPlanDir}`
         );
+        expect(execFileAsync.calls.allArgs().map(([, gitArgs]) => gitArgs[0])).toEqual(['branch']);
+      });
+    });
+
+    describe('detached HEAD', () => {
+      it('refuses before checking plan_dir, staging, committing or pushing', async () => {
+        const execFileAsync = fakeGitExecFileAsync({ branch: '' });
+        const configChain = fakeConfigChain({ omitModelCoauthor: false });
+        const instance = new AutoPlanIssueCommitPlan({ repoPath }, { execFileAsync, configChain });
+        const missingPlanDir = path.join(repoPath, 'docs', 'agents', 'plans', 'does-not-exist');
+
+        await expectAsync(instance.run(missingPlanDir, ID, MODEL_NAME, MODEL_EMAIL)).toBeRejectedWithError(
+          'refusing to push: no current branch (detached HEAD?)'
+        );
+        expect(execFileAsync.calls.allArgs().map(([, gitArgs]) => gitArgs[0])).toEqual(['branch']);
+      });
+
+      it('refuses through an injected gitClient without running any git command', async () => {
+        const execFileAsync = fakeGitExecFileAsync();
+        const configChain = fakeConfigChain({ omitModelCoauthor: false });
+        const gitClient = {
+          requireCurrentBranch: jasmine.createSpy('requireCurrentBranch')
+            .and.rejectWith(new Error('refusing to push: no current branch (detached HEAD?)')),
+          pushCurrentBranch: jasmine.createSpy('pushCurrentBranch')
+        };
+        const instance = new AutoPlanIssueCommitPlan({ repoPath }, { execFileAsync, configChain, gitClient });
+
+        await expectAsync(instance.run(planDir, ID, MODEL_NAME, MODEL_EMAIL)).toBeRejectedWithError(
+          'refusing to push: no current branch (detached HEAD?)'
+        );
         expect(execFileAsync).not.toHaveBeenCalled();
+        expect(gitClient.pushCurrentBranch).not.toHaveBeenCalled();
       });
     });
 

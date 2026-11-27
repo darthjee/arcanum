@@ -63,6 +63,36 @@ describe('AutoFixIssueCommitChange', () => {
       });
     });
 
+    describe('detached HEAD', () => {
+      it('refuses before building the message, committing or pushing', async () => {
+        const execFileAsync = fakeGitExecFileAsync({ ...EXEC_FILE_ASYNC_OPTS, branch: '' });
+        const configChain = fakeConfigChain({ omitModelCoauthor: false });
+        const coauthorTrailers = { lines: jasmine.createSpy('lines').and.resolveTo([]) };
+        const instance = new AutoFixIssueCommitChange({ repoPath }, { execFileAsync, configChain, coauthorTrailers });
+
+        await expectAsync(instance.run(TYPE, SCOPE, ID, SUBJECT, AGENT, MODEL_NAME, MODEL_EMAIL))
+          .toBeRejectedWithError('refusing to push: no current branch (detached HEAD?)');
+        expect(execFileAsync.calls.allArgs().map(([, gitArgs]) => gitArgs[0])).toEqual(['branch']);
+        expect(coauthorTrailers.lines).not.toHaveBeenCalled();
+      });
+
+      it('refuses through an injected gitClient without running any git command', async () => {
+        const execFileAsync = fakeGitExecFileAsync(EXEC_FILE_ASYNC_OPTS);
+        const configChain = fakeConfigChain({ omitModelCoauthor: false });
+        const gitClient = {
+          requireCurrentBranch: jasmine.createSpy('requireCurrentBranch')
+            .and.rejectWith(new Error('refusing to push: no current branch (detached HEAD?)')),
+          pushCurrentBranch: jasmine.createSpy('pushCurrentBranch')
+        };
+        const instance = new AutoFixIssueCommitChange({ repoPath }, { execFileAsync, configChain, gitClient });
+
+        await expectAsync(instance.run(TYPE, SCOPE, ID, SUBJECT, AGENT, MODEL_NAME, MODEL_EMAIL))
+          .toBeRejectedWithError('refusing to push: no current branch (detached HEAD?)');
+        expect(execFileAsync).not.toHaveBeenCalled();
+        expect(gitClient.pushCurrentBranch).not.toHaveBeenCalled();
+      });
+    });
+
     describe('commit message construction', () => {
       it('builds the subject-only message, with no body/comment trailers, when neither is given', async () => {
         await expectCommitMessage({

@@ -35,6 +35,7 @@ MODEL_EMAIL="${6:-}"
 }
 
 repo_path_enter "$REPO_PATH"
+require_current_branch >/dev/null
 
 if [[ -n "$(git ls-files "$ISSUE_FILE" 2>/dev/null)" ]]; then
   git rm "$ISSUE_FILE" >/dev/null

@@ -3,6 +3,7 @@ import { promisify } from 'node:util';
 import AgentEmail from '../../../../shared/lib/config/AgentEmail.js';
 import ConfigChain from '../../../../shared/lib/config/ConfigChain.js';
 import CoauthorTrailers from '../../utils/git/CoauthorTrailers.js';
+import GitClient from '../../utils/git/GitClient.js';
 
 const promisifiedExecFile = promisify(execFile);
 const USAGE = 'Usage: commit_change.sh <repo_path> <type> <scope> <id> <subject> <agent> <model_name> ' +
@@ -88,18 +89,23 @@ class AutoFixIssueCommitChange {
    * @param {CoauthorTrailers} [deps.coauthorTrailers] - the shared
    *   `Co-Authored-By` trailer builder (defaults to one built on
    *   `configChain`/`agentEmail`).
+   * @param {GitClient} [deps.gitClient] - the shared git client (branch
+   *   check and strict push; defaults to one bound to `repoContext` and
+   *   driven by `execFileAsync`).
    */
   constructor(repoContext, {
     execFileAsync = defaultExecFileAsync,
     configChain = new ConfigChain(),
     agentEmail = new AgentEmail({ configChain }),
-    coauthorTrailers = new CoauthorTrailers({ configChain, agentEmail })
+    coauthorTrailers = new CoauthorTrailers({ configChain, agentEmail }),
+    gitClient = new GitClient({ context: repoContext, execFileAsync })
   } = {}) {
     this._repoContext = repoContext;
     this._execFileAsync = execFileAsync;
     this._configChain = configChain;
     this._agentEmail = agentEmail;
     this._coauthorTrailers = coauthorTrailers;
+    this._gitClient = gitClient;
   }
 
   /**
@@ -138,11 +144,13 @@ class AutoFixIssueCommitChange {
       throw new Error(USAGE);
     }
 
+    await this._gitClient.requireCurrentBranch();
+
     const message = await this._buildMessage(repoPath, type, scope, id, subject, agent, modelName, modelEmail,
       body, commentUrl);
 
     const commitStdout = await this._commit(repoPath, message);
-    const pushStdout = await this._pushCurrentBranch(repoPath);
+    const pushStdout = await this._gitClient.pushCurrentBranch();
 
     return commitStdout + pushStdout;
   }
@@ -197,28 +205,6 @@ class AutoFixIssueCommitChange {
     const { stdout } = await this._execFileAsync('git', ['commit', '-F', '-'], {
       cwd: repoPath,
       input: message
-    });
-
-    return stdout;
-  }
-
-  /**
-   * Native re-derivation of `arcanum/_lib/push.sh`'s
-   * `push_current_branch` for this entrypoint's own use only: resolves
-   * the current branch, then pushes it to `origin` with upstream
-   * tracking. `git push -u`'s own stdout is left unredirected in the
-   * shell script, so it's relayed here too.
-   * @param {string} repoPath - the target repo's local checkout path.
-   * @returns {Promise<string>} `git push`'s own stdout.
-   */
-  async _pushCurrentBranch(repoPath) {
-    const { stdout: branchStdout } = await this._execFileAsync('git', ['branch', '--show-current'], {
-      cwd: repoPath
-    });
-    const branch = branchStdout.trim();
-
-    const { stdout } = await this._execFileAsync('git', ['push', '-u', 'origin', `${branch}:${branch}`], {
-      cwd: repoPath
     });
 
     return stdout;

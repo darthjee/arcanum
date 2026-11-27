@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { detachHead, expectDetachedHeadRefusal, snapshotRepoState } from '../support/utils/detachedHead.js';
 import { createGitFixtureRepo } from '../support/utils/gitFixtureRepo.js';
 import { isolateGlobalConfig } from '../support/utils/isolatedGlobalConfig.js';
 import { createTempDir, removeTempDir } from '../support/utils/tempDir.js';
@@ -243,6 +244,46 @@ describe('auto-fix-all-cleanup-artifacts parity (shell vs. native)', () => {
 
           expect(nativeLog.stdout).toEqual(shellLog.stdout);
           expect(shellLog.stdout).toEqual(`${expected.join('\n')}\n\n`);
+        } finally {
+          await Promise.all([shellRepo.cleanup(), nativeRepo.cleanup()]);
+        }
+      });
+    });
+  });
+
+  describe('on a detached HEAD (refusal, issue #947)', () => {
+    [
+      { title: 'with nothing to clean up (issue file and plan dir untracked)', seed: false },
+      { title: 'with the issue file and plan dir tracked', seed: true }
+    ].forEach(({ title, seed }) => {
+      it(`refuses identically on both sides, leaving the repo and the remote untouched (${title})`, async () => {
+        const shellRepo = await createGitFixtureRepo();
+        const nativeRepo = await createGitFixtureRepo();
+
+        try {
+          await Promise.all([configureIdentity(shellRepo.repoPath), configureIdentity(nativeRepo.repoPath)]);
+          if (seed) {
+            await Promise.all([seedArtifacts(shellRepo.repoPath), seedArtifacts(nativeRepo.repoPath)]);
+          }
+          await Promise.all([detachHead(shellRepo.repoPath), detachHead(nativeRepo.repoPath)]);
+          const [shellBefore, nativeBefore] = await Promise.all([
+            snapshotRepoState(shellRepo), snapshotRepoState(nativeRepo)
+          ]);
+
+          const shell = await runCommand(
+            [SHELL_SCRIPT, shellRepo.repoPath, ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, MODEL_EMAIL], shellRepo.repoPath
+          );
+          const native = await runCommand(
+            [
+              process.execPath, NATIVE_BIN, 'auto-fix-all-cleanup-artifacts',
+              nativeRepo.repoPath, ISSUE_FILE, PLAN_DIR, ID, MODEL_NAME, MODEL_EMAIL
+            ],
+            nativeRepo.repoPath
+          );
+
+          expectDetachedHeadRefusal({ shell, native });
+          expect(await snapshotRepoState(shellRepo)).toEqual(shellBefore);
+          expect(await snapshotRepoState(nativeRepo)).toEqual(nativeBefore);
         } finally {
           await Promise.all([shellRepo.cleanup(), nativeRepo.cleanup()]);
         }
