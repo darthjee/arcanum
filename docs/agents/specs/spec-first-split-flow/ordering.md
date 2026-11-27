@@ -22,7 +22,7 @@ Hub: [specs.md](specs.md)
 - The enhancement issues are blocked as in Flow B.
 - The implementation-split issue is blocked by the generation issue and every enhancement issue.
 - The fold issue is blocked by the implementation-split issue.
-- When the reentrant split creates the implementation issues, it adds each one as a blocker of the fold issue. The reentrancy details are an open point (#941).
+- When the reentrant split creates the implementation issues, it adds each one as a blocker of the fold issue. Its links, including the confirmed order between implementation issues, are defined in [reentrancy.md](reentrancy.md).
 
 **Flow C:** no edges, as today.
 

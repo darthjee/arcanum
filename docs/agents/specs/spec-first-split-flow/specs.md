@@ -45,6 +45,7 @@ To make that work, the pipeline gains three things:
 - The shared dialogue, automation behaviour and the precedence rule (the spec governs technical design, the issue keeps scope and intent): [dialogue.md](dialogue.md)
 - The shared push guard: [guard.md](guard.md)
 - "Blocked by" ordering: [ordering.md](ordering.md)
+- Split reentrancy (the spec-driven split, coverage, the recursion guard and the fold links): [reentrancy.md](reentrancy.md)
 - The fold and its rules: [fold.md](fold.md)
 - The migration plan and release timing: [migration.md](migration.md)
 - Epic acceptance criteria and risks: [acceptance.md](acceptance.md)
@@ -53,10 +54,10 @@ To make that work, the pipeline gains three things:
 
 Each enhancement issue creates its own part and adds it to this hub and to the fold map.
 
-- #941, split reentrancy (`reentrancy.md`): specs as the source of truth for Flow A's second split, part coverage, the recursion guard, and adding the generated issues as fold blockers.
 - #942, flow choice and interaction (`interaction.md`): where the per-issue flow choice is stored (config key, tiers, default, how downstream skills read it), and whether the split question and the resolver dialogue use a TTY-first script (exit `4` / `FALLBACK=chat`) or chat only.
 - #943, edge cases and testing strategy (`testing.md`).
 - #944, alternatives considered (`alternatives.md`).
+- Canonical issue-type label names, including the implementation-split and fold type labels: no part defines them yet. #938 implementation item 8 names them.
 
 ## Parts
 
@@ -66,6 +67,7 @@ Each enhancement issue creates its own part and adds it to this hub and to the f
 - [dialogue.md](dialogue.md)
 - [guard.md](guard.md)
 - [ordering.md](ordering.md)
+- [reentrancy.md](reentrancy.md)
 - [fold.md](fold.md)
 - [migration.md](migration.md)
 - [acceptance.md](acceptance.md)
@@ -81,6 +83,7 @@ Each enhancement issue creates its own part and adds it to this hub and to the f
 | `dialogue.md` | `docs/agents/architecture/spec-pipeline.md` |
 | `guard.md` | `docs/agents/architecture/spec-pipeline.md` |
 | `ordering.md` | `docs/agents/architecture/spec-pipeline.md` |
+| `reentrancy.md` | `docs/agents/architecture/spec-pipeline.md` |
 | `fold.md` | `docs/agents/specs.md` (end of the pipeline-spec lifecycle) and `docs/agents/architecture/spec-pipeline.md` (the fold procedure) |
 | `migration.md` | `drop` (migrations document themselves in their `NNN.md` files) |
 | `acceptance.md` | `drop` (build history) |

@@ -36,4 +36,4 @@ The hub is either `<topic>.md` or `<topic>/specs.md`, and only the hub is listed
 | Spec | Summary | Status |
 | --- | --- | --- |
 | [Shell Engine Removal](specs/shell-engine-removal.md) | Remove `engine.mode=shell` and every `*_shell.sh` implementation once every entrypoint has a native counterpart. | Proposed |
-| [Spec-first split flow](specs/spec-first-split-flow/specs.md) | Spec-first flows for `arcanum-split-issue`: the issue-to-spec pointer, the shared resolver, dialogue and push guard, "blocked by" ordering, and the fold back into `docs/agents`. | Drafting |
+| [Spec-first split flow](specs/spec-first-split-flow/specs.md) | Spec-first flows for `arcanum-split-issue`: the issue-to-spec pointer, the shared resolver, dialogue and push guard, "blocked by" ordering, split reentrancy, and the fold back into `docs/agents`. | Drafting |

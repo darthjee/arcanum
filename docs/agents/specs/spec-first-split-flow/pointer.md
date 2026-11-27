@@ -45,6 +45,7 @@ A body that opens with an H1 (the shape of an epic):
 
 - The pointer goes on the first non-blank line of the body or, when the body opens with an H1, on the first non-blank line after that H1.
 - Emitters (the split and the body templates) write it there. The push guard re-inserts a dropped pointer at the same spot (see [guard.md](guard.md)).
+- A normal split of a pointer-carrying issue copies the pointer line verbatim into each sub-issue at that spot (see [reentrancy.md](reentrancy.md)).
 - Split sub-issues have no H1 in the body, because the title lives only in the GitHub title. Epics open with `# <title>`. The rule covers both shapes.
 - The resolver scans the whole body, and the first match wins (see [resolver.md](resolver.md)). A pointer found anywhere else, or a second pointer line, is still honoured but adds an entry to `warnings[]`.
 

@@ -25,6 +25,13 @@ The resolver returns one of three states, with a single blocking point:
 - `ready`: the hub exists and every part it lists exists. Read and proceed.
 - `not_ready`: read nothing. It carries `reason` (`missing` | `partial` | `invalid`), `missing_parts[]` and the raw `source_line`.
 
+The spec-driven split additionally requires the hub's `Status` to be `Ready` (see [reentrancy.md](reentrancy.md)).
+
+## Part paths
+
+- The part paths the hub lists are confined under the spec's own root: `docs/agents/specs/<topic>/`, or the hub alone for the single-file layout.
+- A part link that escapes that root makes the pointer `not_ready` with `reason: invalid`, and nothing is read.
+
 ## Output shape
 
 ```text
