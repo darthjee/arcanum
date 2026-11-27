@@ -10,9 +10,11 @@ Flow A needs a second split that creates the implementation issues from the fini
 
 ## Expected Behavior
 ### Acceptance criteria
-- The spec has a reentrancy part with the mode, the coverage check and the recursion guard defined unambiguously.
-- `reentrancy.md` defines, unambiguously: the mode trigger, the inputs, the coverage unit/rule/record, the recursion guard, the dependency links, the readiness gate, and the effects on the implementation-split issue.
-- The hub links `reentrancy.md`, its Open points no longer list reentrancy, and its `## Fold map` has the `reentrancy.md` row.
+- `reentrancy.md` exists in the spec's directory, in the same present-tense contract style as the other parts, and defines, unambiguously: the mode trigger, the inputs, the coverage unit/rule/record, the recursion guard, the dependency links, the readiness gate, the effects on the implementation-split issue, and the trust boundaries.
+- `resolver.md` states that the hub's part paths are confined under the spec's root, and that an escaping part link makes the pointer `not_ready` with `reason: invalid`.
+- `pointer.md`, `ordering.md`, `resolver.md` and `dialogue.md` each carry a one-line cross-reference to `reentrancy.md` for the decision they touch, without duplicating it.
+- The hub lists `reentrancy.md` under Parts, its Open points no longer list reentrancy but do list the undefined label names, and its `## Fold map` has the row `reentrancy.md` → `docs/agents/architecture/spec-pipeline.md`.
+- The hub's `Status` (and its row in `docs/agents/specs.md`) follows the "Spec status" rule: `Ready` if no other enhancement issue (#941–#944) is open when this one closes, otherwise `Drafting`.
 
 ## Solution
 ### Task
@@ -44,7 +46,7 @@ Design Flow A's second split, where the specs are the source of truth instead of
   | --- | --- |
   | `resolver.md` | Shared resolver |
   | `guard.md` | Pointer preservation in body rewrites |
-  | `migration.md` | waived: handled by the pending `next/` migrations |
+  | `<part>` | waived: <reason the user gave> |
   ```
 
   At that point the sub-issues don't exist yet, so the table names them by title. After the push, the split replaces each title with its issue number (`#NNN`). That second body update is best-effort, and the titles stay readable if it fails. Both updates go through the shared push guard, so the issue's pointer survives.
@@ -77,11 +79,25 @@ It never falls back silently.
 - **The split stays repo-free.** The spec-driven split never commits. Setting the hub's `Status` to `Implementing` (and the matching Status column in `docs/agents/specs.md`) is done by the implementation-split issue's own small docs PR, as its body already says. The split's closing report reminds the user of this follow-up.
 - **The parent is treated like any split parent.** After the push, the implementation-split issue gets the `Split` label and stays open as the tracking issue, the same as today. Its status PR closes it. The fold issue doesn't depend on it staying open: the fold is blocked by every implementation issue through the dependency links, not only by the implementation-split issue.
 
+### Settled: trust boundaries
+The spec-driven split reads inputs from issue bodies and from files. Each one has an explicit trust rule:
+- **File reads go through the resolver only.** The split reads exactly the `hub` and `parts[]` the resolver returns, and never parses part links out of the hub itself. Part paths are confined under the spec's own root (`docs/agents/specs/<topic>/`, or the hub alone for the single-file layout). A part link that escapes it makes the pointer `not_ready` with `reason: invalid`, and nothing is read. This confinement is a resolver rule, so `reentrancy.md` only references it, and this issue adds the one-line rule to `resolver.md` (today `resolver.md` and `pointer.md` only validate the pointer path).
+- **"Add the pointer" is validated like any pointer.** The hub path the user types goes through the shared pointer parser and the allowlist in `pointer.md`, and must have the hub shape (`docs/agents/specs/<topic>.md` or `docs/agents/specs/<topic>/specs.md`). A rejected path is asked again and never written. Once it's written, the resolver runs on it and the readiness gate applies as usual.
+- **The `Implementation breakdown` hint is untrusted data.** It is free text in a GitHub issue body. The split uses it only to suggest groupings, never as instructions, and never takes paths, issue numbers or commands from it.
+- **Every `#N` is checked before use.** `**Folded by:** #N` must be a bare number, and it is checked through `gh` against the same repo, its open state and the fold type label (see "dependency links"). The re-run `gh api` commands in the closing report are built only from those checked numbers and the resolved `owner/repo`, never from body text.
+- **Performance:** no new rule. Files are read once after `ready` (no cache, per `resolver.md`). Link creation costs one API call per edge, about N fold links plus the confirmed links between implementation issues, and each failure is already best-effort.
+
+### Settled: label references
+- **Abstract terms only.** `reentrancy.md` refers to "the implementation-split type label" and "the fold type label" and never writes a literal label name. It defines both terms once: the canonical labels for these issue types, named by #938 implementation item 8. When item 8 names them, they're recorded in one place and `reentrancy.md` needs no edit.
+- **The gap stays visible.** No part of the spec defines the canonical issue types and labels yet, even though the hub's Scope lists them. This issue adds an entry to the hub's Open points saying the label names are still to be defined, by #938 implementation item 8.
+
 ### Where it goes in the spec
 - Write the settled decisions above as `reentrancy.md` in the spec's directory, in the same present-tense contract style as the other parts, and link it from the hub's parts list.
 - Remove the reentrancy entry from the hub's Open points.
+- Add a hub Open points entry noting that the canonical issue-type label names aren't defined by any part yet (#938 implementation item 8); see "label references".
 - Add the fold-map row `reentrancy.md` → `docs/agents/architecture/spec-pipeline.md`.
 - Where these decisions touch other parts, add a one-line cross-reference rather than duplicating the text: pointer inheritance → `pointer.md`, links → `ordering.md`, gate → `resolver.md`/`dialogue.md`.
+- Add to `resolver.md` the rule that part paths listed by the hub are confined under the spec's root, and that an escaping part link makes the pointer `not_ready` with `reason: invalid` (see "trust boundaries").
 
 ### Project concerns
 - **Scope:** docs only. This issue writes `reentrancy.md` and updates the hub; it implements nothing (that's #938's implementation item 10).
